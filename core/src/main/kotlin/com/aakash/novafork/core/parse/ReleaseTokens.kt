@@ -25,6 +25,8 @@ internal class Token(
     val paren: Boolean = false,
     /** The source had a '.' right after this token ("Mr.", "Vol.", "S.H.I.E.L.D."). */
     val dotAfter: Boolean = false,
+    /** The source had an unspaced '-' right before this token ("x264-GROUP", "2019-GRP"). */
+    val dashBefore: Boolean = false,
 ) {
     val year: Int? get() = if (type == TokenType.YEAR) text.trim('(', ')').toIntOrNull() else null
 
@@ -68,15 +70,15 @@ internal object ReleaseTokens {
         "hdtv(?:rip)?", "pdtv", "sdtv", "dvd[ .-]?(?:rip|scr|r)", "dvd[59]?", "hd[ .-]?rip", "hd[ .-]?cam", "hd[ .-]?ts",
         "telesync", "telecine", "amzn", "dsnp", "hmax", "atvp", "pcok", "pmtp",
         // Video codec
-        "[xh][ .]?26[45]", "hevc", "avc", "av1", "xvid", "divx", "vp9", "1[02][ .-]?bits?", "8[ .-]?bits?", "hi10p?",
+        "[xh][ .]?26[45]", "hevc", "avc", "av1", "xvid", "divx", "vp9", "1[02][ .-]?bits?", "hi10p?",
         // Audio
-        "ddp$CH", "dd\\+$CH", "dd[ .]?[1-7][ .][01]", "e-?ac-?3$CH", "aac$CH",
-        "dts(?:-?hd)?(?:[ .-]?(?:ma|hra|es|x))?$CH", "true[ .-]?hd$CH", "atmos", "flac$CH", "mp3", "opus", "l?pcm",
+        "ddp$CH", "dd\\+$CH", "dd[ .]?[1-7][ .][01]", "(?:e-?)?ac-?3$CH", "aac$CH",
+        "dts(?:-?hd)?(?:[ .-]?(?:ma|hra|es|x))?$CH", "true[ .-]?hd$CH", "atmos", "flac$CH", "mp3", "l?pcm",
         "[257]\\.[01]",
         // Dynamic range
         "hdr(?:10(?:\\+|plus)?)?", "dovi", "dolby[ .]?vision", "sdr", "hlg",
-        // Multi-disc rips
-        "cd\\d{1,2}",
+        // Multi-disc rips, film formats
+        "cd\\d{1,2}", "(?:35|70)mm",
     )
 
     private val TAIL: Pattern = alternatives(
@@ -87,8 +89,9 @@ internal object ReleaseTokens {
         "hindi", "tamil", "telugu", "malayalam", "kannada", "bengali", "eng", "ita", "vostfr", "truefrench",
     )
 
+    // "Opus" and "8-Bit" are real title words ("Mr. Holland's Opus", "8-Bit Christmas").
     private val WEAK: Pattern = alternatives(
-        "web", "cam", "ts", "nf", "dv", "hulu",
+        "web", "cam", "ts", "nf", "dv", "hulu", "opus", "8[ .-]?bits?",
         "french", "german", "spanish", "italian", "japanese", "korean", "chinese", "russian",
     )
 
@@ -100,6 +103,14 @@ internal object ReleaseTokens {
     private val SPACES = Regex("\\s+")
     private val GROUP_SUFFIX = Regex("^(.{2,}?)-([A-Z0-9]{2,})$")
 
+    /** "[05]" / "[12v2]": an anime episode number in brackets, kept as " - 05 ". */
+    private val BRACKET_EPISODE = Regex("\\d{1,3}(?:v\\d)?")
+
+    private val RESOLUTION = Regex("(?<![\\p{L}\\p{N}])(\\d{3,4})[pPiI](?![\\p{L}\\p{N}])")
+    private val UHD = Regex("(?<![\\p{L}\\p{N}])(?:4k|uhd)(?![\\p{L}\\p{N}])", RegexOption.IGNORE_CASE)
+    private val FRAME_SIZE = Regex("(?<![\\p{L}\\p{N}])\\d{3,4}x(\\d{3,4})(?![\\p{L}\\p{N}])", RegexOption.IGNORE_CASE)
+    private val KNOWN_HEIGHTS = setOf(240, 360, 480, 540, 576, 720, 1080, 1440, 2160, 4320)
+
     /** Abbreviations that keep their dot in a title ("Mr. Robot", "Kill Bill Vol. 1"). */
     private val ABBREVIATIONS = setOf("mr", "mrs", "ms", "dr", "jr", "sr", "st", "vol", "vs", "prof", "sgt", "lt")
 
@@ -108,12 +119,27 @@ internal object ReleaseTokens {
 
     fun isPlausibleYear(year: Int): Boolean = year in MIN_YEAR..MAX_YEAR
 
-    private fun isYearText(text: String): Boolean =
+    fun isYearText(text: String): Boolean =
         text.length == 4 && text.all { it in '0'..'9' } && isPlausibleYear(text.toInt())
 
+    /** "2160p" for 2160p/4K/UHD, else the first "NNNp" (or "1920x1080" frame size) in [text]. */
+    fun resolution(text: String): String? {
+        RESOLUTION.findAll(text).forEach { match ->
+            val height = match.groupValues[1].toInt()
+            if (height in KNOWN_HEIGHTS) return "${height}p"
+        }
+        if (UHD.containsMatchIn(text)) return "2160p"
+        FRAME_SIZE.findAll(text).forEach { match ->
+            val height = match.groupValues[1].toInt()
+            if (height in KNOWN_HEIGHTS) return "${height}p"
+        }
+        return null
+    }
+
     /**
-     * Drops [..] / {..} groups and (..) groups except a "(year)" ("[2019]" becomes "(2019)") or a
-     * country code ("(US)" becomes "US"); underscores become spaces.
+     * Drops [..] / {..} groups and (..) groups except a "(year)" ("[2019]" becomes "(2019)"), a
+     * country code ("(US)" becomes "US") or a bracketed episode number ("[05]" becomes " - 05 ");
+     * underscores become spaces.
      */
     fun prepare(raw: String): Prepared {
         val trimmed = raw.trim()
@@ -121,11 +147,13 @@ internal object ReleaseTokens {
         var junk = false
         val withoutBrackets = BRACKETS.replace(trimmed) { match ->
             val inner = match.groupValues.drop(1).firstOrNull { it.isNotEmpty() }.orEmpty().trim()
-            if (isYearText(inner)) {
-                " ($inner) "
-            } else {
-                if (containsJunk(inner)) junk = true
-                " "
+            when {
+                isYearText(inner) -> " ($inner) "
+                BRACKET_EPISODE.matches(inner) -> " - $inner "
+                else -> {
+                    if (containsJunk(inner)) junk = true
+                    " "
+                }
             }
         }
         val withoutParens = PARENS.replace(withoutBrackets) { match ->
@@ -169,6 +197,7 @@ internal object ReleaseTokens {
                 i++
                 continue
             }
+            val dashBefore = i > 0 && text[i - 1].isDash() && (i == 1 || text[i - 2] != ' ')
             var end = parenYear.endAt(i)
             if (end > 0) {
                 val inner = text.substring(i + 1, end - 1)
@@ -185,13 +214,18 @@ internal object ReleaseTokens {
                 else -> null
             }
             if (junkStrength != null) {
-                tokens += Token(text.substring(i, end), TokenType.JUNK, strength = junkStrength)
+                tokens += Token(text.substring(i, end), TokenType.JUNK, strength = junkStrength, dashBefore = dashBefore)
                 i = end
                 continue
             }
             end = year.endAt(i)
             if (end > 0 && isYearText(text.substring(i, end))) {
-                tokens += Token(text.substring(i, end), TokenType.YEAR, dotAfter = end < n && text[end] == '.')
+                tokens += Token(
+                    text.substring(i, end),
+                    TokenType.YEAR,
+                    dotAfter = end < n && text[end] == '.',
+                    dashBefore = dashBefore,
+                )
                 i = end
                 continue
             }
@@ -199,7 +233,7 @@ internal object ReleaseTokens {
             while (j < n && text[j] != ' ' && text[j] != '.' && text[j] != '_') j++
             val word = text.substring(i, j).trimEnd('-', '–', '—')
             if (word.isNotEmpty()) {
-                tokens += Token(word, TokenType.WORD, dotAfter = j < n && text[j] == '.')
+                tokens += Token(word, TokenType.WORD, dotAfter = j < n && text[j] == '.', dashBefore = dashBefore)
             }
             i = j
         }
@@ -209,7 +243,8 @@ internal object ReleaseTokens {
     /**
      * For each token: does it count as release junk here? Strong junk always does; tail junk at
      * the end or before more junk; weak junk only before more junk. Upper-case flags in an
-     * otherwise mixed-case name ("Movie.EXTENDED.2019") count too.
+     * otherwise mixed-case name ("Movie.EXTENDED.2019") count too, and so does a scene group
+     * glued to the end of the name ("…x264-GROUP", "…2019-GRP").
      */
     private fun junkFlags(tokens: List<Token>, mixedCase: Boolean): BooleanArray {
         val flags = BooleanArray(tokens.size)
@@ -217,14 +252,24 @@ internal object ReleaseTokens {
         for (i in tokens.indices.reversed()) {
             val token = tokens[i]
             if (token.type == TokenType.DASH) continue
-            flags[i] = token.type == TokenType.JUNK && when (token.strength) {
-                JunkStrength.STRONG -> true
-                JunkStrength.TAIL -> nextIsJunk ?: true || (mixedCase && token.isUpperCase)
-                JunkStrength.WEAK, null -> nextIsJunk == true || (mixedCase && token.isUpperCase)
+            flags[i] = when (token.type) {
+                TokenType.JUNK -> when (token.strength) {
+                    JunkStrength.STRONG -> true
+                    JunkStrength.TAIL -> (nextIsJunk ?: true) || (mixedCase && token.isUpperCase)
+                    JunkStrength.WEAK, null -> nextIsJunk == true || (mixedCase && token.isUpperCase)
+                }
+                TokenType.WORD -> nextIsJunk == null && token.dashBefore && isGroupTag(tokens, i)
+                TokenType.YEAR, TokenType.DASH -> false
             }
             nextIsJunk = flags[i]
         }
         return flags
+    }
+
+    /** "x264-GROUP", "2019-GRP", or an upper-case tag right after an episode marker ("S01E01-GRP"). */
+    private fun isGroupTag(tokens: List<Token>, index: Int): Boolean {
+        val previous = tokens.getOrNull(index - 1) ?: return tokens[index].text.none { it.isLowerCase() }
+        return previous.type == TokenType.JUNK || previous.type == TokenType.YEAR
     }
 
     /**
@@ -232,7 +277,9 @@ internal object ReleaseTokens {
      * junk or the end (or any "(year)"), never the first token; the title ends at that year or at
      * the first junk token, whichever comes first.
      */
-    fun analyze(text: String): TitleInfo {
+    fun analyze(text: String): TitleInfo = analyze(text, yearAtEnd = true)
+
+    private fun analyze(text: String, yearAtEnd: Boolean): TitleInfo {
         val tokens = tokenize(text)
         val first = tokens.indexOfFirst { it.type != TokenType.DASH }
         if (first < 0) return TitleInfo("", null, false)
@@ -244,7 +291,8 @@ internal object ReleaseTokens {
             val token = tokens[i]
             if (token.type != TokenType.YEAR) continue
             val next = nextNonDash(tokens, i)
-            if (token.paren || (i < firstStrong && (next < 0 || junk[next]))) yearIndex = i
+            val followedOk = if (next < 0) yearAtEnd else junk[next]
+            if (token.paren || (i < firstStrong && followedOk)) yearIndex = i
         }
         val firstJunk = (first + 1 until tokens.size).firstOrNull { junk[it] } ?: -1
         val cut = listOf(yearIndex, firstJunk).filter { it >= 0 }.minOrNull() ?: tokens.size
@@ -260,16 +308,15 @@ internal object ReleaseTokens {
         return format(tokens.subList(0, cut), stripGroup = false).takeIf { title -> title.any { it.isLetterOrDigit() } }
     }
 
-    /** cleanTitle: cut at the first junk token (never the first token) and format. */
-    fun clean(raw: String): String {
-        val prepared = prepare(raw)
-        val tokens = tokenize(prepared.text)
-        val first = tokens.indexOfFirst { it.type != TokenType.DASH }
-        if (first < 0) return ""
-        val junk = junkFlags(tokens, prepared.text.isMixedCase())
-        val cut = (first + 1 until tokens.size).firstOrNull { junk[it] } ?: tokens.size
-        return format(tokens.subList(0, cut), stripGroup = cut == tokens.size && ' ' !in prepared.text)
-    }
+    /** True when [text] starts (after dashes) with a plausible year: "Movie - 2 (2019)" is no episode. */
+    fun startsWithYear(text: String): Boolean =
+        tokenize(text).firstOrNull { it.type != TokenType.DASH }?.type == TokenType.YEAR
+
+    /**
+     * cleanTitle: drops brackets and junk; a year goes only when it is a "(year)" or release junk
+     * follows it, so "Wonder Woman 1984" stays whole while "Inception (2010)" loses its year.
+     */
+    fun clean(raw: String): String = analyze(prepare(raw).text, yearAtEnd = false).title
 
     private fun nextNonDash(tokens: List<Token>, index: Int): Int {
         for (i in index + 1 until tokens.size) if (tokens[i].type != TokenType.DASH) return i
