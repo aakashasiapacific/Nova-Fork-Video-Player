@@ -1,0 +1,34 @@
+70:> Task :app:compileReleaseKotlin FAILED
+71:e: file:///home/runner/work/Nova-Fork-Video-Player/Nova-Fork-Video-Player/app/src/main/java/com/aakash/novafork/player/PlayerActivity.kt:28:31 Unresolved reference 'player'.
+72:e: file:///home/runner/work/Nova-Fork-Video-Player/Nova-Fork-Video-Player/app/src/main/java/com/aakash/novafork/player/PlayerActivity.kt:79:17 Unresolved reference 'PlayerScreen'.
+73:e: file:///home/runner/work/Nova-Fork-Video-Player/Nova-Fork-Video-Player/app/src/main/java/com/aakash/novafork/player/PlayerActivity.kt:84:21 @Composable invocations can only happen from the context of a @Composable function
+74-gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/__run-1791341251116.json
+75-
+76:FAILURE: Build failed with an exception.
+77-
+78:* What went wrong:
+79-Execution failed for task ':app:compileReleaseKotlin'.
+80-> A failure occurred while executing org.jetbrains.kotlin.compilerRunner.GradleCompilerRunnerWithWorkers$GradleKotlinCompilerWorkAction
+81-   > Compilation error. See log for more details
+82-
+83-* Try:
+84-> Run with --info or --debug option to get more log output.
+--
+122:Caused by: org.gradle.workers.internal.DefaultWorkerExecutor$WorkExecutionException: A failure occurred while executing org.jetbrains.kotlin.compilerRunner.GradleCompilerRunnerWithWorkers$GradleKotlinCompilerWorkAction
+123-	at org.gradle.workers.internal.DefaultWorkerExecutor$WorkItemExecution.waitForCompletion(DefaultWorkerExecutor.java:287)
+124-	at org.gradle.internal.work.DefaultAsyncWorkTracker.lambda$waitForItemsAndGatherFailures$2(DefaultAsyncWorkTracker.java:130)
+125-	at org.gradle.internal.Factories$1.create(Factories.java:31)
+126-	at org.gradle.internal.work.DefaultWorkerLeaseService.withoutLocks(DefaultWorkerLeaseService.java:335)
+127-	at org.gradle.internal.work.DefaultWorkerLeaseService.withoutLocks(DefaultWorkerLeaseService.java:318)
+128-	at org.gradle.internal.work.DefaultWorkerLeaseService.withoutLock(DefaultWorkerLeaseService.java:323)
+--
+247:Caused by: org.jetbrains.kotlin.gradle.tasks.CompilationErrorException: Compilation error. See log for more details
+248-	at org.jetbrains.kotlin.gradle.tasks.TasksUtilsKt.throwExceptionIfCompilationFailed(tasksUtils.kt:21)
+249-	at org.jetbrains.kotlin.compilerRunner.GradleKotlinCompilerWork.run(GradleKotlinCompilerWork.kt:119)
+250-	at org.jetbrains.kotlin.compilerRunner.GradleCompilerRunnerWithWorkers$GradleKotlinCompilerWorkAction.execute(GradleCompilerRunnerWithWorkers.kt:76)
+251-	at org.gradle.workers.internal.DefaultWorkerServer.execute(DefaultWorkerServer.java:63)
+252-	at org.gradle.workers.internal.NoIsolationWorkerFactory$1$1.create(NoIsolationWorkerFactory.java:66)
+253-	at org.gradle.workers.internal.NoIsolationWorkerFactory$1$1.create(NoIsolationWorkerFactory.java:62)
+--
+280:BUILD FAILED in 2m 55s
+281-41 actionable tasks: 41 executed

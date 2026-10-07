@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.aakash.novafork.core.match.TitleMatcherTest" tests="19" skipped="0" failures="0" errors="0" timestamp="2026-10-07T02:49:02.958Z" hostname="runnervm8df0l" time="0.021">
+  <properties/>
+  <testcase name="normalizeStripsDiacritics" classname="com.aakash.novafork.core.match.TitleMatcherTest" time="0.001"/>
+  <testcase name="bestAllowsAYearOffByOne" classname="com.aakash.novafork.core.match.TitleMatcherTest" time="0.002"/>
+  <testcase name="bestUsesPopularityAsTiebreakWithoutYear" classname="com.aakash.novafork.core.match.TitleMatcherTest" time="0.001"/>
+  <testcase name="normalizeDropsOneLeadingArticle" classname="com.aakash.novafork.core.match.TitleMatcherTest" time="0.001"/>
+  <testcase name="normalizeTurnsAmpersandIntoAnd" classname="com.aakash.novafork.core.match.TitleMatcherTest" time="0.001"/>
+  <testcase name="similarityIsOneForEqualNormalizedTitles" classname="com.aakash.novafork.core.match.TitleMatcherTest" time="0.001"/>
+  <testcase name="similarityToleratesSmallDifferences" classname="com.aakash.novafork.core.match.TitleMatcherTest" time="0.002"/>
+  <testcase name="similarityIsLowForDifferentTitles" classname="com.aakash.novafork.core.match.TitleMatcherTest" time="0.0"/>
+  <testcase name="popularityDoesNotBeatABetterTitle" classname="com.aakash.novafork.core.match.TitleMatcherTest" time="0.001"/>
+  <testcase name="normalizeJoinsInitials" classname="com.aakash.novafork.core.match.TitleMatcherTest" time="0.0"/>
+  <testcase name="normalizeKeepsNonLatinScripts" classname="com.aakash.novafork.core.match.TitleMatcherTest" time="0.001"/>
+  <testcase name="similarityUsesTokenSetsForReorderedWords" classname="com.aakash.novafork.core.match.TitleMatcherTest" time="0.001"/>
+  <testcase name="normalizeLowercasesAndStripsPunctuation" classname="com.aakash.novafork.core.match.TitleMatcherTest" time="0.001"/>
+  <testcase name="bestPrefersTheMatchingYear" classname="com.aakash.novafork.core.match.TitleMatcherTest" time="0.001"/>
+  <testcase name="bestRejectsWeakMatches" classname="com.aakash.novafork.core.match.TitleMatcherTest" time="0.0"/>
+  <testcase name="bestMatchesTheOriginalTitle" classname="com.aakash.novafork.core.match.TitleMatcherTest" time="0.002"/>
+  <testcase name="bestKeepsAnExactTitleEvenWhenTheYearIsWrong" classname="com.aakash.novafork.core.match.TitleMatcherTest" time="0.001"/>
+  <testcase name="similarityIsSymmetricAndBounded" classname="com.aakash.novafork.core.match.TitleMatcherTest" time="0.001"/>
+  <testcase name="bestRejectsAMediocreTitleWithTheWrongYear" classname="com.aakash.novafork.core.match.TitleMatcherTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

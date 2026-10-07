@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.aakash.novafork.core.smb.SmbUrisTest" tests="11" skipped="0" failures="0" errors="0" timestamp="2026-10-07T02:49:03.222Z" hostname="runnervm8df0l" time="0.007">
+  <properties/>
+  <testcase name="buildsEncodedUris" classname="com.aakash.novafork.core.smb.SmbUrisTest" time="0.002"/>
+  <testcase name="parsesEncodedUris" classname="com.aakash.novafork.core.smb.SmbUrisTest" time="0.0"/>
+  <testcase name="rejectsOtherSchemesAndMissingParts" classname="com.aakash.novafork.core.smb.SmbUrisTest" time="0.0"/>
+  <testcase name="roundTrips" classname="com.aakash.novafork.core.smb.SmbUrisTest" time="0.002"/>
+  <testcase name="parsesRawUris" classname="com.aakash.novafork.core.smb.SmbUrisTest" time="0.0"/>
+  <testcase name="keepsTheHostAsGiven" classname="com.aakash.novafork.core.smb.SmbUrisTest" time="0.001"/>
+  <testcase name="bracketsIpv6Hosts" classname="com.aakash.novafork.core.smb.SmbUrisTest" time="0.0"/>
+  <testcase name="locationHelpers" classname="com.aakash.novafork.core.smb.SmbUrisTest" time="0.0"/>
+  <testcase name="buildOverloadTrimsSlashes" classname="com.aakash.novafork.core.smb.SmbUrisTest" time="0.0"/>
+  <testcase name="stripsUserInfo" classname="com.aakash.novafork.core.smb.SmbUrisTest" time="0.001"/>
+  <testcase name="keepsUnreservedCharactersAndEncodesTheRest" classname="com.aakash.novafork.core.smb.SmbUrisTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.aakash.novafork.core.subs.SubtitleRulesTest" tests="12" skipped="0" failures="0" errors="0" timestamp="2026-10-07T02:49:03.233Z" hostname="runnervm8df0l" time="0.067">
+  <properties/>
+  <testcase name="ordersExactThenPreferredLanguageThenAlphabetical" classname="com.aakash.novafork.core.subs.SubtitleRulesTest" time="0.063"/>
+  <testcase name="followsThePreferredLanguageOrder" classname="com.aakash.novafork.core.subs.SubtitleRulesTest" time="0.0"/>
+  <testcase name="neverReturnsSubtitlesOfAnotherVideo" classname="com.aakash.novafork.core.subs.SubtitleRulesTest" time="0.0"/>
+  <testcase name="ignoresSuffixesThatAreNotLanguagesOrFlags" classname="com.aakash.novafork.core.subs.SubtitleRulesTest" time="0.0"/>
+  <testcase name="acceptsNumberedTracks" classname="com.aakash.novafork.core.subs.SubtitleRulesTest" time="0.0"/>
+  <testcase name="understandsRegionTags" classname="com.aakash.novafork.core.subs.SubtitleRulesTest" time="0.0"/>
+  <testcase name="isCaseInsensitive" classname="com.aakash.novafork.core.subs.SubtitleRulesTest" time="0.0"/>
+  <testcase name="ignoresNonSubtitlesAndDuplicates" classname="com.aakash.novafork.core.subs.SubtitleRulesTest" time="0.001"/>
+  <testcase name="isSubtitle" classname="com.aakash.novafork.core.subs.SubtitleRulesTest" time="0.0"/>
+  <testcase name="vobSubIdxReplacesItsSubSibling" classname="com.aakash.novafork.core.subs.SubtitleRulesTest" time="0.0"/>
+  <testcase name="noSiblingsNoSubtitles" classname="com.aakash.novafork.core.subs.SubtitleRulesTest" time="0.0"/>
+  <testcase name="acceptsIso6392AndLanguageNames" classname="com.aakash.novafork.core.subs.SubtitleRulesTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

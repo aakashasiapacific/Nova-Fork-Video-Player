@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.aakash.novafork.core.artwork.ArtworkRulesTest" tests="11" skipped="0" failures="0" errors="0" timestamp="2026-10-07T02:49:02.797Z" hostname="runnervm8df0l" time="0.098">
+  <properties/>
+  <testcase name="jpgWinsOverOtherExtensionsWithTheSameName" classname="com.aakash.novafork.core.artwork.ArtworkRulesTest" time="0.079"/>
+  <testcase name="showArtComesFromTheShowFolder" classname="com.aakash.novafork.core.artwork.ArtworkRulesTest" time="0.001"/>
+  <testcase name="movieArtPrefersFilesNamedAfterTheVideo" classname="com.aakash.novafork.core.artwork.ArtworkRulesTest" time="0.001"/>
+  <testcase name="seasonPosterNamingVariants" classname="com.aakash.novafork.core.artwork.ArtworkRulesTest" time="0.011"/>
+  <testcase name="backdropFallsBackInPriorityOrder" classname="com.aakash.novafork.core.artwork.ArtworkRulesTest" time="0.001"/>
+  <testcase name="onlyKnownImageTypesCount" classname="com.aakash.novafork.core.artwork.ArtworkRulesTest" time="0.0"/>
+  <testcase name="posterFallsBackInPriorityOrder" classname="com.aakash.novafork.core.artwork.ArtworkRulesTest" time="0.001"/>
+  <testcase name="thumbIsTheImageWithTheVideoBaseName" classname="com.aakash.novafork.core.artwork.ArtworkRulesTest" time="0.0"/>
+  <testcase name="matchingIsCaseInsensitiveAndKeepsOriginalNames" classname="com.aakash.novafork.core.artwork.ArtworkRulesTest" time="0.0"/>
+  <testcase name="episodesUseThumbsAndSeasonPostersOnly" classname="com.aakash.novafork.core.artwork.ArtworkRulesTest" time="0.001"/>
+  <testcase name="isImage" classname="com.aakash.novafork.core.artwork.ArtworkRulesTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

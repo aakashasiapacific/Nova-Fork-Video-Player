@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.aakash.novafork.core.parse.NameParserTest" tests="135" skipped="0" failures="0" errors="0" timestamp="2026-10-07T02:49:03.084Z" hostname="runnervm8df0l" time="0.132">
+  <properties/>
+  <testcase name="parses[Dune.Part.Two.2024.2160p.WEB-DL.DDP5.1.Atmos.DV.HDR.H.265-FLUX.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.014"/>
+  <testcase name="parses[The Matrix (1999).mp4]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.0"/>
+  <testcase name="parses[Blade Runner 2049 (2017) [1080p].mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.001"/>
+  <testcase name="parses[Blade.Runner.2049.2017.1080p.BluRay.x264.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.001"/>
+  <testcase name="parses[Inception.2010.1080p.BluRay.x264-SPARKS.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.004"/>
+  <testcase name="parses[Oppenheimer (2023) [2160p] [4K] [WEB] [5.1] [YTS.MX].mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.001"/>
+  <testcase name="parses[Parasite (2019) [1080p] [BluRay] [5.1] [YTS.MX].mp4]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.003"/>
+  <testcase name="parses[Mr.Hollands.Opus.1995.DVDRip.XviD.avi]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.0"/>
+  <testcase name="parses[Kill.Bill.Vol.1.2003.1080p.BluRay.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.0"/>
+  <testcase name="parses[Mission.Impossible.Dead.Reckoning.Part.One.2023.IMAX.2160p.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.002"/>
+  <testcase name="parses[Spider-Man.No.Way.Home.2021.HDR.2160p.WEB.H265-NAISU.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.0"/>
+  <testcase name="parses[The.Lord.of.the.Rings.The.Return.of.the.King.2003.EXTENDED.1080p.BluRay.x264.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.001"/>
+  <testcase name="parses[Avengers Endgame 2019 Hindi Dubbed 720p HDRip.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.001"/>
+  <testcase name="parses[Joker.2019.2160p.UHD.BluRay.REMUX.HDR10+.HEVC.TrueHD.7.1.Atmos-FGT.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.0"/>
+  <testcase name="parses[Interstellar.2014.IMAX.1080p.AMZN.WEB-DL.DDP5.1.H.264-NTb.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.001"/>
+  <testcase name="parses[Tenet.2020.HDRip.XviD.AC3-EVO.avi]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.001"/>
+  <testcase name="parses[Some.Movie.2018.UNRATED.DIRECTORS.CUT.BDRip.x264.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.0"/>
+  <testcase name="parses[Movie.Title.2019.PROPER.REPACK.1080p.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.001"/>
+  <testcase name="parses[Godzilla.Minus.One.2023.JAPANESE.1080p.WEBRip.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.0"/>
+  <testcase name="parses[Barbie 2023 1080p.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.001"/>
+  <testcase name="parses[The.Batman.2022.4K.HMAX.WEB-DL.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.0"/>
+  <testcase name="parses[Some.Movie.CAM.x264.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.0"/>
+  <testcase name="parses[Some.Movie.720p.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.001"/>
+  <testcase name="parses[Movie.2019-GRP.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.0"/>
+  <testcase name="parses[A.Quiet.Place.Part.II.2020.MULTi.1080p.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.001"/>
+  <testcase name="parses[Pathaan.2023.Hindi.1080p.NF.WEB-DL.DD5.1.x264.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.0"/>
+  <testcase name="parses[RRR.2022.TELUGU.720p.HDRip.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.0"/>
+  <testcase name="parses[2001.A.Space.Odyssey.1968.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.001"/>
+  <testcase name="parses[1917.2019.1080p.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.0"/>
+  <testcase name="parses[2012.2009.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.0"/>
+  <testcase name="parses[300.2006.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.002"/>
+  <testcase name="parses[Wonder.Woman.1984.2020.1080p.WEBRip.x264.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.001"/>
+  <testcase name="parses[10.Cloverfield.Lane.2016.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.0"/>
+  <testcase name="parses[S.W.A.T.2003.720p.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.001"/>
+  <testcase name="parses[E.T.the.Extra-Terrestrial.1982.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.0"/>
+  <testcase name="parses[Mr. &amp; Mrs. Smith (2005).mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.001"/>
+  <testcase name="parses[Amélie (2001).mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.003"/>
+  <testcase name="parses[Charlotte's Web (2006).mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.001"/>
+  <testcase name="parses[The.French.Dispatch.2021.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.003"/>
+  <testcase name="parses[Dual (2022).mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.0"/>
+  <testcase name="parses[Saw.X.2023.1080p.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.001"/>
+  <testcase name="parses[WALL-E.2008.1080p.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.0"/>
+  <testcase name="parses[8-Bit Christmas (2021).mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.0"/>
+  <testcase name="parses[Star.Wars.Episode.4.A.New.Hope.1977.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.001"/>
+  <testcase name="parses[Wonder Woman 1984.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.0"/>
+  <testcase name="parses[The.Hateful.Eight.2015.70mm.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.0"/>
+  <testcase name="parses[Toy.Story.3.2010.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.004"/>
+  <testcase name="parses[Se7en.1995.REMASTERED.1080p.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.003"/>
+  <testcase name="parses[MOVIE.TITLE.2019.1080P.BLURAY.X264-GROUP.MKV]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.0"/>
+  <testcase name="parses[Movie (2019) (1080p BluRay x265 10bit).mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.0"/>
+  <testcase name="parses[Top Gun - Maverick (2022).mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.0"/>
+  <testcase name="parses[1917.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.0"/>
+  <testcase name="parses[Blade Runner 2049.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.0"/>
+  <testcase name="parses[The.Office.US.S02E03.720p.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.003"/>
+  <testcase name="parses[breaking bad - 1x05 - Gray Matter.avi]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.0"/>
+  <testcase name="parses[Show S01E01E02.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.001"/>
+  <testcase name="parses[Show.S01E01-E03.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.0"/>
+  <testcase name="parses[Show.S01E01-02.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.001"/>
+  <testcase name="parses[show.s1e2.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.001"/>
+  <testcase name="parses[Show.S01.E02.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.0"/>
+  <testcase name="parses[Show Season 1 Episode 2.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.0"/>
+  <testcase name="parses[Show.S01E01-720p.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.0"/>
+  <testcase name="parses[Fargo.2x07.Did.You.Do.This.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.0"/>
+  <testcase name="parses[Game.of.Thrones.S08E06.The.Iron.Throne.1080p.AMZN.WEB-DL.DDP5.1.H.264-GoT.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.0"/>
+  <testcase name="parses[Doctor.Who.2005.S01E01.Rose.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.0"/>
+  <testcase name="parses[Mr.Robot.S01E01.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.002"/>
+  <testcase name="parses[Marvels.Agents.of.S.H.I.E.L.D.S01E01.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.001"/>
+  <testcase name="parses[The.Mandalorian.S03E08.2160p.DSNP.WEB-DL.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.0"/>
+  <testcase name="parses[Ted.Lasso.S03E12.So.Long.Farewell.2160p.ATVP.WEB-DL.DDP5.1.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.0"/>
+  <testcase name="parses[Show.S01E02.HDTV.x264-LOL.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.001"/>
+  <testcase name="parses[Show.S01E02-LOL.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.0"/>
+  <testcase name="parses[1883.S01E01.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.0"/>
+  <testcase name="parses[The.Office.US.(2005).S01E01.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.001"/>
+  <testcase name="parses[The Office (US) - S01E01 - Pilot.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.002"/>
+  <testcase name="parses[Seinfeld - S09E23E24 - The Finale.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.0"/>
+  <testcase name="parses[friends_s10e17_the_last_one.avi]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.001"/>
+  <testcase name="parses[Kota Factory S02 E01.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.0"/>
+  <testcase name="parses[Sacred Games - Season 2 Episode 3.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.0"/>
+  <testcase name="parses[Twin Peaks (2017) S01E01.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.004"/>
+  <testcase name="parses[The.100.S01E01.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.0"/>
+  <testcase name="parses[9-1-1.S01E01.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.0"/>
+  <testcase name="parses[Show.Name.S2024E05.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.001"/>
+  <testcase name="parses[[SubsPlease] Sousou no Frieren - 12 (1080p) [A1B2C3D4].mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.0"/>
+  <testcase name="parses[Frieren - 12v2.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.001"/>
+  <testcase name="parses[Title - 12 (1080p).mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.0"/>
+  <testcase name="parses[One Piece - 1071 [1080p].mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.0"/>
+  <testcase name="parses[Naruto Shippuden Ep 245.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.002"/>
+  <testcase name="parses[Naruto Shippuden Ep12.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.001"/>
+  <testcase name="parses[[Erai-raws] Spy x Family S2 - 05 [1080p].mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.001"/>
+  <testcase name="parses[[Group] Title [05][720p].mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.0"/>
+  <testcase name="parses[[Group] Show 2nd Season - 03 [1080p].mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.001"/>
+  <testcase name="parses[The Office - 05 - Pilot.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.0"/>
+  <testcase name="parses[The.Daily.Show.2024.05.12.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.003"/>
+  <testcase name="parses[Jimmy.Kimmel.Live.2024.03.15.Guest.Name.720p.WEB.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.0"/>
+  <testcase name="parses[Last Week Tonight 12-05-2024.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.0"/>
+  <testcase name="parses[The Office (2005)/Season 2/03 - Title.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.001"/>
+  <testcase name="parses[Severance/Season 1/E05.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.0"/>
+  <testcase name="parses[TV Shows/Severance (2022)/Season 1/05.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.001"/>
+  <testcase name="parses[Doctor Who/Specials/E01.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.0"/>
+  <testcase name="parses[Show/Season 00/E05.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.0"/>
+  <testcase name="parses[The Office (2005)/Season 3/Episode 5.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.003"/>
+  <testcase name="parses[Show/S02/Ep 05.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.0"/>
+  <testcase name="parses[Sherlock/Series 2/Episode 5.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.0"/>
+  <testcase name="parses[Severance/Season 1/S01E05.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.0"/>
+  <testcase name="parses[The Office (2005)/05 - Pilot.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.0"/>
+  <testcase name="parses[The Office (2005)/Season 1/The.Office.S01E01.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.001"/>
+  <testcase name="parses[The.Office.US.S02.720p.WEB/E05.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.0"/>
+  <testcase name="parses[Breaking Bad Season 3/Episode 3.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.0"/>
+  <testcase name="parses[Downloads/E05.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.0"/>
+  <testcase name="parses[Inception (2010)/movie.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.005"/>
+  <testcase name="parses[Movies/Arrival (2016)/video.mp4]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.001"/>
+  <testcase name="parses[Heat.1995.1080p.BluRay.x264-GRP/film.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.0"/>
+  <testcase name="parses[Inception (2010)/Inception.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.0"/>
+  <testcase name="parses[Avatar (2009)/BDMV/STREAM/00000.m2ts]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.001"/>
+  <testcase name="parses[Movies/Some Clip.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.0"/>
+  <testcase name="parses[Films/Action/Some Clip.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.003"/>
+  <testcase name="parses[Home/Some Clip.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.0"/>
+  <testcase name="parses[family trip.mp4]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.0"/>
+  <testcase name="parses[Downloads/movie.mkv]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.001"/>
+  <testcase name="parses[VID_20240501_123456.mp4]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.0"/>
+  <testcase name="parses[IMG_1234.MOV]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.0"/>
+  <testcase name="parses[PXL_20240101_101010123.mp4]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.0"/>
+  <testcase name="parses[MVI_1234.MOV]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.0"/>
+  <testcase name="parses[DSC_0001.MOV]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.001"/>
+  <testcase name="parses[DJI_0001.MP4]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.0"/>
+  <testcase name="parses[GOPR0001.MP4]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.0"/>
+  <testcase name="parses[GX010001.MP4]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.001"/>
+  <testcase name="parses[VID-20240501-WA0001.mp4]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.0"/>
+  <testcase name="parses[WhatsApp Video 2024-05-01 at 12.34.56.mp4]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.0"/>
+  <testcase name="parses[Screen_Recording_20240501-123456_YouTube.mp4]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.0"/>
+  <testcase name="parses[Screenrecorder-2024-05-01-12-34-56-123.mp4]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.0"/>
+  <testcase name="parses[20240501_123456.mp4]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.0"/>
+  <testcase name="parses[2024-05-01 12-34-56.mp4]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.0"/>
+  <testcase name="parses[VID_20240501_123456_1080p.mp4]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.0"/>
+  <testcase name="parses[Movies/VID_20240501_123456.mp4]" classname="com.aakash.novafork.core.parse.NameParserTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
