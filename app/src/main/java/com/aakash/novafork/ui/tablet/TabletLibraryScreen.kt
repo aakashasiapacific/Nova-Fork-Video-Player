@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -78,6 +79,8 @@ internal fun TabletLibraryScreen(
         LibraryHeader(
             library = library,
             actions = actions,
+            // Portrait is too narrow for title, chips and sort on one line.
+            stacked = !listDetail,
             modifier = Modifier
                 .statusBarsPadding()
                 .padding(start = dims.gutter, end = dims.gutter - 8.dp, top = 20.dp, bottom = 12.dp),
@@ -157,42 +160,56 @@ internal fun AppActions.openItem(item: LibraryItemUi) {
 }
 
 @Composable
-private fun LibraryHeader(library: LibraryUi, actions: AppActions, modifier: Modifier = Modifier) {
-    Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Text("Library", style = MaterialTheme.typography.headlineMedium)
-        Spacer(Modifier.width(28.dp))
-        Row(
-            Modifier
-                .weight(1f)
-                .horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            LibraryFilter.entries.forEach { filter ->
-                val selected = filter == library.filter
-                val count = library.counts[filter]
-                FilterChip(
-                    selected = selected,
-                    onClick = { actions.setLibraryFilter(filter) },
-                    label = {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(filter.label)
-                            if (count != null) {
-                                Spacer(Modifier.width(6.dp))
-                                Text(count.toString(), color = LocalContentColor.current.copy(alpha = 0.65f))
-                            }
-                        }
-                    },
-                    leadingIcon = if (selected) {
-                        { NovaIcon(R.drawable.ic_check, contentDescription = null, modifier = Modifier.size(FilterChipDefaults.IconSize)) }
-                    } else {
-                        null
-                    },
-                )
+private fun LibraryHeader(library: LibraryUi, actions: AppActions, stacked: Boolean, modifier: Modifier = Modifier) {
+    if (stacked) {
+        Column(modifier.fillMaxWidth()) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Library", style = MaterialTheme.typography.headlineMedium, modifier = Modifier.weight(1f))
+                SortMenu(sort = library.sort, onSort = actions::setLibrarySort)
             }
+            Spacer(Modifier.height(12.dp))
+            FilterChipRow(library = library, onFilter = actions::setLibraryFilter)
         }
-        Spacer(Modifier.width(12.dp))
-        SortMenu(sort = library.sort, onSort = actions::setLibrarySort)
+    } else {
+        Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text("Library", style = MaterialTheme.typography.headlineMedium)
+            Spacer(Modifier.width(28.dp))
+            FilterChipRow(library = library, onFilter = actions::setLibraryFilter, modifier = Modifier.weight(1f))
+            Spacer(Modifier.width(12.dp))
+            SortMenu(sort = library.sort, onSort = actions::setLibrarySort)
+        }
+    }
+}
+
+@Composable
+private fun FilterChipRow(library: LibraryUi, onFilter: (LibraryFilter) -> Unit, modifier: Modifier = Modifier) {
+    Row(
+        modifier.horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        LibraryFilter.entries.forEach { filter ->
+            val selected = filter == library.filter
+            val count = library.counts[filter]
+            FilterChip(
+                selected = selected,
+                onClick = { onFilter(filter) },
+                label = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(filter.label)
+                        if (count != null) {
+                            Spacer(Modifier.width(6.dp))
+                            Text(count.toString(), color = LocalContentColor.current.copy(alpha = 0.65f))
+                        }
+                    }
+                },
+                leadingIcon = if (selected) {
+                    { NovaIcon(R.drawable.ic_check, contentDescription = null, modifier = Modifier.size(FilterChipDefaults.IconSize)) }
+                } else {
+                    null
+                },
+            )
+        }
     }
 }
 

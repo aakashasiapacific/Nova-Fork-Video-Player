@@ -56,7 +56,9 @@ import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -89,7 +91,8 @@ import com.aakash.novafork.ui.model.MediaKind
 import com.aakash.novafork.ui.model.ShowCardUi
 import com.aakash.novafork.ui.model.VideoCardUi
 import com.aakash.novafork.ui.theme.NovaColors
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.roundToInt
 
 // ---------------------------------------------------------------------------------------------
@@ -160,10 +163,12 @@ internal fun TabletPullToRefresh(
     content: @Composable BoxScope.() -> Unit,
 ) {
     var pulled by remember { mutableStateOf(false) }
-    if (pulled && !scanning) {
-        // Grace period for the scan to start; leaves the composition (cancelled) once it does.
+    val currentScanning by rememberUpdatedState(scanning)
+    if (pulled) {
         LaunchedEffect(Unit) {
-            delay(PULL_REFRESH_GRACE_MS)
+            // Give the scan a moment to start, then keep spinning until it is over.
+            withTimeoutOrNull(PULL_REFRESH_GRACE_MS) { snapshotFlow { currentScanning }.first { it } }
+            snapshotFlow { currentScanning }.first { !it }
             pulled = false
         }
     }

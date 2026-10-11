@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -25,9 +24,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.MaterialTheme
@@ -544,6 +541,11 @@ private fun OnboardingText(scan: ScanUi, permission: PermissionUi, actions: AppA
             title = "Looking for videos…"
             body = scan.label ?: "This can take a moment the first time."
         }
+        permission.partial -> {
+            title = "No videos yet"
+            body = "Nova can only see the videos you picked. Allow access to all of them, add a folder, " +
+                "connect to a network share or open a stream."
+        }
         else -> {
             title = "No videos yet"
             body = "Nothing turned up on this tablet. Add a folder, connect to a network share or open a stream."
@@ -564,9 +566,12 @@ private fun OnboardingText(scan: ScanUi, permission: PermissionUi, actions: AppA
                 .fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            if (!permission.granted) {
+            if (!permission.granted || permission.partial) {
                 Button(onClick = actions::requestPermission, modifier = Modifier.fillMaxWidth().height(48.dp)) {
-                    ButtonLabel(R.drawable.ic_video_library, "Allow access to videos")
+                    ButtonLabel(
+                        R.drawable.ic_video_library,
+                        if (permission.partial) "Allow access to all videos" else "Allow access to videos",
+                    )
                 }
             }
             FilledTonalButton(onClick = actions::addFolder, modifier = Modifier.fillMaxWidth().height(48.dp)) {

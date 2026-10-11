@@ -85,8 +85,6 @@ class LibraryIndex(
     val home: HomeUi by lazy { UiMappers.home(this) }
 
     companion object {
-        val EMPTY = LibraryIndex(emptyList(), emptyList(), emptyList(), preferLocalArtwork = false)
-
         fun build(rows: List<VideoWithMeta>, sources: List<SourceEntity>, preferLocalArtwork: Boolean): LibraryIndex {
             val sourcesById = sources.associateBy { it.id }
             val smbRoots = sources
@@ -469,7 +467,7 @@ internal fun percentDecode(text: String): String {
     var i = 0
     while (i < text.length) {
         val c = text[i]
-        if (c == '%' && i + 2 < text.length + 0 && i + 2 <= text.length - 1) {
+        if (c == '%' && i + 2 < text.length) {
             val high = Character.digit(text[i + 1], 16)
             val low = Character.digit(text[i + 2], 16)
             if (high >= 0 && low >= 0) {

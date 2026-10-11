@@ -37,6 +37,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.coerceAtLeast
 import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
 import com.aakash.novafork.ui.common.BackdropArt
@@ -201,8 +202,9 @@ private fun PreviewLayout(
                     .height(artHeight)
                     .bottomScrim(paneColor, startFraction = 0.3f),
             )
+            // The poster and title overlap the faded bottom of the backdrop.
             Row(
-                Modifier.padding(start = PanePadding, end = PanePadding, top = artHeight - 76.dp),
+                Modifier.padding(start = PanePadding, end = PanePadding, top = (artHeight - 76.dp).coerceAtLeast(0.dp)),
                 verticalAlignment = Alignment.Bottom,
             ) {
                 TabletDetailsPoster(artwork = artwork, title = title, width = 112.dp)

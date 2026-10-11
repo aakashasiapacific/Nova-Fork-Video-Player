@@ -5,7 +5,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -21,6 +20,7 @@ import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
@@ -50,35 +50,34 @@ fun TabletApp(state: AppUiState, actions: AppActions, layout: DeviceLayout, modi
         // Pages leave the composition when navigated away from; this keeps their scroll positions
         // for when the user comes back.
         val pageStates = rememberSaveableStateHolder()
-        Row(
-            modifier
-                .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background),
-        ) {
-            TabletNavRail(
-                selected = state.route.top,
-                searchSelected = state.route == Route.Search,
-                onSelect = actions::selectTab,
-                onSearch = { if (state.route != Route.Search) actions.navigate(Route.Search) },
-                modifier = Modifier.fillMaxHeight(),
-            )
-            // Keyed by page, so updates within a page recompose it in place while a page change
-            // crossfades and the outgoing page keeps the state it was built with.
-            AnimatedContent(
-                targetState = state,
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxHeight()
-                    .windowInsetsPadding(
-                        WindowInsets.systemBars.union(WindowInsets.displayCutout).only(WindowInsetsSides.End),
-                    ),
-                transitionSpec = { fadeIn(tween(durationMillis = 240, delayMillis = 40)) togetherWith fadeOut(tween(durationMillis = 160)) },
-                contentAlignment = Alignment.TopStart,
-                contentKey = { it.route.pageKey() },
-                label = "tabletPage",
-            ) { pageState ->
-                pageStates.SaveableStateProvider(pageState.route.pageKey().toString()) {
-                    TabletPage(state = pageState, actions = actions, layout = layout)
+        // A Surface (not just a background) so text and icons get onBackground by default.
+        Surface(modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+            Row(Modifier.fillMaxSize()) {
+                TabletNavRail(
+                    selected = state.route.top,
+                    searchSelected = state.route == Route.Search,
+                    onSelect = actions::selectTab,
+                    onSearch = { if (state.route != Route.Search) actions.navigate(Route.Search) },
+                    modifier = Modifier.fillMaxHeight(),
+                )
+                // Keyed by page, so updates within a page recompose it in place while a page change
+                // crossfades and the outgoing page keeps the state it was built with.
+                AnimatedContent(
+                    targetState = state,
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .windowInsetsPadding(
+                            WindowInsets.systemBars.union(WindowInsets.displayCutout).only(WindowInsetsSides.End),
+                        ),
+                    transitionSpec = { fadeIn(tween(durationMillis = 240, delayMillis = 40)) togetherWith fadeOut(tween(durationMillis = 160)) },
+                    contentAlignment = Alignment.TopStart,
+                    contentKey = { it.route.pageKey() },
+                    label = "tabletPage",
+                ) { pageState ->
+                    pageStates.SaveableStateProvider(pageState.route.pageKey().toString()) {
+                        TabletPage(state = pageState, actions = actions, layout = layout)
+                    }
                 }
             }
         }

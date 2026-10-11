@@ -29,7 +29,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -55,7 +54,8 @@ internal fun TabletSearchScreen(
 ) {
     val dims = LocalNovaDimens.current
     // Local text state: echoing every keystroke through the view model would fight the cursor.
-    var query by rememberSaveable { mutableStateOf(search.query) }
+    // Seeded from the view model, which outlives rotation, so the two never disagree on return.
+    var query by remember { mutableStateOf(search.query) }
     val focusRequester = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
     LaunchedEffect(Unit) { focusRequester.requestFocus() }

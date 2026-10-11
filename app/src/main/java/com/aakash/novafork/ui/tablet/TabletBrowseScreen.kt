@@ -58,6 +58,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
 import com.aakash.novafork.data.db.SourceType
@@ -78,7 +79,6 @@ import com.aakash.novafork.ui.model.ScanUi
 import com.aakash.novafork.ui.model.SourceUi
 import com.aakash.novafork.ui.model.VideoCardUi
 
-private val DirCellMin = 220.dp
 private val PaneGutter = 28.dp
 
 @Immutable
@@ -93,8 +93,10 @@ internal fun TabletBrowseScreen(
     modifier: Modifier = Modifier,
 ) {
     val dirRoute = state.route as? Route.BrowseDir
-    // A listing left over from another source must not show under this one's route.
-    val dir = state.browseDir?.takeIf { dirRoute != null && it.sourceId == dirRoute.sourceId }
+    // A listing left over from another folder must not show under this one's breadcrumbs.
+    val dir = state.browseDir?.takeIf { dirRoute != null && it.isListingOf(dirRoute) }
+    // Portrait uses a narrower sources pane and smaller cells so the folder grid keeps two columns.
+    val dirCellMin = if (layout.isExpanded) 220.dp else 160.dp
     val dirStates = rememberSaveableStateHolder()
     Row(modifier.fillMaxSize()) {
         SourcesPane(
@@ -126,13 +128,16 @@ internal fun TabletBrowseScreen(
                     if (shown == null) {
                         TabletLoading(Modifier.fillMaxSize())
                     } else {
-                        BrowseDirPane(dir = shown, actions = actions, modifier = Modifier.fillMaxSize())
+                        BrowseDirPane(dir = shown, cellMin = dirCellMin, actions = actions, modifier = Modifier.fillMaxSize())
                     }
                 }
             }
         }
     }
 }
+
+private fun BrowseDirUi.isListingOf(route: Route.BrowseDir): Boolean =
+    sourceId == route.sourceId && path.trim('/') == route.path.trim('/')
 
 // ---------------------------------------------------------------------------------------------
 // Sources pane
@@ -493,7 +498,7 @@ private fun ActionTile(
 }
 
 @Composable
-private fun BrowseDirPane(dir: BrowseDirUi, actions: AppActions, modifier: Modifier = Modifier) {
+private fun BrowseDirPane(dir: BrowseDirUi, cellMin: Dp, actions: AppActions, modifier: Modifier = Modifier) {
     val isEmpty = dir.folders.isEmpty() && dir.videos.isEmpty()
     Column(modifier) {
         BrowseDirHeader(
@@ -530,7 +535,7 @@ private fun BrowseDirPane(dir: BrowseDirUi, actions: AppActions, modifier: Modif
                     body = "This folder has no videos or subfolders with videos.",
                 )
             }
-            else -> DirGrid(dir = dir, error = error, actions = actions)
+            else -> DirGrid(dir = dir, error = error, cellMin = cellMin, actions = actions)
         }
     }
 }
@@ -597,9 +602,9 @@ private fun BrowseDirHeader(dir: BrowseDirUi, actions: AppActions, modifier: Mod
 }
 
 @Composable
-private fun DirGrid(dir: BrowseDirUi, error: String?, actions: AppActions) {
+private fun DirGrid(dir: BrowseDirUi, error: String?, cellMin: Dp, actions: AppActions) {
     LazyVerticalGrid(
-        columns = GridCells.Adaptive(DirCellMin),
+        columns = GridCells.Adaptive(cellMin),
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(
             start = PaneGutter,
