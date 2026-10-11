@@ -11,7 +11,6 @@ import android.graphics.RadialGradient
 import android.graphics.RectF
 import android.graphics.Shader
 import android.graphics.drawable.BitmapDrawable
-import android.os.Looper
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -19,6 +18,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.junit4.ComposeContentTestRule
 import androidx.compose.ui.test.onRoot
@@ -45,8 +45,6 @@ import com.github.takahirom.roborazzi.captureScreenRoboImage
 import kotlin.math.abs
 import kotlin.math.roundToInt
 import kotlin.random.Random
-import org.robolectric.Shadows.shadowOf
-import java.time.Duration
 
 /**
  * Stands in for TMDB, local artwork and video frames: Coil's singleton answers every request with
@@ -245,30 +243,27 @@ fun ComposeContentTestRule.captureScreen(
     name: String,
     settleMs: Long = 1_200L,
     wholeScreen: Boolean = false,
+    reveal: (() -> Unit)? = null,
     content: @Composable () -> Unit,
 ) {
-    val path = "build/screens/$name.png"
-    val steps = 6
-    if (wholeScreen) {
-        // A dialog lives in its own window, which Robolectric lays out from Choreographer frames
-        // that only run when the looper clock moves. With the compose clock paused it never gets
-        // laid out and the test can't go idle, so dialogs run on the normal clock and the looper
-        // is stepped forward instead.
-        setContent(content)
-        repeat(steps) {
-            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(settleMs / steps))
-            waitForIdle()
-        }
-        captureScreenRoboImage(path)
-        return
-    }
     mainClock.autoAdvance = false
     setContent(content)
     // Several short steps: each one runs effects and recompositions, and the idle wait in between
     // lets image requests (resolved on the main looper) land before the next frame.
+    val steps = 6
     repeat(steps) {
         mainClock.advanceTimeBy(settleMs / steps)
         waitForIdle()
     }
-    onRoot().captureRoboImage(path)
+    if (reveal != null) {
+        // A dialog window over the screen never reads as idle under Robolectric, so it is shown
+        // only after the screen has settled and from then on the clock is just moved by hand.
+        runOnUiThread {
+            reveal()
+            Snapshot.sendApplyNotifications()
+        }
+        mainClock.advanceTimeBy(2_000)
+    }
+    val path = "build/screens/$name.png"
+    if (wholeScreen) captureScreenRoboImage(path) else onRoot().captureRoboImage(path)
 }
