@@ -11,6 +11,7 @@ import android.graphics.RadialGradient
 import android.graphics.RectF
 import android.graphics.Shader
 import android.graphics.drawable.BitmapDrawable
+import android.os.Looper
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -44,6 +45,8 @@ import com.github.takahirom.roborazzi.captureScreenRoboImage
 import kotlin.math.abs
 import kotlin.math.roundToInt
 import kotlin.random.Random
+import org.robolectric.Shadows.shadowOf
+import java.time.Duration
 
 /**
  * Stands in for TMDB, local artwork and video frames: Coil's singleton answers every request with
@@ -244,15 +247,28 @@ fun ComposeContentTestRule.captureScreen(
     wholeScreen: Boolean = false,
     content: @Composable () -> Unit,
 ) {
+    val path = "build/screens/$name.png"
+    val steps = 6
+    if (wholeScreen) {
+        // A dialog lives in its own window, which Robolectric lays out from Choreographer frames
+        // that only run when the looper clock moves. With the compose clock paused it never gets
+        // laid out and the test can't go idle, so dialogs run on the normal clock and the looper
+        // is stepped forward instead.
+        setContent(content)
+        repeat(steps) {
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(settleMs / steps))
+            waitForIdle()
+        }
+        captureScreenRoboImage(path)
+        return
+    }
     mainClock.autoAdvance = false
     setContent(content)
     // Several short steps: each one runs effects and recompositions, and the idle wait in between
     // lets image requests (resolved on the main looper) land before the next frame.
-    val steps = 6
     repeat(steps) {
         mainClock.advanceTimeBy(settleMs / steps)
         waitForIdle()
     }
-    val path = "build/screens/$name.png"
-    if (wholeScreen) captureScreenRoboImage(path) else onRoot().captureRoboImage(path)
+    onRoot().captureRoboImage(path)
 }
