@@ -1,0 +1,540 @@
+package com.aakash.novafork
+
+import com.aakash.novafork.FakeLibrary.BEACH_CLIP
+import com.aakash.novafork.FakeLibrary.BUNNY
+import com.aakash.novafork.FakeLibrary.CAMERA_CLIP
+import com.aakash.novafork.FakeLibrary.DEVICE
+import com.aakash.novafork.FakeLibrary.DUNE
+import com.aakash.novafork.FakeLibrary.EVERYTHING
+import com.aakash.novafork.FakeLibrary.INTERSTELLAR
+import com.aakash.novafork.FakeLibrary.MOVIES_FOLDER
+import com.aakash.novafork.FakeLibrary.NAS
+import com.aakash.novafork.FakeLibrary.OFFICE_KEY
+import com.aakash.novafork.FakeLibrary.OFFICE_S2E4
+import com.aakash.novafork.FakeLibrary.OPPENHEIMER
+import com.aakash.novafork.FakeLibrary.PANCHAYAT_KEY
+import com.aakash.novafork.FakeLibrary.PANCHAYAT_S3E4
+import com.aakash.novafork.FakeLibrary.PARASITE
+import com.aakash.novafork.FakeLibrary.RRR
+import com.aakash.novafork.FakeLibrary.SEVERANCE_KEY
+import com.aakash.novafork.FakeLibrary.SEVERANCE_S1E1
+import com.aakash.novafork.FakeLibrary.SEVERANCE_S2E3
+import com.aakash.novafork.FakeLibrary.SEVERANCE_S2E4
+import com.aakash.novafork.FakeLibrary.SHOGUN_KEY
+import com.aakash.novafork.FakeLibrary.SHOGUN_S1E1
+import com.aakash.novafork.FakeLibrary.SPIRITED_AWAY
+import com.aakash.novafork.FakeLibrary.TEARS
+import com.aakash.novafork.data.ScanState
+import com.aakash.novafork.data.db.MetadataEntity
+import com.aakash.novafork.data.db.SourceEntity
+import com.aakash.novafork.data.db.SourceType
+import com.aakash.novafork.data.db.VideoEntity
+import com.aakash.novafork.data.db.VideoKind
+import com.aakash.novafork.data.db.VideoWithMeta
+import com.aakash.novafork.ui.LibraryIndex
+import com.aakash.novafork.ui.NaturalOrder
+import com.aakash.novafork.ui.UiMappers
+import com.aakash.novafork.ui.frameSourceOf
+import com.aakash.novafork.ui.model.Crumb
+import com.aakash.novafork.ui.model.HeroTarget
+import com.aakash.novafork.ui.model.LibraryFilter
+import com.aakash.novafork.ui.model.LibraryItemUi
+import com.aakash.novafork.ui.model.LibrarySort
+import com.aakash.novafork.ui.model.MediaKind
+import com.aakash.novafork.ui.model.ScanUi
+import com.aakash.novafork.ui.pick
+import com.aakash.novafork.ui.progressOf
+import com.aakash.novafork.ui.treeFolderLabel
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class UiMappersTest {
+    private val index = FakeLibrary.index()
+    private val idle = ScanState()
+
+    private fun card(id: Long) = requireNotNull(index.videosById[id]) { "No video $id" }.card
+
+    // Progress and watched state
+
+    @Test
+    fun progressIsPositionOverDurationUntilWatched() {
+        val dune = card(DUNE)
+        assertEquals((65 * 60_000f + 12_000f) / (167 * 60_000f - 47_000f), requireNotNull(dune.progress), 1e-4f)
+        assertFalse(dune.watched)
+
+        val interstellar = card(INTERSTELLAR)
+        assertTrue(interstellar.watched)
+        assertNull("watched videos show a check, not a bar", interstellar.progress)
+
+        assertNull("never played", card(OPPENHEIMER).progress)
+    }
+
+    @Test
+    fun progressNeedsADurationAndStaysInRange() {
+        val video = video(id = 1, sourceId = DEVICE, uri = "content://media/external/video/media/1", positionMs = 90_000)
+        assertNull(progressOf(video.copy(durationMs = null)))
+        assertNull(progressOf(video.copy(durationMs = 0)))
+        assertNull(progressOf(video.copy(durationMs = 120_000, watched = true)))
+        assertEquals(0.75f, requireNotNull(progressOf(video.copy(durationMs = 120_000))), 1e-6f)
+        assertEquals(1f, requireNotNull(progressOf(video.copy(durationMs = 60_000))), 1e-6f)
+    }
+
+    // Home
+
+    @Test
+    fun continueWatchingIsLastPlayedFirst() {
+        val ids = index.home.continueWatching.map { it.id }
+        assertEquals(listOf(DUNE, SEVERANCE_S2E3, PANCHAYAT_S3E4, EVERYTHING), ids)
+    }
+
+    @Test
+    fun continueWatchingKeepsOneEpisodePerShow() {
+        val older = episode(id = 10, season = 1, episode = 1, positionMs = 60_000, lastPlayedAt = 1_000)
+        val newer = episode(id = 11, season = 1, episode = 2, positionMs = 60_000, lastPlayedAt = 2_000)
+        val home = UiMappers.home(LibraryIndex.build(listOf(row(older), row(newer)), listOf(nas), preferLocalArtwork = false))
+        assertEquals(listOf(11L), home.continueWatching.map { it.id })
+    }
+
+    @Test
+    fun homeRows() {
+        val home = index.home
+        assertFalse(home.isEmpty)
+        assertEquals(
+            listOf(DUNE, EVERYTHING, INTERSTELLAR, OPPENHEIMER, PARASITE, RRR, SPIRITED_AWAY),
+            home.movies.map { it.id },
+        )
+        assertEquals(listOf("The Office", "Panchayat", "Severance", "Shōgun"), home.shows.map { it.title })
+        assertEquals("newest first", listOf(TEARS, BUNNY, BEACH_CLIP, CAMERA_CLIP), home.videos.map { it.id })
+    }
+
+    @Test
+    fun recentlyAddedCollapsesAShowIntoItsNewestEpisode() {
+        val recent = index.home.recentlyAdded
+        assertEquals(listOf(SHOGUN_S1E1 + 3, DUNE, SEVERANCE_S2E4), recent.take(3).map { it.id })
+        val perShow = recent.filter { it.kind == MediaKind.EPISODE }.groupingBy { it.showTitle }.eachCount()
+        assertEquals(mapOf("Shōgun" to 1, "Severance" to 1, "Panchayat" to 1, "The Office" to 1), perShow)
+        // The card wears the show's poster rather than a season or episode image.
+        assertEquals("https://image.tmdb.org/t/p/w500/shogun.jpg", recent.first().artwork.posterUrl)
+    }
+
+    @Test
+    fun heroStartsWithWhatIsInProgressThenTheNewest() {
+        val hero = index.home.hero
+        assertEquals(
+            listOf(
+                HeroTarget.Video(DUNE),
+                HeroTarget.Show(SEVERANCE_KEY),
+                HeroTarget.Show(PANCHAYAT_KEY),
+                HeroTarget.Video(EVERYTHING),
+                HeroTarget.Show(SHOGUN_KEY),
+                HeroTarget.Video(OPPENHEIMER),
+            ),
+            hero.map { it.target },
+        )
+        val dune = hero[0]
+        assertEquals("Resume", dune.playLabel)
+        assertEquals("2024 · 2h 47m · Science Fiction, Adventure", dune.metaLine)
+        val severance = hero[1]
+        assertEquals("Resume S2 · E3", severance.playLabel)
+        assertEquals(SEVERANCE_S2E3, severance.playVideoId)
+        assertEquals("S2 · E3 · Who Is Alive?", severance.metaLine)
+        assertEquals("Play S1 · E1", hero[4].playLabel)
+    }
+
+    @Test
+    fun emptyLibraryAsksForOnboarding() {
+        val home = UiMappers.home(LibraryIndex.build(emptyList(), emptyList(), preferLocalArtwork = false))
+        assertTrue(home.isEmpty)
+        assertTrue(home.hero.isEmpty())
+    }
+
+    // Shows
+
+    @Test
+    fun episodesGroupIntoShowsAndSeasons() {
+        val show = requireNotNull(index.showsByKey[SEVERANCE_KEY]).card
+        assertEquals("Severance", show.title)
+        assertEquals(2, show.seasonCount)
+        assertEquals(8, show.episodeCount)
+        assertEquals(2, show.unwatchedCount)
+
+        val details = requireNotNull(UiMappers.showDetails(index, SEVERANCE_KEY))
+        assertEquals(listOf("Season 1", "Season 2"), details.seasons.map { it.title })
+        assertEquals(listOf("E1", "E2", "E3", "E4"), details.seasons[1].episodes.map { it.code })
+        assertEquals("https://image.tmdb.org/t/p/w500/severance-s2.jpg", details.seasons[1].posterUrl)
+        assertEquals(SEVERANCE_S2E3, details.nextUp?.videoId)
+        assertEquals("Resume S2 · E3", details.playLabel)
+        assertTrue(details.isMatched)
+    }
+
+    @Test
+    fun nextUpIsTheFirstUnwatchedEpisodeAfterTheLastWatchedOne() {
+        val office = requireNotNull(UiMappers.showDetails(index, OFFICE_KEY))
+        assertEquals(OFFICE_S2E4, office.nextUp?.videoId)
+        assertEquals("Play S2 · E4", office.playLabel)
+
+        val shogun = requireNotNull(UiMappers.showDetails(index, SHOGUN_KEY))
+        assertEquals(SHOGUN_S1E1, shogun.nextUp?.videoId)
+        assertEquals("Play S1 · E1", shogun.playLabel)
+    }
+
+    @Test
+    fun twoCopiesOfAnEpisodeCountOnceAndSpecialsComeLast() {
+        val rows = listOf(
+            row(episode(id = 1, season = 1, episode = 1, fileName = "Show.S01E01.720p.mkv")),
+            row(episode(id = 2, season = 1, episode = 1, fileName = "Show.S01E01.1080p.mkv")),
+            row(episode(id = 3, season = 1, episode = 2)),
+            row(episode(id = 4, season = 0, episode = 1)),
+            row(episode(id = 5, season = null, episode = 3)),
+        )
+        val index = LibraryIndex.build(rows, listOf(nas), preferLocalArtwork = false)
+        val show = index.shows.single()
+        assertEquals(4, show.card.episodeCount)
+        assertEquals(2, show.card.seasonCount)
+
+        val details = requireNotNull(UiMappers.showDetails(index, show.key))
+        assertEquals(listOf("Season 1", "Specials"), details.seasons.map { it.title })
+        // Absolute-numbered episodes have no season yet and sit in season 1.
+        assertEquals(listOf(1L, 2L, 3L, 5L), details.seasons[0].episodes.map { it.videoId })
+    }
+
+    // Artwork
+
+    @Test
+    fun tmdbArtworkWinsUnlessLocalArtworkIsPreferred() {
+        val meta = MetadataEntity(
+            key = "movie:1",
+            tmdbId = 1,
+            type = "movie",
+            title = "Heat",
+            year = 1995,
+            posterPath = "/heat.jpg",
+            backdropPath = "/heat-backdrop.jpg",
+        )
+        val movie = video(
+            id = 1,
+            sourceId = DEVICE,
+            uri = "content://media/external/video/media/1",
+            kind = VideoKind.MOVIE,
+            metadataKey = meta.key,
+            localPoster = "content://media/external/images/media/7",
+            localBackdrop = "content://media/external/images/media/8",
+            localThumb = "content://media/external/images/media/9",
+        )
+        val rows = listOf(VideoWithMeta(movie, meta))
+
+        val tmdbFirst = LibraryIndex.build(rows, listOf(device), preferLocalArtwork = false).videos.single().card.artwork
+        assertEquals("https://image.tmdb.org/t/p/w500/heat.jpg", tmdbFirst.posterUrl)
+        assertEquals("https://image.tmdb.org/t/p/w1280/heat-backdrop.jpg", tmdbFirst.backdropUrl)
+        assertNull("a movie's thumb is only a fallback for a missing backdrop", tmdbFirst.stillUrl)
+
+        val localFirst = LibraryIndex.build(rows, listOf(device), preferLocalArtwork = true).videos.single().card.artwork
+        assertEquals("content://media/external/images/media/7", localFirst.posterUrl)
+        assertEquals("content://media/external/images/media/8", localFirst.backdropUrl)
+
+        val withoutFanart = VideoWithMeta(movie.copy(localBackdrop = null), null)
+        val unmatched = LibraryIndex.build(listOf(withoutFanart), listOf(device), preferLocalArtwork = false)
+            .videos.single().card.artwork
+        assertEquals("content://media/external/images/media/7", unmatched.posterUrl)
+        assertNull(unmatched.backdropUrl)
+        assertEquals("content://media/external/images/media/9", unmatched.stillUrl)
+
+        assertEquals("tmdb", pick("tmdb", "local", preferLocal = false))
+        assertEquals("local", pick("tmdb", "local", preferLocal = true))
+        assertEquals("tmdb", pick("tmdb", null, preferLocal = true))
+        assertEquals("local", pick(null, "local", preferLocal = false))
+    }
+
+    @Test
+    fun fakeLibraryArtworkFollowsThePriority() {
+        assertEquals("https://image.tmdb.org/t/p/w500/spirited-away.jpg", card(SPIRITED_AWAY).artwork.posterUrl)
+        val localFirst = FakeLibrary.index(preferLocalArtwork = true)
+        assertEquals(
+            "${FakeLibrary.MOVIES_TREE}/document/primary%3AMovies%2FAnime%2Fposter.jpg",
+            requireNotNull(localFirst.videosById[SPIRITED_AWAY]).card.artwork.posterUrl,
+        )
+
+        val episode = card(SEVERANCE_S1E1).artwork
+        assertEquals("https://image.tmdb.org/t/p/w780/severance-s1e1.jpg", episode.stillUrl)
+        assertEquals("season poster first", "https://image.tmdb.org/t/p/w500/severance-s1.jpg", episode.posterUrl)
+        assertEquals("https://image.tmdb.org/t/p/w1280/severance-backdrop.jpg", episode.backdropUrl)
+    }
+
+    @Test
+    fun frameSourceOnlyForLocalFiles() {
+        assertEquals("content://media/external/video/media/5", frameSourceOf("content://media/external/video/media/5"))
+        assertEquals("file:///sdcard/Movies/a.mkv", frameSourceOf("file:///sdcard/Movies/a.mkv"))
+        assertNull(frameSourceOf("smb://nas.local/Media/a.mkv"))
+        assertNull(frameSourceOf("https://example.com/live.m3u8"))
+        assertNull(frameSourceOf("rtsp://camera.local/stream"))
+
+        assertNotNull(card(BEACH_CLIP).artwork.frameSource)
+        assertNotNull(card(DUNE).artwork.frameSource)
+        assertNull("files on the NAS are never downloaded for a frame", card(SEVERANCE_S2E3).artwork.frameSource)
+        assertNull(card(BUNNY).artwork.frameSource)
+    }
+
+    // Library
+
+    @Test
+    fun libraryFiltersAndCounts() {
+        val all = UiMappers.library(index, LibraryFilter.ALL, LibrarySort.RECENT)
+        assertEquals(
+            mapOf(LibraryFilter.ALL to 15, LibraryFilter.MOVIES to 7, LibraryFilter.SHOWS to 4, LibraryFilter.VIDEOS to 4),
+            all.counts,
+        )
+        assertEquals(15, all.items.size)
+        assertEquals("Shōgun", all.items.first().title)
+
+        val shows = UiMappers.library(index, LibraryFilter.SHOWS, LibrarySort.TITLE)
+        assertTrue(shows.items.all { it is LibraryItemUi.Show })
+        assertEquals(listOf("The Office", "Panchayat", "Severance", "Shōgun"), shows.items.map { it.title })
+    }
+
+    @Test
+    fun librarySorts() {
+        val byTitle = UiMappers.library(index, LibraryFilter.ALL, LibrarySort.TITLE).items.map { it.title }
+        assertEquals(listOf("Big Buck Bunny", "Dune: Part Two", "Everything Everywhere All at Once"), byTitle.take(3))
+        assertEquals("articles are ignored", listOf("The Office", "Oppenheimer"), byTitle.subList(5, 7))
+
+        val byRating = UiMappers.library(index, LibraryFilter.ALL, LibrarySort.RATING).items.map { it.title }
+        assertEquals(listOf("Panchayat", "The Office", "Shōgun"), byRating.take(3))
+        assertEquals(
+            "unrated last",
+            listOf("Big Buck Bunny", "Goa trip - Palolem sunset", "Tears of Steel", "VID_20250914_183012"),
+            byRating.takeLast(4),
+        )
+
+        val byYear = UiMappers.library(index, LibraryFilter.MOVIES, LibrarySort.YEAR).items.map { it.title }
+        assertEquals(
+            listOf("Dune: Part Two", "Oppenheimer", "Everything Everywhere All at Once", "RRR", "Parasite", "Interstellar", "Spirited Away"),
+            byYear,
+        )
+    }
+
+    // Details
+
+    @Test
+    fun movieDetails() {
+        val dune = requireNotNull(UiMappers.videoDetails(index, DUNE))
+        assertEquals(MediaKind.MOVIE, dune.kind)
+        assertEquals("Dune: Part Two", dune.title)
+        assertNull("same as the title", dune.originalTitle)
+        assertEquals("Long live the fighters.", dune.tagline)
+        assertEquals("2h 47m", dune.runtimeLabel)
+        assertEquals(listOf("Science Fiction", "Adventure"), dune.genres)
+        assertEquals("Resume from 1:05:12", dune.playLabel)
+        assertEquals("Movies › Sci-Fi", dune.location)
+        assertEquals("18.4 GB", dune.sizeLabel)
+        assertEquals("3840×1606 · 4K", dune.resolutionLabel)
+        assertEquals("Movies", dune.sourceLabel)
+        assertTrue(dune.isMatched)
+    }
+
+    @Test
+    fun episodeDetails() {
+        val episode = requireNotNull(UiMappers.videoDetails(index, SEVERANCE_S2E3))
+        assertEquals(MediaKind.EPISODE, episode.kind)
+        assertEquals("Who Is Alive?", episode.title)
+        assertEquals("Severance", episode.showTitle)
+        assertEquals(SEVERANCE_KEY, episode.showKey)
+        assertEquals("S02E03", episode.episodeCode)
+        assertEquals("2025-01-31", episode.airDate)
+        assertEquals(2025, episode.year)
+        assertEquals("52m", episode.runtimeLabel)
+        assertEquals("Resume from 31:40", episode.playLabel)
+        assertEquals(SEVERANCE_S2E4, episode.nextEpisode?.id)
+        assertEquals("NAS · Media › TV/Severance/Season 2", episode.location)
+        assertNull("show taglines are not episode taglines", episode.tagline)
+    }
+
+    @Test
+    fun homeVideoAndStreamDetails() {
+        val clip = requireNotNull(UiMappers.videoDetails(index, BEACH_CLIP))
+        assertEquals(MediaKind.VIDEO, clip.kind)
+        assertEquals("Goa trip - Palolem sunset", clip.title)
+        assertFalse(clip.isMatched)
+        assertNull(clip.overview)
+        assertEquals("Device storage › DCIM/Trips", clip.location)
+        assertEquals("Play", clip.playLabel)
+
+        val stream = requireNotNull(UiMappers.videoDetails(index, BUNNY))
+        assertEquals(MediaKind.STREAM, stream.kind)
+        assertEquals("Big Buck Bunny", stream.title)
+        assertEquals("https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8", stream.location)
+        assertNull(UiMappers.videoDetails(index, 9_999))
+    }
+
+    // Browse
+
+    @Test
+    fun sourcesAreDeviceThenFoldersThenSharesWithoutStreams() {
+        val browse = UiMappers.browse(index, idle)
+        assertEquals(listOf(SourceType.DEVICE, SourceType.FOLDER, SourceType.SMB), browse.sources.map { it.type })
+        assertEquals(
+            listOf("Internal storage and SD cards", "Movies", "nas.local/Media"),
+            browse.sources.map { it.detail },
+        )
+        assertEquals(listOf(7, 7, 16), browse.sources.map { it.videoCount })
+        assertEquals(listOf(TEARS, BUNNY), browse.streams.map { it.id })
+
+        val scanning = UiMappers.browse(index, ScanState(running = true, sourceName = "NAS · Media"))
+        assertEquals(listOf(false, false, true), scanning.sources.map { it.isScanning })
+    }
+
+    @Test
+    fun pickedFolderLabels() {
+        val tree = "content://com.android.externalstorage.documents/tree/"
+        assertEquals("Movies", treeFolderLabel(FakeLibrary.MOVIES_TREE))
+        assertEquals("Movies/Action", treeFolderLabel("${tree}primary%3AMovies%2FAction"))
+        assertEquals("Internal storage", treeFolderLabel("${tree}primary%3A"))
+        assertEquals("SD card", treeFolderLabel("${tree}1A2B-3C4D%3A"))
+        assertNull(treeFolderLabel("content://media/external/video/media/1"))
+    }
+
+    @Test
+    fun browseDirListsSubfoldersWithRecursiveCountsAndTheVideosHere() {
+        val root = requireNotNull(UiMappers.browseDir(index, MOVIES_FOLDER, "", idle))
+        assertEquals("Movies", root.title)
+        assertEquals(SourceType.FOLDER, root.sourceType)
+        assertEquals(listOf(Crumb("Movies", "")), root.crumbs)
+        assertEquals(listOf("Anime" to 1, "Sci-Fi" to 2), root.folders.map { it.name to it.videoCount })
+        assertEquals(listOf("Anime", "Sci-Fi"), root.folders.map { it.path })
+        assertEquals(listOf(EVERYTHING, OPPENHEIMER, PARASITE, RRR), root.videos.map { it.id })
+
+        val sciFi = requireNotNull(UiMappers.browseDir(index, MOVIES_FOLDER, "Sci-Fi", idle))
+        assertEquals("Sci-Fi", sciFi.title)
+        assertEquals(listOf(Crumb("Movies", ""), Crumb("Sci-Fi", "Sci-Fi")), sciFi.crumbs)
+        assertTrue(sciFi.folders.isEmpty())
+        assertEquals(listOf(DUNE, INTERSTELLAR), sciFi.videos.map { it.id })
+    }
+
+    @Test
+    fun browseDirOnTheNasAndTheDevice() {
+        val nasRoot = requireNotNull(UiMappers.browseDir(index, NAS, "", idle))
+        assertEquals(listOf("TV" to 16), nasRoot.folders.map { it.name to it.videoCount })
+        assertTrue(nasRoot.videos.isEmpty())
+
+        val tv = requireNotNull(UiMappers.browseDir(index, NAS, "/TV/", idle))
+        assertEquals("TV", tv.path)
+        assertEquals(listOf("Severance" to 8, "Shogun" to 4, "The Office" to 4), tv.folders.map { it.name to it.videoCount })
+        assertEquals("TV/Severance", tv.folders.first().path)
+
+        val device = requireNotNull(UiMappers.browseDir(index, DEVICE, "", idle))
+        assertEquals(listOf("DCIM" to 2, "Download" to 5), device.folders.map { it.name to it.videoCount })
+
+        assertNull(UiMappers.browseDir(index, 99, "", idle))
+    }
+
+    // Search
+
+    @Test
+    fun searchRanksTitlesThatStartWithTheQueryFirst() {
+        val results = UiMappers.search(index, "pa").results
+        assertEquals(
+            listOf("Panchayat", "Parasite", "Dune: Part Two", "Goa trip - Palolem sunset", "Spirited Away"),
+            results.map { it.title },
+        )
+        assertTrue(results.first() is LibraryItemUi.Show)
+    }
+
+    @Test
+    fun searchFindsEpisodesAsTheirShow() {
+        val byEpisodeTitle = UiMappers.search(index, "who is alive").results
+        assertEquals(listOf("s:$SEVERANCE_KEY"), byEpisodeTitle.map { it.key })
+
+        val byShowTitle = UiMappers.search(index, "OFFICE").results
+        assertEquals(listOf("s:$OFFICE_KEY"), byShowTitle.map { it.key })
+
+        val byFileName = UiMappers.search(index, "x36xhzz").results
+        assertEquals(listOf("v:$BUNNY"), byFileName.map { it.key })
+
+        val blank = UiMappers.search(index, "  ")
+        assertEquals("  ", blank.query)
+        assertTrue(blank.results.isEmpty())
+    }
+
+    // Scan
+
+    @Test
+    fun scanLabels() {
+        assertEquals(ScanUi(), UiMappers.scan(ScanState()))
+        assertEquals(
+            ScanUi(running = true, label = "Scanning NAS · Media · 214 found"),
+            UiMappers.scan(ScanState(running = true, sourceName = "NAS · Media", found = 214)),
+        )
+        assertEquals(ScanUi(running = true, label = "Scanning library"), UiMappers.scan(ScanState(running = true)))
+        val enriching = UiMappers.scan(ScanState(enriching = true, enrichDone = 12, enrichTotal = 80))
+        assertEquals("Fetching posters 12 / 80", enriching.label)
+        assertEquals(0.15f, requireNotNull(enriching.progress), 1e-6f)
+    }
+
+    @Test
+    fun naturalOrderComparesNumbersByValue() {
+        val sorted = listOf("Part 10", "part 2", "Part 1", "Part 02b").sortedWith(NaturalOrder)
+        assertEquals(listOf("Part 1", "part 2", "Part 02b", "Part 10"), sorted)
+    }
+
+    // Fixtures
+
+    private val device = SourceEntity(id = DEVICE, type = SourceType.DEVICE, name = "Device storage", location = "device")
+    private val nas = SourceEntity(id = NAS, type = SourceType.SMB, name = "NAS", location = "smb://nas.local/Media")
+
+    private fun row(video: VideoEntity) = VideoWithMeta(video, null)
+
+    private fun video(
+        id: Long,
+        sourceId: Long,
+        uri: String,
+        kind: VideoKind = VideoKind.VIDEO,
+        fileName: String = uri.substringAfterLast('/'),
+        positionMs: Long = 0,
+        metadataKey: String? = null,
+        localPoster: String? = null,
+        localBackdrop: String? = null,
+        localThumb: String? = null,
+    ) = VideoEntity(
+        id = id,
+        sourceId = sourceId,
+        uri = uri,
+        fileName = fileName,
+        folder = "Movies",
+        durationMs = 120_000,
+        dateAdded = 1_000L * id,
+        kind = kind,
+        parsedTitle = "Heat",
+        metadataKey = metadataKey,
+        localPoster = localPoster,
+        localBackdrop = localBackdrop,
+        localThumb = localThumb,
+        positionMs = positionMs,
+    )
+
+    private fun episode(
+        id: Long,
+        season: Int?,
+        episode: Int,
+        fileName: String = "Show.S${season ?: 0}E$episode.mkv",
+        positionMs: Long = 0,
+        lastPlayedAt: Long? = null,
+    ) = VideoEntity(
+        id = id,
+        sourceId = NAS,
+        uri = "smb://nas.local/Media/TV/Show/$fileName",
+        fileName = fileName,
+        folder = "TV/Show",
+        durationMs = 1_800_000,
+        dateAdded = 1_000L * id,
+        kind = VideoKind.EPISODE,
+        parsedTitle = "Show",
+        season = season,
+        episode = episode,
+        showKey = "name:show",
+        positionMs = positionMs,
+        lastPlayedAt = lastPlayedAt,
+    )
+}
