@@ -70,6 +70,8 @@ sealed interface DialogUi {
 @Immutable
 data class AppUiState(
     val route: Route = Route.Home,
+    /** The tab the current page was opened from (details opened from Library keep Library highlighted). */
+    val tab: TopDestination = TopDestination.HOME,
     val canGoBack: Boolean = false,
     val home: HomeUi = HomeUi(),
     val library: LibraryUi = LibraryUi(),
@@ -89,6 +91,8 @@ data class AppUiState(
     val dialog: DialogUi? = null,
     /** One-shot snackbar text; call AppActions.consumeMessage() after showing it. */
     val message: String? = null,
+    /** Stack trace of the last crash (CrashReporter), shown once with Share / Dismiss. */
+    val crashReport: String? = null,
 )
 
 /**
@@ -142,6 +146,11 @@ interface AppActions {
     fun clearMetadata()
 
     fun consumeMessage()
+
+    /** Shares the crash report text (Android share sheet). */
+    fun shareCrashReport()
+    /** Forgets the crash report. */
+    fun dismissCrashReport()
 }
 
 /** No-op actions for previews and screenshot tests. */
@@ -174,4 +183,6 @@ open class NoOpAppActions : AppActions {
     override fun checkTmdbKey() {}
     override fun clearMetadata() {}
     override fun consumeMessage() {}
+    override fun shareCrashReport() {}
+    override fun dismissCrashReport() {}
 }

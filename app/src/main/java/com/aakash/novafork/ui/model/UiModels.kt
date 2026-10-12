@@ -45,6 +45,8 @@ data class VideoCardUi(
     val episode: Int? = null,
     /** "Device", "Folder name", "NAS", "Stream". */
     val sourceLabel: String? = null,
+    /** The source the video belongs to (lets a saved stream be removed). */
+    val sourceId: Long? = null,
 )
 
 @Immutable
@@ -262,7 +264,10 @@ data class SearchUi(
 
 @Immutable
 data class ScanUi(
+    /** Files are being scanned (pull-to-refresh spinner, "Rescan" disabled). */
     val running: Boolean = false,
+    /** Posters and details are being fetched after a scan; never blocks a rescan. */
+    val fetchingArtwork: Boolean = false,
     /** "Scanning Device storage · 214 found", "Fetching posters 12/80" */
     val label: String? = null,
     /** 0–1, or null when indeterminate. */

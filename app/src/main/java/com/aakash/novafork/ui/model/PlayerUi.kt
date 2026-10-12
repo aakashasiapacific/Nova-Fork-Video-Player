@@ -50,6 +50,8 @@ data class PlayerUiState(
     val locked: Boolean = false,
     val inPictureInPicture: Boolean = false,
     val canEnterPictureInPicture: Boolean = true,
+    /** False where the system ignores orientation requests (Android 16+ on screens ≥ 600dp). */
+    val canRotate: Boolean = true,
     val feedback: GestureFeedback? = null,
     /** Shown for a few seconds after auto-resume: "Resumed at 12:34" with a Start over button. */
     val resumedFromMs: Long? = null,
