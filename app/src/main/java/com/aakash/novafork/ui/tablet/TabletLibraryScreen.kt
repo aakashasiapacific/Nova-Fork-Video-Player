@@ -1,121 +1,134 @@
 package com.aakash.novafork.ui.tablet
 
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
-import androidx.compose.material3.LocalContentColor
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.coerceIn
 import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
 import com.aakash.novafork.ui.adaptive.DeviceLayout
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
 import com.aakash.novafork.ui.common.EmptyState
-import com.aakash.novafork.ui.common.NovaIcon
+import com.aakash.novafork.ui.common.GlassCapsuleRow
+import com.aakash.novafork.ui.common.GlassMenuItem
+import com.aakash.novafork.ui.common.LargeTitleHeader
+import com.aakash.novafork.ui.common.PullDownButton
 import com.aakash.novafork.ui.common.ScanBanner
+import com.aakash.novafork.ui.common.largeTitleTopPadding
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.AppUiState
+import com.aakash.novafork.ui.model.DialogUi
 import com.aakash.novafork.ui.model.LibraryFilter
 import com.aakash.novafork.ui.model.LibraryItemUi
 import com.aakash.novafork.ui.model.LibrarySort
-import com.aakash.novafork.ui.model.LibraryUi
+import com.aakash.novafork.ui.model.MediaKind
+import com.aakash.novafork.ui.model.ScanUi
 import com.aakash.novafork.ui.model.TopDestination
 
 /**
- * Library. Landscape: list-detail (poster grid + preview pane driven by [AppActions.preview]).
- * Portrait: the grid alone, cells open the details page.
+ * The Library capsules. The view model knows four filters; Streams is split out of the videos
+ * filter here so it gets its own capsule (and Home Videos holds only files).
+ */
+internal enum class LibraryCategory(val label: String, val filter: LibraryFilter) {
+    ALL("All", LibraryFilter.ALL),
+    MOVIES("Movies", LibraryFilter.MOVIES),
+    SHOWS("TV Shows", LibraryFilter.SHOWS),
+    HOME_VIDEOS("Home Videos", LibraryFilter.VIDEOS),
+    STREAMS("Streams", LibraryFilter.VIDEOS),
+    ;
+
+    /** The items of this category out of the view model's list for [filter]. */
+    fun select(items: List<LibraryItemUi>): List<LibraryItemUi> = when (this) {
+        HOME_VIDEOS -> items.filterNot { it.isStream() }
+        STREAMS -> items.filter { it.isStream() }
+        ALL, MOVIES, SHOWS -> items
+    }
+
+    companion object {
+        fun of(filter: LibraryFilter, streams: Boolean): LibraryCategory = when (filter) {
+            LibraryFilter.ALL -> ALL
+            LibraryFilter.MOVIES -> MOVIES
+            LibraryFilter.SHOWS -> SHOWS
+            LibraryFilter.VIDEOS -> if (streams) STREAMS else HOME_VIDEOS
+        }
+    }
+}
+
+private fun LibraryItemUi.isStream(): Boolean = this is LibraryItemUi.Video && card.kind == MediaKind.STREAM
+
+private fun LibrarySort.menuLabel(): String = when (this) {
+    LibrarySort.RECENT -> "Recently Added"
+    LibrarySort.TITLE -> "Title"
+    LibrarySort.YEAR -> "Release Date"
+    LibrarySort.RATING -> "Rating"
+}
+
+/** Narrower windows (a forced tablet layout) have no room for the preview pane. */
+private val ListDetailMinWidth = 840.dp
+
+/**
+ * Library: Large Title, category capsules with "Sort ▾", and an adaptive grid of 2:3 posters.
+ * Landscape keeps a frosted preview pane on the right, driven by [AppActions.preview] and
+ * [AppUiState.previewKey]: a tap previews, a second tap opens. Portrait taps open directly.
  */
 @Composable
 internal fun TabletLibraryScreen(
     state: AppUiState,
     layout: DeviceLayout,
     actions: AppActions,
+    category: LibraryCategory,
+    onCategory: (LibraryCategory) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val dims = LocalNovaDimens.current
     val library = state.library
-    val items = library.items
+    val items = remember(library.items, category) { category.select(library.items) }
     val previewKey = state.previewKey
-    val listDetail = layout.isExpanded
-
-    if (listDetail) {
-        // Keep something in the pane: the first item initially, and again when a filter change
-        // removes the previewed one from the list.
-        LaunchedEffect(items, previewKey) {
-            if (items.isNotEmpty() && items.none { it.key == previewKey }) actions.preview(items.first())
+    BoxWithConstraints(modifier.fillMaxSize()) {
+        val listDetail = layout.isExpanded && maxWidth >= ListDetailMinWidth
+        if (listDetail) {
+            // Keep something in the pane: the first item initially, and again when a category
+            // change removes the previewed one from the grid.
+            LaunchedEffect(items, previewKey) {
+                if (items.isNotEmpty() && items.none { it.key == previewKey }) actions.preview(items.first())
+            }
         }
-    }
-
-    Column(modifier.fillMaxSize()) {
-        LibraryHeader(
-            library = library,
-            actions = actions,
-            // Portrait is too narrow for title, chips and sort on one line.
-            stacked = !listDetail,
-            modifier = Modifier
-                .statusBarsPadding()
-                .padding(start = dims.gutter, end = dims.gutter - 8.dp, top = 20.dp, bottom = 12.dp),
-        )
-        ScanBanner(state.scan, Modifier.padding(horizontal = dims.gutter - 16.dp))
-        when {
-            items.isEmpty() -> LibraryEmpty(
-                filter = library.filter,
+        val paneWidth = (maxWidth * 0.36f).coerceIn(360.dp, 480.dp)
+        Row(Modifier.fillMaxSize()) {
+            LibraryGrid(
+                items = items,
+                category = category,
+                sort = library.sort,
+                scan = state.scan,
+                selectedKey = if (listDetail) previewKey else null,
+                onClick = { item ->
+                    if (listDetail && item.key != previewKey) actions.preview(item) else actions.openItem(item)
+                },
                 actions = actions,
+                onCategory = onCategory,
+                endPadding = if (listDetail) 24.dp else LocalNovaDimens.current.gutter,
                 modifier = Modifier
                     .weight(1f)
-                    .fillMaxWidth(),
+                    .fillMaxHeight(),
             )
-            listDetail -> Row(
-                Modifier
-                    .weight(1f)
-                    .fillMaxWidth(),
-            ) {
-                LibraryGrid(
-                    items = items,
-                    selectedKey = previewKey,
-                    // A second tap on the previewed title opens it.
-                    onClick = { item -> if (item.key == previewKey) actions.openItem(item) else actions.preview(item) },
-                    onLongClick = { item -> actions.openItem(item) },
-                    longClickLabel = { "Open details" },
-                    contentPadding = PaddingValues(
-                        start = dims.gutter,
-                        end = 24.dp,
-                        top = 8.dp,
-                        bottom = navigationBarBottom() + 24.dp,
-                    ),
-                    modifier = Modifier
-                        .weight(0.58f)
-                        .fillMaxHeight(),
-                )
+            if (listDetail) {
                 TabletPreviewPane(
                     previewKey = previewKey,
                     item = items.firstOrNull { it.key == previewKey },
@@ -123,120 +136,9 @@ internal fun TabletLibraryScreen(
                     show = state.showDetails?.takeIf { previewKey == "s:${it.key}" },
                     actions = actions,
                     modifier = Modifier
-                        .weight(0.42f)
-                        .fillMaxHeight(),
-                )
-            }
-            else -> LibraryGrid(
-                items = items,
-                selectedKey = null,
-                onClick = { item -> actions.openItem(item) },
-                onLongClick = { item ->
-                    when (item) {
-                        is LibraryItemUi.Video -> actions.play(item.card.id)
-                        is LibraryItemUi.Show -> actions.openShow(item.card.key)
-                    }
-                },
-                longClickLabel = { item -> if (item is LibraryItemUi.Video) "Play" else "Open details" },
-                contentPadding = PaddingValues(
-                    start = dims.gutter,
-                    end = dims.gutter,
-                    top = 8.dp,
-                    bottom = navigationBarBottom() + 24.dp,
-                ),
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth(),
-            )
-        }
-    }
-}
-
-internal fun AppActions.openItem(item: LibraryItemUi) {
-    when (item) {
-        is LibraryItemUi.Video -> openVideo(item.card.id)
-        is LibraryItemUi.Show -> openShow(item.card.key)
-    }
-}
-
-@Composable
-private fun LibraryHeader(library: LibraryUi, actions: AppActions, stacked: Boolean, modifier: Modifier = Modifier) {
-    if (stacked) {
-        Column(modifier.fillMaxWidth()) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Library", style = MaterialTheme.typography.headlineMedium, modifier = Modifier.weight(1f))
-                SortMenu(sort = library.sort, onSort = actions::setLibrarySort)
-            }
-            Spacer(Modifier.height(12.dp))
-            FilterChipRow(library = library, onFilter = actions::setLibraryFilter)
-        }
-    } else {
-        Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text("Library", style = MaterialTheme.typography.headlineMedium)
-            Spacer(Modifier.width(28.dp))
-            FilterChipRow(library = library, onFilter = actions::setLibraryFilter, modifier = Modifier.weight(1f))
-            Spacer(Modifier.width(12.dp))
-            SortMenu(sort = library.sort, onSort = actions::setLibrarySort)
-        }
-    }
-}
-
-@Composable
-private fun FilterChipRow(library: LibraryUi, onFilter: (LibraryFilter) -> Unit, modifier: Modifier = Modifier) {
-    Row(
-        modifier.horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        LibraryFilter.entries.forEach { filter ->
-            val selected = filter == library.filter
-            val count = library.counts[filter]
-            FilterChip(
-                selected = selected,
-                onClick = { onFilter(filter) },
-                label = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(filter.label)
-                        if (count != null) {
-                            Spacer(Modifier.width(6.dp))
-                            Text(count.toString(), color = LocalContentColor.current.copy(alpha = 0.65f))
-                        }
-                    }
-                },
-                leadingIcon = if (selected) {
-                    { NovaIcon(R.drawable.ic_check, contentDescription = null, modifier = Modifier.size(FilterChipDefaults.IconSize)) }
-                } else {
-                    null
-                },
-            )
-        }
-    }
-}
-
-@Composable
-private fun SortMenu(sort: LibrarySort, onSort: (LibrarySort) -> Unit) {
-    var open by remember { mutableStateOf(false) }
-    Box {
-        TextButton(onClick = { open = true }) {
-            NovaIcon(R.drawable.ic_sort, contentDescription = null, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(8.dp))
-            Text(sort.label)
-            Spacer(Modifier.width(4.dp))
-            NovaIcon(R.drawable.ic_expand_more, contentDescription = null, modifier = Modifier.size(18.dp))
-        }
-        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-            LibrarySort.entries.forEach { option ->
-                DropdownMenuItem(
-                    text = { Text(option.label) },
-                    onClick = {
-                        open = false
-                        onSort(option)
-                    },
-                    trailingIcon = if (option == sort) {
-                        { NovaIcon(R.drawable.ic_check, contentDescription = "Selected") }
-                    } else {
-                        null
-                    },
+                        .width(paneWidth)
+                        .fillMaxHeight()
+                        .padding(top = largeTitleTopPadding(), end = 24.dp, bottom = navigationBarBottom() + 24.dp),
                 )
             }
         }
@@ -246,58 +148,102 @@ private fun SortMenu(sort: LibrarySort, onSort: (LibrarySort) -> Unit) {
 @Composable
 private fun LibraryGrid(
     items: List<LibraryItemUi>,
+    category: LibraryCategory,
+    sort: LibrarySort,
+    scan: ScanUi,
     selectedKey: String?,
     onClick: (LibraryItemUi) -> Unit,
-    onLongClick: (LibraryItemUi) -> Unit,
-    longClickLabel: (LibraryItemUi) -> String,
-    contentPadding: PaddingValues,
+    actions: AppActions,
+    onCategory: (LibraryCategory) -> Unit,
+    endPadding: Dp,
     modifier: Modifier = Modifier,
 ) {
     val dims = LocalNovaDimens.current
     LazyVerticalGrid(
         columns = GridCells.Adaptive(dims.gridMinCell),
         modifier = modifier,
-        contentPadding = contentPadding,
+        contentPadding = PaddingValues(
+            start = dims.gutter,
+            end = endPadding,
+            bottom = navigationBarBottom() + 32.dp,
+        ),
         horizontalArrangement = Arrangement.spacedBy(dims.rowSpacing),
-        verticalArrangement = Arrangement.spacedBy(24.dp),
+        verticalArrangement = Arrangement.spacedBy(28.dp),
     ) {
-        items(items, key = { it.key }, contentType = { "poster" }) { item ->
-            TabletLibraryItemCard(
-                item = item,
-                onClick = { onClick(item) },
-                onLongClick = { onLongClick(item) },
-                onLongClickLabel = longClickLabel(item),
-                selected = item.key == selectedKey,
-            )
+        item(key = "header", span = { GridItemSpan(maxLineSpan) }, contentType = "header") {
+            Column(Modifier.fillMaxWidth()) {
+                LargeTitleHeader("Library", horizontalPadding = 0.dp)
+                GlassCapsuleRow(
+                    items = LibraryCategory.entries.map { it.label },
+                    selectedIndex = category.ordinal,
+                    onSelect = { index -> onCategory(LibraryCategory.entries[index]) },
+                    contentPadding = PaddingValues(0.dp),
+                    trailing = {
+                        PullDownButton(
+                            label = "Sort",
+                            items = LibrarySort.entries.map { option ->
+                                GlassMenuItem(option.menuLabel(), checked = option == sort) { actions.setLibrarySort(option) }
+                            },
+                        )
+                    },
+                )
+                ScanBanner(scan, Modifier.padding(top = 4.dp))
+            }
+        }
+        if (items.isEmpty()) {
+            item(key = "empty", span = { GridItemSpan(maxLineSpan) }, contentType = "empty") {
+                LibraryEmpty(category = category, actions = actions, onCategory = onCategory)
+            }
+        } else {
+            items(items, key = { it.key }, contentType = { "poster" }) { item ->
+                TabletLibraryCard(
+                    item = item,
+                    onClick = { onClick(item) },
+                    menu = libraryItemMenu(item, actions),
+                    selected = item.key == selectedKey,
+                )
+            }
         }
     }
 }
 
 @Composable
-private fun LibraryEmpty(filter: LibraryFilter, actions: AppActions, modifier: Modifier = Modifier) {
-    Box(modifier, contentAlignment = Alignment.Center) {
-        if (filter == LibraryFilter.ALL) {
-            EmptyState(
+private fun LibraryEmpty(category: LibraryCategory, actions: AppActions, onCategory: (LibraryCategory) -> Unit) {
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .padding(top = 64.dp),
+        contentAlignment = Alignment.TopCenter,
+    ) {
+        when (category) {
+            LibraryCategory.ALL -> EmptyState(
                 icon = R.drawable.ic_video_library,
-                title = "Your library is empty",
+                title = "Your Library Is Empty",
                 body = "Add a folder or a network share, or allow access to the videos on this tablet.",
-                actionLabel = "Add a folder",
+                actionLabel = "Add Folder",
                 onAction = actions::addFolder,
-                secondaryLabel = "Browse sources",
+                secondaryLabel = "Browse Sources",
                 onSecondary = { actions.selectTab(TopDestination.BROWSE) },
             )
-        } else {
-            val title = when (filter) {
-                LibraryFilter.MOVIES -> "No movies yet"
-                LibraryFilter.SHOWS -> "No TV shows yet"
-                LibraryFilter.VIDEOS, LibraryFilter.ALL -> "No videos yet"
-            }
-            EmptyState(
+            LibraryCategory.STREAMS -> EmptyState(
+                icon = R.drawable.ic_live_tv,
+                title = "No Streams",
+                body = "Save a live channel or a video link to watch it from here.",
+                actionLabel = "Add Stream",
+                onAction = { actions.showDialog(DialogUi.AddStream) },
+                secondaryLabel = "Show All",
+                onSecondary = { onCategory(LibraryCategory.ALL) },
+            )
+            LibraryCategory.MOVIES, LibraryCategory.SHOWS, LibraryCategory.HOME_VIDEOS -> EmptyState(
                 icon = R.drawable.ic_filter_list,
-                title = title,
-                body = "Nothing in your library falls into this group yet.",
-                actionLabel = "Show everything",
-                onAction = { actions.setLibraryFilter(LibraryFilter.ALL) },
+                title = when (category) {
+                    LibraryCategory.MOVIES -> "No Movies"
+                    LibraryCategory.SHOWS -> "No TV Shows"
+                    else -> "No Home Videos"
+                },
+                body = "Nothing in your library falls into this category yet.",
+                actionLabel = "Show All",
+                onAction = { onCategory(LibraryCategory.ALL) },
             )
         }
     }
