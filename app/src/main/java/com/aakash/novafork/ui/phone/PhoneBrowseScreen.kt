@@ -2,12 +2,10 @@ package com.aakash.novafork.ui.phone
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Icon
@@ -16,7 +14,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
@@ -225,7 +222,7 @@ private fun SourceRow(
     }
 }
 
-/** A saved stream: orange icon square, title over its URL. Tap plays; swipe or long press removes. */
+/** A saved stream: orange icon square and its title. Tap plays; swipe or long press removes. */
 @Composable
 private fun StreamRow(stream: VideoCardUi, actions: AppActions, onRemove: (VideoCardUi) -> Unit) {
     val menu = rememberPhoneMenuState()
@@ -234,18 +231,14 @@ private fun StreamRow(stream: VideoCardUi, actions: AppActions, onRemove: (Video
         SwipeToDeleteRow(onDelete = { onRemove(stream) }, enabled = removable) {
             ListRow(
                 title = stream.title,
-                subtitle = stream.sourceLabel?.takeIf { it.isNotBlank() && it != stream.title && it != "Stream" },
                 leading = { ListRowIcon(R.drawable.ic_live_tv, NovaColors.orange) },
                 trailing = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            painterResource(R.drawable.ic_play_arrow),
-                            contentDescription = null,
-                            modifier = Modifier.size(20.dp),
-                            tint = NovaColors.tertiaryLabel,
-                        )
-                        Spacer(Modifier.width(2.dp))
-                    }
+                    Icon(
+                        painterResource(R.drawable.ic_play_arrow),
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp),
+                        tint = NovaColors.tertiaryLabel,
+                    )
                 },
                 onLongClick = { menu.open = true },
                 onClick = { actions.play(stream.id) },
