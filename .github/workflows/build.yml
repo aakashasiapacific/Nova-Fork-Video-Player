@@ -57,6 +57,11 @@ jobs:
         run: |
           mkdir -p /tmp/apk
           cp dist/*.apk /tmp/apk/
+          # Fixed names too, so a download link never changes between builds.
+          for f in dist/*.apk; do
+            abi=$(basename "$f" .apk | sed -E 's/^NovaFork-[0-9]+-//')
+            cp "$f" "/tmp/apk/NovaFork-latest-$abi.apk"
+          done
           cd /tmp/apk
           git init -q && git checkout -q -b apk
           git config user.name "ci" && git config user.email "ci@users.noreply.github.com"
