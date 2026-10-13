@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -17,14 +18,15 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import coil.request.videoFramePercent
 import com.aakash.novafork.ui.model.Artwork
-import com.aakash.novafork.ui.theme.NovaType
 import kotlin.math.abs
 
 /**
@@ -119,25 +121,22 @@ fun BackdropArt(artwork: Artwork, modifier: Modifier = Modifier) {
     }
 }
 
-/**
- * Two colours picked from [seed] so the same title always gets the same placeholder: a subtle,
- * nearly black gradient with a faint hue, like an empty Apple TV tile.
- */
+/** Two colours picked from [seed] so the same title always gets the same placeholder. */
 fun placeholderColors(seed: String): Pair<Color, Color> {
     val palette = listOf(
-        Color(0xFF2C2C30) to Color(0xFF141416),
-        Color(0xFF282C34) to Color(0xFF111317),
-        Color(0xFF2F2A30) to Color(0xFF141214),
-        Color(0xFF282F2D) to Color(0xFF111413),
-        Color(0xFF302D28) to Color(0xFF151412),
-        Color(0xFF292B35) to Color(0xFF121318),
-        Color(0xFF2F292D) to Color(0xFF151214),
-        Color(0xFF272E31) to Color(0xFF111416),
+        Color(0xFF3B2A55) to Color(0xFF14101F),
+        Color(0xFF15405A) to Color(0xFF0B1620),
+        Color(0xFF5A2A2A) to Color(0xFF1C0E0E),
+        Color(0xFF254D3A) to Color(0xFF0C1A13),
+        Color(0xFF5A4520) to Color(0xFF1D160A),
+        Color(0xFF2B3A6B) to Color(0xFF0E1324),
+        Color(0xFF5B2A4D) to Color(0xFF1E0E1A),
+        Color(0xFF304A4F) to Color(0xFF0F1819),
     )
     return palette[abs(seed.hashCode() % palette.size)]
 }
 
-/** Gradient tile with the title (Subhead semibold, white 85%), used when no artwork loads. */
+/** Gradient tile with the title, used when no artwork loads. */
 @Composable
 fun ArtPlaceholder(seed: String, title: String?, modifier: Modifier = Modifier) {
     val (top, bottom) = placeholderColors(seed)
@@ -150,9 +149,9 @@ fun ArtPlaceholder(seed: String, title: String?, modifier: Modifier = Modifier) 
         if (!title.isNullOrBlank()) {
             Text(
                 text = title,
-                modifier = Modifier.padding(12.dp),
-                color = Color.White.copy(alpha = 0.85f),
-                style = NovaType.subheadSemibold,
+                modifier = Modifier.padding(10.dp),
+                color = Color.White.copy(alpha = 0.92f),
+                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold, lineHeight = 18.sp),
                 textAlign = TextAlign.Center,
                 maxLines = 4,
                 overflow = TextOverflow.Ellipsis,
@@ -163,46 +162,26 @@ fun ArtPlaceholder(seed: String, title: String?, modifier: Modifier = Modifier) 
 
 /**
  * Darkens the bottom of an image so text on top stays readable, fading into [color]
- * (usually the page background so the art melts into the page). The ramp is eased, so there is
- * no visible band where the gradient starts. Apple TV heroes: startFraction = 0.55 (lower 45%).
+ * (usually the page background so the art melts into the page).
  */
 fun Modifier.bottomScrim(color: Color, startFraction: Float = 0.35f): Modifier = drawWithContent {
     drawContent()
-    val s = startFraction.coerceIn(0f, 0.99f)
-    val span = 1f - s
     drawRect(
         Brush.verticalGradient(
             0f to Color.Transparent,
-            s to Color.Transparent,
-            s + span * 0.25f to color.copy(alpha = color.alpha * 0.18f),
-            s + span * 0.5f to color.copy(alpha = color.alpha * 0.5f),
-            s + span * 0.75f to color.copy(alpha = color.alpha * 0.84f),
+            startFraction to Color.Transparent,
             1f to color,
         ),
     )
 }
 
-/** Darkens the start edge (iPad heroes keep text on the left over the backdrop). Eased like bottomScrim. */
+/** Darkens the start edge (tablet heroes keep text on the left over the backdrop). */
 fun Modifier.startScrim(color: Color, endFraction: Float = 0.7f): Modifier = drawWithContent {
     drawContent()
-    val e = endFraction.coerceIn(0.01f, 1f)
     drawRect(
         Brush.horizontalGradient(
             0f to color,
-            e * 0.3f to color.copy(alpha = color.alpha * 0.8f),
-            e * 0.65f to color.copy(alpha = color.alpha * 0.35f),
-            e to Color.Transparent,
-        ),
-    )
-}
-
-/** Darkens the top of artwork so the status bar and floating glass buttons stay legible. */
-fun Modifier.topScrim(color: Color = Color.Black.copy(alpha = 0.45f), endFraction: Float = 0.25f): Modifier = drawWithContent {
-    drawContent()
-    drawRect(
-        Brush.verticalGradient(
-            0f to color,
-            endFraction.coerceIn(0.01f, 1f) to Color.Transparent,
+            endFraction to Color.Transparent,
         ),
     )
 }

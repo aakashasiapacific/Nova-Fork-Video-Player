@@ -1,36 +1,51 @@
 package com.aakash.novafork.ui.tablet
 
+import androidx.annotation.DrawableRes
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
 import com.aakash.novafork.ui.adaptive.DeviceLayout
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
-import com.aakash.novafork.ui.common.GlassCircleButton
-import com.aakash.novafork.ui.common.GlassMenuItem
-import com.aakash.novafork.ui.common.GlassStyle
-import com.aakash.novafork.ui.common.NovaGlyphs
-import com.aakash.novafork.ui.common.PrimaryCapsuleButton
-import com.aakash.novafork.ui.common.TextAction
+import com.aakash.novafork.ui.common.NovaIcon
+import com.aakash.novafork.ui.common.RatingPill
 import com.aakash.novafork.ui.common.metaLine
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.MediaKind
 import com.aakash.novafork.ui.model.VideoDetailsUi
-import com.aakash.novafork.ui.theme.NovaColors
-import com.aakash.novafork.ui.theme.NovaType
+
+/** Compact (portrait) poster width; landscape uses [com.aakash.novafork.ui.adaptive.NovaDimens.detailPosterWidth]. */
+internal val CompactDetailPosterWidth = 200.dp
 
 /**
- * Movie / episode / home video / stream page: full-screen artwork, title, meta and badges, the
- * Play capsule with Start Over, Watched and Identify circles, the description; under the fold
- * Up Next, About and Information.
+ * Movie / episode / video page: the artwork fills the screen behind a heavy scrim. Landscape puts
+ * the poster and file facts in a left column next to the text; portrait stacks them.
  */
 @Composable
 internal fun TabletVideoDetailsScreen(
@@ -39,130 +54,211 @@ internal fun TabletVideoDetailsScreen(
     actions: AppActions,
     modifier: Modifier = Modifier,
 ) {
-    val isStream = details.kind == MediaKind.STREAM
-    val started = (details.progress ?: 0f) > 0f
-    val showKey = details.showKey
-    TabletDetailsPage(
-        artwork = details.artwork,
-        title = details.title,
-        onBack = actions::back,
-        menu = detailsMenu(details, actions),
-        modifier = modifier,
-        fold = {
-            if (details.kind == MediaKind.EPISODE) {
-                val eyebrow = metaLine(details.showTitle, episodeTag(details.season, details.episode))
-                if (eyebrow.isNotEmpty()) {
-                    DetailsEyebrow(eyebrow, onClick = if (showKey != null) ({ actions.openShow(showKey) }) else null)
-                }
-            }
-            DetailsTitle(details.title)
-            DetailsMeta(
-                meta = metaLine(details.genres.firstOrNull(), details.year?.toString(), details.runtimeLabel),
-                quality = qualityBadge(details.resolutionLabel),
-                rating = details.rating,
-            )
-            Spacer(Modifier.height(22.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                PrimaryCapsuleButton(text = details.playLabel, onClick = { actions.play(details.id) })
-                if (started) {
-                    Spacer(Modifier.width(12.dp))
-                    GlassCircleButton(
-                        onClick = { actions.play(details.id, startOver = true) },
-                        icon = R.drawable.ic_restart_alt,
-                        contentDescription = "Start Over",
-                        style = GlassStyle.Clear,
-                    )
-                }
-                if (!isStream) {
-                    Spacer(Modifier.width(12.dp))
-                    GlassCircleButton(
-                        onClick = { actions.setWatched(details.id, !details.watched) },
-                        icon = NovaGlyphs.Check,
-                        contentDescription = if (details.watched) "Mark as Unwatched" else "Mark as Watched",
-                        selected = details.watched,
-                        style = GlassStyle.Clear,
-                    )
-                    Spacer(Modifier.width(12.dp))
-                    GlassCircleButton(
-                        onClick = { actions.identify(details.id) },
-                        icon = R.drawable.ic_edit,
-                        contentDescription = "Identify",
-                        style = GlassStyle.Clear,
-                    )
-                }
-            }
-            ResumeLine(
-                progress = details.progress,
-                label = remainingLabel(details.progress, details.durationMs, details.positionMs),
-            )
-            if (details.overview.isNullOrBlank() && !isStream && !details.isMatched) {
-                Spacer(Modifier.height(18.dp))
-                Text(
-                    text = "No description for this one yet. If the title looks wrong, Identify it to pick the right match.",
-                    style = NovaType.subhead,
-                    color = NovaColors.OnMediaSecondary,
-                    modifier = Modifier.widthIn(max = LocalNovaDimens.current.descriptionMaxWidth),
-                )
-                TextAction("Identify…", onClick = { actions.identify(details.id) })
-            } else {
-                DetailsOverview(details.overview, details.title)
-            }
-        },
-        below = {
-            val next = details.nextEpisode
-            if (next != null) {
-                detailsSection(key = "upNext", title = "Up Next") {
-                    TabletWideCard(
-                        artwork = next.artwork,
-                        title = next.title,
-                        caption = metaLine(next.episodeTag(), minutesLabel(next.durationMs)),
-                        onClick = { actions.play(next.id) },
-                        onClickLabel = "Play",
-                        progress = next.progress,
-                        watched = next.watched,
-                        menu = videoMenu(next, actions),
-                        modifier = Modifier
-                            .padding(horizontal = LocalNovaDimens.current.gutter)
-                            .width(LocalNovaDimens.current.episodeCardWidth),
-                    )
-                }
-            }
-            aboutSection(
-                title = details.title,
-                overview = details.overview,
-                subtitle = metaLine(details.tagline, details.genres.joinToString(", ")),
-            )
-            informationSection(
-                listOf(
-                    "Released" to (details.airDate ?: details.year?.toString()),
-                    "Run Time" to details.runtimeLabel,
-                    "Genres" to details.genres.joinToString(", "),
-                    "Original Title" to details.originalTitle?.takeUnless { it.equals(details.title, ignoreCase = true) },
-                    "Episode" to details.episodeCode,
-                    "Resolution" to details.resolutionLabel,
-                    "File" to details.fileName,
-                    "Size" to details.sizeLabel,
-                    "Location" to details.location,
-                    "Source" to details.sourceLabel,
+    val dims = LocalNovaDimens.current
+    Box(modifier.fillMaxSize()) {
+        TabletDetailsBackdrop(details.artwork)
+        Column(
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .statusBarsPadding()
+                .padding(
+                    start = dims.gutter,
+                    end = dims.gutter,
+                    top = 12.dp,
+                    bottom = navigationBarBottom() + dims.sectionSpacing,
                 ),
-            )
-        },
-    )
+        ) {
+            TabletBackButton(onClick = actions::back)
+            Spacer(Modifier.height(20.dp))
+            if (layout.isExpanded) {
+                Row(horizontalArrangement = Arrangement.spacedBy(40.dp)) {
+                    Column(
+                        Modifier.width(dims.detailPosterWidth),
+                        verticalArrangement = Arrangement.spacedBy(20.dp),
+                    ) {
+                        TabletDetailsPoster(details.artwork, details.title, dims.detailPosterWidth)
+                        VideoFileCard(details, Modifier.fillMaxWidth())
+                    }
+                    Column(
+                        Modifier
+                            .weight(1f, fill = false)
+                            .widthIn(max = 760.dp),
+                    ) {
+                        VideoHeadline(details)
+                        Spacer(Modifier.height(28.dp))
+                        VideoBody(details, actions)
+                    }
+                }
+            } else {
+                Row(verticalAlignment = Alignment.Bottom) {
+                    TabletDetailsPoster(details.artwork, details.title, CompactDetailPosterWidth)
+                    Spacer(Modifier.width(28.dp))
+                    Column(Modifier.weight(1f)) { VideoHeadline(details) }
+                }
+                Spacer(Modifier.height(28.dp))
+                VideoBody(details, actions)
+                Spacer(Modifier.height(28.dp))
+                VideoFileCard(details, Modifier.fillMaxWidth())
+            }
+        }
+    }
 }
 
-/** The "…" menu: what the circles do, plus Go to Show for episodes and Remove for streams. */
-private fun detailsMenu(details: VideoDetailsUi, actions: AppActions): List<GlassMenuItem> = buildList {
-    val showKey = details.showKey
-    if (details.kind == MediaKind.EPISODE && showKey != null) {
-        add(GlassMenuItem("Go to Show", icon = R.drawable.ic_tv) { actions.openShow(showKey) })
-    }
-    if (details.kind != MediaKind.STREAM) {
-        add(
-            GlassMenuItem(
-                label = if (details.watched) "Mark as Unwatched" else "Mark as Watched",
-                icon = if (details.watched) R.drawable.ic_visibility_off else R.drawable.ic_check_circle,
-            ) { actions.setWatched(details.id, !details.watched) },
+@Composable
+private fun VideoHeadline(details: VideoDetailsUi) {
+    Column {
+        Text(
+            text = details.title,
+            style = MaterialTheme.typography.displaySmall,
+            maxLines = 3,
+            overflow = TextOverflow.Ellipsis,
         )
-        add(GlassMenuItem("Identify…", icon = R.drawable.ic_edit) { actions.identify(details.id) })
+        val original = details.originalTitle
+        if (!original.isNullOrBlank() && !original.equals(details.title, ignoreCase = true)) {
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = original,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        val meta = metaLine(details.year?.toString(), details.runtimeLabel, details.episodeCode)
+        if (meta.isNotEmpty() || (details.rating ?: 0f) > 0f) {
+            Spacer(Modifier.height(12.dp))
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                if (meta.isNotEmpty()) {
+                    Text(meta, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                RatingPill(details.rating)
+            }
+        }
+        if (details.genres.isNotEmpty()) {
+            Spacer(Modifier.height(16.dp))
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                details.genres.forEach { TabletTag(it) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun VideoBody(details: VideoDetailsUi, actions: AppActions) {
+    val dims = LocalNovaDimens.current
+    val isStream = details.kind == MediaKind.STREAM
+    val started = (details.progress ?: 0f) > 0f
+    Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            TabletPlayButton(label = details.playLabel, onClick = { actions.play(details.id) })
+            if (started) {
+                FilledTonalButton(onClick = { actions.play(details.id, startOver = true) }, modifier = Modifier.height(48.dp)) {
+                    ButtonLabel(R.drawable.ic_restart_alt, "Start over")
+                }
+            }
+            if (!isStream) {
+                OutlinedButton(onClick = { actions.identify(details.id) }, modifier = Modifier.height(48.dp)) {
+                    ButtonLabel(R.drawable.ic_search, "Identify")
+                }
+                OutlinedButton(onClick = { actions.setWatched(details.id, !details.watched) }, modifier = Modifier.height(48.dp)) {
+                    if (details.watched) {
+                        ButtonLabel(R.drawable.ic_visibility_off, "Mark unwatched")
+                    } else {
+                        ButtonLabel(R.drawable.ic_check, "Mark watched")
+                    }
+                }
+            }
+        }
+        WatchProgress(progress = details.progress, positionMs = details.positionMs, durationMs = details.durationMs)
+        val showKey = details.showKey
+        if (details.kind == MediaKind.EPISODE && showKey != null && !details.showTitle.isNullOrBlank()) {
+            TextButton(onClick = { actions.openShow(showKey) }) {
+                ButtonLabel(R.drawable.ic_tv, "From ${details.showTitle}")
+                Spacer(Modifier.width(4.dp))
+                NovaIcon(R.drawable.ic_chevron_right, contentDescription = null, modifier = Modifier.size(18.dp))
+            }
+        }
+        if (!details.tagline.isNullOrBlank()) {
+            Text(
+                text = details.tagline,
+                style = MaterialTheme.typography.titleMedium,
+                fontStyle = FontStyle.Italic,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        when {
+            !details.overview.isNullOrBlank() -> Text(details.overview, style = MaterialTheme.typography.bodyLarge)
+            !isStream && !details.isMatched -> Text(
+                text = "No description for this one yet. If the title looks wrong, use Identify to pick the right match.",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        val next = details.nextEpisode
+        if (next != null) {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("Next episode", style = MaterialTheme.typography.titleLarge)
+                TabletLandscapeCard(
+                    card = next,
+                    onClick = { actions.play(next.id) },
+                    onLongClick = { actions.openVideo(next.id) },
+                    modifier = Modifier.width(dims.landscapeCardWidth),
+                )
+            }
+        }
+    }
+}
+
+private class FileFact(@DrawableRes val icon: Int, val label: String, val value: String)
+
+@Composable
+private fun VideoFileCard(details: VideoDetailsUi, modifier: Modifier = Modifier) {
+    val facts = listOfNotNull(
+        details.fileName.takeIf { it.isNotBlank() }?.let { FileFact(R.drawable.ic_video_file, "File", it) },
+        details.location.takeIf { it.isNotBlank() }?.let { FileFact(R.drawable.ic_folder, "Location", it) },
+        details.sizeLabel?.takeIf { it.isNotBlank() }?.let { FileFact(R.drawable.ic_sd_storage, "Size", it) },
+        details.resolutionLabel?.takeIf { it.isNotBlank() }?.let { FileFact(R.drawable.ic_hd, "Video", it) },
+        details.sourceLabel.takeIf { it.isNotBlank() }?.let { FileFact(R.drawable.ic_storage, "Source", it) },
+    )
+    if (facts.isEmpty()) return
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.78f),
+    ) {
+        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Text("File", style = MaterialTheme.typography.titleSmall)
+            facts.forEach { fact ->
+                Row {
+                    NovaIcon(
+                        fact.icon,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier
+                            .padding(top = 2.dp)
+                            .size(18.dp),
+                    )
+                    Spacer(Modifier.width(12.dp))
+                    Column {
+                        Text(
+                            text = fact.label,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Text(
+                            text = fact.value,
+                            style = MaterialTheme.typography.bodyMedium,
+                            maxLines = 4,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+            }
+        }
     }
 }

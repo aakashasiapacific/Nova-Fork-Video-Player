@@ -5,16 +5,22 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import com.aakash.novafork.ui.adaptive.LocalDeviceLayout
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
@@ -60,6 +66,7 @@ fun NovaRoot(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
                     )
                 }
                 NovaDialogs(dialog = state.dialog, actions = actions)
+                state.crashReport?.let { report -> CrashReportDialog(report, actions) }
             }
 
             val message = state.message
@@ -74,4 +81,22 @@ fun NovaRoot(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
             BackHandler(enabled = state.canGoBack) { actions.back() }
         }
     }
+}
+
+/** Shown once after a crash so the report can be sent to the developer. */
+@Composable
+private fun CrashReportDialog(report: String, actions: AppActions) {
+    AlertDialog(
+        onDismissRequest = actions::dismissCrashReport,
+        title = { Text("Nova Fork closed unexpectedly") },
+        text = {
+            Text(
+                text = report.lineSequence().take(14).joinToString("\n"),
+                style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+            )
+        },
+        confirmButton = { TextButton(onClick = actions::shareCrashReport) { Text("Share report") } },
+        dismissButton = { TextButton(onClick = actions::dismissCrashReport) { Text("Dismiss") } },
+    )
 }

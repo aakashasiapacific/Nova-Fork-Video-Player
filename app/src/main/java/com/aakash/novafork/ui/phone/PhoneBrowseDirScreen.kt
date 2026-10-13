@@ -1,175 +1,219 @@
 package com.aakash.novafork.ui.phone
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
-import com.aakash.novafork.ui.common.ActivityIndicator
-import com.aakash.novafork.ui.common.BackButton
+import com.aakash.novafork.ui.adaptive.LocalNovaDimens
 import com.aakash.novafork.ui.common.EmptyState
-import com.aakash.novafork.ui.common.GlassMenuButton
-import com.aakash.novafork.ui.common.GlassMenuItem
-import com.aakash.novafork.ui.common.InsetGroup
-import com.aakash.novafork.ui.common.InsetGroupDefaults
-import com.aakash.novafork.ui.common.LargeTitleHeader
-import com.aakash.novafork.ui.common.ListRow
-import com.aakash.novafork.ui.common.ListRowIcon
-import com.aakash.novafork.ui.common.ListSectionFooter
-import com.aakash.novafork.ui.common.glassTabBarClearance
-import com.aakash.novafork.ui.common.rememberTitleCollapsed
+import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.BrowseDirUi
-import com.aakash.novafork.ui.model.VideoCardUi
-import com.aakash.novafork.ui.theme.NovaColors
+import com.aakash.novafork.ui.model.FolderUi
+import com.aakash.novafork.ui.model.Route
 
-/** Where the hairline of a row with a 64dp 16:9 thumbnail starts. */
-private val ThumbnailDividerInset = InsetGroupDefaults.RowPadding + 64.dp + InsetGroupDefaults.IconGap
-
-/**
- * One folder of a source: Large Title = folder name, an inset group of subfolders (folder icon,
- * video count, "›") and one of videos (16:9 thumbnail, title, caption). Tap plays a video; long
- * press opens its context menu.
- */
 @Composable
-internal fun PhoneBrowseDirScreen(
-    dir: BrowseDirUi,
+fun PhoneBrowseDirScreen(
+    dir: BrowseDirUi?,
     actions: AppActions,
     modifier: Modifier = Modifier,
 ) {
-    val list = rememberLazyListState()
-    val collapsed = rememberTitleCollapsed(list)
+    Column(modifier.fillMaxSize()) {
+        PhoneTopBar(
+            title = dir?.title.orEmpty(),
+            onBack = actions::back,
+            actions = {
+                if (dir != null) {
+                    IconButton(onClick = { actions.rescanSource(dir.sourceId) }, enabled = !dir.isLoading) {
+                        NovaIcon(R.drawable.ic_refresh, contentDescription = "Rescan")
+                    }
+                }
+            },
+        )
+        if (dir == null) {
+            LoadingBox()
+        } else {
+            BrowseDirContent(dir = dir, actions = actions)
+        }
+    }
+}
+
+@Composable
+private fun BrowseDirContent(dir: BrowseDirUi, actions: AppActions) {
+    val dims = LocalNovaDimens.current
     val isEmpty = dir.folders.isEmpty() && dir.videos.isEmpty()
     val error = dir.error
-    PhoneLargeTitlePage(
-        modifier = modifier,
-        title = dir.title,
-        collapsed = collapsed,
-        leading = { BackButton(onClick = actions::back) },
-        trailing = {
-            GlassMenuButton(
-                items = listOf(
-                    GlassMenuItem("Rescan", icon = R.drawable.ic_refresh, enabled = !dir.isLoading) {
-                        actions.rescanSource(dir.sourceId)
-                    },
-                ),
+
+    if (dir.crumbs.size > 1) {
+        Breadcrumbs(dir = dir, actions = actions)
+    }
+    if (dir.isLoading && !isEmpty) {
+        LinearProgressIndicator(Modifier.fillMaxWidth())
+    }
+    when {
+        isEmpty && dir.isLoading -> LoadingBox()
+        isEmpty && !error.isNullOrBlank() -> CenteredScrollable {
+            EmptyState(
+                icon = R.drawable.ic_error,
+                title = "Couldn't open this folder",
+                body = error,
+                actionLabel = "Go back",
+                onAction = actions::back,
             )
-        },
-    ) {
-        LazyColumn(
-            state = list,
+        }
+        isEmpty -> CenteredScrollable {
+            EmptyState(
+                icon = R.drawable.ic_folder_open,
+                title = "No videos here",
+                body = "This folder has no videos or subfolders.",
+            )
+        }
+        else -> LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(bottom = glassTabBarClearance()),
+            contentPadding = PaddingValues(top = 4.dp, bottom = dims.sectionSpacing),
         ) {
-            item(key = "title") { LargeTitleHeader(dir.title, collapsed = collapsed) }
-            when {
-                isEmpty && dir.isLoading -> item(key = "loading") {
-                    Box(
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(top = 64.dp),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        ActivityIndicator(size = 36.dp)
-                    }
-                }
-                isEmpty && !error.isNullOrBlank() -> item(key = "error") {
-                    EmptyState(
-                        icon = R.drawable.ic_error,
-                        title = "Can't Open Folder",
-                        body = error,
-                        actionLabel = "Try Again",
-                        onAction = { actions.rescanSource(dir.sourceId) },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 48.dp),
+            if (!error.isNullOrBlank()) {
+                item(key = "error") {
+                    ErrorNote(
+                        message = error,
+                        modifier = Modifier.padding(horizontal = dims.gutter, vertical = 8.dp),
                     )
                 }
-                isEmpty -> item(key = "empty") {
-                    EmptyState(
-                        icon = R.drawable.ic_folder_open,
-                        title = "No Videos",
-                        body = "This folder has no videos or subfolders.",
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 48.dp),
-                    )
-                }
-                else -> {
-                    if (dir.isLoading) {
-                        item(key = "refreshing") {
-                            Box(
-                                Modifier
-                                    .fillMaxWidth()
-                                    .padding(bottom = 12.dp),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                ActivityIndicator()
-                            }
-                        }
-                    }
-                    if (dir.folders.isNotEmpty()) {
-                        item(key = "folders") {
-                            InsetGroup {
-                                dir.folders.forEachIndexed { index, folder ->
-                                    ListRow(
-                                        title = folder.name,
-                                        value = folder.videoCount.toString(),
-                                        leading = { ListRowIcon(R.drawable.ic_folder, NovaColors.tint) },
-                                        chevron = true,
-                                        showDivider = index < dir.folders.lastIndex,
-                                        onClick = { actions.openFolder(folder) },
-                                    )
-                                }
-                            }
-                        }
-                    }
-                    if (dir.folders.isNotEmpty() && dir.videos.isNotEmpty()) {
-                        item(key = "gap") { Spacer(Modifier.height(InsetGroupDefaults.SectionSpacing)) }
-                    }
-                    if (dir.videos.isNotEmpty()) {
-                        item(key = "videos") {
-                            InsetGroup(header = countLabel(dir.videos.size, "Video")) {
-                                dir.videos.forEachIndexed { index, video ->
-                                    FolderVideoRow(video, actions, showDivider = index < dir.videos.lastIndex)
-                                }
-                            }
-                        }
-                    }
-                    if (!error.isNullOrBlank()) {
-                        item(key = "errorNote") {
-                            ListSectionFooter(error, Modifier.padding(horizontal = 16.dp))
-                        }
-                    }
-                }
+            }
+            items(dir.folders, key = { "folder:${it.path}" }) { folder ->
+                FolderRow(folder = folder, onClick = { actions.openFolder(folder) })
+            }
+            items(dir.videos, key = { "video:${it.id}" }) { video ->
+                PhoneVideoRow(
+                    card = video,
+                    onClick = { actions.play(video.id) },
+                    onLongClick = { actions.openVideo(video.id) },
+                )
             }
         }
     }
 }
 
 @Composable
-private fun FolderVideoRow(video: VideoCardUi, actions: AppActions, showDivider: Boolean) {
-    val menu = rememberPhoneMenuState()
-    Box(Modifier.phoneContextTarget(menu)) {
-        ListRow(
-            title = video.cardTitle(),
-            subtitle = video.cardCaption(),
-            leading = { PhoneRowThumbnail(video.artwork, video.title, video.kind) },
-            showDivider = showDivider,
-            dividerInset = ThumbnailDividerInset,
-            minHeight = 60.dp,
-            onLongClick = { menu.open = true },
-            onClick = { actions.play(video.id) },
-        )
-        PhoneContextMenu(menu, videoMenuItems(video, actions))
+private fun Breadcrumbs(dir: BrowseDirUi, actions: AppActions) {
+    val dims = LocalNovaDimens.current
+    val crumbs = dir.crumbs
+    val listState = rememberLazyListState()
+    // Deep paths overflow the row; keep the current folder in view.
+    LaunchedEffect(crumbs.size) {
+        if (crumbs.isNotEmpty()) listState.scrollToItem(crumbs.lastIndex)
+    }
+    LazyRow(
+        state = listState,
+        modifier = Modifier.fillMaxWidth(),
+        contentPadding = PaddingValues(horizontal = dims.gutter),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        itemsIndexed(crumbs) { index, crumb ->
+            val isCurrent = index == crumbs.lastIndex
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (index > 0) {
+                    NovaIcon(
+                        R.drawable.ic_chevron_right,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier
+                            .padding(horizontal = 2.dp)
+                            .size(18.dp),
+                    )
+                }
+                AssistChip(
+                    onClick = { if (!isCurrent) actions.navigate(Route.BrowseDir(dir.sourceId, crumb.path)) },
+                    label = { Text(crumb.label, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    leadingIcon = if (index == 0) {
+                        { NovaIcon(dir.sourceType.iconRes(), contentDescription = null, modifier = Modifier.size(AssistChipDefaults.IconSize)) }
+                    } else {
+                        null
+                    },
+                    colors = if (isCurrent) {
+                        AssistChipDefaults.assistChipColors(
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                            labelColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                        )
+                    } else {
+                        AssistChipDefaults.assistChipColors()
+                    },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun FolderRow(folder: FolderUi, onClick: () -> Unit) {
+    ListItem(
+        modifier = Modifier.clickable(onClick = onClick),
+        leadingContent = {
+            Box(
+                Modifier
+                    .size(40.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                contentAlignment = Alignment.Center,
+            ) {
+                NovaIcon(R.drawable.ic_folder, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
+            }
+        },
+        headlineContent = { Text(folder.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+        supportingContent = { Text(countLabel(folder.videoCount, "video")) },
+        trailingContent = {
+            NovaIcon(R.drawable.ic_chevron_right, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        },
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+    )
+}
+
+@Composable
+private fun ErrorNote(message: String, modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(LocalNovaDimens.current.cardRadius),
+        color = MaterialTheme.colorScheme.errorContainer,
+        contentColor = MaterialTheme.colorScheme.onErrorContainer,
+    ) {
+        Row(
+            Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            NovaIcon(R.drawable.ic_error, contentDescription = null, modifier = Modifier.size(20.dp))
+            Text(message, style = MaterialTheme.typography.bodySmall)
+        }
     }
 }

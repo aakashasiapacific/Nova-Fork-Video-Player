@@ -1,6 +1,17 @@
 package com.aakash.novafork.ui.tablet
 
+import androidx.annotation.DrawableRes
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.LocalIndication
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.indication
+import androidx.compose.foundation.interaction.InteractionSource
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -8,24 +19,40 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -35,368 +62,275 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
 import com.aakash.novafork.core.format.Formats
-import com.aakash.novafork.data.db.SourceType
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
-import com.aakash.novafork.ui.common.ActivityIndicator
-import com.aakash.novafork.ui.common.ArtImage
 import com.aakash.novafork.ui.common.ArtPlaceholder
-import com.aakash.novafork.ui.common.GlassMenu
-import com.aakash.novafork.ui.common.GlassMenuItem
-import com.aakash.novafork.ui.common.NovaRefreshIndicator
+import com.aakash.novafork.ui.common.BackdropArt
+import com.aakash.novafork.ui.common.LandscapeArt
+import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.PosterArt
-import com.aakash.novafork.ui.common.ProgressBar
-import com.aakash.novafork.ui.common.SmallCapsText
+import com.aakash.novafork.ui.common.ProgressStrip
+import com.aakash.novafork.ui.common.RatingPill
 import com.aakash.novafork.ui.common.WatchedBadge
-import com.aakash.novafork.ui.common.contextLift
+import com.aakash.novafork.ui.common.bottomScrim
 import com.aakash.novafork.ui.common.metaLine
-import com.aakash.novafork.ui.common.novaClickable
-import com.aakash.novafork.ui.model.AppActions
+import com.aakash.novafork.ui.common.startScrim
 import com.aakash.novafork.ui.model.Artwork
-import com.aakash.novafork.ui.model.DialogUi
 import com.aakash.novafork.ui.model.EpisodeUi
-import com.aakash.novafork.ui.model.HeroTarget
 import com.aakash.novafork.ui.model.LibraryItemUi
 import com.aakash.novafork.ui.model.MediaKind
 import com.aakash.novafork.ui.model.ShowCardUi
-import com.aakash.novafork.ui.model.SourceUi
 import com.aakash.novafork.ui.model.VideoCardUi
 import com.aakash.novafork.ui.theme.NovaColors
-import com.aakash.novafork.ui.theme.NovaMotion
-import com.aakash.novafork.ui.theme.NovaType
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlin.math.roundToInt
 
-// ─────────────────────────────── Insets ───────────────────────────────
+// ---------------------------------------------------------------------------------------------
+// Insets and small helpers
+// ---------------------------------------------------------------------------------------------
 
-/** Height of the status bar. */
+/** Height of the status bar; pages that draw art behind it pad their text by this much. */
 @Composable
 internal fun statusBarTop(): Dp = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
 
-/** Bottom inset of the navigation bar: scrolling content passes behind it but ends above it. */
+/** Bottom padding that lets scrolling content pass behind the navigation bar but end above it. */
 @Composable
 internal fun navigationBarBottom(): Dp = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
 
-// ─────────────────────────────── Labels ───────────────────────────────
+/** Card scale: shrinks slightly while pressed, grows a little on hover or keyboard focus. */
+@Composable
+internal fun animateCardScale(interactionSource: InteractionSource): State<Float> {
+    val pressed by interactionSource.collectIsPressedAsState()
+    val hovered by interactionSource.collectIsHoveredAsState()
+    val focused by interactionSource.collectIsFocusedAsState()
+    val target = when {
+        pressed -> 0.96f
+        hovered || focused -> 1.04f
+        else -> 1f
+    }
+    return animateFloatAsState(targetValue = target, label = "cardScale")
+}
 
-/** First line under a card: the show for episodes (so "Pilot" never stands alone), else the title. */
+/** First line of a card: the show for episodes (so "Pilot" never stands alone), else the title. */
 internal fun VideoCardUi.primaryLine(): String =
     if (kind == MediaKind.EPISODE && !showTitle.isNullOrBlank()) showTitle else title
 
-/** "S2, E3", "E3", or null when the numbers are unknown. */
-internal fun episodeTag(season: Int?, episode: Int?): String? = when {
-    season != null && episode != null -> "S$season, E$episode"
-    episode != null -> "E$episode"
-    season != null -> "Season $season"
-    else -> null
-}
-
-internal fun VideoCardUi.episodeTag(): String? = episodeTag(season, episode)
-
-/** Caption under a 16:9 card: "S1, E3 · Pilot", "2021 · 2h 35m", "Stream". */
-internal fun VideoCardUi.caption(): String? = when (kind) {
-    MediaKind.EPISODE ->
-        if (!showTitle.isNullOrBlank()) metaLine(episodeTag(), title).ifEmpty { null } else episodeTag() ?: subtitle
-    else -> subtitle
-}
-
-/** Caption under a 2:3 poster: the year for movies, "S1, E3" for episodes. */
-internal fun VideoCardUi.posterCaption(): String? = when (kind) {
-    MediaKind.MOVIE -> year?.toString() ?: subtitle
-    MediaKind.EPISODE -> episodeTag() ?: subtitle
-    MediaKind.VIDEO, MediaKind.STREAM -> subtitle
-}
-
-/** Continue Watching caption: "S2, E3 · 20m left". */
-internal fun VideoCardUi.continueCaption(): String? =
-    metaLine(if (kind == MediaKind.EPISODE) episodeTag() else null, remainingLabel()).ifEmpty { caption() }
+/** Second line of a card: "S1 · E3 · Pilot" for episodes, else the provided subtitle. */
+internal fun VideoCardUi.secondaryLine(): String? =
+    if (kind == MediaKind.EPISODE && !showTitle.isNullOrBlank()) metaLine(subtitle, title) else subtitle
 
 /** "42m left" for a partly watched card, null otherwise. */
-internal fun VideoCardUi.remainingLabel(): String? = remainingLabel(progress, durationMs)
-
-internal fun remainingLabel(progress: Float?, durationMs: Long?, positionMs: Long = 0L): String? {
+internal fun VideoCardUi.remainingLabel(): String? {
     val p = progress ?: return null
     val duration = durationMs ?: return null
     if (p <= 0f || duration <= 0L) return null
-    val position = if (positionMs > 0L) positionMs else (duration * p.coerceIn(0f, 1f)).toLong()
-    return Formats.remaining(position, duration)
+    return Formats.remaining((duration * p.coerceIn(0f, 1f)).toLong(), duration)
 }
 
-/** "2022 · 3 Seasons". */
-internal fun ShowCardUi.caption(): String = metaLine(
-    year?.toString(),
-    when {
-        seasonCount > 0 -> countLabel(seasonCount, "Season")
-        episodeCount > 0 -> countLabel(episodeCount, "Episode")
-        else -> null
-    },
-)
-
-/** Episode length as Apple writes it: "47 min", "1 hr 5 min". */
-internal fun minutesLabel(durationMs: Long?): String? {
+/** "45m" / "1h 2m"; null when unknown. */
+internal fun durationLabel(durationMs: Long?): String? {
     if (durationMs == null || durationMs <= 0L) return null
-    val minutes = ((durationMs + 30_000L) / 60_000L).toInt().coerceAtLeast(1)
-    val hours = minutes / 60
-    val rest = minutes % 60
-    return when {
-        hours == 0 -> "$minutes min"
-        rest == 0 -> "$hours hr"
-        else -> "$hours hr $rest min"
-    }
+    return Formats.runtime(((durationMs + 30_000L) / 60_000L).toInt().coerceAtLeast(1))
 }
 
 internal fun countLabel(count: Int, singular: String, plural: String = singular + "s"): String =
     if (count == 1) "1 $singular" else "$count $plural"
 
-/** "EPISODE 3" / "EPISODES 3–4" for the small caps line of an episode card. */
-internal fun EpisodeUi.capsLabel(): String {
-    val numbers = code.removePrefix("E").replace("–E", "–")
-    return when {
-        code.isBlank() -> "Episode $episode"
-        numbers.contains('–') -> "Episodes $numbers"
-        else -> "Episode $numbers"
-    }
-}
-
-/** "4K" / "HD" from "3840×2160 · 4K"; null for SD or unknown. */
-internal fun qualityBadge(resolutionLabel: String?): String? = when {
-    resolutionLabel == null -> null
-    resolutionLabel.endsWith("4K") -> "4K"
-    resolutionLabel.contains("HD") -> "HD"
-    else -> null
-}
-
-// ─────────────────────────────── Navigation helpers ───────────────────────────────
-
-/** Streams play straight away; everything else opens its details page. */
-internal fun AppActions.openCard(card: VideoCardUi) {
-    if (card.kind == MediaKind.STREAM) play(card.id) else openVideo(card.id)
-}
-
-internal fun AppActions.openItem(item: LibraryItemUi) {
-    when (item) {
-        is LibraryItemUi.Video -> openCard(item.card)
-        is LibraryItemUi.Show -> openShow(item.card.key)
-    }
-}
-
-internal fun AppActions.openHero(target: HeroTarget) {
-    when (target) {
-        is HeroTarget.Video -> openVideo(target.id)
-        is HeroTarget.Show -> openShow(target.key)
-    }
-}
-
-/** Saved streams are sources of their own; removing one goes through the usual confirmation. */
-internal fun AppActions.confirmRemoveStream(sourceId: Long, title: String) {
-    showDialog(DialogUi.ConfirmRemoveSource(SourceUi(id = sourceId, type = SourceType.STREAM, name = title, detail = "")))
-}
-
-internal val LibraryItemUi.artwork: Artwork
-    get() = when (this) {
-        is LibraryItemUi.Video -> card.artwork
-        is LibraryItemUi.Show -> card.artwork
-    }
-
-// ─────────────────────────────── Context menus ───────────────────────────────
-
-/** Long-press menu of a video card: play, details, watched state, Identify (or Remove for streams). */
-internal fun videoMenu(card: VideoCardUi, actions: AppActions, includeDetails: Boolean = true): List<GlassMenuItem> {
-    val stream = card.kind == MediaKind.STREAM
-    val started = (card.progress ?: 0f) > 0f
-    return buildList {
-        add(GlassMenuItem(if (started) "Resume" else "Play", icon = R.drawable.ic_play_arrow) { actions.play(card.id) })
-        if (started) {
-            add(GlassMenuItem("Play from Beginning", icon = R.drawable.ic_restart_alt) { actions.play(card.id, startOver = true) })
-        }
-        if (includeDetails) {
-            add(GlassMenuItem("Details", icon = R.drawable.ic_info) { actions.openVideo(card.id) })
-        }
-        if (!stream) {
-            add(
-                GlassMenuItem(
-                    label = if (card.watched) "Mark as Unwatched" else "Mark as Watched",
-                    icon = if (card.watched) R.drawable.ic_visibility_off else R.drawable.ic_check_circle,
-                    startsSection = true,
-                ) { actions.setWatched(card.id, !card.watched) },
-            )
-            add(GlassMenuItem("Identify…", icon = R.drawable.ic_edit) { actions.identify(card.id) })
-        } else {
-            val sourceId = card.sourceId
-            if (sourceId != null) {
-                add(
-                    GlassMenuItem("Remove Stream", icon = R.drawable.ic_delete, destructive = true, startsSection = true) {
-                        actions.confirmRemoveStream(sourceId, card.title)
-                    },
-                )
-            }
-        }
-    }
-}
-
-internal fun showMenu(key: String, actions: AppActions): List<GlassMenuItem> =
-    listOf(GlassMenuItem("Go to Show", icon = R.drawable.ic_tv) { actions.openShow(key) })
-
-internal fun episodeMenu(episode: EpisodeUi, actions: AppActions): List<GlassMenuItem> {
-    val started = (episode.progress ?: 0f) > 0f
-    return buildList {
-        add(GlassMenuItem(if (started) "Resume" else "Play", icon = R.drawable.ic_play_arrow) { actions.play(episode.videoId) })
-        if (started) {
-            add(GlassMenuItem("Play from Beginning", icon = R.drawable.ic_restart_alt) { actions.play(episode.videoId, startOver = true) })
-        }
-        add(GlassMenuItem("Details", icon = R.drawable.ic_info) { actions.openVideo(episode.videoId) })
-        add(
-            GlassMenuItem(
-                label = if (episode.watched) "Mark as Unwatched" else "Mark as Watched",
-                icon = if (episode.watched) R.drawable.ic_visibility_off else R.drawable.ic_check_circle,
-                startsSection = true,
-            ) { actions.setWatched(episode.videoId, !episode.watched) },
-        )
-    }
-}
-
-internal fun libraryItemMenu(item: LibraryItemUi, actions: AppActions): List<GlassMenuItem> = when (item) {
-    is LibraryItemUi.Video -> videoMenu(item.card, actions)
-    is LibraryItemUi.Show -> showMenu(item.card.key, actions)
-}
-
-// ─────────────────────────────── Artwork and cards ───────────────────────────────
-
-/** 16:9 card art: still, backdrop, the poster cropped, then a frame of the video. */
-@Composable
-internal fun WideArt(artwork: Artwork, title: String, modifier: Modifier = Modifier, showTitle: Boolean = true) {
-    val candidates = remember(artwork) {
-        listOfNotNull(artwork.stillUrl, artwork.backdropUrl, artwork.posterUrl, artwork.frameSource).distinct()
-    }
-    ArtImage(
-        candidates = candidates,
-        contentDescription = title,
-        modifier = modifier,
-        frameSource = artwork.frameSource,
-    ) {
-        ArtPlaceholder(seed = artwork.seed.ifEmpty { title }, title = if (showTitle) title else null)
-    }
-}
-
-/** Progress capsule inside the artwork (Continue Watching), or a check for watched items. */
-@Composable
-private fun BoxScope.CardOverlay(progress: Float?, watched: Boolean) {
-    if (progress != null && progress > 0f) {
-        ProgressBar(
-            progress = progress,
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(start = 12.dp, end = 12.dp, bottom = 6.dp),
-        )
-    } else if (watched) {
-        WatchedBadge(
-            Modifier
-                .align(Alignment.TopEnd)
-                .padding(8.dp),
-        )
-    }
-}
-
-/** Title (Subhead semibold) and caption (Footnote secondary) under a card's artwork. */
-@Composable
-private fun CardText(title: String, caption: String?) {
-    Spacer(Modifier.height(8.dp))
-    Text(
-        text = title,
-        style = NovaType.subheadSemibold,
-        color = NovaColors.label,
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
-    )
-    if (!caption.isNullOrBlank()) {
-        Text(
-            text = caption,
-            style = NovaType.footnote,
-            color = NovaColors.secondaryLabel,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-    }
-}
-
-/** Long press opens the card's context menu; null when it has none. */
-private fun menuOpener(menu: List<GlassMenuItem>, open: () -> Unit): (() -> Unit)? =
-    if (menu.isEmpty()) null else open
+internal fun ShowCardUi.subtitleLine(): String = metaLine(
+    year?.toString(),
+    if (seasonCount > 0) countLabel(seasonCount, "season") else countLabel(episodeCount, "episode"),
+)
 
 /**
- * The Apple TV card: 16:9 artwork (no border, no shadow) with the title and caption BELOW it.
- * A long press lifts the card and opens [menu]. Width comes from [modifier].
+ * Pull-to-refresh whose spinner shows from the pull until the scan it started is over. Scans that
+ * start on their own only show the scan banner, not this spinner.
  */
 @Composable
-internal fun TabletWideCard(
-    artwork: Artwork,
-    title: String,
-    caption: String?,
-    onClick: () -> Unit,
+internal fun TabletPullToRefresh(
+    scanning: Boolean,
+    onRefresh: () -> Unit,
     modifier: Modifier = Modifier,
-    progress: Float? = null,
-    watched: Boolean = false,
-    menu: List<GlassMenuItem> = emptyList(),
-    onClickLabel: String? = null,
+    content: @Composable BoxScope.() -> Unit,
 ) {
-    val dims = LocalNovaDimens.current
-    var menuOpen by remember { mutableStateOf(false) }
-    Column(
-        modifier
-            .contextLift(menuOpen)
-            .novaClickable(
-                onClickLabel = onClickLabel,
-                onLongClick = menuOpener(menu) { menuOpen = true },
-                onClick = onClick,
-            ),
-    ) {
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .aspectRatio(16f / 9f)
-                .clip(RoundedCornerShape(dims.cardRadius)),
-        ) {
-            WideArt(artwork = artwork, title = title, modifier = Modifier.matchParentSize())
-            CardOverlay(progress, watched)
+    var pulled by remember { mutableStateOf(false) }
+    val currentScanning by rememberUpdatedState(scanning)
+    if (pulled) {
+        LaunchedEffect(Unit) {
+            // Give the scan a moment to start, then keep spinning until it is over.
+            withTimeoutOrNull(PULL_REFRESH_GRACE_MS) { snapshotFlow { currentScanning }.first { it } }
+            snapshotFlow { currentScanning }.first { !it }
+            pulled = false
         }
-        CardText(title, caption)
-        GlassMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }, items = menu)
+    }
+    val refreshState = rememberPullToRefreshState()
+    PullToRefreshBox(
+        isRefreshing = pulled,
+        onRefresh = {
+            pulled = true
+            onRefresh()
+        },
+        modifier = modifier,
+        state = refreshState,
+        indicator = {
+            PullToRefreshDefaults.Indicator(
+                state = refreshState,
+                isRefreshing = pulled,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .statusBarsPadding(),
+            )
+        },
+        content = content,
+    )
+}
+
+private const val PULL_REFRESH_GRACE_MS = 900L
+
+// ---------------------------------------------------------------------------------------------
+// Buttons and labels
+// ---------------------------------------------------------------------------------------------
+
+/** Primary "Play / Resume …" button, a little taller than the default for lean-back screens. */
+@Composable
+internal fun TabletPlayButton(label: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true) {
+    Button(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = modifier.height(48.dp),
+        contentPadding = ButtonDefaults.ButtonWithIconContentPadding,
+    ) {
+        NovaIcon(R.drawable.ic_play_arrow, contentDescription = null, modifier = Modifier.size(22.dp))
+        Spacer(Modifier.width(ButtonDefaults.IconSpacing))
+        Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 
+/** Icon + text content for secondary buttons. */
+@Composable
+internal fun ButtonLabel(@DrawableRes icon: Int, text: String) {
+    NovaIcon(icon, contentDescription = null, modifier = Modifier.size(ButtonDefaults.IconSize))
+    Spacer(Modifier.width(ButtonDefaults.IconSpacing))
+    Text(text, maxLines = 1)
+}
+
+/** Round back button that stays readable over artwork. */
+@Composable
+internal fun TabletBackButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
+    FilledTonalIconButton(
+        onClick = onClick,
+        modifier = modifier.size(48.dp),
+        colors = IconButtonDefaults.filledTonalIconButtonColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.72f),
+            contentColor = MaterialTheme.colorScheme.onSurface,
+        ),
+    ) {
+        NovaIcon(R.drawable.ic_arrow_back, contentDescription = "Back")
+    }
+}
+
+/** Non-interactive genre tag (genres are labels, not filters). */
+@Composable
+internal fun TabletTag(text: String, modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(8.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.6f),
+        contentColor = MaterialTheme.colorScheme.onSurface,
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelLarge,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+            maxLines = 1,
+        )
+    }
+}
+
+/** Small label drawn on top of artwork ("Next up", "45m"). */
+@Composable
+internal fun ImageLabel(text: String, modifier: Modifier = Modifier, emphasized: Boolean = false) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelMedium,
+        color = if (emphasized) MaterialTheme.colorScheme.onPrimary else Color.White,
+        maxLines = 1,
+        modifier = modifier
+            .clip(RoundedCornerShape(6.dp))
+            .background(if (emphasized) MaterialTheme.colorScheme.primary else Color.Black.copy(alpha = 0.6f))
+            .padding(horizontal = 7.dp, vertical = 3.dp),
+    )
+}
+
+/** Centered spinner, used while details or folder listings load. */
+@Composable
+internal fun TabletLoading(modifier: Modifier = Modifier) {
+    Box(modifier, contentAlignment = Alignment.Center) {
+        CircularProgressIndicator()
+    }
+}
+
+/** The brand mark: amber → coral disc with a play glyph. */
+@Composable
+internal fun BrandMark(modifier: Modifier = Modifier, size: Dp = 40.dp) {
+    Box(
+        modifier
+            .size(size)
+            .clip(CircleShape)
+            .background(Brush.linearGradient(listOf(NovaColors.Amber, NovaColors.Coral))),
+        contentAlignment = Alignment.Center,
+    ) {
+        NovaIcon(R.drawable.ic_play_arrow, contentDescription = null, tint = Color.White, modifier = Modifier.size(size * 0.6f))
+    }
+}
+
+// ---------------------------------------------------------------------------------------------
+// Cards
+// ---------------------------------------------------------------------------------------------
+
 /**
- * 2:3 poster with the title below (Library grid). [selected] draws the iPad selection ring
- * around the artwork (the item shown in the preview pane).
+ * 2:3 poster card with the title below. The whole card is the touch target; the ripple is clipped
+ * to the poster and the card scales on press/hover. Width comes from [modifier].
  */
 @Composable
 internal fun TabletPosterCard(
     artwork: Artwork,
     title: String,
-    caption: String?,
+    subtitle: String?,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    selected: Boolean = false,
+    onLongClick: (() -> Unit)? = null,
+    onLongClickLabel: String? = null,
+    rating: Float? = null,
     progress: Float? = null,
     watched: Boolean = false,
-    menu: List<GlassMenuItem> = emptyList(),
+    badge: String? = null,
+    selected: Boolean = false,
 ) {
     val dims = LocalNovaDimens.current
-    var menuOpen by remember { mutableStateOf(false) }
+    val shape = RoundedCornerShape(dims.cardRadius)
+    val interactionSource = remember { MutableInteractionSource() }
+    val scale by animateCardScale(interactionSource)
     Column(
         modifier
-            .contextLift(menuOpen)
-            .novaClickable(
-                onLongClick = menuOpener(menu) { menuOpen = true },
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
+            .combinedClickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onLongClickLabel = onLongClickLabel,
+                onLongClick = onLongClick,
                 onClick = onClick,
             ),
     ) {
@@ -404,91 +338,242 @@ internal fun TabletPosterCard(
             Modifier
                 .fillMaxWidth()
                 .aspectRatio(2f / 3f)
-                .selectionRing(selected, dims.cardRadius)
-                .clip(RoundedCornerShape(dims.cardRadius)),
+                .shadow(if (selected) 12.dp else 4.dp, shape)
+                .outlineIf(selected, MaterialTheme.colorScheme.primary, shape)
+                .indication(interactionSource, LocalIndication.current),
         ) {
-            PosterArt(artwork = artwork, title = title, modifier = Modifier.matchParentSize())
-            CardOverlay(progress, watched)
+            PosterArt(artwork = artwork, title = title, modifier = Modifier.fillMaxSize())
+            RatingPill(rating, onImage = true, modifier = Modifier.align(Alignment.TopStart).padding(8.dp))
+            when {
+                watched -> WatchedBadge(Modifier.align(Alignment.TopEnd).padding(8.dp))
+                badge != null -> ImageLabel(badge, Modifier.align(Alignment.TopEnd).padding(8.dp), emphasized = true)
+            }
+            ProgressStrip(progress, Modifier.align(Alignment.BottomCenter), height = 4.dp)
         }
-        CardText(title, caption)
-        GlassMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }, items = menu)
-    }
-}
-
-/** A 2.5dp label-coloured ring 4dp outside the artwork, fading in and out. */
-@Composable
-private fun Modifier.selectionRing(selected: Boolean, radius: Dp): Modifier {
-    val color = NovaColors.label
-    val ringAlpha by animateFloatAsState(if (selected) 1f else 0f, NovaMotion.fade(NovaMotion.FastMs), label = "ring")
-    return drawWithContent {
-        drawContent()
-        if (ringAlpha > 0f) {
-            val stroke = 2.5.dp.toPx()
-            val outset = 4.dp.toPx() + stroke / 2f
-            drawRoundRect(
-                color = color.copy(alpha = color.alpha * ringAlpha),
-                topLeft = Offset(-outset, -outset),
-                size = Size(size.width + outset * 2f, size.height + outset * 2f),
-                cornerRadius = CornerRadius(radius.toPx() + outset),
-                style = Stroke(width = stroke),
+        Spacer(Modifier.height(10.dp))
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleSmall,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        if (!subtitle.isNullOrBlank()) {
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
         }
     }
 }
 
-/** Library grid cell for any item. */
+/** Poster card for a video: tap opens details (streams play), long-press plays (streams open details). */
 @Composable
-internal fun TabletLibraryCard(
+internal fun TabletVideoPosterCard(
+    card: VideoCardUi,
+    onOpen: (Long) -> Unit,
+    onPlay: (Long) -> Unit,
+    modifier: Modifier = Modifier,
+    selected: Boolean = false,
+) {
+    val stream = card.kind == MediaKind.STREAM
+    TabletPosterCard(
+        artwork = card.artwork,
+        title = card.primaryLine(),
+        subtitle = card.secondaryLine(),
+        onClick = { if (stream) onPlay(card.id) else onOpen(card.id) },
+        onLongClick = { if (stream) onOpen(card.id) else onPlay(card.id) },
+        onLongClickLabel = if (stream) "Details" else "Play",
+        modifier = modifier,
+        rating = card.rating,
+        progress = card.progress,
+        watched = card.watched,
+        selected = selected,
+    )
+}
+
+@Composable
+internal fun TabletShowPosterCard(
+    card: ShowCardUi,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    onLongClick: (() -> Unit)? = null,
+    selected: Boolean = false,
+) {
+    TabletPosterCard(
+        artwork = card.artwork,
+        title = card.title,
+        subtitle = card.subtitleLine(),
+        onClick = onClick,
+        onLongClick = onLongClick,
+        onLongClickLabel = if (onLongClick != null) "Details" else null,
+        modifier = modifier,
+        rating = card.rating,
+        watched = card.episodeCount > 0 && card.unwatchedCount == 0,
+        badge = if (card.unwatchedCount > 0) "${card.unwatchedCount} new" else null,
+        selected = selected,
+    )
+}
+
+/** Poster card for any library item. */
+@Composable
+internal fun TabletLibraryItemCard(
     item: LibraryItemUi,
     onClick: () -> Unit,
-    menu: List<GlassMenuItem>,
     modifier: Modifier = Modifier,
+    onLongClick: (() -> Unit)? = null,
+    onLongClickLabel: String? = null,
     selected: Boolean = false,
 ) {
     when (item) {
         is LibraryItemUi.Video -> TabletPosterCard(
             artwork = item.card.artwork,
             title = item.card.primaryLine(),
-            caption = item.card.posterCaption(),
+            subtitle = item.card.secondaryLine(),
             onClick = onClick,
+            onLongClick = onLongClick,
+            onLongClickLabel = onLongClickLabel,
             modifier = modifier,
-            selected = selected,
+            rating = item.card.rating,
             progress = item.card.progress,
             watched = item.card.watched,
-            menu = menu,
+            selected = selected,
         )
         is LibraryItemUi.Show -> TabletPosterCard(
             artwork = item.card.artwork,
             title = item.card.title,
-            caption = item.card.caption(),
+            subtitle = item.card.subtitleLine(),
             onClick = onClick,
+            onLongClick = onLongClick,
+            onLongClickLabel = onLongClickLabel,
             modifier = modifier,
-            selected = selected,
+            rating = item.card.rating,
             watched = item.card.episodeCount > 0 && item.card.unwatchedCount == 0,
-            menu = menu,
+            badge = if (item.card.unwatchedCount > 0) "${item.card.unwatchedCount} new" else null,
+            selected = selected,
         )
     }
 }
 
 /**
- * Episode card of the details carousel: 16:9 still with the progress capsule inside, "EPISODE 3"
- * in small caps, the title, a 3-line description and the length. Tap plays.
+ * 16:9 card with the title inside the image (continue watching, next episode). Tap plays,
+ * long-press opens details. Width comes from [modifier].
  */
 @Composable
-internal fun TabletEpisodeCard(
-    episode: EpisodeUi,
+internal fun TabletLandscapeCard(
+    card: VideoCardUi,
     onClick: () -> Unit,
-    menu: List<GlassMenuItem>,
+    onLongClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val dims = LocalNovaDimens.current
-    var menuOpen by remember { mutableStateOf(false) }
+    val shape = RoundedCornerShape(dims.cardRadius)
+    val interactionSource = remember { MutableInteractionSource() }
+    val scale by animateCardScale(interactionSource)
+    Box(
+        modifier
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
+            .aspectRatio(16f / 9f)
+            .shadow(4.dp, shape)
+            .combinedClickable(
+                interactionSource = interactionSource,
+                indication = LocalIndication.current,
+                onClickLabel = "Play",
+                onLongClickLabel = "Details",
+                onLongClick = onLongClick,
+                onClick = onClick,
+            ),
+    ) {
+        LandscapeArt(
+            artwork = card.artwork,
+            title = card.title,
+            modifier = Modifier
+                .fillMaxSize()
+                .bottomScrim(Color.Black.copy(alpha = 0.88f), startFraction = 0.3f),
+        )
+        Row(
+            Modifier
+                .align(Alignment.BottomStart)
+                .fillMaxWidth()
+                .padding(start = 16.dp, end = 12.dp, bottom = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    text = card.primaryLine(),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = Color.White,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                val secondary = metaLine(card.secondaryLine(), card.remainingLabel())
+                if (secondary.isNotEmpty()) {
+                    Text(
+                        text = secondary,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.White.copy(alpha = 0.78f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+            Spacer(Modifier.width(12.dp))
+            Box(
+                Modifier
+                    .size(44.dp)
+                    .clip(CircleShape)
+                    .background(Color.White.copy(alpha = 0.22f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                NovaIcon(R.drawable.ic_play_arrow, contentDescription = null, tint = Color.White, modifier = Modifier.size(28.dp))
+            }
+        }
+        if (card.watched) WatchedBadge(Modifier.align(Alignment.TopEnd).padding(10.dp))
+        ProgressStrip(card.progress, Modifier.align(Alignment.BottomCenter), height = 4.dp)
+    }
+}
+
+/**
+ * 16:9 still with text below (episodes, files in a folder). Tap plays, long-press opens details.
+ * [cornerLabel] sits on the image (duration), [badge] marks it ("Next up").
+ */
+@Composable
+internal fun TabletStillCard(
+    artwork: Artwork,
+    title: String,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    subtitle: String? = null,
+    description: String? = null,
+    footnote: String? = null,
+    cornerLabel: String? = null,
+    progress: Float? = null,
+    watched: Boolean = false,
+    badge: String? = null,
+    highlighted: Boolean = false,
+) {
+    val dims = LocalNovaDimens.current
+    val shape = RoundedCornerShape(dims.cardRadius)
+    val interactionSource = remember { MutableInteractionSource() }
+    val scale by animateCardScale(interactionSource)
     Column(
         modifier
-            .contextLift(menuOpen)
-            .novaClickable(
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
+            .combinedClickable(
+                interactionSource = interactionSource,
+                indication = null,
                 onClickLabel = "Play",
-                onLongClick = menuOpener(menu) { menuOpen = true },
+                onLongClickLabel = "Details",
+                onLongClick = onLongClick,
                 onClick = onClick,
             ),
     ) {
@@ -496,46 +581,101 @@ internal fun TabletEpisodeCard(
             Modifier
                 .fillMaxWidth()
                 .aspectRatio(16f / 9f)
-                .clip(RoundedCornerShape(dims.cardRadius)),
+                .shadow(4.dp, shape)
+                .outlineIf(highlighted, MaterialTheme.colorScheme.primary, shape)
+                .indication(interactionSource, LocalIndication.current),
         ) {
-            WideArt(artwork = episode.artwork, title = episode.title, modifier = Modifier.matchParentSize(), showTitle = false)
-            CardOverlay(episode.progress, episode.watched)
+            LandscapeArt(artwork = artwork, title = title, modifier = Modifier.fillMaxSize())
+            if (badge != null) ImageLabel(badge, Modifier.align(Alignment.TopStart).padding(10.dp), emphasized = true)
+            if (watched) WatchedBadge(Modifier.align(Alignment.TopEnd).padding(10.dp))
+            if (cornerLabel != null) {
+                ImageLabel(cornerLabel, Modifier.align(Alignment.BottomEnd).padding(start = 10.dp, end = 10.dp, bottom = 12.dp))
+            }
+            ProgressStrip(progress, Modifier.align(Alignment.BottomCenter), height = 4.dp)
         }
         Spacer(Modifier.height(10.dp))
-        SmallCapsText(episode.capsLabel())
-        Spacer(Modifier.height(2.dp))
         Text(
-            text = episode.title,
-            style = NovaType.subheadSemibold,
-            color = NovaColors.label,
+            text = title,
+            style = MaterialTheme.typography.titleSmall,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
-        Spacer(Modifier.height(2.dp))
-        Text(
-            text = episode.overview.orEmpty(),
-            style = NovaType.footnote,
-            color = NovaColors.secondaryLabel,
-            maxLines = 3,
-            minLines = 3,
-            overflow = TextOverflow.Ellipsis,
-        )
-        val length = metaLine(minutesLabel(episode.durationMs), remainingLabel(episode.progress, episode.durationMs))
-        if (length.isNotEmpty()) {
-            Spacer(Modifier.height(4.dp))
-            Text(text = length, style = NovaType.footnote, color = NovaColors.secondaryLabel, maxLines = 1)
+        if (!subtitle.isNullOrBlank()) {
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
-        GlassMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }, items = menu)
+        if (!description.isNullOrBlank()) {
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = description,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        if (!footnote.isNullOrBlank()) {
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = footnote,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+            )
+        }
     }
 }
 
-// ─────────────────────────────── Page helpers ───────────────────────────────
-
-/** Large activity indicator in the middle of [modifier]. */
+/** Episode tile for the show grid: still, "E3 · Title", two lines of overview, duration. */
 @Composable
-internal fun TabletLoading(modifier: Modifier = Modifier) {
-    Box(modifier, contentAlignment = Alignment.Center) {
-        ActivityIndicator(size = 36.dp)
+internal fun TabletEpisodeCard(
+    episode: EpisodeUi,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    isNextUp: Boolean = false,
+) {
+    TabletStillCard(
+        artwork = episode.artwork,
+        title = metaLine(episode.code.ifBlank { "E${episode.episode}" }, episode.title),
+        onClick = onClick,
+        onLongClick = onLongClick,
+        modifier = modifier,
+        description = episode.overview,
+        footnote = metaLine(durationLabel(episode.durationMs), episode.airDate),
+        progress = episode.progress,
+        watched = episode.watched,
+        badge = if (isNextUp) "Next up" else null,
+        highlighted = isNextUp,
+    )
+}
+
+/** "Resume" progress bar with the time left, for details pages. Nothing when unwatched. */
+@Composable
+internal fun WatchProgress(progress: Float?, positionMs: Long, durationMs: Long?, modifier: Modifier = Modifier) {
+    if (progress == null || progress <= 0f) return
+    val fraction = progress.coerceIn(0f, 1f)
+    val label = if (durationMs != null && durationMs > 0L) {
+        val position = if (positionMs > 0L) positionMs else (durationMs * fraction).toLong()
+        Formats.remaining(position, durationMs)
+    } else {
+        "${(fraction * 100).roundToInt()}% watched"
+    }
+    Row(modifier, verticalAlignment = Alignment.CenterVertically) {
+        LinearProgressIndicator(
+            progress = { fraction },
+            modifier = Modifier
+                .width(240.dp)
+                .height(6.dp)
+                .clip(RoundedCornerShape(3.dp)),
+        )
+        Spacer(Modifier.width(14.dp))
+        Text(label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -561,51 +701,77 @@ internal fun CenteredScrollColumn(
     }
 }
 
+/** 2dp outline for the selected / highlighted card, drawn over the art. */
+internal fun Modifier.outlineIf(selected: Boolean, color: Color, shape: Shape): Modifier =
+    if (selected) border(2.dp, color, shape) else this
+
+// ---------------------------------------------------------------------------------------------
+// Details backdrop and poster
+// ---------------------------------------------------------------------------------------------
+
 /**
- * Pull-to-refresh with the iOS spinner. It spins from the pull until the scan it started is
- * over; scans that start on their own (or poster fetching) only show the scan banner. Only pass
- * ScanUi.running as [scanning].
+ * Full-screen art behind the details pages, darkened heavily so text anywhere stays readable.
+ * Fixed in place while the content scrolls over it.
  */
 @Composable
-internal fun TabletRefreshBox(
-    scanning: Boolean,
-    onRefresh: () -> Unit,
-    modifier: Modifier = Modifier,
-    indicatorTop: Dp = 0.dp,
-    indicatorColor: Color = NovaColors.secondaryLabel,
-    content: @Composable BoxScope.() -> Unit,
-) {
-    var pulled by remember { mutableStateOf(false) }
-    val currentScanning by rememberUpdatedState(scanning)
-    if (pulled) {
-        LaunchedEffect(Unit) {
-            // Give the scan a moment to start, then keep spinning until it is over.
-            withTimeoutOrNull(PULL_REFRESH_GRACE_MS) { snapshotFlow { currentScanning }.first { it } }
-            snapshotFlow { currentScanning }.first { !it }
-            pulled = false
-        }
+internal fun TabletDetailsBackdrop(artwork: Artwork, modifier: Modifier = Modifier) {
+    val background = MaterialTheme.colorScheme.background
+    Box(modifier.fillMaxSize()) {
+        BackdropArt(
+            artwork = artwork,
+            modifier = Modifier
+                .fillMaxSize()
+                .startScrim(background.copy(alpha = 0.85f), endFraction = 0.75f),
+        )
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(Brush.verticalGradient(listOf(background.copy(alpha = 0.55f), background))),
+        )
     }
-    val state = rememberPullToRefreshState()
-    PullToRefreshBox(
-        isRefreshing = pulled,
-        onRefresh = {
-            pulled = true
-            onRefresh()
-        },
-        modifier = modifier,
-        state = state,
-        indicator = {
-            NovaRefreshIndicator(
-                state = state,
-                isRefreshing = pulled,
-                color = indicatorColor,
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(top = indicatorTop),
-            )
-        },
-        content = content,
+}
+
+/** Large rounded poster with a soft shadow, for details headers. */
+@Composable
+internal fun TabletDetailsPoster(artwork: Artwork, title: String, width: Dp, modifier: Modifier = Modifier) {
+    val shape = RoundedCornerShape(16.dp)
+    PosterArt(
+        artwork = artwork,
+        title = title,
+        modifier = modifier
+            .width(width)
+            .aspectRatio(2f / 3f)
+            .shadow(20.dp, shape)
+            .clip(shape),
     )
 }
 
-private const val PULL_REFRESH_GRACE_MS = 900L
+/** Fanned stack of placeholder posters: decoration for empty and welcome panels. */
+@Composable
+internal fun PosterCollage(modifier: Modifier = Modifier) {
+    Box(modifier.size(width = 340.dp, height = 300.dp), contentAlignment = Alignment.Center) {
+        CollagePoster("Nova · drama", rotation = -12f, offsetX = -96f)
+        CollagePoster("Nova · space", rotation = 12f, offsetX = 96f)
+        CollagePoster("Nova · night", rotation = 0f, offsetX = 0f, elevated = true)
+        BrandMark(Modifier.align(Alignment.BottomCenter), size = 64.dp)
+    }
+}
+
+@Composable
+private fun CollagePoster(seed: String, rotation: Float, offsetX: Float, elevated: Boolean = false) {
+    val shape = RoundedCornerShape(16.dp)
+    Box(
+        Modifier
+            .graphicsLayer {
+                rotationZ = rotation
+                translationX = offsetX * density
+                translationY = if (elevated) -18f * density else 0f
+            }
+            .width(if (elevated) 150.dp else 130.dp)
+            .aspectRatio(2f / 3f)
+            .shadow(if (elevated) 18.dp else 8.dp, shape)
+            .clip(shape),
+    ) {
+        ArtPlaceholder(seed = seed, title = null)
+    }
+}

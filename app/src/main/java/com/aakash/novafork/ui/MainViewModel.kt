@@ -5,6 +5,7 @@ import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.aakash.novafork.BuildConfig
+import com.aakash.novafork.CrashReporter
 import com.aakash.novafork.NovaApp
 import com.aakash.novafork.core.smb.SmbUris
 import com.aakash.novafork.core.tmdb.TmdbDisabledException
@@ -74,10 +75,15 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
         val keyStatus: KeyStatus = KeyStatus.UNKNOWN,
         val permission: PermissionUi = PermissionUi(),
         val allFilesAccess: Boolean = false,
+        val crashReport: String? = null,
     )
 
     private val local = MutableStateFlow(
-        LocalState(permission = currentPermission(), allFilesAccess = StoragePermissions.hasAllFilesAccess(app)),
+        LocalState(
+            permission = currentPermission(),
+            allFilesAccess = StoragePermissions.hasAllFilesAccess(app),
+            crashReport = CrashReporter.pending(app),
+        ),
     )
 
     private val libraryIndex = combine(
@@ -158,6 +164,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
             permission = user.permission,
             dialog = user.dialog,
             message = user.message,
+            crashReport = user.crashReport,
         )
     }
 
@@ -255,6 +262,15 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
 
     override fun consumeMessage() {
         local.update { it.copy(message = null) }
+    }
+
+    // Crash report (MainActivity overrides shareCrashReport with the share sheet)
+
+    override fun shareCrashReport() {}
+
+    override fun dismissCrashReport() {
+        CrashReporter.clear(getApplication())
+        local.update { it.copy(crashReport = null) }
     }
 
     override fun addStream(title: String, url: String) {

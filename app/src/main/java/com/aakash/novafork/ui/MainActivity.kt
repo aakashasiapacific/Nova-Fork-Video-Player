@@ -69,6 +69,17 @@ class MainActivity : ComponentActivity() {
 
             override fun requestAllFilesAccess() = openAllFilesAccess()
 
+            override fun shareCrashReport() {
+                val report = viewModel.state.value.crashReport ?: return
+                val send = Intent(Intent.ACTION_SEND)
+                    .setType("text/plain")
+                    .putExtra(Intent.EXTRA_SUBJECT, "Nova Fork crash report")
+                    .putExtra(Intent.EXTRA_TEXT, report)
+                if (!tryStart(Intent.createChooser(send, "Share crash report"))) {
+                    viewModel.showMessage("No app to share the report with")
+                }
+            }
+
             override fun addFolder() {
                 try {
                     folderPicker.launch(null)
