@@ -90,10 +90,12 @@ class DeviceScanner(context: Context) : SourceScanner {
         }.toTypedArray()
         val storageRoot = if (modern) "" else legacyStorageRoot()
         val rows = ArrayList<VideoRow>()
-        val cursor = query(collection, projection, null, null) ?: return rows
+        // No cursor means MediaProvider isn't available (restarting, being updated), not an empty
+        // device: failing the scan keeps the library as it is instead of hiding every video.
+        val cursor = query(collection, projection, null, null) ?: throw IOException(MEDIA_UNAVAILABLE)
         cursor.use { c ->
             val idCol = c.getColumnIndex(MediaStore.Video.Media._ID)
-            if (idCol < 0) return rows
+            if (idCol < 0) throw IOException(MEDIA_UNAVAILABLE)
             val nameCol = c.getColumnIndex(MediaStore.Video.Media.DISPLAY_NAME)
             val sizeCol = c.getColumnIndex(MediaStore.Video.Media.SIZE)
             val durationCol = c.getColumnIndex(MediaStore.Video.Media.DURATION)
@@ -307,6 +309,7 @@ class DeviceScanner(context: Context) : SourceScanner {
 
     private companion object {
         const val NO_ACCESS = "Allow access to videos to scan this device"
+        const val MEDIA_UNAVAILABLE = "Media storage isn't available right now"
 
         /** MediaColumns.DATA: deprecated on API 29+, but the only folder information before it. */
         @Suppress("DEPRECATION")

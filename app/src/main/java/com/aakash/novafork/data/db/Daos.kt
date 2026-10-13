@@ -85,6 +85,18 @@ interface VideoDao {
     @Query("SELECT * FROM videos WHERE metadataKey = :metadataKey")
     suspend fun byMetadataKey(metadataKey: String): List<VideoEntity>
 
+    /** Every episode grouped under a show, present or not. */
+    @Query("SELECT * FROM videos WHERE showKey = :showKey")
+    suspend fun byShowKey(showKey: String): List<VideoEntity>
+
+    /** At most [SQL_CHUNK] URIs per call. */
+    @Query("SELECT * FROM videos WHERE uri IN (:uris)")
+    suspend fun byUris(uris: List<String>): List<VideoEntity>
+
+    /** Episodes whose numbering came from automatic matching (may hold resolved absolute numbers). */
+    @Query("SELECT * FROM videos WHERE kind = 'EPISODE' AND matchState != 'MANUAL'")
+    suspend fun automaticEpisodes(): List<VideoEntity>
+
     /** Movies and episodes to look up: never tried, or tried without success before [retryBefore]. */
     @Query(
         "SELECT * FROM videos WHERE present = 1 AND kind IN ('MOVIE', 'EPISODE') AND " +
@@ -121,6 +133,10 @@ interface VideoDao {
     @Query("DELETE FROM videos WHERE sourceId = :sourceId")
     suspend fun deleteBySource(sourceId: Long)
 
+    /** Hands videos to another source that also covers them. At most [SQL_CHUNK] ids per call. */
+    @Query("UPDATE videos SET sourceId = :sourceId WHERE id IN (:ids)")
+    suspend fun moveToSource(ids: List<Long>, sourceId: Long)
+
     // Playback
 
     @Query("UPDATE videos SET positionMs = :positionMs, lastPlayedAt = :playedAt WHERE id = :id")
@@ -145,21 +161,32 @@ interface VideoDao {
     @Query("UPDATE videos SET audioTrackId = :audioTrackId, subtitleTrackId = :subtitleTrackId WHERE id = :id")
     suspend fun saveTracks(id: Long, audioTrackId: Int?, subtitleTrackId: Int?)
 
-    // Automatic matching. These only touch rows still waiting for a match, so a manual match or a
-    // rename made while a lookup was in flight is never overwritten.
+    // Automatic matching. These only touch rows still waiting for a match and still carrying the
+    // parse the lookup was made for, so neither a manual match nor a rename (re-parsed while the
+    // lookup was in flight) is overwritten with a stale answer. [kind] is a [VideoKind] name.
 
     /** At most [SQL_CHUNK] ids per call. */
     @Query(
         "UPDATE videos SET metadataKey = :metadataKey, matchState = 'MATCHED', matchAttemptAt = :attemptAt " +
-            "WHERE id IN (:ids) AND matchState IN ('PENDING', 'UNMATCHED')",
+            "WHERE id IN (:ids) AND matchState IN ('PENDING', 'UNMATCHED') " +
+            "AND kind = :kind AND parsedTitle = :parsedTitle AND parsedYear IS :parsedYear",
     )
-    suspend fun setMovieMatch(ids: List<Long>, metadataKey: String, attemptAt: Long)
+    suspend fun setMovieMatch(
+        ids: List<Long>,
+        metadataKey: String,
+        attemptAt: Long,
+        kind: String,
+        parsedTitle: String,
+        parsedYear: Int?,
+    )
 
+    /** [fileName]: the name the numbering was parsed from; a renamed file is left for the next pass. */
     @Query(
         "UPDATE videos SET metadataKey = :metadataKey, showKey = :metadataKey, season = :season, episode = :episode, " +
             "episodeTitle = :episodeTitle, episodeOverview = :episodeOverview, episodeStillPath = :episodeStillPath, " +
             "episodeAirDate = :episodeAirDate, matchState = 'MATCHED', matchAttemptAt = :attemptAt " +
-            "WHERE id = :id AND matchState IN ('PENDING', 'UNMATCHED')",
+            "WHERE id = :id AND matchState IN ('PENDING', 'UNMATCHED') AND kind = 'EPISODE' " +
+            "AND fileName = :fileName AND parsedTitle = :parsedTitle AND parsedYear IS :parsedYear",
     )
     suspend fun setEpisodeMatch(
         id: Long,
@@ -171,14 +198,18 @@ interface VideoDao {
         episodeStillPath: String?,
         episodeAirDate: String?,
         attemptAt: Long,
+        fileName: String,
+        parsedTitle: String,
+        parsedYear: Int?,
     )
 
     /** At most [SQL_CHUNK] ids per call. */
     @Query(
         "UPDATE videos SET matchState = 'UNMATCHED', matchAttemptAt = :attemptAt " +
-            "WHERE id IN (:ids) AND matchState IN ('PENDING', 'UNMATCHED')",
+            "WHERE id IN (:ids) AND matchState IN ('PENDING', 'UNMATCHED') " +
+            "AND kind = :kind AND parsedTitle = :parsedTitle AND parsedYear IS :parsedYear",
     )
-    suspend fun setUnmatched(ids: List<Long>, attemptAt: Long)
+    suspend fun setUnmatched(ids: List<Long>, attemptAt: Long, kind: String, parsedTitle: String, parsedYear: Int?)
 
     /** Refreshes TMDB episode data without touching the match itself (used for manual matches too). */
     @Query(
@@ -206,6 +237,10 @@ interface VideoDao {
 
     @Query("UPDATE videos SET showKey = :showKey WHERE kind = 'EPISODE' AND matchState != 'MANUAL' AND parsedTitle = :parsedTitle")
     suspend fun setShowKeyForTitle(parsedTitle: String, showKey: String)
+
+    /** Puts back the numbering from the file name (absolute anime numbers are re-placed on the next match). */
+    @Query("UPDATE videos SET season = :season, episode = :episode, episodeEnd = :episodeEnd WHERE id = :id")
+    suspend fun setEpisodeNumbers(id: Long, season: Int?, episode: Int?, episodeEnd: Int?)
 }
 
 @Dao

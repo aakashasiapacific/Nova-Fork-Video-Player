@@ -12,6 +12,7 @@ import android.provider.DocumentsContract.Document
 import android.provider.MediaStore
 import android.provider.OpenableColumns
 import androidx.annotation.RequiresApi
+import com.aakash.novafork.core.library.VideoFiles
 import com.aakash.novafork.core.smb.SmbUris
 import com.aakash.novafork.core.subs.SubtitleRules
 import com.aakash.novafork.data.SmbBrowser
@@ -240,15 +241,40 @@ class SubtitleFinder(
             val size = sibling.sizeBytes
             if (size != null && size > MAX_BYTES) continue
             val target = File(dir, safeFileName(name) ?: continue)
+            // VobSub: libVLC opens the .idx and reads the pictures from the ".sub" next to it, so
+            // the pair has to land in the cache together; an .idx alone shows nothing.
+            val isVobSub = VideoFiles.extension(name) == "idx"
+            val pictures = if (isVobSub) vobSubPictures(name, siblings) else null
+            if (isVobSub && pictures == null) continue
+            val picturesTarget = pictures?.let { File(dir, VideoFiles.baseName(target.name) + ".sub") }
             try {
+                if (pictures != null && picturesTarget != null) {
+                    val picturesInput = open(pictures) ?: continue
+                    if (!picturesInput.use { copyLimited(it, picturesTarget, MAX_VOBSUB_BYTES) }) continue
+                }
                 val input = open(sibling) ?: continue
-                if (input.use { copyLimited(it, target, MAX_BYTES) }) out += target
+                if (input.use { copyLimited(it, target, MAX_BYTES) }) {
+                    out += target
+                } else {
+                    picturesTarget?.delete()
+                }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 target.delete()
+                picturesTarget?.delete()
             }
         }
+    }
+
+    /** The ".sub" picture file that goes with a VobSub [idxName] (same name, any case), if it is small enough. */
+    private fun vobSubPictures(idxName: String, siblings: Map<String, Sibling>): Sibling? {
+        val stem = VideoFiles.baseName(idxName)
+        val entry = siblings.entries.firstOrNull { (name, _) ->
+            VideoFiles.extension(name) == "sub" && VideoFiles.baseName(name).equals(stem, ignoreCase = true)
+        } ?: return null
+        val size = entry.value.sizeBytes
+        return if (size != null && size > MAX_VOBSUB_BYTES) null else entry.value
     }
 
     /** Copies [input] into [target]; false (and no file left behind) when it is larger than [limit]. */
@@ -342,6 +368,9 @@ class SubtitleFinder(
     private companion object {
         const val MAX_FILES = 8
         const val MAX_BYTES = 5L * 1024 * 1024
+
+        /** VobSub pictures (.sub) are often far bigger than text subtitles. */
+        const val MAX_VOBSUB_BYTES = 150L * 1024 * 1024
 
         /** Picked files get more room (ASS files with embedded fonts) but a picked video is refused. */
         const val MAX_PICKED_BYTES = 20L * 1024 * 1024

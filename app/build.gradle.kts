@@ -9,10 +9,15 @@ plugins {
 val buildNumber = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 1
 
 // Optional built-in TMDB key: set the TMDB_API_KEY repository secret (CI) or a gradle property.
-// People can always paste their own key in Settings, which wins over this one.
-val tmdbKey: String = (System.getenv("TMDB_API_KEY") ?: (project.findProperty("TMDB_API_KEY") as String?) ?: "")
-    .trim()
-    .replace("\"", "")
+// With it posters work with no setup; a key pasted in Settings wins over it.
+// An unset secret reaches the build as "", so blank values fall through to the property. Only the
+// characters of a v3 key (hex) or a v4 token (JWT) are kept, so the Java string literal stays valid.
+val tmdbKey: String = (
+    System.getenv("TMDB_API_KEY")?.takeIf { it.isNotBlank() }
+        ?: (project.findProperty("TMDB_API_KEY") as String?)
+        ?: ""
+    )
+    .filter { it.isLetterOrDigit() || it == '.' || it == '_' || it == '-' }
 
 android {
     namespace = "com.aakash.novafork"

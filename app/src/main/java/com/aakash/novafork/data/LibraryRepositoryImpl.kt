@@ -5,16 +5,20 @@ import android.content.Intent
 import android.net.Uri
 import android.util.Log
 import androidx.room.withTransaction
+import com.aakash.novafork.CrashReporter
 import com.aakash.novafork.core.library.LibraryKeys
 import com.aakash.novafork.core.library.VideoFiles
 import com.aakash.novafork.core.parse.NameParser
 import com.aakash.novafork.core.parse.ParsedKind
 import com.aakash.novafork.core.parse.ParsedName
+import com.aakash.novafork.core.smb.SmbLocation
 import com.aakash.novafork.core.smb.SmbUris
 import com.aakash.novafork.core.tmdb.TmdbClient
+import com.aakash.novafork.core.tmdb.TmdbEpisode
 import com.aakash.novafork.core.tmdb.TmdbException
 import com.aakash.novafork.core.tmdb.TmdbMovieSummary
 import com.aakash.novafork.core.tmdb.TmdbTvSummary
+import com.aakash.novafork.data.db.MatchCacheEntity
 import com.aakash.novafork.data.db.MatchState
 import com.aakash.novafork.data.db.NovaDatabase
 import com.aakash.novafork.data.db.SQL_CHUNK
@@ -48,6 +52,7 @@ private const val TAG = "LibraryRepository"
 private const val DEVICE_SOURCE_NAME = "Device storage"
 private const val DEVICE_SOURCE_LOCATION = "device"
 private const val KEY_SETTLE_MS = 1_500L
+private const val DEFAULT_SMB_PORT = 445
 
 class LibraryRepositoryImpl(
     context: Context,
@@ -95,9 +100,10 @@ class LibraryRepositoryImpl(
             if (!scanMutex.tryLock()) return@withContext
             try {
                 state.update { it.copy(running = true, sourceName = null, found = 0, lastError = null) }
-                syncDeviceSource(settings.settings.value.scanDeviceStorage)
+                logFailure("Device source setup") { syncDeviceSource(settings.settings.value.scanDeviceStorage) }
                 for (source in sourceDao.all()) {
-                    if (isScannable(source)) scan(source)
+                    // One source going wrong (even its error bookkeeping) never stops the others.
+                    if (isScannable(source)) logFailure("Scanning a ${source.type.name} source") { scan(source) }
                 }
             } finally {
                 state.update { it.copy(running = false, sourceName = null, found = 0) }
@@ -144,11 +150,19 @@ class LibraryRepositoryImpl(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            Log.w(TAG, "Scanning ${source.name} failed", e)
-            val message = e.message?.takeIf { it.isNotBlank() } ?: e.javaClass.simpleName
-            sourceDao.markFailed(source.id, message)
-            state.update { it.copy(lastError = "${source.name}: $message") }
+            recordFailure(source, e)
+        } catch (e: LinkageError) {
+            // A library class missing on this Android version fails this source, not the app.
+            recordFailure(source, e)
         }
+    }
+
+    private suspend fun recordFailure(source: SourceEntity, e: Throwable) {
+        Log.w(TAG, "Scanning ${source.name} failed", e)
+        CrashReporter.log("Scanning a ${source.type.name} source failed", e)
+        val message = e.message?.takeIf { it.isNotBlank() } ?: e.javaClass.simpleName
+        sourceDao.markFailed(source.id, message)
+        state.update { it.copy(lastError = "${source.name}: $message") }
     }
 
     /**
@@ -161,16 +175,32 @@ class LibraryRepositoryImpl(
             if (sourceDao.byId(source.id) == null) return@withTransaction
             val existing = videoDao.bySource(source.id).associateBy { it.uri }
             val seen = HashSet<String>(scanned.size * 2)
+            val fresh = ArrayList<ScannedVideo>()
             val inserts = ArrayList<VideoEntity>()
             val updates = ArrayList<VideoEntity>()
             for (file in scanned) {
                 if (!seen.add(file.uri)) continue
                 val old = existing[file.uri]
                 if (old == null) {
-                    inserts += newVideo(source.id, file)
+                    fresh += file
                 } else {
                     val merged = refreshed(old, file)
                     if (merged != old) updates += merged
+                }
+            }
+            if (fresh.isNotEmpty()) {
+                // URIs are unique across sources: a file another source already lists (overlapping
+                // shares) stays with that source, unless that one is off or no longer sees it.
+                val elsewhere = fresh.map { it.uri }.chunked(SQL_CHUNK).flatMap { videoDao.byUris(it) }.associateBy { it.uri }
+                val enabledSources = if (elsewhere.isEmpty()) emptySet() else sourceDao.all().filter { it.enabled }.map { it.id }.toSet()
+                for (file in fresh) {
+                    val other = elsewhere[file.uri]
+                    when {
+                        other == null -> inserts += newVideo(source.id, file)
+                        other.sourceId !in enabledSources || !other.present ->
+                            updates += refreshed(other, file).copy(sourceId = source.id)
+                        else -> Unit
+                    }
                 }
             }
             if (inserts.isNotEmpty()) videoDao.insertAll(inserts)
@@ -310,7 +340,13 @@ class LibraryRepositoryImpl(
     override suspend fun removeSource(sourceId: Long) {
         withContext(Dispatchers.IO) {
             val source = sourceDao.byId(sourceId) ?: return@withContext
+            // While "Scan device storage" is on the next scan brings it straight back, with fresh ids
+            // and none of the watch history removing it threw away. The setting hides it instead.
+            require(source.type != SourceType.DEVICE) {
+                "Device storage can't be removed. Turn off \"Scan device storage\" in Settings instead."
+            }
             database.withTransaction {
+                if (source.type == SourceType.SMB) handOverCoveredVideos(source)
                 videoDao.deleteBySource(sourceId)
                 sourceDao.delete(sourceId)
                 metadataDao.deleteUnreferenced()
@@ -325,6 +361,24 @@ class LibraryRepositoryImpl(
                     Log.i(TAG, "No persisted permission to release for ${source.location}")
                 }
             }
+        }
+    }
+
+    /** Videos another share also covers (nested or overlapping locations) move there, history included. */
+    private suspend fun handOverCoveredVideos(source: SourceEntity) {
+        val others = sourceDao.smbSources()
+            .filter { it.id != source.id }
+            .sortedByDescending { it.enabled }
+            .mapNotNull { other -> SmbUris.parse(other.location)?.let { other to it } }
+        if (others.isEmpty()) return
+        val moves = HashMap<Long, MutableList<Long>>()
+        for (video in videoDao.bySource(source.id)) {
+            val file = SmbUris.parse(video.uri) ?: continue
+            val target = others.firstOrNull { (_, root) -> root.covers(file) }?.first ?: continue
+            moves.getOrPut(target.id) { ArrayList() } += video.id
+        }
+        for ((targetId, ids) in moves) {
+            for (chunk in ids.chunked(SQL_CHUNK)) videoDao.moveToSource(chunk, targetId)
         }
     }
 
@@ -409,19 +463,20 @@ class LibraryRepositoryImpl(
         val current = videoDao.byId(videoId) ?: return@withContext null
         val showKey = current.showKey
         if (current.kind != VideoKind.EPISODE || showKey == null) return@withContext null
-        val season = current.season ?: 0
+        // No season (absolute numbering not placed yet) is listed as season 1, as in the UI.
+        val season = current.season ?: 1
         val lastEpisode = current.episodeEnd ?: current.episode ?: return@withContext null
         // Strictly later episodes only: a second copy of the same episode is not "next".
         videoDao.episodesOf(showKey)
             .filter {
-                val otherSeason = it.video.season ?: 0
+                val otherSeason = it.video.season ?: 1
                 val otherEpisode = it.video.episode ?: Int.MAX_VALUE
                 it.video.id != videoId &&
                     (otherSeason > season || (otherSeason == season && otherEpisode > lastEpisode))
             }
             .minWithOrNull(
                 compareBy<VideoWithMeta>(
-                    { it.video.season ?: 0 },
+                    { it.video.season ?: 1 },
                     { it.video.episode ?: Int.MAX_VALUE },
                     { it.video.fileName.lowercase() },
                 ),
@@ -475,41 +530,86 @@ class LibraryRepositoryImpl(
                         )
                     }
                 }
-                IdentifyType.TV -> {
-                    val show = tmdb.tv(result.tmdbId)
-                    val metadata = show.toMetadata(now)
-                    val resolved = resolveEpisodeNumbers(video.season, video.episode, show.seasons)
-                    val season = resolved.first ?: 1
-                    val number = resolved.second ?: 1
-                    val episode = try {
-                        tmdb.season(show.id, season).episodes.firstOrNull { it.episodeNumber == number }
-                    } catch (e: TmdbException) {
-                        if (e.code == 404) null else throw e
-                    }
-                    database.withTransaction {
-                        metadataDao.upsert(metadata)
-                        val current = videoDao.byId(videoId) ?: return@withTransaction
-                        videoDao.update(
-                            current.copy(
-                                kind = VideoKind.EPISODE,
-                                metadataKey = metadata.key,
-                                showKey = metadata.key,
-                                season = season,
-                                episode = number,
-                                episodeEnd = current.episodeEnd?.takeIf { video.season != null && it > number },
-                                episodeTitle = episode?.name.nonBlank(),
-                                episodeOverview = episode?.overview.nonBlank(),
-                                episodeStillPath = episode?.stillPath.nonBlank(),
-                                episodeAirDate = episode?.airDate.nonBlank(),
-                                matchState = MatchState.MANUAL,
-                                matchAttemptAt = now,
-                            ),
-                        )
-                    }
-                }
+                IdentifyType.TV -> identifyShow(video, result.tmdbId, now)
             }
         }
     }
+
+    /**
+     * Matches [video] to a TMDB show. An episode takes every episode grouped with it (same showKey)
+     * along, so identifying a show never splits it in two. Each keeps its own numbering; absolute
+     * anime numbers are placed into the new show's seasons.
+     */
+    private suspend fun identifyShow(video: VideoEntity, tmdbId: Int, now: Long) {
+        val show = tmdb.tv(tmdbId)
+        val metadata = show.toMetadata(now)
+        val group = video.showKey?.takeIf { video.kind == VideoKind.EPISODE }?.let { videoDao.byShowKey(it) }.orEmpty()
+        val targets = if (group.any { it.id == video.id }) group else group + video
+        val seasonEpisodes = HashMap<Int, List<TmdbEpisode>>()
+        val matches = targets.map { target ->
+            // A movie or home video made an episode has no numbers of its own: it becomes S1E1.
+            val raw = if (target.kind != VideoKind.EPISODE && target.season == null && target.episode == null) {
+                EpisodeNumbers(1, 1, null)
+            } else {
+                rawNumbers(target)
+            }
+            val (season, number) = resolveEpisodeNumbers(raw.season, raw.episode, show.seasons)
+            val details = if (season != null && number != null) {
+                val episodes = seasonEpisodes.getOrPut(season) {
+                    try {
+                        tmdb.season(show.id, season).episodes
+                    } catch (e: TmdbException) {
+                        if (e.code == 404) emptyList() else throw e
+                    }
+                }
+                episodes.firstOrNull { it.episodeNumber == number }
+            } else {
+                null
+            }
+            ShowMatch(
+                videoId = target.id,
+                season = season,
+                episode = number,
+                episodeEnd = raw.episodeEnd?.takeIf { raw.season != null && number != null && it > number },
+                details = details,
+            )
+        }
+        database.withTransaction {
+            metadataDao.upsert(metadata)
+            for (match in matches) {
+                val current = videoDao.byId(match.videoId) ?: continue
+                videoDao.update(
+                    current.copy(
+                        kind = VideoKind.EPISODE,
+                        metadataKey = metadata.key,
+                        showKey = metadata.key,
+                        season = match.season,
+                        episode = match.episode,
+                        episodeEnd = match.episodeEnd,
+                        episodeTitle = match.details?.name.nonBlank(),
+                        episodeOverview = match.details?.overview.nonBlank(),
+                        episodeStillPath = match.details?.stillPath.nonBlank(),
+                        episodeAirDate = match.details?.airDate.nonBlank(),
+                        matchState = MatchState.MANUAL,
+                        matchAttemptAt = now,
+                    ),
+                )
+            }
+            // Files of this show added later (same parsed title) join it by themselves.
+            targets.filter { it.kind == VideoKind.EPISODE }
+                .map { LibraryKeys.matchQueryKey("tv", it.parsedTitle, it.parsedYear) }
+                .distinct()
+                .forEach { query -> matchCacheDao.put(MatchCacheEntity(query = query, metadataKey = metadata.key, checkedAt = now)) }
+        }
+    }
+
+    private class ShowMatch(
+        val videoId: Long,
+        val season: Int?,
+        val episode: Int?,
+        val episodeEnd: Int?,
+        val details: TmdbEpisode?,
+    )
 
     override suspend fun clearMetadata() {
         enricher.invalidate()
@@ -520,6 +620,13 @@ class LibraryRepositoryImpl(
                 videoDao.resetAutomaticMatches()
                 for (title in videoDao.automaticEpisodeTitles()) {
                     videoDao.setShowKeyForTitle(title, LibraryKeys.showKey(null, title))
+                }
+                // Absolute numbers were placed into the old match's seasons; start from the file again.
+                for (episode in videoDao.automaticEpisodes()) {
+                    val raw = rawNumbers(episode)
+                    if (raw.season != episode.season || raw.episode != episode.episode || raw.episodeEnd != episode.episodeEnd) {
+                        videoDao.setEpisodeNumbers(episode.id, raw.season, raw.episode, raw.episodeEnd)
+                    }
                 }
             }
         }
@@ -584,6 +691,7 @@ class LibraryRepositoryImpl(
             throw e
         } catch (e: Exception) {
             Log.w(TAG, "$what failed", e)
+            CrashReporter.log("$what failed", e)
         }
     }
 }
@@ -595,15 +703,14 @@ private fun VideoEntity.withParse(parsed: ParsedName): VideoEntity {
         ParsedKind.EPISODE -> VideoKind.EPISODE
         ParsedKind.UNKNOWN -> VideoKind.VIDEO
     }
-    // Absolute anime numbering is placed into a TMDB season once the show is matched.
-    val absolute = parsed.absoluteEpisode?.takeIf { parsed.season == null || parsed.episode == null }
+    val numbers = parsed.numbers()
     return copy(
         kind = kind,
         parsedTitle = parsed.title,
         parsedYear = parsed.year,
-        season = if (absolute != null) null else parsed.season,
-        episode = absolute ?: parsed.episode,
-        episodeEnd = if (absolute != null) null else parsed.episodeEnd,
+        season = numbers.season,
+        episode = numbers.episode,
+        episodeEnd = numbers.episodeEnd,
         metadataKey = null,
         showKey = if (kind == VideoKind.EPISODE) LibraryKeys.showKey(null, parsed.title) else null,
         episodeTitle = null,
@@ -615,6 +722,35 @@ private fun VideoEntity.withParse(parsed: ParsedName): VideoEntity {
     )
 }
 
+private class EpisodeNumbers(val season: Int?, val episode: Int?, val episodeEnd: Int?)
+
+/**
+ * The parser gives absolute anime numbers as season 1 plus [ParsedName.absoluteEpisode]; they are
+ * stored without a season so matching can place them into the show's TMDB seasons.
+ */
+private fun ParsedName.numbers(): EpisodeNumbers {
+    val absolute = absoluteEpisode
+    return if (absolute != null) EpisodeNumbers(null, absolute, null) else EpisodeNumbers(season, episode, episodeEnd)
+}
+
+/**
+ * An episode's numbering as its file name gives it. A match may have placed an absolute number
+ * into a season of the show it found; this takes it back to the absolute number.
+ */
+private fun rawNumbers(video: VideoEntity): EpisodeNumbers {
+    val stored = EpisodeNumbers(video.season, video.episode, video.episodeEnd)
+    if (video.kind != VideoKind.EPISODE) return stored
+    val parsed = parseName(video.fileName, video.folder.split('/').filter { it.isNotEmpty() }.asReversed())
+    val absolute = parsed.absoluteEpisode?.takeIf { parsed.kind == ParsedKind.EPISODE } ?: return stored
+    return EpisodeNumbers(null, absolute, null)
+}
+
+private fun SmbLocation.covers(file: SmbLocation): Boolean =
+    host.equals(file.host, ignoreCase = true) &&
+        (port ?: DEFAULT_SMB_PORT) == (file.port ?: DEFAULT_SMB_PORT) &&
+        share.equals(file.share, ignoreCase = true) &&
+        (path.isEmpty() || file.path.startsWith("$path/", ignoreCase = true))
+
 /** A bug in the parser must not fail a whole scan: such a file becomes a plain video. */
 private fun parseName(fileName: String, parentFolders: List<String>): ParsedName =
     try {
@@ -622,6 +758,10 @@ private fun parseName(fileName: String, parentFolders: List<String>): ParsedName
     } catch (e: Exception) {
         Log.w(TAG, "Could not parse \"$fileName\"", e)
         ParsedName(kind = ParsedKind.UNKNOWN, title = VideoFiles.baseName(fileName).ifBlank { fileName })
+    } catch (e: StackOverflowError) {
+        // A pathological name can overflow java.util.regex's recursion; the scan goes on.
+        Log.w(TAG, "Could not parse \"$fileName\"", e)
+        ParsedName(kind = ParsedKind.UNKNOWN, title = fileName)
     }
 
 /**

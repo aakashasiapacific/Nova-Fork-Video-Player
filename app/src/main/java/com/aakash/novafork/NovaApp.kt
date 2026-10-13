@@ -10,6 +10,8 @@ class NovaApp : Application(), ImageLoaderFactory {
         private set
 
     override fun onCreate() {
+        // First, so a crash anywhere below still leaves a report for the next start.
+        CrashReporter.install(this)
         super.onCreate()
         graph = AppGraph(this)
     }

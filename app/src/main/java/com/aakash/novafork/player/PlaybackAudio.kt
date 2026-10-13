@@ -75,7 +75,10 @@ internal class PlaybackAudio(context: Context, private val listener: Listener) {
 
     fun release() {
         unregisterNoisyReceiver()
-        abandonFocus()
+        // Always: AudioManager keeps the request (and with it this listener and the player
+        // screen) even when the request was refused, e.g. during a call.
+        hasFocus = false
+        audioManager.abandonAudioFocusRequest(focusRequest)
     }
 
     private fun abandonFocus() {

@@ -1,5 +1,6 @@
 package com.aakash.novafork.sources
 
+import com.aakash.novafork.core.smb.SmbLocation
 import com.aakash.novafork.core.smb.SmbUris
 import com.aakash.novafork.data.SmbBrowser
 import com.aakash.novafork.data.SmbCredentials
@@ -21,10 +22,12 @@ import com.hierynomus.smbj.auth.NtlmAuthenticator
 import com.hierynomus.smbj.connection.Connection
 import com.hierynomus.smbj.session.Session
 import com.hierynomus.smbj.share.DiskShare
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.FilterInputStream
 import java.io.IOException
+import java.io.InputStream
 import java.net.ConnectException
 import java.net.NoRouteToHostException
 import java.net.SocketTimeoutException
@@ -34,6 +37,7 @@ import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
+import java.util.concurrent.atomic.AtomicReference
 import com.hierynomus.smbj.share.File as SmbFile
 
 /** A folder or file on a share is missing or off limits; the server and share themselves work. */
@@ -100,6 +104,8 @@ class SmbBrowserImpl(
             }
         } catch (e: Exception) {
             throw failure(e, key, host, share, dir, isFile = false)
+        } catch (e: LinkageError) {
+            throw unsupported(e)
         }
     }
 
@@ -119,15 +125,31 @@ class SmbBrowserImpl(
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(failure(e, key, host, share, dir, isFile = false))
+        } catch (e: LinkageError) {
+            Result.failure(unsupported(e))
         }
     }
 
-    override suspend fun open(smbUri: String): SmbReadHandle = withContext(Dispatchers.IO) {
+    override suspend fun open(smbUri: String): SmbReadHandle {
         val location = SmbUris.parse(smbUri) ?: throw IOException("Not an smb:// address: $smbUri")
         if (location.path.isEmpty()) throw IOException("Not a file: $smbUri")
         val credentials = credentialsFor(location.host, location.share) ?: SmbCredentials(null, null, null)
-        val key = sessionKey(location.host, location.port, credentials)
+        // Coil cancels a poster request as soon as it scrolls away. withContext then drops the
+        // block's result, so the handle is kept here and closed: otherwise every cancelled open
+        // would leave a file open on the server for as long as the session lives.
+        val opened = AtomicReference<SmbReadHandle?>(null)
         try {
+            withContext(Dispatchers.IO) { opened.set(openBlocking(location, credentials)) }
+        } catch (e: CancellationException) {
+            opened.getAndSet(null)?.stream?.closeQuietly()
+            throw e
+        }
+        return opened.getAndSet(null) ?: throw IOException("Couldn't open $smbUri")
+    }
+
+    private fun openBlocking(location: SmbLocation, credentials: SmbCredentials): SmbReadHandle {
+        val key = sessionKey(location.host, location.port, credentials)
+        return try {
             withShare(key, location.share, failFast = true) { disk ->
                 val file = disk.openFile(
                     location.path.toSmbPath(),
@@ -147,8 +169,17 @@ class SmbBrowserImpl(
             }
         } catch (e: Exception) {
             throw failure(e, key, location.host, location.share, location.path, isFile = true)
+        } catch (e: LinkageError) {
+            throw unsupported(e)
         }
     }
+
+    /**
+     * smbj reaching for a class this Android version lacks is an Error, not an Exception; it
+     * fails this request instead of the whole app.
+     */
+    private fun unsupported(e: LinkageError): IOException =
+        IOException("Network shares don't work on this device (${e.javaClass.simpleName})", e)
 
     /**
      * Runs [block] on the share, reconnecting once when a reused session turns out to be dead.
@@ -295,9 +326,15 @@ class SmbBrowserImpl(
             }
             NtStatus.STATUS_ACCESS_DENIED ->
                 return when {
-                    key.isGuest -> IOException("$share needs a user name and password", e)
-                    shareRefused -> IOException("This account can't open $share on $host", e)
+                    // Only the share itself (or its root) being refused means the login is the problem;
+                    // one folder off limits inside a working share is skipped by the scan.
+                    (shareRefused || path.isEmpty()) && key.isGuest -> IOException("$share needs a user name and password", e)
+                    shareRefused || path.isEmpty() -> IOException("This account can't open $share on $host", e)
                     else -> SmbPathException("No permission to open $target", e)
+                }
+            in PATH_ONLY_STATUSES ->
+                if (!shareRefused && path.isNotEmpty()) {
+                    return SmbPathException(if (isFile) "Can't open $target" else "Can't open the folder $target", e)
                 }
             NtStatus.STATUS_IO_TIMEOUT, NtStatus.STATUS_TIMEOUT ->
                 return IOException("$host didn't answer", e)
@@ -366,6 +403,18 @@ class SmbBrowserImpl(
     private companion object {
         val UNREACHABLE_BACKOFF_NANOS = TimeUnit.SECONDS.toNanos(30)
 
+        /** Failures that concern one folder or file (a DFS link, something being deleted, …). */
+        val PATH_ONLY_STATUSES = setOf(
+            NtStatus.STATUS_PATH_NOT_COVERED,
+            NtStatus.STATUS_DELETE_PENDING,
+            NtStatus.STATUS_FILE_DELETED,
+            NtStatus.STATUS_SHARING_VIOLATION,
+            NtStatus.STATUS_STOPPED_ON_SYMLINK,
+            NtStatus.STATUS_IO_REPARSE_TAG_NOT_HANDLED,
+            NtStatus.STATUS_FILE_ENCRYPTED,
+            NtStatus.STATUS_NAME_TOO_LONG,
+        )
+
         val SESSION_GONE = setOf(
             NtStatus.STATUS_USER_SESSION_DELETED,
             NtStatus.STATUS_NETWORK_SESSION_EXPIRED,
@@ -386,5 +435,13 @@ class SmbBrowserImpl(
 
         fun Throwable.ntStatus(): NtStatus? =
             causes().firstNotNullOfOrNull { (it as? SMBApiException)?.status }
+
+        fun InputStream.closeQuietly() {
+            try {
+                close()
+            } catch (e: IOException) {
+                // The handle is being dropped anyway.
+            }
+        }
     }
 }

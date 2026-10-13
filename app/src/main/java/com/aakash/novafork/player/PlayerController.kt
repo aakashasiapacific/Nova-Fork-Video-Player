@@ -2,8 +2,10 @@ package com.aakash.novafork.player
 
 import android.app.Activity
 import android.content.pm.ActivityInfo
+import android.content.res.Configuration
 import android.media.AudioManager
 import android.net.Uri
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.ParcelFileDescriptor
@@ -11,6 +13,7 @@ import android.os.SystemClock
 import android.provider.OpenableColumns
 import android.util.Log
 import com.aakash.novafork.AppGraph
+import com.aakash.novafork.CrashReporter
 import com.aakash.novafork.core.library.VideoFiles
 import com.aakash.novafork.core.smb.SmbUris
 import com.aakash.novafork.data.AspectMode
@@ -107,7 +110,16 @@ class PlayerController(
     private var pendingSeekMs: Long? = null
     private var resumeBannerPending = false
     private var userRotated = false
+
+    /** False from open() until the new media is set: the player still holds the previous one. */
+    private var mediaReady = false
+
+    // A start waits for the video surface (onStart) and for the screen being in front (onResume).
     private var playWhenAttached = false
+    private var playOnResume = false
+
+    /** The activity is paused or stopped outside picture-in-picture: nothing is on screen. */
+    private var hostPaused = false
 
     // Track choices
     private var rememberedAudio: Int? = null
@@ -180,6 +192,7 @@ class PlayerController(
             aspect = settings.defaultAspect,
             seekStepMs = seekStepMs(settings),
             canEnterPictureInPicture = host.supportsPictureInPicture,
+            canRotate = canRotateScreen(activity.resources.configuration),
             volume = volumeLevel,
             brightness = currentBrightness(),
         )
@@ -210,9 +223,22 @@ class PlayerController(
         audio.unregisterNoisyReceiver()
         lastRequest = request
         nowPlaying = null
+        mediaReady = false
         resetSession()
         _state.update { old -> freshState(old, title = request.title.orEmpty()) }
-        openJob = scope.launch { load(request) }
+        CrashReporter.log("Player: opening a ${if (request.videoId != null) "library video" else "link"}")
+        openJob = scope.launch {
+            try {
+                load(request)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // Whatever goes wrong while preparing a video ends in the error card, not a crash.
+                Log.w(TAG, "Opening failed", e)
+                CrashReporter.log("Player: opening failed", e)
+                showError(errorMessage(nowPlaying?.kind))
+            }
+        }
     }
 
     private suspend fun load(request: PlayRequest) {
@@ -319,13 +345,24 @@ class PlayerController(
         opened.media.release()
         descriptor.closeQuietly()
         descriptor = opened.descriptor
-        // Without a surface libVLC would open the video output blind and play sound only.
-        if (attachedLayout != null) {
-            startPlayback()
-        } else {
-            playWhenAttached = true
+        mediaReady = true
+        requestStart()
+    }
+
+    /**
+     * Starts playback once it can be seen: without a surface libVLC would open the video output
+     * blind and play sound only, and a screen left while the video was loading must not start
+     * playing in the background.
+     */
+    private fun requestStart() {
+        when {
+            isHidden -> playOnResume = true
+            attachedLayout == null -> playWhenAttached = true
+            else -> startPlayback()
         }
     }
+
+    private val isHidden: Boolean get() = hostPaused && !_state.value.inPictureInPicture
 
     private fun startPlayback() {
         audio.requestFocus()
@@ -350,6 +387,7 @@ class PlayerController(
         seekSeriesStartMs = null
         seekSeriesTargetMs = null
         playWhenAttached = false
+        playOnResume = false
         _videoSize.value = null
     }
 
@@ -361,6 +399,7 @@ class PlayerController(
         locked = old.locked,
         inPictureInPicture = old.inPictureInPicture,
         canEnterPictureInPicture = old.canEnterPictureInPicture,
+        canRotate = old.canRotate,
         seekStepMs = seekStepMs(graph.settings.settings.value),
         volume = old.volume,
         brightness = old.brightness,
@@ -385,7 +424,7 @@ class PlayerController(
         mediaPlayer.setVideoScale(_state.value.aspect.toScaleType())
         if (playWhenAttached) {
             playWhenAttached = false
-            startPlayback()
+            requestStart()
         }
     }
 
@@ -397,11 +436,31 @@ class PlayerController(
         if (!released) mediaPlayer.detachViews()
     }
 
+    /**
+     * The screen is no longer in front (outside picture-in-picture). Only a playing media is
+     * paused: pausing one that is still opening would stop its input. One that starts later is
+     * held back by [requestStart] and [onPlaying] until [onHostResumed].
+     */
     fun onHostPaused() {
         if (released) return
+        hostPaused = true
         pausedByFocusLoss = false
         if (mediaPlayer.isPlaying) mediaPlayer.pause()
         saveProgress()
+    }
+
+    /** The screen is in front again: a start that was held back while it was away happens now. */
+    fun onHostResumed() {
+        hostPaused = false
+        if (released || !playOnResume) return
+        playOnResume = false
+        requestStart()
+    }
+
+    /** Android 16 ignores orientation requests on large screens; the rotate control hides there. */
+    fun onConfigurationChanged(configuration: Configuration) {
+        val canRotate = canRotateScreen(configuration)
+        if (canRotate != _state.value.canRotate) _state.update { it.copy(canRotate = canRotate) }
     }
 
     fun onPictureInPictureModeChanged(inPictureInPicture: Boolean) {
@@ -491,6 +550,9 @@ class PlayerController(
             restartFromEnd(startAtMs = 0)
             return
         }
+        // Still loading: the player holds the previous media (already closed), and the new one
+        // starts by itself once it is set.
+        if (!mediaReady) return
         startPlayback()
     }
 
@@ -639,7 +701,7 @@ class PlayerController(
     }
 
     override fun rotate() {
-        if (released) return
+        if (released || !_state.value.canRotate) return
         val (orientation, label) = when (activity.requestedOrientation) {
             ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE -> ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT to "Portrait"
             ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT -> ActivityInfo.SCREEN_ORIENTATION_FULL_SENSOR to "Auto-rotate"
@@ -714,9 +776,13 @@ class PlayerController(
     }
 
     private fun onPlaying() {
-        _state.update { it.copy(isPlaying = true, error = null) }
-        audio.requestFocus()
-        audio.registerNoisyReceiver()
+        // Left while the media was still opening: the setup below runs, then it waits paused.
+        val unseen = isHidden
+        _state.update { it.copy(isPlaying = !unseen, error = null) }
+        if (!unseen) {
+            audio.requestFocus()
+            audio.registerNoisyReceiver()
+        }
         val firstStart = !playbackStarted
         playbackStarted = true
         pendingSeekMs?.let { target ->
@@ -735,6 +801,10 @@ class PlayerController(
             refreshTracks()
             if (audioChoicePending) applyAudioChoice()
             trySetupSubtitles()
+        }
+        if (unseen) {
+            playOnResume = true
+            mediaPlayer.pause()
         }
     }
 
@@ -797,7 +867,7 @@ class PlayerController(
         }
         val size = VideoSize(width, height)
         _videoSize.value = size
-        if (!userRotated && !_state.value.inPictureInPicture) {
+        if (!userRotated && !_state.value.inPictureInPicture && _state.value.canRotate) {
             activity.requestedOrientation = if (size.isPortrait) {
                 ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT
             } else {
@@ -981,20 +1051,21 @@ class PlayerController(
     /** The closest earlier episode of the same show (previous episode, else last of an earlier season). */
     private suspend fun previousEpisode(current: VideoEntity): VideoEntity? {
         val showKey = current.showKey ?: return null
-        val season = current.season ?: 0
+        // No season (absolute numbering not placed yet) counts as season 1, as in the library.
+        val season = current.season ?: 1
         val episode = current.episode ?: return null
         return graph.library.observeVideos().first()
             .asSequence()
             .map { it.video }
             .filter { it.id != current.id && it.kind == VideoKind.EPISODE && it.showKey == showKey }
             .filter { other ->
-                val otherSeason = other.season ?: 0
+                val otherSeason = other.season ?: 1
                 val otherLast = other.episodeEnd ?: other.episode ?: return@filter false
                 otherSeason < season || (otherSeason == season && otherLast < episode)
             }
             .maxWithOrNull(
                 compareBy<VideoEntity>(
-                    { it.season ?: 0 },
+                    { it.season ?: 1 },
                     { it.episode ?: 0 },
                     { it.fileName.lowercase(Locale.ROOT) },
                 ),
@@ -1024,15 +1095,26 @@ class PlayerController(
         playNext()
     }
 
+    /**
+     * Plays an ended video again through a fresh session. libVLC can't restart an ended input, and
+     * replaying the same fd:// media would read on from the descriptor's offset (the end), so a
+     * content:// video would fail. A new session also re-applies tracks and the subtitle delay.
+     */
     private fun restartFromEnd(startAtMs: Long) {
-        ended = false
-        upNextJob?.cancel()
-        _state.update { it.copy(upNext = null) }
-        pendingSeekMs = startAtMs.takeIf { it > 0 }
-        resumeBannerPending = false
-        // An ended input can't seek or play again; a fresh one starts from the same media.
-        mediaPlayer.stop()
-        startPlayback()
+        val current = nowPlaying
+        val request = lastRequest
+        val videoId = current?.videoId ?: request?.videoId
+        val uri = current?.uri ?: request?.uri
+        if (videoId == null && uri == null) return
+        open(
+            PlayRequest(
+                videoId = videoId,
+                uri = uri,
+                title = request?.title,
+                startOver = startAtMs <= 0L,
+                startPositionMs = startAtMs.takeIf { it > 0 },
+            ),
+        )
     }
 
     private fun seekInternal(targetMs: Long) {
@@ -1160,6 +1242,14 @@ class PlayerController(
 
         /** libvlc_video_orient_t values 4–7 swap width and height. */
         val TRANSPOSED_ORIENTATIONS = 4..7
+
+        /** Android 16 (API 36) ignores orientation requests of apps targeting it on screens this wide. */
+        const val ORIENTATION_IGNORED_SDK = 36
+        const val LARGE_SCREEN_DP = 600
+
+        fun canRotateScreen(configuration: Configuration): Boolean =
+            Build.VERSION.SDK_INT < ORIENTATION_IGNORED_SDK ||
+                configuration.smallestScreenWidthDp < LARGE_SCREEN_DP
 
         fun seekStepMs(settings: Settings): Long = settings.seekStepSeconds.coerceAtLeast(1) * 1_000L
 

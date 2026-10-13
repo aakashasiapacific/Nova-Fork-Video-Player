@@ -1,6 +1,7 @@
 package com.aakash.novafork.data
 
 import android.util.Log
+import com.aakash.novafork.CrashReporter
 import com.aakash.novafork.core.library.LibraryKeys
 import com.aakash.novafork.core.parse.ParsedKind
 import com.aakash.novafork.core.parse.ParsedName
@@ -73,6 +74,7 @@ internal class MetadataEnricher(
                     throw e
                 } catch (e: Exception) {
                     Log.w(TAG, "Metadata pass failed", e)
+                    CrashReporter.log("Metadata pass failed", e)
                 } finally {
                     scanState.update { it.copy(enriching = false) }
                 }
@@ -106,13 +108,13 @@ internal class MetadataEnricher(
                 val permits = Semaphore(CONCURRENCY)
                 for (key in orphanKeys) {
                     launch {
-                        permits.withPermit { pass.restore(key) }
+                        permits.withPermit { isolated("Restoring $key") { pass.restore(key) } }
                         advance(1)
                     }
                 }
                 for ((query, group) in groups) {
                     launch {
-                        permits.withPermit { pass.match(query, group) }
+                        permits.withPermit { isolated("Matching $query") { pass.match(query, group) } }
                         advance(group.size)
                     }
                 }
@@ -129,6 +131,23 @@ internal class MetadataEnricher(
         scanState.update { it.copy(enrichDone = it.enrichDone + count) }
     }
 
+    /**
+     * One title's lookup or write (e.g. a database error) failing must not end the whole pass;
+     * those videos are simply tried again on a later pass. [StopPass] still ends it.
+     */
+    private suspend fun isolated(what: String, block: suspend () -> Unit) {
+        try {
+            block()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: StopPass) {
+            throw e
+        } catch (e: Exception) {
+            Log.w(TAG, "$what failed", e)
+            CrashReporter.log("$what failed", e)
+        }
+    }
+
     /** Ends the whole pass; [message] (if any) is shown as [ScanState.lastError]. Videos stay as they are. */
     private class StopPass(message: String?) : Exception(message)
 
@@ -142,14 +161,13 @@ internal class MetadataEnricher(
         /** Matches every video of one title (same [LibraryKeys.matchQueryKey]). */
         suspend fun match(query: String, group: List<VideoEntity>) {
             ensureCurrent()
-            val ids = group.map { it.id }
-            tmdbStep(onNotFound = { recordMiss(query, ids) }) {
+            tmdbStep(onNotFound = { recordMiss(query, group) }) {
                 val cached = matchCacheDao.get(query)
                 val cachedKey = cached?.metadataKey
                 when {
                     cachedKey != null && cachedKey.startsWith(keyPrefix(group)) -> applyCachedMatch(cachedKey, group)
                     cached != null && cachedKey == null && cached.checkedAt >= now - MATCH_RETRY_AFTER_MS ->
-                        markUnmatched(ids, cached.checkedAt)
+                        markUnmatched(group, cached.checkedAt)
                     else -> lookUp(query, group)
                 }
             }
@@ -193,14 +211,14 @@ internal class MetadataEnricher(
                 if (show != null) metadataDao.upsert(show.toMetadata(now))
                 val key = show?.let { LibraryKeys.tvKey(it.id) }
                 matchCacheDao.put(MatchCacheEntity(query = query, metadataKey = key, checkedAt = now))
-                if (show != null) applyShow(show.id, show.seasons, group) else markUnmatched(group.map { it.id }, now)
+                if (show != null) applyShow(show.id, show.seasons, group) else markUnmatched(group, now)
             } else {
                 val movie = tmdb.findMovie(parsed)
                 ensureCurrent()
                 if (movie != null) metadataDao.upsert(movie.toMetadata(now))
                 val key = movie?.let { LibraryKeys.movieKey(it.id) }
                 matchCacheDao.put(MatchCacheEntity(query = query, metadataKey = key, checkedAt = now))
-                if (key != null) markMovie(group.map { it.id }, key) else markUnmatched(group.map { it.id }, now)
+                if (key != null) markMovie(group, key) else markUnmatched(group, now)
             }
         }
 
@@ -224,7 +242,7 @@ internal class MetadataEnricher(
                     ensureCurrent()
                     metadataDao.upsert(movie.toMetadata(now))
                 }
-                markMovie(group.map { it.id }, key)
+                markMovie(group, key)
             }
         }
 
@@ -244,6 +262,9 @@ internal class MetadataEnricher(
                     episodeStillPath = episode?.stillPath.nonBlank(),
                     episodeAirDate = episode?.airDate.nonBlank(),
                     attemptAt = now,
+                    fileName = video.fileName,
+                    parsedTitle = video.parsedTitle,
+                    parsedYear = video.parsedYear,
                 )
             }
         }
@@ -263,20 +284,28 @@ internal class MetadataEnricher(
             return details
         }
 
-        private suspend fun markMovie(ids: List<Long>, key: String) {
+        private suspend fun markMovie(group: List<VideoEntity>, key: String) {
             ensureCurrent()
-            for (chunk in ids.chunked(SQL_CHUNK)) videoDao.setMovieMatch(chunk, key, now)
+            for ((parse, videos) in group.groupBy { it.parseSnapshot() }) {
+                for (chunk in videos.map { it.id }.chunked(SQL_CHUNK)) {
+                    videoDao.setMovieMatch(chunk, key, now, parse.kind.name, parse.title, parse.year)
+                }
+            }
         }
 
-        private suspend fun markUnmatched(ids: List<Long>, attemptAt: Long) {
+        private suspend fun markUnmatched(group: List<VideoEntity>, attemptAt: Long) {
             ensureCurrent()
-            for (chunk in ids.chunked(SQL_CHUNK)) videoDao.setUnmatched(chunk, attemptAt)
+            for ((parse, videos) in group.groupBy { it.parseSnapshot() }) {
+                for (chunk in videos.map { it.id }.chunked(SQL_CHUNK)) {
+                    videoDao.setUnmatched(chunk, attemptAt, parse.kind.name, parse.title, parse.year)
+                }
+            }
         }
 
-        private suspend fun recordMiss(query: String, ids: List<Long>) {
+        private suspend fun recordMiss(query: String, group: List<VideoEntity>) {
             ensureCurrent()
             matchCacheDao.put(MatchCacheEntity(query = query, metadataKey = null, checkedAt = now))
-            markUnmatched(ids, now)
+            markUnmatched(group, now)
         }
 
         private fun ensureCurrent() {
@@ -309,6 +338,11 @@ internal class MetadataEnricher(
         }
     }
 }
+
+/** What a lookup was made for; writes only land on rows that still carry it (see VideoDao). */
+private data class ParseSnapshot(val kind: VideoKind, val title: String, val year: Int?)
+
+private fun VideoEntity.parseSnapshot() = ParseSnapshot(kind, parsedTitle, parsedYear)
 
 private fun keyPrefix(group: List<VideoEntity>): String =
     if (group.first().kind == VideoKind.EPISODE) "tv:" else "movie:"

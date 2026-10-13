@@ -67,6 +67,11 @@ interface LibraryRepository {
         domain: String?,
     ): Long
 
+    /**
+     * Removes a folder, share or stream with its videos. Videos another share also covers move to
+     * that share instead. The DEVICE source can't be removed (IllegalArgumentException): turn off
+     * Settings.scanDeviceStorage to hide it.
+     */
     suspend fun removeSource(sourceId: Long)
 
     /** Saves a stream URL as a STREAM source plus one video; returns the video id. Title defaults to the URL's last segment. */
@@ -90,7 +95,11 @@ interface LibraryRepository {
 
     suspend fun searchTmdb(query: String, type: IdentifyType?): List<TmdbSearchResult>
 
-    /** Manual match. For TV the video keeps its parsed season/episode; episode data is fetched. Sets MatchState.MANUAL. */
+    /**
+     * Manual match; sets MatchState.MANUAL. For TV every episode sharing the video's showKey is
+     * matched to the show too (the whole show moves to the new showKey "tv:<id>"); each keeps its
+     * parsed season/episode (absolute numbers placed into the show's seasons) and gets episode data.
+     */
     suspend fun identify(videoId: Long, result: TmdbSearchResult)
 
     /** Drops all TMDB data and match cache; marks every non-manual video PENDING and re-matches. */

@@ -7,6 +7,7 @@ import android.content.res.Configuration
 import android.media.AudioManager
 import android.os.Build
 import android.os.Bundle
+import android.os.PowerManager
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
@@ -128,23 +129,32 @@ class PlayerActivity : ComponentActivity(), PlayerController.Host {
         super.onResume()
         pickingSubtitle = false
         hideSystemBars()
+        controller.onHostResumed()
     }
 
     override fun onPause() {
         super.onPause()
-        // In picture-in-picture the activity is paused but still on screen: keep playing.
-        if (!isInPictureInPictureMode) controller.onHostPaused()
+        // Paused but still on screen: in picture-in-picture, and on Android 8-9 in split screen
+        // as soon as the other app is touched. onStop pauses once it really is gone.
+        if (!isInPictureInPictureMode && !isInMultiWindowMode) controller.onHostPaused()
     }
 
     override fun onStop() {
         super.onStop()
-        if (isInPictureInPictureMode) {
+        if (isInPictureInPictureMode && isScreenOn()) {
             // The PiP window was dismissed.
             controller.saveProgress()
             finish()
-        } else {
-            controller.detachSurface()
+            return
         }
+        // Left the app, or the screen went off (in PiP too): pause and keep the session.
+        controller.onHostPaused()
+        controller.detachSurface()
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        controller.onConfigurationChanged(newConfig)
     }
 
     override fun onDestroy() {
@@ -214,6 +224,9 @@ class PlayerActivity : ComponentActivity(), PlayerController.Host {
         controller.detachSurface(layout)
         if (videoLayout === layout) videoLayout = null
     }
+
+    /** Dismissing the PiP window and turning the screen off both stop the activity while in PiP. */
+    private fun isScreenOn(): Boolean = getSystemService(PowerManager::class.java)?.isInteractive ?: true
 
     private fun keepScreenOn(on: Boolean) {
         if (on) {
