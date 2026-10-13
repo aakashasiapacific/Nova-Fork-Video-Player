@@ -108,6 +108,13 @@ android {
     }
 }
 
+// Room writes each database version's schema to app/schemas/<database>/<version>.json; commit
+// them, migrations are written against them. A plain path (not an @InputDirectory provider) so a
+// checkout without the folder still builds: Room creates it.
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
+}
+
 dependencies {
     implementation(project(":core"))
 

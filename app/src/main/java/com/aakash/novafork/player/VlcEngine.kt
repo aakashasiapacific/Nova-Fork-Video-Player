@@ -46,9 +46,11 @@ object VlcEngine {
             LibVLC(context, ArrayList(coreOptions + moduleOptions))
         } catch (e: IllegalStateException) {
             Log.w(TAG, "libVLC rejected the tuned options; starting with the core ones", e)
+            PlayerDiagnostics.record("engine: tuned options rejected, core options only")
             LibVLC(context, ArrayList(coreOptions))
         }
         libVLC.setUserAgent("Nova Fork", "NovaFork/${BuildConfig.VERSION_NAME}")
+        PlayerDiagnostics.record("engine: libVLC ${LibVLC.version()}")
         return libVLC
     }
 }

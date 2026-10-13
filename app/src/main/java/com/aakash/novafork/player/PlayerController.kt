@@ -17,6 +17,7 @@ import com.aakash.novafork.CrashReporter
 import com.aakash.novafork.core.library.VideoFiles
 import com.aakash.novafork.core.smb.SmbUris
 import com.aakash.novafork.data.AspectMode
+import com.aakash.novafork.data.HwDecoding
 import com.aakash.novafork.data.Settings
 import com.aakash.novafork.data.SmbCredentials
 import com.aakash.novafork.data.db.VideoEntity
@@ -44,6 +45,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import org.videolan.libvlc.MediaPlayer
 import org.videolan.libvlc.interfaces.IMedia
 import org.videolan.libvlc.util.VLCVideoLayout
@@ -83,6 +85,9 @@ class PlayerController(
         val videoId: Long? get() = entry?.video?.id
     }
 
+    /** What the user chose in a session that is reopened in software, handed to the new one. */
+    private class CarriedChoices(val audioTrack: Int?, val subtitleTrack: Int?, val subtitleDelayMs: Long)
+
     private val libVLC = VlcEngine.libVLC(activity)
     private val mediaPlayer: MediaPlayer = VlcEngine.newMediaPlayer(activity)
     private val audioManager: AudioManager = checkNotNull(activity.getSystemService(AudioManager::class.java))
@@ -98,6 +103,9 @@ class PlayerController(
 
     /** Null until the first picture is shown (and for audio-only media). */
     val videoSize: StateFlow<VideoSize?> = _videoSize.asStateFlow()
+
+    /** Bumped by every open(): work that finishes later must not land in the next video. */
+    private var session = 0
 
     // The media being played
     private var nowPlaying: NowPlaying? = null
@@ -151,11 +159,25 @@ class PlayerController(
     private var staleEventToken = 0
     private var droppingStaleEvents = false
 
+    // Hardware decoding fallback (see fallBackToSoftwareDecoding)
+    /** How the current media decodes; null until it is opened. */
+    private var decoding: HwDecoding? = null
+    private var videoTrackSeen = false
+    private var videoOutputSeen = false
+
+    /** Playback time without a picture so far, counted by [watchForPicture]. */
+    private var noPictureMs = 0L
+    private var carried: CarriedChoices? = null
+
+    /** The last position save: a reopen reads the library only once it is written. */
+    private var pendingSave: Job? = null
+
     private var openJob: Job? = null
     private var subtitleJob: Job? = null
     private var upNextJob: Job? = null
     private var resumeBannerJob: Job? = null
     private var feedbackJob: Job? = null
+    private var pictureWatchJob: Job? = null
 
     private val eventListener = object : MediaPlayer.EventListener {
         override fun onEvent(event: MediaPlayer.Event) = onPlayerEvent(event)
@@ -165,12 +187,14 @@ class PlayerController(
         activity,
         object : PlaybackAudio.Listener {
             override fun onFocusLost(transient: Boolean) {
+                PlayerDiagnostics.record(if (transient) "audio focus lost for a while" else "audio focus lost")
                 if (released || !mediaPlayer.isPlaying) return
                 pausedByFocusLoss = transient
                 mediaPlayer.pause()
             }
 
             override fun onFocusRegained() {
+                PlayerDiagnostics.record("audio focus regained")
                 if (released || !pausedByFocusLoss) return
                 pausedByFocusLoss = false
                 mediaPlayer.play()
@@ -180,7 +204,10 @@ class PlayerController(
                 if (!released) mediaPlayer.setVolume(if (ducked) DUCKED_VOLUME else FULL_VOLUME)
             }
 
-            override fun onBecomingNoisy() = pause()
+            override fun onBecomingNoisy() {
+                PlayerDiagnostics.record("headphones disconnected")
+                pause()
+            }
         },
     )
 
@@ -208,12 +235,18 @@ class PlayerController(
     val positionMs: Long get() = if (released) _state.value.positionMs else currentPositionMs()
 
     fun open(request: PlayRequest) {
+        openSession(request, carry = null)
+    }
+
+    /** Starts a new session for [request]; [carry] keeps the user's choices across a software reopen. */
+    private fun openSession(request: PlayRequest, carry: CarriedChoices?) {
         if (released) return
         saveProgress()
         openJob?.cancel()
         subtitleJob?.cancel()
         upNextJob?.cancel()
         resumeBannerJob?.cancel()
+        pictureWatchJob?.cancel()
         if (mediaPlayer.hasMedia()) {
             mediaPlayer.stop()
             dropStaleEvents()
@@ -224,11 +257,20 @@ class PlayerController(
         lastRequest = request
         nowPlaying = null
         mediaReady = false
+        session++
         resetSession()
-        _state.update { old -> freshState(old, title = request.title.orEmpty()) }
-        CrashReporter.log("Player: opening a ${if (request.videoId != null) "library video" else "link"}")
+        carried = carry
+        val subtitleDelayMs = carry?.subtitleDelayMs ?: 0L
+        _state.update { old -> freshState(old, title = request.title.orEmpty()).copy(subtitleDelayMs = subtitleDelayMs) }
+        val what = if (request.videoId != null) "library video" else "link"
+        CrashReporter.log("Player: opening a $what")
+        PlayerDiagnostics.record("open: a $what${if (request.startPositionMs != null) " at a set position" else ""}")
+        val lastSave = pendingSave
         openJob = scope.launch {
             try {
+                // Reopening the video that was just saved (a new intent, a retry) must resume from
+                // that save, not from the one before it. Bounded: a busy database never holds up playback.
+                if (lastSave != null) withTimeoutOrNull(SAVE_WAIT_MS) { lastSave.join() }
                 load(request)
             } catch (e: CancellationException) {
                 throw e
@@ -236,6 +278,7 @@ class PlayerController(
                 // Whatever goes wrong while preparing a video ends in the error card, not a crash.
                 Log.w(TAG, "Opening failed", e)
                 CrashReporter.log("Player: opening failed", e)
+                PlayerDiagnostics.record("open: failed with ${e.javaClass.simpleName}")
                 showError(errorMessage(nowPlaying?.kind))
             }
         }
@@ -261,8 +304,9 @@ class PlayerController(
         _state.update { it.copy(title = titles.title, subtitle = titles.subtitle) }
 
         val video = entry?.video
-        rememberedAudio = video?.audioTrackId
-        rememberedSubtitle = video?.subtitleTrackId
+        val carry = carried
+        rememberedAudio = carry?.audioTrack ?: video?.audioTrackId
+        rememberedSubtitle = carry?.subtitleTrack ?: video?.subtitleTrackId
         audioLanguage = TrackLanguages.aliases(settings.preferredAudioLanguage)
         subtitleLanguage = TrackLanguages.aliases(settings.preferredSubtitleLanguage)
         audioChoicePending = rememberedAudio != null || audioLanguage.isNotEmpty()
@@ -279,7 +323,10 @@ class PlayerController(
 
         startSubtitleSearch(current, settings)
 
-        val opened = openMedia(uri, kind, settings)
+        val decoding = MediaSource.decodingFor(uri, settings.hardwareDecoding)
+        this.decoding = decoding
+        PlayerDiagnostics.record("open: ${describeSource(kind, fileName)}, ${decodingLabel(decoding)}")
+        val opened = openMedia(uri, kind, settings, decoding)
         if (opened == null) {
             showError(errorMessage(kind))
             return
@@ -310,18 +357,19 @@ class PlayerController(
     }
 
     /** Builds the media off the main thread; never leaks a descriptor when the open is cancelled. */
-    private suspend fun openMedia(uri: String, kind: UriKind, settings: Settings): OpenedMedia? {
+    private suspend fun openMedia(uri: String, kind: UriKind, settings: Settings, decoding: HwDecoding): OpenedMedia? {
         val credentials = if (kind == UriKind.SMB) smbCredentialsFor(uri) else null
         val result = AtomicReference<OpenedMedia?>(null)
         try {
             withContext(Dispatchers.IO) {
-                result.set(MediaSource.open(activity.applicationContext, libVLC, uri, settings, credentials))
+                result.set(MediaSource.open(activity.applicationContext, libVLC, uri, settings, decoding, credentials))
             }
         } catch (e: CancellationException) {
             result.getAndSet(null)?.discard()
             throw e
         } catch (e: Exception) {
             Log.w(TAG, "Couldn't open a ${kind.name.lowercase(Locale.ROOT)} video", e)
+            PlayerDiagnostics.record("open: couldn't build the media: ${e.javaClass.simpleName}")
             return null
         }
         return result.getAndSet(null)
@@ -356,8 +404,14 @@ class PlayerController(
      */
     private fun requestStart() {
         when {
-            isHidden -> playOnResume = true
-            attachedLayout == null -> playWhenAttached = true
+            isHidden -> {
+                playOnResume = true
+                PlayerDiagnostics.record("start: waiting for the screen to come back")
+            }
+            attachedLayout == null -> {
+                playWhenAttached = true
+                PlayerDiagnostics.record("start: waiting for the video surface")
+            }
             else -> startPlayback()
         }
     }
@@ -388,6 +442,13 @@ class PlayerController(
         seekSeriesTargetMs = null
         playWhenAttached = false
         playOnResume = false
+        // A picker result that arrives after this belongs to the previous video.
+        resumeAfterPicker = false
+        decoding = null
+        videoTrackSeen = false
+        videoOutputSeen = false
+        noPictureMs = 0L
+        carried = null
         _videoSize.value = null
     }
 
@@ -420,6 +481,7 @@ class PlayerController(
         if (attachedLayout != null) mediaPlayer.detachViews()
         mediaPlayer.attachViews(layout, null, ENABLE_SUBTITLES, USE_TEXTURE_VIEW)
         attachedLayout = layout
+        PlayerDiagnostics.record("surface attached")
         // The scale lives in the view helper that attachViews just created.
         mediaPlayer.setVideoScale(_state.value.aspect.toScaleType())
         if (playWhenAttached) {
@@ -434,6 +496,7 @@ class PlayerController(
         if (layout != null && layout !== attached) return
         attachedLayout = null
         if (!released) mediaPlayer.detachViews()
+        PlayerDiagnostics.record("surface detached")
     }
 
     /**
@@ -443,6 +506,7 @@ class PlayerController(
      */
     fun onHostPaused() {
         if (released) return
+        if (!hostPaused) PlayerDiagnostics.record("screen left")
         hostPaused = true
         pausedByFocusLoss = false
         if (mediaPlayer.isPlaying) mediaPlayer.pause()
@@ -451,6 +515,7 @@ class PlayerController(
 
     /** The screen is in front again: a start that was held back while it was away happens now. */
     fun onHostResumed() {
+        if (hostPaused) PlayerDiagnostics.record("screen back in front")
         hostPaused = false
         if (released || !playOnResume) return
         playOnResume = false
@@ -464,6 +529,7 @@ class PlayerController(
     }
 
     fun onPictureInPictureModeChanged(inPictureInPicture: Boolean) {
+        PlayerDiagnostics.record(if (inPictureInPicture) "picture-in-picture on" else "picture-in-picture off")
         if (inPictureInPicture) {
             scrubStartMs = null
             volumeGestureActive = false
@@ -484,6 +550,7 @@ class PlayerController(
             resumeAfterPicking()
             return
         }
+        val pickedFor = session
         scope.launch {
             val file = try {
                 subtitleFinder.importPicked(uri)
@@ -493,7 +560,8 @@ class PlayerController(
                 Log.w(TAG, "Subtitle import failed", e)
                 null
             }
-            if (released) return@launch
+            // Another video started while the file was copied: it isn't that video's subtitle.
+            if (released || session != pickedFor) return@launch
             val added = file != null && mediaPlayer.addSlave(IMedia.Slave.Type.Subtitle, Uri.fromFile(file), true)
             if (added) pendingSubtitleRestore = null
             showLabel(if (added) "Subtitles added" else "Couldn't load that subtitle file")
@@ -520,7 +588,9 @@ class PlayerController(
         upNextJob?.cancel()
         resumeBannerJob?.cancel()
         feedbackJob?.cancel()
+        pictureWatchJob?.cancel()
         mainHandler.removeCallbacksAndMessages(null)
+        PlayerDiagnostics.record("player released")
         audio.release()
         mediaPlayer.setEventListener(null)
         mediaPlayer.stop()
@@ -637,6 +707,7 @@ class PlayerController(
 
     override fun selectAudioTrack(id: Int) {
         if (released) return
+        PlayerDiagnostics.record("user: audio track $id")
         mediaPlayer.setAudioTrack(id)
         audioChoicePending = false
         rememberedAudio = id
@@ -648,6 +719,7 @@ class PlayerController(
 
     override fun selectSubtitleTrack(id: Int) {
         if (released) return
+        PlayerDiagnostics.record("user: subtitle track $id")
         mediaPlayer.setSpuTrack(id)
         pendingSubtitleRestore = null
         rememberedSubtitle = id
@@ -749,11 +821,15 @@ class PlayerController(
 
     private fun onPlayerEvent(event: MediaPlayer.Event) {
         if (released || droppingStaleEvents) return
+        recordEvent(event)
         when (event.type) {
             MediaPlayer.Event.Opening -> _state.update { it.copy(isBuffering = true) }
             MediaPlayer.Event.Buffering -> {
                 val buffering = event.buffering < 100f
-                if (buffering != _state.value.isBuffering) _state.update { it.copy(isBuffering = buffering) }
+                if (buffering != _state.value.isBuffering) {
+                    PlayerDiagnostics.record(if (buffering) "vlc: buffering" else "vlc: buffered")
+                    _state.update { it.copy(isBuffering = buffering) }
+                }
             }
             MediaPlayer.Event.Playing -> onPlaying()
             MediaPlayer.Event.Paused -> onPaused()
@@ -769,10 +845,33 @@ class PlayerController(
                 val seekable = event.seekable
                 _state.update { it.copy(seekable = seekable) }
             }
-            MediaPlayer.Event.Vout -> if (event.voutCount > 0) onVideoOutput()
-            MediaPlayer.Event.ESAdded -> onTracksChanged(added = true)
+            MediaPlayer.Event.Vout -> onVideoOutputsChanged(event.voutCount)
+            MediaPlayer.Event.ESAdded -> {
+                if (event.esChangedType == IMedia.Track.Type.Video) videoTrackSeen = true
+                onTracksChanged(added = true)
+            }
             MediaPlayer.Event.ESDeleted, MediaPlayer.Event.ESSelected -> onTracksChanged(added = false)
         }
+    }
+
+    /** libVLC's events for the diagnostics trail; the frequent time and position ones are left out. */
+    private fun recordEvent(event: MediaPlayer.Event) {
+        val line = when (event.type) {
+            MediaPlayer.Event.Opening -> "opening"
+            MediaPlayer.Event.Playing -> "playing"
+            MediaPlayer.Event.Paused -> "paused at ${formatPosition(currentPositionMs())}"
+            MediaPlayer.Event.Stopped -> "stopped"
+            MediaPlayer.Event.EndReached -> "end reached"
+            MediaPlayer.Event.EncounteredError -> "error"
+            MediaPlayer.Event.LengthChanged -> "length ${formatPosition(event.lengthChanged)}"
+            MediaPlayer.Event.SeekableChanged -> if (event.seekable) "seekable" else "not seekable"
+            MediaPlayer.Event.Vout -> "video outputs: ${event.voutCount}"
+            MediaPlayer.Event.ESAdded -> "track added: ${trackTypeName(event.esChangedType)} ${event.esChangedID}"
+            MediaPlayer.Event.ESDeleted -> "track removed: ${trackTypeName(event.esChangedType)} ${event.esChangedID}"
+            MediaPlayer.Event.ESSelected -> "track selected: ${trackTypeName(event.esChangedType)} ${event.esChangedID}"
+            else -> return
+        }
+        PlayerDiagnostics.record("vlc: $line")
     }
 
     private fun onPlaying() {
@@ -798,6 +897,9 @@ class PlayerController(
         if (firstStart) {
             val rate = _state.value.rate
             if (rate != 1f) mediaPlayer.setRate(rate)
+            // libVLC keeps the delay per input: one set while opening (or carried over) applies now.
+            val subtitleDelayMs = _state.value.subtitleDelayMs
+            if (subtitleDelayMs != 0L) mediaPlayer.setSpuDelay(subtitleDelayMs * 1_000)
             refreshTracks()
             if (audioChoicePending) applyAudioChoice()
             trySetupSubtitles()
@@ -805,10 +907,13 @@ class PlayerController(
         if (unseen) {
             playOnResume = true
             mediaPlayer.pause()
+        } else {
+            watchForPicture()
         }
     }
 
     private fun onPaused() {
+        pictureWatchJob?.cancel()
         val position = currentPositionMs()
         _state.update { it.copy(isPlaying = false, positionMs = position) }
         audio.unregisterNoisyReceiver()
@@ -816,11 +921,13 @@ class PlayerController(
     }
 
     private fun onStopped() {
+        pictureWatchJob?.cancel()
         _state.update { it.copy(isPlaying = false, isBuffering = false) }
         audio.unregisterNoisyReceiver()
     }
 
     private fun onEndReached() {
+        pictureWatchJob?.cancel()
         ended = true
         audio.unregisterNoisyReceiver()
         val duration = _state.value.durationMs.takeIf { it > 0 } ?: mediaPlayer.length.coerceAtLeast(0L)
@@ -839,10 +946,118 @@ class PlayerController(
     }
 
     private fun onError() {
+        pictureWatchJob?.cancel()
+        val fallBack = errorMayBeHardwareDecoding()
+        reportPlaybackError(fallingBack = fallBack)
+        if (fallBack && fallBackToSoftwareDecoding("playback error")) return
         val kind = nowPlaying?.kind
         audio.unregisterNoisyReceiver()
         _state.update { it.copy(isPlaying = false, isBuffering = false, error = errorMessage(kind)) }
         mediaPlayer.stop()
+    }
+
+    /**
+     * Whether an error is worth one more try in software. Only with "Automatic" decoding and once
+     * a video track exists (an input that can't even be opened has none). On SMB and network
+     * sources an error after the picture was shown is almost always the connection: reopening
+     * would only delay the error card and keep the video in slow software decoding for nothing.
+     */
+    private fun errorMayBeHardwareDecoding(): Boolean {
+        val current = nowPlaying ?: return false
+        if (decoding != HwDecoding.AUTO || !videoTrackSeen) return false
+        return !videoOutputSeen || current.kind.isLocal
+    }
+
+    /**
+     * A short report of a libVLC error with the last player events, kept in the crash reporter's
+     * trail so it reaches the next crash report.
+     */
+    private fun reportPlaybackError(fallingBack: Boolean) {
+        val current = nowPlaying
+        val summary = buildString {
+            append("Player: libVLC error (")
+            append(if (current != null) describeSource(current.kind, current.fileName) else "nothing open")
+            append(", ").append(decodingLabel(decoding))
+            if (playbackStarted) {
+                append(", at ").append(formatPosition(currentPositionMs()))
+            } else {
+                append(", before playback started")
+            }
+            append(if (videoOutputSeen) ", picture shown" else ", no picture yet")
+            if (fallingBack) append("; retrying with software decoding")
+            append(")")
+        }
+        val trail = PlayerDiagnostics.recent(ERROR_REPORT_EVENTS)
+        CrashReporter.log(
+            buildString {
+                append(summary)
+                for (line in trail) append("\n    ").append(line)
+            },
+        )
+    }
+
+    /**
+     * Reopens the current video once with software decoding, where it stopped, and remembers that
+     * choice for the video until the process ends. [MediaSource.decodingFor] then never hands it
+     * "Automatic" again, so this can't repeat for the same video. False when there is nothing to reopen.
+     */
+    private fun fallBackToSoftwareDecoding(reason: String): Boolean {
+        val current = nowPlaying ?: return false
+        val request = lastRequest ?: return false
+        if (released || decoding != HwDecoding.AUTO) return false
+        MediaSource.rememberSoftwareDecoding(current.uri)
+        // Before the first start the pending resume point is recomputed from the request.
+        val position = if (playbackStarted) currentPositionMs().takeIf { it > 0 } else null
+        PlayerDiagnostics.record("decoding: $reason with hardware decoding, reopening in software")
+        CrashReporter.log("Player: $reason with hardware decoding, switched to software decoding")
+        val carry = CarriedChoices(
+            audioTrack = rememberedAudio,
+            subtitleTrack = rememberedSubtitle,
+            subtitleDelayMs = _state.value.subtitleDelayMs,
+        )
+        openSession(request.copy(startPositionMs = position ?: request.startPositionMs), carry)
+        showFeedback(GestureFeedback.Label("Switched to software decoding"), SOFTWARE_DECODING_LABEL_MS)
+        return true
+    }
+
+    /**
+     * With hardware decoding a failing decoder or surface can leave the screen black while the
+     * sound plays: no video output ever appears. After [NO_PICTURE_TIMEOUT_MS] of such playback
+     * the video is reopened in software. Only time that really played counts, with the surface
+     * attached: opening, buffering, pauses and a hidden screen don't.
+     */
+    private fun watchForPicture() {
+        if (videoOutputSeen || decoding != HwDecoding.AUTO || pictureWatchJob?.isActive == true) return
+        val watched = session
+        pictureWatchJob = scope.launch {
+            var lastTime = mediaPlayer.time
+            while (noPictureMs < NO_PICTURE_TIMEOUT_MS) {
+                delay(PICTURE_CHECK_INTERVAL_MS)
+                if (released || session != watched || videoOutputSeen) return@launch
+                val time = mediaPlayer.time
+                if (mediaPlayer.isPlaying && attachedLayout != null && time > lastTime) {
+                    noPictureMs += PICTURE_CHECK_INTERVAL_MS
+                }
+                lastTime = time
+            }
+            if (!videoOutputSeen && hasVideoTrack()) {
+                fallBackToSoftwareDecoding("no picture after ${NO_PICTURE_TIMEOUT_MS / 1_000} s")
+            }
+        }
+    }
+
+    private fun hasVideoTrack(): Boolean = videoTrackSeen || realTracks(mediaPlayer.videoTracks).isNotEmpty()
+
+    private fun onVideoOutputsChanged(count: Int) {
+        if (count <= 0) return
+        if (!videoOutputSeen) {
+            videoOutputSeen = true
+            pictureWatchJob?.cancel()
+            mediaPlayer.currentVideoTrack?.let { track ->
+                PlayerDiagnostics.record("picture: ${track.codec ?: "unknown codec"} ${track.width}x${track.height}")
+            }
+        }
+        onVideoOutput()
     }
 
     private fun onTimeChanged(timeMs: Long) {
@@ -1054,22 +1269,25 @@ class PlayerController(
         // No season (absolute numbering not placed yet) counts as season 1, as in the library.
         val season = current.season ?: 1
         val episode = current.episode ?: return null
-        return graph.library.observeVideos().first()
-            .asSequence()
-            .map { it.video }
-            .filter { it.id != current.id && it.kind == VideoKind.EPISODE && it.showKey == showKey }
-            .filter { other ->
-                val otherSeason = other.season ?: 1
-                val otherLast = other.episodeEnd ?: other.episode ?: return@filter false
-                otherSeason < season || (otherSeason == season && otherLast < episode)
-            }
-            .maxWithOrNull(
-                compareBy<VideoEntity>(
-                    { it.season ?: 1 },
-                    { it.episode ?: 0 },
-                    { it.fileName.lowercase(Locale.ROOT) },
-                ),
-            )
+        val videos = graph.library.observeVideos().first()
+        // The whole library: sifted off the main thread.
+        return withContext(Dispatchers.Default) {
+            videos.asSequence()
+                .map { it.video }
+                .filter { it.id != current.id && it.kind == VideoKind.EPISODE && it.showKey == showKey }
+                .filter { other ->
+                    val otherSeason = other.season ?: 1
+                    val otherLast = other.episodeEnd ?: other.episode ?: return@filter false
+                    otherSeason < season || (otherSeason == season && otherLast < episode)
+                }
+                .maxWithOrNull(
+                    compareBy<VideoEntity>(
+                        { it.season ?: 1 },
+                        { it.episode ?: 0 },
+                        { it.fileName.lowercase(Locale.ROOT) },
+                    ),
+                )
+        }
     }
 
     private suspend fun offerUpNext(next: VideoWithMeta) {
@@ -1118,6 +1336,7 @@ class PlayerController(
     }
 
     private fun seekInternal(targetMs: Long) {
+        PlayerDiagnostics.record("seek to ${formatPosition(targetMs)}")
         if (ended) {
             restartFromEnd(targetMs)
             return
@@ -1142,8 +1361,11 @@ class PlayerController(
 
     private fun persistPlayback(videoId: Long, positionMs: Long, durationMs: Long) {
         val library = graph.library
-        // App scope: the save must outlive the activity that is closing.
-        graph.appScope.launch {
+        val previous = pendingSave
+        // App scope: the save must outlive the activity that is closing. One after the other, so
+        // a periodic save still in flight can't overwrite the "watched" written at the end.
+        pendingSave = graph.appScope.launch {
+            previous?.join()
             try {
                 library.savePlayback(videoId, positionMs, durationMs)
             } catch (e: CancellationException) {
@@ -1240,6 +1462,20 @@ class PlayerController(
         const val MIN_BRIGHTNESS = 0.01f
         const val DEFAULT_SYSTEM_BRIGHTNESS = 128
 
+        /** Played time without a picture after which hardware decoding counts as failed. */
+        const val NO_PICTURE_TIMEOUT_MS = 4_000L
+        const val PICTURE_CHECK_INTERVAL_MS = 500L
+        const val SOFTWARE_DECODING_LABEL_MS = 3_000L
+
+        /** How long a reopen waits for the position save of the session it replaces. */
+        const val SAVE_WAIT_MS = 1_000L
+
+        /** Player events that go into an error report. */
+        const val ERROR_REPORT_EVENTS = 25
+
+        /** Stream playlists, named in reports next to the video file extensions. */
+        val STREAM_EXTENSIONS = setOf("m3u8", "m3u", "mpd")
+
         /** libvlc_video_orient_t values 4–7 swap width and height. */
         val TRANSPOSED_ORIENTATIONS = 4..7
 
@@ -1257,6 +1493,42 @@ class PlayerController(
             UriKind.SMB -> "Can't play this file — check the share and login"
             UriKind.NETWORK -> "Can't play this file — check the URL and your connection"
             UriKind.CONTENT, UriKind.FILE, null -> "Can't play this file"
+        }
+
+        /** "smb .mkv": the kind of source and a known extension, never the name, path or host. */
+        fun describeSource(kind: UriKind, fileName: String): String {
+            val source = kind.name.lowercase(Locale.ROOT)
+            val extension = VideoFiles.extension(fileName)
+                .takeIf { VideoFiles.isVideo(fileName) || it in STREAM_EXTENSIONS }
+            return if (extension != null) "$source .$extension" else source
+        }
+
+        fun decodingLabel(decoding: HwDecoding?): String = when (decoding) {
+            HwDecoding.AUTO -> "hw decoding auto"
+            HwDecoding.FORCED -> "hw decoding forced"
+            HwDecoding.DISABLED -> "sw decoding"
+            null -> "decoding not set"
+        }
+
+        fun trackTypeName(type: Int): String = when (type) {
+            IMedia.Track.Type.Audio -> "audio"
+            IMedia.Track.Type.Video -> "video"
+            IMedia.Track.Type.Text -> "subtitles"
+            else -> "other"
+        }
+
+        /** "1:02:03" or "2:03"; "?" when libVLC doesn't know. */
+        fun formatPosition(ms: Long): String {
+            if (ms < 0) return "?"
+            val totalSeconds = ms / 1_000
+            val hours = totalSeconds / 3_600
+            val minutes = totalSeconds / 60 % 60
+            val seconds = totalSeconds % 60
+            return if (hours > 0) {
+                String.format(Locale.ROOT, "%d:%02d:%02d", hours, minutes, seconds)
+            } else {
+                String.format(Locale.ROOT, "%d:%02d", minutes, seconds)
+            }
         }
 
         fun AspectMode.toScaleType(): MediaPlayer.ScaleType = when (this) {

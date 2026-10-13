@@ -32,6 +32,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import java.io.IOException
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.coroutines.cancellation.CancellationException
 
@@ -50,12 +51,17 @@ private val PASS_ERRORS = setOf(KEY_REJECTED, UNREACHABLE)
  * last tried a week ago (never MANUAL). Each distinct title is looked up once per pass and the
  * answer is kept in the match cache. A pass also re-fetches metadata that videos point at but the
  * database lacks, which is how manual matches get their data back after [LibraryRepository.clearMetadata].
+ *
+ * Offline (no validated network) a pass changes nothing and shows no error: the next refresh, or
+ * the network coming back, starts it again. [TmdbClient] retries transient failures and keeps to
+ * TMDB's rate limit.
  */
 internal class MetadataEnricher(
     database: NovaDatabase,
     private val tmdb: TmdbClient,
     private val scanState: MutableStateFlow<ScanState>,
     scope: CoroutineScope,
+    private val connectivity: Connectivity,
 ) {
     private val videoDao = database.videoDao()
     private val metadataDao = database.metadataDao()
@@ -64,7 +70,13 @@ internal class MetadataEnricher(
     private val requests = Channel<Unit>(Channel.CONFLATED)
     private val generation = AtomicInteger()
 
+    /** A pass was skipped or stopped for lack of network; the next validated network runs it again. */
+    private val waitingForNetwork = AtomicBoolean(false)
+
     init {
+        connectivity.whenValidated {
+            if (waitingForNetwork.compareAndSet(true, false)) request()
+        }
         scope.launch(Dispatchers.IO) {
             while (true) {
                 requests.receive()
@@ -92,12 +104,23 @@ internal class MetadataEnricher(
         generation.incrementAndGet()
     }
 
+    /** Leaves the videos as they are until the network is back (or the next refresh). */
+    private fun waitForNetwork() {
+        waitingForNetwork.set(true)
+        // The network may have come back before the flag was set; its callback found nothing to do.
+        if (connectivity.isOnline && waitingForNetwork.compareAndSet(true, false)) request()
+    }
+
     private suspend fun runPass() {
         if (!tmdb.isEnabled) return
         val pass = Pass(generation.get())
         val orphanKeys = videoDao.orphanMetadataKeys()
         val candidates = videoDao.needingMatch(retryBefore = pass.now - MATCH_RETRY_AFTER_MS)
         if (orphanKeys.isEmpty() && candidates.isEmpty()) return
+        if (!connectivity.isOnline) {
+            waitForNetwork()
+            return
+        }
 
         val groups = candidates.groupBy { it.matchQueryKey() }
         scanState.update {
@@ -329,7 +352,10 @@ internal class MetadataEnricher(
                     else -> throw StopPass(UNREACHABLE)
                 }
             } catch (e: IOException) {
-                throw StopPass(UNREACHABLE)
+                // Offline now (the network dropped mid-pass): stop quietly and carry on once it is back.
+                if (connectivity.isOnline) throw StopPass(UNREACHABLE)
+                waitForNetwork()
+                throw StopPass(null)
             } catch (e: Exception) {
                 // One odd response must not block every other title: treat it as no match.
                 Log.w(TAG, "Lookup failed", e)

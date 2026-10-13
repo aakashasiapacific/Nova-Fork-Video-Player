@@ -65,7 +65,7 @@ class AppGraph(val app: Application) {
         )
     }
 
-    val library: LibraryRepository by lazy {
+    private val repository: Lazy<LibraryRepositoryImpl> = lazy {
         LibraryRepositoryImpl(
             context = app,
             database = database,
@@ -73,7 +73,17 @@ class AppGraph(val app: Application) {
             tmdb = tmdb,
             settings = settings,
             scope = appScope,
-        )
+        ).also { it.watchDeviceStorage() }
+    }
+
+    val library: LibraryRepository by repository
+
+    /**
+     * NovaApp calls this when the main screen is created: the library refresh it starts is an app
+     * launch's. A repository created right then counts its first refresh as a launch's anyway.
+     */
+    internal fun onMainScreenCreated() {
+        if (repository.isInitialized()) repository.value.markLaunch()
     }
 
     val imageLoader: ImageLoader by lazy { Network.createImageLoader(app, http, smb) }

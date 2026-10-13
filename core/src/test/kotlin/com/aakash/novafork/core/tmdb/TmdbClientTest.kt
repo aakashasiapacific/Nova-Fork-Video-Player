@@ -36,12 +36,23 @@ class TmdbClientTest {
     fun setUp() {
         server = MockWebServer()
         server.start()
+        client = client()
+    }
+
+    private fun client(
+        retryDelaysMs: List<Long> = listOf(10L, 10L),
+        rateLimitRequests: Int = TmdbClient.RATE_LIMIT_REQUESTS,
+        rateLimitWindowMs: Long = TmdbClient.RATE_LIMIT_WINDOW_MS,
+    ): TmdbClient {
         val baseUrl = server.url("/3/").toString()
-        client = TmdbClient(
+        return TmdbClient(
             http = http,
             credentials = { credentials },
             baseUrl = { baseUrl },
             language = { language },
+            retryDelaysMs = retryDelaysMs,
+            rateLimitRequests = rateLimitRequests,
+            rateLimitWindowMs = rateLimitWindowMs,
         )
     }
 
@@ -210,7 +221,7 @@ class TmdbClientTest {
 
     @Test
     fun errorWithoutJsonBodyStillCarriesTheCode() = runBlocking<Unit> {
-        server.enqueue(MockResponse().setResponseCode(503).setBody("<html>Service Unavailable</html>"))
+        repeat(3) { server.enqueue(MockResponse().setResponseCode(503).setBody("<html>Service Unavailable</html>")) }
         try {
             client.tv(1)
             fail("Expected TmdbException")
@@ -218,6 +229,81 @@ class TmdbClientTest {
             assertEquals(503, e.code)
             assertTrue(e.message.orEmpty().contains("503"))
         }
+        // The first try and two retries.
+        assertEquals(3, server.requestCount)
+    }
+
+    @Test
+    fun serverErrorsAreRetried() = runBlocking<Unit> {
+        server.enqueue(MockResponse().setResponseCode(503))
+        server.enqueue(MockResponse().setResponseCode(502))
+        server.enqueue(json(MOVIE_DETAILS))
+        assertEquals(603, client.movie(603).id)
+        assertEquals(3, server.requestCount)
+    }
+
+    @Test
+    fun networkErrorsAreRetried() = runBlocking<Unit> {
+        server.enqueue(MockResponse().setSocketPolicy(SocketPolicy.DISCONNECT_AT_START))
+        server.enqueue(json(MOVIE_DETAILS))
+        assertEquals(603, client.movie(603).id)
+        assertEquals(2, server.requestCount)
+    }
+
+    @Test
+    fun networkErrorIsThrownAfterTwoRetries() = runBlocking<Unit> {
+        repeat(3) { server.enqueue(MockResponse().setSocketPolicy(SocketPolicy.DISCONNECT_AT_START)) }
+        server.enqueue(json(MOVIE_DETAILS))
+        try {
+            client.movie(603)
+            fail("Expected IOException")
+        } catch (e: IOException) {
+            assertFalse(e is TmdbException)
+        }
+        assertEquals(3, server.requestCount)
+    }
+
+    @Test
+    fun clientErrorsAreNotRetried() = runBlocking<Unit> {
+        server.enqueue(json("""{"status_code":34,"status_message":"Not found","success":false}""", 404))
+        server.enqueue(json(MOVIE_DETAILS))
+        try {
+            client.movie(1)
+            fail("Expected TmdbException")
+        } catch (e: TmdbException) {
+            assertEquals(404, e.code)
+        }
+        assertEquals(1, server.requestCount)
+    }
+
+    @Test
+    fun retriesWaitBetweenAttempts() = runBlocking<Unit> {
+        val client = client(retryDelaysMs = listOf(200L, 400L))
+        server.enqueue(MockResponse().setResponseCode(500))
+        server.enqueue(MockResponse().setResponseCode(500))
+        server.enqueue(json(MOVIE_DETAILS))
+        val started = System.nanoTime()
+        client.movie(603)
+        val waitedMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started)
+        assertTrue("waited $waitedMs ms", waitedMs >= 600)
+    }
+
+    @Test
+    fun defaultsFollowTmdbLimits() {
+        assertEquals(listOf(1_000L, 3_000L), TmdbClient.DEFAULT_RETRY_DELAYS_MS)
+        assertEquals(40, TmdbClient.RATE_LIMIT_REQUESTS)
+        assertEquals(10_000L, TmdbClient.RATE_LIMIT_WINDOW_MS)
+    }
+
+    @Test
+    fun requestsBeyondTheRateLimitWait() = runBlocking<Unit> {
+        val client = client(rateLimitRequests = 2, rateLimitWindowMs = 500)
+        routes { json(EMPTY_PAGE) }
+        val started = System.nanoTime()
+        repeat(3) { client.searchMovie("Dune") }
+        val waitedMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started)
+        assertEquals(3, server.requestCount)
+        assertTrue("waited $waitedMs ms", waitedMs >= 450)
     }
 
     @Test

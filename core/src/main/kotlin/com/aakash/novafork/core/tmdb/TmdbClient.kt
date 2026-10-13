@@ -38,7 +38,10 @@ class TmdbDisabledException : IOException("No TMDB API key")
  * Small TMDB v3 client. All functions are main-safe (they switch to Dispatchers.IO) and
  * cancellable. Responses decode with ignoreUnknownKeys / coerceInputValues.
  *
- * Retries a 429 once after the Retry-After delay (default 2 s), capped at 10 s.
+ * Every request waits for a slot under TMDB's rate limit (about 40 requests per 10 seconds).
+ * A 429 is retried once after the Retry-After delay (default 2 s), capped at 10 s. Transient
+ * failures (network errors, HTTP 5xx) are retried after each of [retryDelaysMs]; other 4xx
+ * answers and a missing key are not.
  */
 class TmdbClient(
     private val http: OkHttpClient,
@@ -48,7 +51,14 @@ class TmdbClient(
     private val baseUrl: () -> String = { DEFAULT_BASE_URL },
     /** Read on every call, e.g. "en-US". */
     private val language: () -> String = { "en-US" },
+    /** Waits before each retry of a transient failure; its size is the number of retries. */
+    private val retryDelaysMs: List<Long> = DEFAULT_RETRY_DELAYS_MS,
+    /** At most this many requests start in any [rateLimitWindowMs]; 0 turns the limit off. */
+    rateLimitRequests: Int = RATE_LIMIT_REQUESTS,
+    rateLimitWindowMs: Long = RATE_LIMIT_WINDOW_MS,
 ) {
+    private val rateLimiter = TmdbRateLimiter(rateLimitRequests, rateLimitWindowMs)
+
     val isEnabled: Boolean get() = credentials() != null
 
     suspend fun searchMovie(query: String, year: Int? = null): List<TmdbMovieSummary> {
@@ -209,16 +219,44 @@ class TmdbClient(
     private suspend fun fetch(path: String, params: List<Pair<String, String?>>): String {
         val key = credentials() ?: throw TmdbDisabledException()
         val request = buildRequest(key, path, params)
-        return withContext(Dispatchers.IO) {
-            var response = http.newCall(request).await()
-            if (response.code == HTTP_TOO_MANY_REQUESTS) {
-                val waitSeconds = retryAfterSeconds(response.header("Retry-After"))
-                response.close()
-                delay(waitSeconds * 1000L)
-                response = http.newCall(request).await()
+        return withContext(Dispatchers.IO) { sendWithRetries(request) }
+    }
+
+    private suspend fun sendWithRetries(request: Request): String {
+        var retries = 0
+        while (true) {
+            try {
+                return send(request)
+            } catch (e: IOException) {
+                val wait = retryDelaysMs.getOrNull(retries)
+                if (wait == null || !isTransient(e)) throw e
+                retries++
+                delay(wait)
             }
-            response.use { readBody(it) }
         }
+    }
+
+    private suspend fun send(request: Request): String {
+        rateLimiter.acquire()
+        var response = http.newCall(request).await()
+        if (response.code == HTTP_TOO_MANY_REQUESTS) {
+            val waitSeconds = retryAfterSeconds(response.header("Retry-After"))
+            response.close()
+            delay(waitSeconds * 1000L)
+            rateLimiter.acquire()
+            response = http.newCall(request).await()
+        }
+        return response.use { readBody(it) }
+    }
+
+    /**
+     * Network errors and server errors may go away; a 4xx answer (bad key, not found, still rate
+     * limited after waiting) or a missing key will not.
+     */
+    private fun isTransient(e: IOException): Boolean = when (e) {
+        is TmdbDisabledException -> false
+        is TmdbException -> e.code in 500..599
+        else -> true
     }
 
     private fun buildRequest(credentials: TmdbCredentials, path: String, params: List<Pair<String, String?>>): Request {
@@ -287,6 +325,13 @@ class TmdbClient(
         /** Official alias that some ISPs (e.g. in India) do not block when they block the main host. */
         const val ALT_BASE_URL = "https://api.tmdb.org/3/"
         const val IMAGE_BASE_URL = "https://image.tmdb.org/t/p/"
+
+        /** Waits before the first and second retry of a transient failure. */
+        val DEFAULT_RETRY_DELAYS_MS: List<Long> = listOf(1_000L, 3_000L)
+
+        /** TMDB's documented limit: about 40 requests every 10 seconds. */
+        const val RATE_LIMIT_REQUESTS = 40
+        const val RATE_LIMIT_WINDOW_MS = 10_000L
 
         private const val HTTP_TOO_MANY_REQUESTS = 429
         private const val DEFAULT_RETRY_AFTER_SECONDS = 2L

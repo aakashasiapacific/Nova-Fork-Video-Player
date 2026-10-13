@@ -2,8 +2,14 @@ package com.aakash.novafork.data
 
 import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
+import android.database.ContentObserver
 import android.net.Uri
+import android.os.Handler
+import android.os.SystemClock
+import android.provider.MediaStore
 import android.util.Log
+import androidx.core.content.edit
 import androidx.room.withTransaction
 import com.aakash.novafork.CrashReporter
 import com.aakash.novafork.core.library.LibraryKeys
@@ -31,6 +37,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.async
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -40,11 +47,15 @@ import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.math.max
 
@@ -53,6 +64,20 @@ private const val DEVICE_SOURCE_NAME = "Device storage"
 private const val DEVICE_SOURCE_LOCATION = "device"
 private const val KEY_SETTLE_MS = 1_500L
 private const val DEFAULT_SMB_PORT = 445
+
+/** Quiet time after the last MediaStore change before device storage is scanned again. */
+private const val MEDIA_SETTLE_MS = 5_000L
+
+/** The refresh that comes with an app launch skips folders and shares scanned this recently. */
+private const val LAUNCH_RESCAN_AFTER_MS = 30L * 60 * 1000
+
+/** A launch's refresh arrives within this time (the main screen starts it as it opens). */
+private const val LAUNCH_WINDOW_MS = 10_000L
+private const val NO_LAUNCH = Long.MIN_VALUE
+
+/** Repository state outside the database: the language the stored metadata was fetched in. */
+private const val STATE_PREFS = "library_state"
+private const val KEY_METADATA_LANGUAGE = "metadata_language"
 
 class LibraryRepositoryImpl(
     context: Context,
@@ -71,9 +96,36 @@ class LibraryRepositoryImpl(
     private val state = MutableStateFlow(ScanState())
     override val scanState: StateFlow<ScanState> = state.asStateFlow()
 
-    /** One scan at a time: refreshAll coalesces into a running scan, scanSource waits for it. */
+    /**
+     * One scan at a time: refreshAll coalesces into a running refresh and waits out a single
+     * source's scan; scanSource and MediaStore rescans wait their turn.
+     */
     private val scanMutex = Mutex()
-    private val enricher = MetadataEnricher(database, tmdb, state, scope)
+    private val enricher = MetadataEnricher(database, tmdb, state, scope, Connectivity(this.context))
+    private val statePrefs: SharedPreferences = this.context.getSharedPreferences(STATE_PREFS, Context.MODE_PRIVATE)
+
+    /** Source id → wall-clock start of its latest scan in this process, failed ones included. */
+    private val scanStarts = ConcurrentHashMap<Long, Long>()
+
+    /** elapsedRealtime of an app launch whose refresh hasn't come yet ([NO_LAUNCH] if none). */
+    private val launchAt = AtomicLong(SystemClock.elapsedRealtime())
+
+    /** A forced refresh came while a launch refresh ran: that one also scans what it skipped. */
+    private val forceRequested = AtomicBoolean(false)
+
+    /** True while refreshAll, not a single source's scan, holds [scanMutex]. */
+    @Volatile private var refreshing = false
+
+    /** Finished refreshAll runs. Written with [scanMutex] held. */
+    @Volatile private var refreshesDone = 0
+
+    private val watchingMedia = AtomicBoolean(false)
+    private val mediaChanges = Channel<Unit>(Channel.CONFLATED)
+
+    /** elapsedRealtime of the latest MediaStore change, and of the latest device scan's start. */
+    @Volatile private var mediaChangedAt = 0L
+
+    @Volatile private var deviceScanStartedAt = 0L
 
     init {
         launchLogged("Device source setup") { syncDeviceSource(settings.settings.value.scanDeviceStorage) }
@@ -95,22 +147,85 @@ class LibraryRepositoryImpl(
 
     // Scanning
 
+    /** The first call after [markLaunch] (or after this repository was created) is the launch's refresh. */
     override suspend fun refreshAll() {
+        refreshAll(force = !takeLaunch())
+    }
+
+    /**
+     * [force] = false is the refresh that comes with an app launch: it skips folders and shares
+     * scanned (or tried) in the last 30 minutes, since walking a big share on every launch is
+     * slow and wakes the NAS. Device storage is always scanned; MediaStore makes that cheap.
+     */
+    internal suspend fun refreshAll(force: Boolean) {
         withContext(Dispatchers.IO) {
-            if (!scanMutex.tryLock()) return@withContext
+            if (!scanMutex.tryLock()) {
+                if (refreshing) {
+                    // Coalesces into the running refresh; a forced one makes it scan what it skipped too.
+                    if (force) forceRequested.set(true)
+                    return@withContext
+                }
+                // Only one source is being scanned (a new share, a MediaStore change): refresh after it.
+                // A launch refresh is not needed when another refresh got there first.
+                val done = refreshesDone
+                scanMutex.lock()
+                if (!force && refreshesDone != done) {
+                    scanMutex.unlock()
+                    return@withContext
+                }
+            }
+            refreshing = true
             try {
+                forceRequested.set(false)
                 state.update { it.copy(running = true, sourceName = null, found = 0, lastError = null) }
                 logFailure("Device source setup") { syncDeviceSource(settings.settings.value.scanDeviceStorage) }
+                val skipped = ArrayList<Long>()
                 for (source in sourceDao.all()) {
+                    if (!isScannable(source)) continue
+                    if (!force && !forceRequested.get() && scannedRecently(source)) {
+                        skipped += source.id
+                        continue
+                    }
                     // One source going wrong (even its error bookkeeping) never stops the others.
-                    if (isScannable(source)) logFailure("Scanning a ${source.type.name} source") { scan(source) }
+                    logFailure("Scanning a ${source.type.name} source") { scan(source) }
+                }
+                if (skipped.isNotEmpty() && forceRequested.getAndSet(false)) {
+                    for (id in skipped) {
+                        logFailure("Scanning a skipped source") {
+                            sourceDao.byId(id)?.takeIf { isScannable(it) }?.let { scan(it) }
+                        }
+                    }
                 }
             } finally {
+                refreshing = false
+                refreshesDone++
                 state.update { it.copy(running = false, sourceName = null, found = 0) }
                 scanMutex.unlock()
             }
         }
         enricher.request()
+    }
+
+    /** The main screen opened: the refresh it starts right away is a launch refresh (see [refreshAll]). */
+    internal fun markLaunch() {
+        launchAt.set(SystemClock.elapsedRealtime())
+    }
+
+    private fun takeLaunch(): Boolean {
+        val at = launchAt.getAndSet(NO_LAUNCH)
+        return at != NO_LAUNCH && SystemClock.elapsedRealtime() - at <= LAUNCH_WINDOW_MS
+    }
+
+    /** A folder or share scanned, or tried, within [LAUNCH_RESCAN_AFTER_MS]. */
+    private fun scannedRecently(source: SourceEntity): Boolean {
+        val walksFiles = when (source.type) {
+            SourceType.FOLDER, SourceType.SMB -> true
+            SourceType.DEVICE, SourceType.STREAM -> false
+        }
+        if (!walksFiles) return false
+        val last = max(source.lastScanAt ?: 0L, scanStarts[source.id] ?: 0L)
+        // A clock set back makes the age negative: scan rather than trust it.
+        return last > 0L && System.currentTimeMillis() - last in 0L until LAUNCH_RESCAN_AFTER_MS
     }
 
     override suspend fun scanSource(sourceId: Long) {
@@ -142,6 +257,8 @@ class LibraryRepositoryImpl(
     /** Scans one source and merges the result. Called with [scanMutex] held. */
     private suspend fun scan(source: SourceEntity) {
         val scanner = scanners[source.type] ?: return
+        if (source.type == SourceType.DEVICE) deviceScanStartedAt = SystemClock.elapsedRealtime()
+        scanStarts[source.id] = System.currentTimeMillis()
         state.update { it.copy(running = true, sourceName = source.name, found = 0) }
         try {
             val found = scanner.scan(source) { count -> state.update { it.copy(found = count) } }
@@ -247,6 +364,56 @@ class LibraryRepositoryImpl(
         // A renamed file (same MediaStore id) may now be something else entirely.
         val renamed = file.fileName != old.fileName && old.matchState != MatchState.MANUAL
         return if (renamed) updated.withParse(parseName(file.fileName, file.parentFolders)) else updated
+    }
+
+    /**
+     * Rescans device storage when MediaStore's videos change (downloads, deletions, renames), once
+     * the changes have settled for 5 s. Only while device scanning is on and video access is
+     * granted; folders and shares are left alone. Called once by AppGraph.
+     */
+    @OptIn(FlowPreview::class)
+    internal fun watchDeviceStorage() {
+        if (!watchingMedia.compareAndSet(false, true)) return
+        // No handler: onChange runs on a binder thread and only queues a rescan.
+        val handler: Handler? = null
+        val observer = object : ContentObserver(handler) {
+            override fun onChange(selfChange: Boolean) {
+                mediaChangedAt = SystemClock.elapsedRealtime()
+                mediaChanges.trySend(Unit)
+            }
+        }
+        try {
+            context.contentResolver.registerContentObserver(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, true, observer)
+        } catch (e: SecurityException) {
+            Log.w(TAG, "Can't watch device storage for changes", e)
+            return
+        }
+        scope.launch {
+            mediaChanges.receiveAsFlow()
+                .debounce(MEDIA_SETTLE_MS)
+                .collect { logFailure("Device storage rescan") { rescanDeviceAfterChange() } }
+        }
+    }
+
+    /** Scans device storage after a MediaStore change, unless a scan that started since has seen it. */
+    private suspend fun rescanDeviceAfterChange() {
+        val changedAt = mediaChangedAt
+        if (!settings.settings.value.scanDeviceStorage || !StoragePermissions.hasAnyVideoAccess(context)) return
+        val scanned = withContext(Dispatchers.IO) {
+            val deviceId = sourceDao.device()?.id ?: return@withContext false
+            // Waits for a running scan instead of overlapping it.
+            scanMutex.withLock {
+                if (deviceScanStartedAt > changedAt) return@withLock false
+                val device = sourceDao.byId(deviceId)?.takeIf { isScannable(it) } ?: return@withLock false
+                try {
+                    scan(device)
+                } finally {
+                    state.update { it.copy(running = false, sourceName = null, found = 0) }
+                }
+                true
+            }
+        }
+        if (scanned) enricher.request()
     }
 
     /** Ensures the single DEVICE source exists while device scanning is on, and hides it while off. */
@@ -658,12 +825,12 @@ class LibraryRepositoryImpl(
                 .collect { logFailure("Retry matching") { retryMatching() } }
         }
         scope.launch {
-            // Metadata is stored in one language: fetch everything again in the new one.
+            // Metadata is stored in one language: fetch everything again in a new one, also when it
+            // changed while the app was closed (the default follows the device's language).
             settings.settings
                 .map { it.tmdbLanguage }
                 .distinctUntilChanged()
-                .drop(1)
-                .collect { logFailure("Metadata reset") { clearMetadata() } }
+                .collect { language -> logFailure("Metadata reset") { useMetadataLanguage(language) } }
         }
         scope.launch {
             settings.settings
@@ -677,6 +844,15 @@ class LibraryRepositoryImpl(
                     }
                 }
         }
+    }
+
+    /** Clears metadata fetched in another language than [language] (see observeSettings). */
+    private suspend fun useMetadataLanguage(language: String) {
+        val fetchedIn = withContext(Dispatchers.IO) { statePrefs.getString(KEY_METADATA_LANGUAGE, null) }
+        if (fetchedIn == language) return
+        // Not recorded yet (first start of this version, or a new install): keep what is there.
+        if (fetchedIn != null) clearMetadata()
+        statePrefs.edit { putString(KEY_METADATA_LANGUAGE, language) }
     }
 
     /** Background work in the app scope must never take the process down; failures are logged. */

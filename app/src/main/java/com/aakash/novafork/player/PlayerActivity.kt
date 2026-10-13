@@ -117,6 +117,7 @@ class PlayerActivity : ComponentActivity(), PlayerController.Host {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        PlayerDiagnostics.record("new intent")
         PlayRequest.fromIntent(intent)?.let { controller.open(it) }
     }
 
@@ -143,6 +144,7 @@ class PlayerActivity : ComponentActivity(), PlayerController.Host {
         super.onStop()
         if (isInPictureInPictureMode && isScreenOn()) {
             // The PiP window was dismissed.
+            PlayerDiagnostics.record("picture-in-picture window closed")
             controller.saveProgress()
             finish()
             return
@@ -187,6 +189,7 @@ class PlayerActivity : ComponentActivity(), PlayerController.Host {
         controller.onPictureInPictureModeChanged(isInPictureInPictureMode)
         // Left PiP while stopped: the window was dismissed rather than expanded.
         if (!isInPictureInPictureMode && lifecycle.currentState == Lifecycle.State.CREATED && !isFinishing) {
+            PlayerDiagnostics.record("picture-in-picture window closed")
             controller.saveProgress()
             finish()
         }

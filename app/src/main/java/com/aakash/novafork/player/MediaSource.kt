@@ -3,6 +3,7 @@ package com.aakash.novafork.player
 import android.content.Context
 import android.net.Uri
 import android.os.ParcelFileDescriptor
+import android.os.SystemClock
 import android.util.Log
 import com.aakash.novafork.data.HwDecoding
 import com.aakash.novafork.data.Settings
@@ -10,6 +11,7 @@ import com.aakash.novafork.data.SmbCredentials
 import java.io.FileNotFoundException
 import java.io.IOException
 import java.util.Locale
+import java.util.concurrent.ConcurrentHashMap
 import org.videolan.libvlc.LibVLC
 import org.videolan.libvlc.Media
 
@@ -64,8 +66,23 @@ internal fun ParcelFileDescriptor?.closeQuietly() {
 internal object MediaSource {
     private const val NETWORK_CACHING_MS = 1500
 
+    /** Videos (by URI) whose hardware decoding failed in this process; they play in software now. */
+    private val softwareOnly: MutableSet<String> = ConcurrentHashMap.newKeySet<String>()
+
     /**
-     * Builds the libVLC media for [uri] with the playback settings applied.
+     * The decoding [uri] gets: the setting, except that "Automatic" stays in software for a video
+     * whose hardware decoding already failed in this process, so a fallback never repeats itself.
+     */
+    fun decodingFor(uri: String, setting: HwDecoding): HwDecoding =
+        if (setting == HwDecoding.AUTO && uri in softwareOnly) HwDecoding.DISABLED else setting
+
+    /** Plays [uri] with software decoding (under "Automatic") until the process ends. */
+    fun rememberSoftwareDecoding(uri: String) {
+        softwareOnly.add(uri)
+    }
+
+    /**
+     * Builds the libVLC media for [uri] with the playback settings and [decoding] applied.
      * Blocking: a content provider may fetch the whole file before it hands out a descriptor,
      * so call this off the main thread.
      */
@@ -74,10 +91,11 @@ internal object MediaSource {
         libVLC: LibVLC,
         uri: String,
         settings: Settings,
+        decoding: HwDecoding,
         smbCredentials: SmbCredentials?,
     ): OpenedMedia {
         val media = when (UriKind.of(uri)) {
-            UriKind.CONTENT -> return openContent(context, libVLC, uri, settings)
+            UriKind.CONTENT -> return openContent(context, libVLC, uri, settings, decoding)
             UriKind.FILE -> Media(libVLC, localPath(uri))
             UriKind.SMB -> Media(libVLC, Uri.parse(uri)).apply {
                 smbCredentials?.username?.takeIf { it.isNotBlank() }?.let { addOption(":smb-user=$it") }
@@ -89,16 +107,25 @@ internal object MediaSource {
                 addOption(":network-caching=$NETWORK_CACHING_MS")
             }
         }
-        applySettings(media, settings)
+        applySettings(media, settings, decoding)
         return OpenedMedia(media, descriptor = null)
     }
 
-    private fun openContent(context: Context, libVLC: LibVLC, uri: String, settings: Settings): OpenedMedia {
+    private fun openContent(
+        context: Context,
+        libVLC: LibVLC,
+        uri: String,
+        settings: Settings,
+        decoding: HwDecoding,
+    ): OpenedMedia {
+        val started = SystemClock.elapsedRealtime()
         val descriptor = context.contentResolver.openFileDescriptor(Uri.parse(uri), "r")
             ?: throw FileNotFoundException("The provider returned no file descriptor")
+        // Cloud providers download the whole file first: a slow start shows up here.
+        PlayerDiagnostics.record("open: provider gave a descriptor in ${SystemClock.elapsedRealtime() - started} ms")
         return try {
             val media = Media(libVLC, descriptor.fileDescriptor)
-            applySettings(media, settings)
+            applySettings(media, settings, decoding)
             OpenedMedia(media, descriptor)
         } catch (e: RuntimeException) {
             descriptor.closeQuietly()
@@ -106,8 +133,8 @@ internal object MediaSource {
         }
     }
 
-    private fun applySettings(media: Media, settings: Settings) {
-        when (settings.hardwareDecoding) {
+    private fun applySettings(media: Media, settings: Settings, decoding: HwDecoding) {
+        when (decoding) {
             HwDecoding.AUTO -> media.setHWDecoderEnabled(true, false)
             HwDecoding.DISABLED -> media.setHWDecoderEnabled(false, false)
             HwDecoding.FORCED -> media.setHWDecoderEnabled(true, true)

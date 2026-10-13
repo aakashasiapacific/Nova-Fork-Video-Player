@@ -2,18 +2,28 @@ package com.aakash.novafork.data
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.os.LocaleList
 import androidx.core.content.edit
 import com.aakash.novafork.BuildConfig
+import com.aakash.novafork.core.tmdb.TmdbLanguages
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-/** [SettingsStore] persisted in the "settings" SharedPreferences file. Enums are stored by name. */
+/**
+ * [SettingsStore] persisted in the "settings" SharedPreferences file. Enums are stored by name.
+ *
+ * Until the user picks a TMDB language, [Settings.tmdbLanguage] follows the device's languages
+ * (see [TmdbLanguages]); picking one stores it for good.
+ */
 class PrefsSettingsStore(context: Context) : SettingsStore {
     private val prefs: SharedPreferences =
         context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-    private val state = MutableStateFlow(read(prefs))
     private val writeLock = Any()
+
+    /** True once the user picked the TMDB language. Guarded by [writeLock] after construction. */
+    private var languageChosen: Boolean = readLanguageChosen(prefs)
+    private val state = MutableStateFlow(read(prefs, languageChosen, deviceTmdbLanguage()))
 
     override val settings: StateFlow<Settings> = state.asStateFlow()
 
@@ -22,6 +32,7 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
             val current = state.value
             val next = transform(current)
             if (next == current) return
+            if (next.tmdbLanguage != current.tmdbLanguage) languageChosen = true
             state.value = next
             write(next)
         }
@@ -36,7 +47,9 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
     private fun write(s: Settings) {
         prefs.edit {
             putString(KEY_TMDB_API_KEY, s.tmdbApiKey)
-            putString(KEY_TMDB_LANGUAGE, s.tmdbLanguage)
+            // A language the user never picked is not stored, so it keeps following the device.
+            putBoolean(KEY_TMDB_LANGUAGE_CHOSEN, languageChosen)
+            if (languageChosen) putString(KEY_TMDB_LANGUAGE, s.tmdbLanguage) else remove(KEY_TMDB_LANGUAGE)
             putString(KEY_TMDB_HOST, s.tmdbHost.name)
             putBoolean(KEY_SECURE_DNS, s.secureDns)
             putBoolean(KEY_PREFER_LOCAL_ARTWORK, s.preferLocalArtwork)
@@ -60,6 +73,7 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
 
         const val KEY_TMDB_API_KEY = "tmdb_api_key"
         const val KEY_TMDB_LANGUAGE = "tmdb_language"
+        const val KEY_TMDB_LANGUAGE_CHOSEN = "tmdb_language_chosen"
         const val KEY_TMDB_HOST = "tmdb_host"
         const val KEY_SECURE_DNS = "secure_dns"
         const val KEY_PREFER_LOCAL_ARTWORK = "prefer_local_artwork"
@@ -76,12 +90,29 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
         const val KEY_SEEK_STEP_SECONDS = "seek_step_seconds"
         const val KEY_AUTO_PLAY_NEXT = "auto_play_next"
 
-        fun read(prefs: SharedPreferences): Settings {
+        /**
+         * Whether the stored TMDB language is the user's pick. Settings saved before the flag
+         * existed always stored a language; the library's metadata is in it, so it is kept.
+         */
+        fun readLanguageChosen(prefs: SharedPreferences): Boolean =
+            if (prefs.contains(KEY_TMDB_LANGUAGE_CHOSEN)) {
+                prefs.getBoolean(KEY_TMDB_LANGUAGE_CHOSEN, false)
+            } else {
+                !prefs.getString(KEY_TMDB_LANGUAGE, null).isNullOrBlank()
+            }
+
+        /** The TMDB tag for the device's languages, most preferred first ("hi-IN", "en-GB", else "en-US"). */
+        fun deviceTmdbLanguage(): String {
+            val locales = LocaleList.getDefault()
+            return TmdbLanguages.forLocales((0 until locales.size()).mapNotNull { locales.get(it) })
+        }
+
+        fun read(prefs: SharedPreferences, languageChosen: Boolean, deviceLanguage: String): Settings {
             val defaults = Settings()
+            val storedLanguage = prefs.getString(KEY_TMDB_LANGUAGE, null)?.takeIf { it.isNotBlank() }
             return Settings(
                 tmdbApiKey = prefs.getString(KEY_TMDB_API_KEY, null) ?: defaults.tmdbApiKey,
-                tmdbLanguage = prefs.getString(KEY_TMDB_LANGUAGE, null)?.takeIf { it.isNotBlank() }
-                    ?: defaults.tmdbLanguage,
+                tmdbLanguage = storedLanguage?.takeIf { languageChosen } ?: deviceLanguage,
                 tmdbHost = enumOrDefault(prefs.getString(KEY_TMDB_HOST, null), defaults.tmdbHost),
                 secureDns = prefs.getBoolean(KEY_SECURE_DNS, defaults.secureDns),
                 preferLocalArtwork = prefs.getBoolean(KEY_PREFER_LOCAL_ARTWORK, defaults.preferLocalArtwork),
