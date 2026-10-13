@@ -16,7 +16,7 @@ replacement below.
 
 | Instead of | Use |
 |---|---|
-| `Button` / `FilledTonalButton` | `PrimaryCapsuleButton` (white "▶ Play"), `GlassCapsuleButton` |
+| `Button` / `FilledTonalButton` / `OutlinedButton` | `PrimaryCapsuleButton` (white "▶ Play"), `GlassCapsuleButton` |
 | `IconButton` / `FloatingActionButton` | `GlassCircleButton`, `AccountButton`, `BackButton`, `GlassMenuButton` |
 | `TextButton` | `TextAction` |
 | `NavigationBar` | `GlassTabBar` (phone) |
@@ -24,19 +24,23 @@ replacement below.
 | `TopAppBar` | `GlassNavBar` + `LargeTitleHeader` |
 | `Switch` | `IosToggle`, `ListToggleRow` |
 | `Slider` | `ThinSlider` |
-| `SegmentedButton` / `FilterChip` | `SegmentedControl`, `GlassCapsuleButton(selected = …)` |
-| `Card` | `InsetGroup` (lists), a clipped `Box` with `cardRadius` (artwork) |
+| `SegmentedButton` / `FilterChip` / `AssistChip` | `SegmentedControl`, `GlassCapsuleRow`, `GlassCapsuleButton(selected = …)` |
+| `TabRow` / `ScrollableTabRow` inside a page | `SegmentedControl` (2–4 options), `GlassCapsuleRow`, `PullDownButton` ("Season 1 ▾") |
+| `Card` | `InsetGroup` (lists), `AboutCard`, a clipped `Box` with `cardRadius` (artwork) |
+| `ListItem` / `RadioButton` / `HorizontalDivider` | `ListRow` (`checked = true` for the chosen option), `Hairline` |
+| `OutlinedTextField` / `TextField` | `ListTextFieldRow` (forms in an `InsetGroup`), `IosTextField` (alerts, single fields), `SearchField` |
+| `Scaffold` | `GlassPage` (content + floating chrome) |
 | `ModalBottomSheet` | `GlassSheet` |
 | `AlertDialog` | `IosAlert` |
 | `DropdownMenu` | `GlassMenu`, `PullDownButton`, `GlassMenuButton` |
 | `CircularProgressIndicator` | `ActivityIndicator`, `NovaRefreshIndicator` |
 | `LinearProgressIndicator` | `ProgressBar`, `ScanBanner` |
-| `Snackbar` | a glass capsule (`Modifier.glass(CircleShape)`) with Subhead text |
+| `Snackbar` / `SnackbarHost` | `GlassToast` |
 
 Files: `ui/theme/Theme.kt` (palette, colours, type, theme), `ui/theme/Motion.kt` (motion, radii),
 `ui/adaptive/DeviceLayout.kt` (phone/tablet and sizes), and in `ui/common`: `Glass.kt`, `Glyphs.kt`,
-`Buttons.kt`, `Navigation.kt`, `Indicators.kt`, `Controls.kt`, `Lists.kt`, `Sheets.kt`, `Art.kt`,
-`Components.kt` (legacy helpers). All are in package `com.aakash.novafork.ui.common` unless noted;
+`Buttons.kt`, `Navigation.kt`, `Indicators.kt`, `Controls.kt`, `Fields.kt`, `Lists.kt`, `Sheets.kt`,
+`Content.kt`, `Art.kt`, `Components.kt` (legacy helpers). All are in package `com.aakash.novafork.ui.common` unless noted;
 import each symbol explicitly (no wildcards).
 
 ---
@@ -63,7 +67,8 @@ fun NovaPlayerTheme(content: @Composable () -> Unit)
 DARK (the Apple TV look) is a pure black canvas; LIGHT uses the iOS light grouped colours.
 Read appearance colours as `NovaColors.label`, `NovaColors.cell`, … — they are `@Composable` getters,
 so read them in composition and capture the value before entering `drawBehind`/`Canvas`/`graphicsLayer`
-lambdas. The full palette object is `LocalNovaPalette.current` (`NovaPalette`).
+lambdas. The full palette object is `LocalNovaPalette.current` (`NovaPalette`; the two instances are
+`DarkPalette` and `LightPalette`).
 
 | `NovaColors.` | Dark | Light | Use |
 |---|---|---|---|
@@ -211,8 +216,8 @@ fun dimensFor(layout: DeviceLayout): NovaDimens
 fun heroHeightFor(layout: DeviceLayout, maxWidth: Dp, maxHeight: Dp): Dp
 ```
 
-`LocalDeviceLayout` and `LocalNovaDimens` are provided by `NovaRoot`. `TabletDimens` is used for both
-tablet layouts.
+`LocalDeviceLayout` and `LocalNovaDimens` are provided by `NovaRoot`. `dimensFor` returns
+`PhoneDimens` for `PHONE` and `TabletDimens` for both tablet layouts.
 
 | `NovaDimens` field | Phone | iPad | Meaning |
 |---|---|---|---|
@@ -228,8 +233,8 @@ tablet layouts.
 | `episodeCardWidth` | 300dp | 360dp | Width of a 16:9 episode card in the details episode carousel. |
 | `posterGridColumns` | 3 | adaptive (gridMinCell) | Fixed column count for poster grids, or null to use [gridMinCell] adaptively. |
 | `heroMargin` | 20dp | 48dp | Margin of the text and buttons that sit on hero / details artwork. |
-| `heroTextMaxWidth` | 520dp | 520dp | Max width of hero text; descriptions on details pages use [descriptionMaxWidth]. |
-| `descriptionMaxWidth` | 600dp | 600dp |  |
+| `heroTextMaxWidth` | 520dp | 520dp | Max width of the title, meta line and description on the Home hero. |
+| `descriptionMaxWidth` | 600dp | 600dp | Max width of the description and About text on details pages. |
 | `primaryButtonHeight` | 50dp | 56dp | White primary capsule ("▶ Play") height. |
 | `glassButtonSize` | 50dp | 56dp | Glass circles next to the primary button ("+", info, Start Over…). |
 | `toolbarButtonSize` | 44dp | 48dp | Glass circles in the top bar (back, more, account). |
@@ -253,6 +258,8 @@ Other per-form-factor rules (from the spec):
 | Episode cards | 300dp | 360dp |
 | Sheets / menus | `GlassSheet` from the bottom | centred form sheet (`GlassSheet` does this automatically) or `GlassMenu` popover |
 | Description max width | — | 600dp (`descriptionMaxWidth`) |
+| Split views | — (pushed pages) | Browse and Settings: 360dp sidebar of inset-grouped rows (`ListRow(selected = …)`) on `background`, detail pane on the right |
+| Text under cards | title Subhead semibold 1 line, caption Footnote secondary, 8dp below the artwork | same |
 
 ---
 
@@ -423,6 +430,26 @@ fun GlassCapsuleButton(
     height: Dp = 40.dp,
     style: GlassStyle = GlassStyle.Regular,
     glass: GlassState? = LocalGlassState.current,
+)
+```
+
+**GlassCapsuleRow** — a horizontally scrolling row of glass capsules with one selected (solid pill):
+the iPad Library categories "All · Movies · TV Shows · Home Videos · Streams" with a `PullDownButton`
+("Sort ▾") in `trailing`, and other single-choice filters. Starts at the gutter by default.
+
+```kotlin
+@Composable
+fun GlassCapsuleRow(
+    items: List<String>,
+    selectedIndex: Int,
+    onSelect: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+    contentPadding: PaddingValues = PaddingValues(horizontal = LocalNovaDimens.current.gutter),
+    spacing: Dp = 8.dp,
+    height: Dp = 40.dp,
+    style: GlassStyle = GlassStyle.Regular,
+    glass: GlassState? = LocalGlassState.current,
+    trailing: (@Composable RowScope.() -> Unit)? = null,
 )
 ```
 
@@ -746,9 +773,56 @@ fun Badge(text: String, modifier: Modifier = Modifier, color: Color = NovaColors
 fun RatingBadge(rating: Float?, modifier: Modifier = Modifier, color: Color = NovaColors.secondaryLabel)
 ```
 
+**GlassHud** — player gesture HUD (volume, brightness, seek): a 44dp Clear glass capsule with a
+white glyph, a 120dp thin bar for `fraction` and/or a short `text` ("+10 s"). Over video only.
+
+```kotlin
+@Composable
+fun GlassHud(
+    modifier: Modifier = Modifier,
+    @DrawableRes icon: Int? = null,
+    fraction: Float? = null,
+    text: String? = null,
+)
+```
+
+**CountdownRing** — a thin white ring filling clockwise from the top around its content: the
+"Up Next" card's play button (`CountdownRing(progress) { PlayGlyph(color = Color.White) }`).
+
+```kotlin
+@Composable
+fun CountdownRing(
+    progress: Float,
+    modifier: Modifier = Modifier,
+    size: Dp = 44.dp,
+    strokeWidth: Dp = 3.dp,
+    color: Color = Color.White,
+    trackColor: Color = Color(0x4DFFFFFF),
+    content: @Composable BoxScope.() -> Unit = {},
+)
+```
+
+**GlassToast** — replaces `Snackbar`: a glass capsule with Subhead semibold text (optional glyph)
+that slides in, stays `durationMs`, slides out and then calls `onDismissed` (consume the one-shot
+`AppUiState.message` there). A new message replaces the visible one; a tap dismisses it early. Put it
+in the root `Box`, bottom-centre: above `glassTabBarClearance()` on phone, 24dp up on iPad.
+
+```kotlin
+@Composable
+fun GlassToast(
+    message: String?,
+    onDismissed: () -> Unit,
+    modifier: Modifier = Modifier,
+    @DrawableRes icon: Int? = null,
+    durationMs: Long = 3_000L,
+    glass: GlassState? = LocalGlassState.current,
+)
+```
+
 ### 4.5 Controls
 
-**IosToggle** — the iOS switch (51×31, green on). In lists use `ListToggleRow`.
+**IosToggle** — the iOS 26 switch: 63×28 capsule track (`green` on, `toggleOff` off) with a white pill
+knob that stretches while held. In lists use `ListToggleRow`.
 
 ```kotlin
 @Composable
@@ -826,6 +900,55 @@ fun Stepper(
 )
 ```
 
+**IosTextField** — the iOS rounded text field: filled (`NovaColors.fill`) box with 10dp corners, Body
+text, tertiary placeholder, blue cursor, clear button while focused. 44dp; pass `height = 36.dp`
+inside an `IosAlert`. `secure = true` for passwords (also switches to the password keyboard).
+`singleLine = false` grows from `height`. Use for the stream URL alert, Identify's search field and
+other single fields outside lists.
+
+```kotlin
+@Composable
+fun IosTextField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    placeholder: String = "",
+    enabled: Boolean = true,
+    secure: Boolean = false,
+    singleLine: Boolean = true,
+    height: Dp = 44.dp,
+    containerColor: Color = NovaColors.fill,
+    keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
+    keyboardActions: KeyboardActions = KeyboardActions.Default,
+    focusRequester: FocusRequester = remember { FocusRequester() },
+    autoFocus: Boolean = false,
+)
+```
+
+**ListTextFieldRow** — a form row inside an `InsetGroup`: optional `label` (Body, `labelWidth` wide)
+and the field filling the rest, like iOS "Other Network" forms ("Server", "Share", "Username",
+"Password"). Tapping anywhere on the row focuses the field; the hairline is inset like `ListRow`'s.
+Use it for the network-share form (in a `GlassSheet`) and the TMDB key / server settings.
+
+```kotlin
+@Composable
+fun ListTextFieldRow(
+    value: String,
+    onValueChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    label: String? = null,
+    placeholder: String = "",
+    enabled: Boolean = true,
+    secure: Boolean = false,
+    labelWidth: Dp = 110.dp,
+    keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
+    keyboardActions: KeyboardActions = KeyboardActions.Default,
+    focusRequester: FocusRequester = remember { FocusRequester() },
+    autoFocus: Boolean = false,
+    showDivider: Boolean = true,
+)
+```
+
 ### 4.6 Lists (iOS Settings style)
 
 Settings, Browse, Information and every list page use inset-grouped sections: 16dp side margin, 10dp
@@ -872,7 +995,8 @@ fun ListSectionFooter(text: String, modifier: Modifier = Modifier)
 ```
 
 **ListRow** — one row. Navigation rows: `chevron = true`. Choice lists: `checked = true` on the
-selected row (blue checkmark). Action rows ("Add Folder", "Open Network Stream"): `titleColor =
+selected row (blue checkmark). iPad sidebars (Settings, Browse): `selected = true` on the open
+section (tint-blue row, white text, no hairline). Action rows ("Add Folder", "Open Network Stream"): `titleColor =
 NovaColors.tint`, no chevron; destructive actions `NovaColors.red`. Search results / folder videos:
 `leading` = a 64dp 16:9 thumbnail and `dividerInset = 16.dp + 64.dp + 14.dp`. `onLongClick` for
 row context menus.
@@ -891,6 +1015,7 @@ fun ListRow(
     titleMaxLines: Int = 1,
     chevron: Boolean = false,
     checked: Boolean = false,
+    selected: Boolean = false,
     enabled: Boolean = true,
     showDivider: Boolean = true,
     dividerInset: Dp? = null,
@@ -988,6 +1113,9 @@ fun GlassSheet(
     title: String? = null,
     showClose: Boolean = title != null,
     dismissible: Boolean = true,
+    onConfirm: (() -> Unit)? = null,
+    confirmEnabled: Boolean = true,
+    confirmLabel: String = "Done",
     content: @Composable ColumnScope.(dismiss: () -> Unit) -> Unit,
 )
 ```
@@ -1022,6 +1150,12 @@ fun IosAlert(
     content: (@Composable ColumnScope.() -> Unit)? = null,
 )
 ```
+
+Examples: removing a source (`Cancel` + `Remove` as `Destructive`); the crash report shown after a
+crash (`AppUiState.crashReport != null`): title "Nova Fork Quit Unexpectedly", a one-line message,
+actions `AlertAction("Not Now", AlertActionStyle.Cancel) { actions.dismissCrashReport() }` and
+`AlertAction("Share Report", preferred = true) { actions.shareCrashReport() }`; a stream URL prompt
+with an `IosTextField(height = 36.dp)` in `content`.
 
 **GlassMenu** — iOS pull-down / context menu: a dense glass panel (250dp, 14dp corners) growing out of
 its anchor, rows of Body text with the icon on the right, a leading checkmark for the selected option,
@@ -1087,7 +1221,61 @@ fun GlassMenuButton(
 )
 ```
 
-### 4.8 Artwork (`Art.kt`)
+### 4.8 Details text blocks (`Content.kt`)
+
+Phone and tablet details pages both use these; each family places and sizes them itself.
+
+**ExpandableText** — the description: `collapsedMaxLines` (3) lines, then a bold "MORE" at the end of
+the last line over a fade into `fadeColor` (the colour behind the text: `Color.Black` over artwork).
+Tap expands in place, or calls `onMore` (show the full text in a `GlassSheet`).
+
+```kotlin
+@Composable
+fun ExpandableText(
+    text: String,
+    modifier: Modifier = Modifier,
+    collapsedMaxLines: Int = 3,
+    style: TextStyle = NovaType.subhead,
+    color: Color = NovaColors.secondaryLabel,
+    moreColor: Color = NovaColors.label,
+    fadeColor: Color = NovaColors.background,
+    onMore: (() -> Unit)? = null,
+)
+```
+
+**AboutCard** — the "About" section: a `cell`-coloured card (`cardRadius` corners) with Headline
+title, Footnote secondary genres and the full overview in Subhead secondary.
+
+```kotlin
+@Composable
+fun AboutCard(
+    title: String,
+    body: String,
+    modifier: Modifier = Modifier,
+    subtitle: String? = null,
+    bodyMaxLines: Int = Int.MAX_VALUE,
+    onClick: (() -> Unit)? = null,
+)
+```
+
+**InfoGrid** — the "Information" section: key/value pairs (Footnote semibold key over Footnote
+secondary value) in 2 columns on phone, 3 on iPad: Released, Run Time, File, Size, Resolution,
+Source. Blank values are skipped.
+
+```kotlin
+@Composable
+fun InfoGrid(
+    entries: List<Pair<String, String?>>,
+    columns: Int,
+    modifier: Modifier = Modifier,
+    columnSpacing: Dp = 20.dp,
+    rowSpacing: Dp = 16.dp,
+    keyColor: Color = NovaColors.label,
+    valueColor: Color = NovaColors.secondaryLabel,
+)
+```
+
+### 4.9 Artwork (`Art.kt`)
 
 Artwork has **no border and no shadow**; clip it with `RoundedCornerShape(dims.cardRadius)`; text sits
 BELOW cards (title Subhead semibold 1 line, caption Footnote secondary). 16:9 everywhere except
@@ -1155,7 +1343,7 @@ fun Modifier.startScrim(color: Color, endFraction: Float = 0.7f): Modifier
 fun Modifier.topScrim(color: Color = Color.Black.copy(alpha = 0.45f), endFraction: Float = 0.25f): Modifier
 ```
 
-### 4.9 Legacy helpers (`Components.kt`)
+### 4.10 Legacy helpers (`Components.kt`)
 
 Kept with their old signatures so current screens build; restyled to the iOS look. Prefer the new
 components in new code.
@@ -1438,6 +1626,95 @@ fun SheetAndAlertSample(sheetOpen: Boolean, onSheetClosed: () -> Unit, alertOpen
                 },
             ),
             onDismissRequest = onAlertClosed,
+        )
+    }
+}
+```
+
+### Form sheet with text fields
+
+```kotlin
+@Composable
+fun NetworkShareSheetSample(onClose: () -> Unit, onSave: (host: String, share: String, user: String, password: String) -> Unit) {
+    var host by remember { mutableStateOf("") }
+    var share by remember { mutableStateOf("") }
+    var user by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    GlassSheet(
+        onDismissRequest = onClose,
+        detent = SheetDetent.Large,
+        title = "Add Network Share",
+        onConfirm = { onSave(host.trim(), share.trim(), user, password) },
+        confirmEnabled = host.isNotBlank() && share.isNotBlank(),
+        confirmLabel = "Save",
+    ) {
+        Column(Modifier.verticalScroll(rememberScrollState())) {
+            InsetGroup(header = "Server") {
+                ListTextFieldRow(
+                    host,
+                    { host = it },
+                    label = "Server",
+                    placeholder = "nas.local",
+                    autoFocus = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Next),
+                )
+                ListTextFieldRow(share, { share = it }, label = "Share", placeholder = "Movies", showDivider = false)
+            }
+            Spacer(Modifier.height(InsetGroupDefaults.SectionSpacing))
+            InsetGroup(header = "Sign In", footer = "Leave both empty to connect as a guest.") {
+                ListTextFieldRow(user, { user = it }, label = "Username", placeholder = "Optional")
+                ListTextFieldRow(password, { password = it }, label = "Password", placeholder = "Optional", secure = true, showDivider = false)
+            }
+            Spacer(Modifier.height(24.dp))
+        }
+    }
+}
+```
+
+### Details text blocks
+
+```kotlin
+@Composable
+fun DetailsTextSample(overview: String, title: String, genres: String, info: List<Pair<String, String?>>, onMore: () -> Unit) {
+    val dims = LocalNovaDimens.current
+    val tablet = LocalDeviceLayout.current.isTablet
+    Column(Modifier.fillMaxWidth()) {
+        ExpandableText(
+            overview,
+            Modifier.padding(horizontal = dims.gutter).widthIn(max = dims.descriptionMaxWidth),
+            fadeColor = Color.Black,
+            onMore = onMore,
+        )
+        Spacer(Modifier.height(12.dp))
+        Row(Modifier.padding(horizontal = dims.gutter), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Badge("4K")
+            RatingBadge(8.2f)
+            Badge("CC")
+        }
+        Spacer(Modifier.height(dims.sectionSpacing))
+        RowHeader("About")
+        AboutCard(title, overview, Modifier.padding(horizontal = dims.gutter).fillMaxWidth(), subtitle = genres)
+        Spacer(Modifier.height(dims.sectionSpacing))
+        RowHeader("Information")
+        InfoGrid(info, columns = if (tablet) 3 else 2, modifier = Modifier.padding(horizontal = dims.gutter))
+    }
+}
+```
+
+### Root toast (replaces SnackbarHost)
+
+```kotlin
+@Composable
+fun RootToastSample(message: String?, consumeMessage: () -> Unit, content: @Composable () -> Unit) {
+    val tablet = LocalDeviceLayout.current.isTablet
+    Box(Modifier.fillMaxSize()) {
+        content()
+        GlassToast(
+            message = message,
+            onDismissed = consumeMessage,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = if (tablet) 24.dp else glassTabBarClearance()),
         )
     }
 }

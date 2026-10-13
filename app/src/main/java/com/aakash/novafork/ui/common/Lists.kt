@@ -53,6 +53,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
@@ -159,6 +160,7 @@ fun InsetGroup(
  * [value] in secondary on the right, then [trailing] (e.g. IosToggle), a blue checkmark when
  * [checked], and a "›" when [chevron]. Highlights while pressed when clickable. The hairline
  * under it is inset to the title ([dividerInset] overrides, e.g. for 16:9 thumbnails).
+ * [selected] is the iPad sidebar selection (Settings, Browse): a tint-blue row with white text.
  */
 @Composable
 fun ListRow(
@@ -173,6 +175,7 @@ fun ListRow(
     titleMaxLines: Int = 1,
     chevron: Boolean = false,
     checked: Boolean = false,
+    selected: Boolean = false,
     enabled: Boolean = true,
     showDivider: Boolean = true,
     dividerInset: Dp? = null,
@@ -186,10 +189,20 @@ fun ListRow(
     val pressed by source.collectIsPressedAsState()
     val clickable = enabled && (onClick != null || onLongClick != null)
     val highlight by animateColorAsState(
-        if (pressed && clickable) palette.cellPressed else Color.Transparent,
+        when {
+            selected -> palette.tint
+            pressed && clickable -> palette.cellPressed
+            else -> Color.Transparent
+        },
         tween(durationMillis = if (pressed) 40 else 300),
         label = "rowHighlight",
     )
+    val titleTint = when {
+        selected -> Color.White
+        titleColor != Color.Unspecified -> titleColor
+        else -> palette.label
+    }
+    val secondaryTint = if (selected) Color.White.copy(alpha = 0.8f) else palette.secondaryLabel
     val click = if (clickable) {
         Modifier.combinedClickable(
             interactionSource = source,
@@ -207,7 +220,8 @@ fun ListRow(
         modifier
             .fillMaxWidth()
             .background(highlight)
-            .then(click),
+            .then(click)
+            .semantics { if (selected) this.selected = true },
     ) {
         Row(
             Modifier
@@ -225,7 +239,7 @@ fun ListRow(
                 Text(
                     text = title,
                     style = titleStyle,
-                    color = if (titleColor != Color.Unspecified) titleColor else palette.label,
+                    color = titleTint,
                     maxLines = titleMaxLines,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -233,7 +247,7 @@ fun ListRow(
                     Text(
                         text = subtitle,
                         style = NovaType.footnote,
-                        color = palette.secondaryLabel,
+                        color = secondaryTint,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.padding(top = 1.dp),
@@ -244,7 +258,7 @@ fun ListRow(
                 Text(
                     text = value,
                     style = NovaType.body,
-                    color = palette.secondaryLabel,
+                    color = secondaryTint,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     textAlign = TextAlign.End,
@@ -259,14 +273,19 @@ fun ListRow(
             }
             if (checked) {
                 Spacer(Modifier.width(8.dp))
-                Icon(NovaGlyphs.Check, contentDescription = "Selected", modifier = Modifier.size(17.dp), tint = palette.tint)
+                Icon(NovaGlyphs.Check, contentDescription = "Selected", modifier = Modifier.size(17.dp), tint = if (selected) Color.White else palette.tint)
             }
             if (chevron) {
                 Spacer(Modifier.width(8.dp))
-                Icon(NovaGlyphs.ChevronRight, contentDescription = null, modifier = Modifier.size(13.dp), tint = palette.tertiaryLabel)
+                Icon(
+                    NovaGlyphs.ChevronRight,
+                    contentDescription = null,
+                    modifier = Modifier.size(13.dp),
+                    tint = if (selected) Color.White.copy(alpha = 0.7f) else palette.tertiaryLabel,
+                )
             }
         }
-        if (showDivider) {
+        if (showDivider && !selected) {
             Box(
                 Modifier
                     .align(Alignment.BottomStart)

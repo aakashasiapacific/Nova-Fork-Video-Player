@@ -70,8 +70,9 @@ data class NovaDimens(
     val posterGridColumns: Int?,
     /** Margin of the text and buttons that sit on hero / details artwork. */
     val heroMargin: Dp,
-    /** Max width of hero text; descriptions on details pages use [descriptionMaxWidth]. */
+    /** Max width of the title, meta line and description on the Home hero. */
     val heroTextMaxWidth: Dp,
+    /** Max width of the description and About text on details pages. */
     val descriptionMaxWidth: Dp,
     /** White primary capsule ("▶ Play") height. */
     val primaryButtonHeight: Dp,

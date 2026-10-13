@@ -72,6 +72,8 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -122,6 +124,9 @@ private class SheetMotion {
  * down to dismiss (also from a scrolled-to-top list inside it), and dims the page behind.
  * [content] gets `dismiss`, which animates the sheet away and then calls [onDismissRequest].
  * Keep it in composition while visible: `if (open) GlassSheet(onDismissRequest = { open = false }) { … }`.
+ * Form sheets (iOS 26): pass [onConfirm] to get a blue ✓ circle on the right (the ✕ moves to the
+ * left); tapping it runs [onConfirm], then the sheet animates away. [confirmEnabled] greys it out
+ * while the form is incomplete.
  */
 @Composable
 fun GlassSheet(
@@ -131,6 +136,9 @@ fun GlassSheet(
     title: String? = null,
     showClose: Boolean = title != null,
     dismissible: Boolean = true,
+    onConfirm: (() -> Unit)? = null,
+    confirmEnabled: Boolean = true,
+    confirmLabel: String = "Done",
     content: @Composable ColumnScope.(dismiss: () -> Unit) -> Unit,
 ) {
     val motion = remember { SheetMotion() }
@@ -153,10 +161,26 @@ fun GlassSheet(
             LocalGlassState provides null,
             LocalGroupedCellColor provides if (palette.dark) palette.raised else palette.cell,
         ) {
-            SheetLayout(motion, onDismissRequest, modifier, detent, title, showClose, dismissible, content)
+            SheetLayout(
+                motion = motion,
+                onDismissRequest = onDismissRequest,
+                modifier = modifier,
+                detent = detent,
+                title = title,
+                showClose = showClose,
+                dismissible = dismissible,
+                confirm = onConfirm?.let { SheetConfirm(it, confirmEnabled, confirmLabel) },
+                content = content,
+            )
         }
     }
 }
+
+/** The ✓ of a form sheet. */
+private class SheetConfirm(val onConfirm: () -> Unit, val enabled: Boolean, val label: String)
+
+/** Size of the ✕ and ✓ circles in a sheet's title bar. */
+private val SheetButtonSize = 36.dp
 
 @Composable
 private fun SheetLayout(
@@ -167,6 +191,7 @@ private fun SheetLayout(
     title: String?,
     showClose: Boolean,
     dismissible: Boolean,
+    confirm: SheetConfirm?,
     content: @Composable ColumnScope.(dismiss: () -> Unit) -> Unit,
 ) {
     val tablet = LocalDeviceLayout.current.isTablet
@@ -321,11 +346,11 @@ private fun SheetLayout(
                     .background(if (palette.dark) Color(0x4DFFFFFF) else Color(0x33000000))
                     .align(Alignment.CenterHorizontally),
             )
-            if (title != null || showClose) {
+            if (title != null || showClose || confirm != null) {
                 Box(
                     Modifier
                         .fillMaxWidth()
-                        .height(48.dp),
+                        .height(52.dp),
                 ) {
                     if (title != null) {
                         Text(
@@ -337,7 +362,7 @@ private fun SheetLayout(
                             textAlign = TextAlign.Center,
                             modifier = Modifier
                                 .align(Alignment.Center)
-                                .padding(horizontal = 56.dp),
+                                .padding(horizontal = 60.dp),
                         )
                     }
                     if (showClose) {
@@ -346,12 +371,35 @@ private fun SheetLayout(
                             icon = NovaGlyphs.Close,
                             contentDescription = "Close",
                             modifier = Modifier
-                                .align(Alignment.CenterEnd)
-                                .padding(end = 12.dp),
-                            size = 32.dp,
-                            iconSize = 12.dp,
+                                .align(if (confirm != null) Alignment.CenterStart else Alignment.CenterEnd)
+                                .padding(horizontal = 12.dp),
+                            size = SheetButtonSize,
+                            iconSize = 13.dp,
                             glass = null,
                         )
+                    }
+                    if (confirm != null) {
+                        Box(
+                            Modifier
+                                .align(Alignment.CenterEnd)
+                                .padding(horizontal = 12.dp)
+                                .size(SheetButtonSize)
+                                .novaClickable(enabled = confirm.enabled, onClickLabel = confirm.label) {
+                                    confirm.onConfirm()
+                                    close()
+                                }
+                                .clip(CircleShape)
+                                .background(if (confirm.enabled) palette.tint else palette.fill)
+                                .semantics { contentDescription = confirm.label },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                NovaGlyphs.Check,
+                                contentDescription = null,
+                                modifier = Modifier.size(15.dp),
+                                tint = if (confirm.enabled) Color.White else palette.tertiaryLabel,
+                            )
+                        }
                     }
                 }
             } else {
