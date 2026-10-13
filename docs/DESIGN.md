@@ -1098,7 +1098,9 @@ Headline title with a glass ✕, dense glass with 12dp top corners; slides up, d
 to dismiss (also from a list scrolled to its top). `SheetDetent.Fit` (content height), `Medium`
 (half screen, drags up to Large), `Large`. On tablets it becomes a centred form sheet. The content
 lambda receives `dismiss` (animates away, then calls `onDismissRequest`); `onDismissRequest` must
-remove the sheet from composition. Use for track pickers on phone, "Identify", "Add Network Share".
+remove the sheet from composition. Form sheets (iOS 26 style): pass `onConfirm` (+ `confirmEnabled`,
+`confirmLabel`) to get a blue ✓ circle on the right with the ✕ on the left; the ✓ runs `onConfirm`
+and then animates the sheet away. Use for track pickers on phone, "Identify", "Add Network Share".
 
 ```kotlin
 enum class SheetDetent { Fit, Medium, Large }
