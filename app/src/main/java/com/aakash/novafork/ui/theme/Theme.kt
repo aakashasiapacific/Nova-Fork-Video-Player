@@ -188,6 +188,8 @@ object NovaColors {
         @Composable @ReadOnlyComposable get() = LocalNovaPalette.current.searchField
     val toggleOff: Color
         @Composable @ReadOnlyComposable get() = LocalNovaPalette.current.toggleOff
+    val segmentThumb: Color
+        @Composable @ReadOnlyComposable get() = LocalNovaPalette.current.segmentThumb
     val tint: Color
         @Composable @ReadOnlyComposable get() = LocalNovaPalette.current.tint
     val green: Color

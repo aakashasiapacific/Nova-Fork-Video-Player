@@ -1,11 +1,18 @@
 package com.aakash.novafork.ui.common
 
+import androidx.annotation.DrawableRes
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -18,9 +25,11 @@ import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
@@ -29,19 +38,35 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.PullToRefreshState
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
@@ -49,6 +74,8 @@ import com.aakash.novafork.ui.theme.NovaColors
 import com.aakash.novafork.ui.theme.NovaMotion
 import com.aakash.novafork.ui.theme.NovaRadius
 import com.aakash.novafork.ui.theme.NovaType
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
 import java.util.Locale
 import kotlin.math.ceil
 import kotlin.math.cos
@@ -269,5 +296,141 @@ fun RatingBadge(rating: Float?, modifier: Modifier = Modifier, color: Color = No
             color = color,
             maxLines = 1,
         )
+    }
+}
+
+/**
+ * Player gesture HUD (volume, brightness, seek): a small Clear glass capsule with a white [icon]
+ * and a thin bar for [fraction] (0–1) and/or a short [text] ("+10 s", "1:02:15"). Over video only;
+ * centre it near the top of the player and fade it in/out yourself.
+ */
+@Composable
+fun GlassHud(
+    modifier: Modifier = Modifier,
+    @DrawableRes icon: Int? = null,
+    fraction: Float? = null,
+    text: String? = null,
+) {
+    Row(
+        modifier
+            .height(44.dp)
+            .glass(CircleShape, style = GlassStyle.Clear, elevation = 8.dp)
+            .padding(horizontal = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (icon != null) {
+            Icon(painterResource(icon), contentDescription = null, modifier = Modifier.size(20.dp), tint = Color.White)
+        }
+        if (fraction != null) {
+            ProgressBar(
+                progress = fraction,
+                modifier = Modifier
+                    .width(120.dp)
+                    .semantics { progressBarRangeInfo = ProgressBarRangeInfo(fraction.coerceIn(0f, 1f), 0f..1f) },
+                height = 4.dp,
+                trackColor = Color(0x4DFFFFFF),
+            )
+        }
+        if (text != null) {
+            Text(text = text, style = NovaType.monoSubhead.copy(fontWeight = FontWeight.SemiBold), color = Color.White, maxLines = 1)
+        }
+    }
+}
+
+/**
+ * A circular countdown: a thin ring that fills clockwise from the top as [progress] goes 0 → 1,
+ * around [content] (usually PlayGlyph). The "Up Next" card's play button.
+ */
+@Composable
+fun CountdownRing(
+    progress: Float,
+    modifier: Modifier = Modifier,
+    size: Dp = 44.dp,
+    strokeWidth: Dp = 3.dp,
+    color: Color = Color.White,
+    trackColor: Color = Color(0x4DFFFFFF),
+    content: @Composable BoxScope.() -> Unit = {},
+) {
+    val p = progress.coerceIn(0f, 1f)
+    Box(
+        modifier
+            .size(size)
+            .drawBehind {
+                val w = strokeWidth.toPx()
+                val inset = w / 2f
+                val arcSize = Size(this.size.width - w, this.size.height - w)
+                val stroke = Stroke(width = w, cap = StrokeCap.Round)
+                drawArc(trackColor, 0f, 360f, useCenter = false, topLeft = Offset(inset, inset), size = arcSize, style = stroke)
+                if (p > 0f) {
+                    drawArc(color, -90f, 360f * p, useCenter = false, topLeft = Offset(inset, inset), size = arcSize, style = stroke)
+                }
+            },
+        contentAlignment = Alignment.Center,
+        content = content,
+    )
+}
+
+/**
+ * The replacement for Snackbar: a glass capsule with Subhead semibold text (and an optional
+ * [icon]) that slides in, stays [durationMs], slides out and then calls [onDismissed] — consume
+ * the one-shot message there (AppActions.consumeMessage). A new [message] replaces the visible one
+ * and restarts the timer; tapping the capsule dismisses it early. Align it yourself: bottom-centre
+ * above glassTabBarClearance() on phone, bottom-centre with 24dp margin on iPad.
+ */
+@Composable
+fun GlassToast(
+    message: String?,
+    onDismissed: () -> Unit,
+    modifier: Modifier = Modifier,
+    @DrawableRes icon: Int? = null,
+    durationMs: Long = 3_000L,
+    glass: GlassState? = LocalGlassState.current,
+) {
+    val visible = remember { MutableTransitionState(false) }
+    var shown by remember { mutableStateOf("") }
+    val dismissed by rememberUpdatedState(onDismissed)
+    LaunchedEffect(message) {
+        if (message == null) {
+            visible.targetState = false
+            return@LaunchedEffect
+        }
+        shown = message
+        visible.targetState = true
+        // Wait for the timer, or for a tap (which hides the toast itself).
+        withTimeoutOrNull(durationMs) { snapshotFlow { visible.targetState }.first { !it } }
+        visible.targetState = false
+        snapshotFlow { visible.isIdle }.first { it }
+        dismissed()
+    }
+    AnimatedVisibility(
+        visibleState = visible,
+        modifier = modifier,
+        enter = slideInVertically(NovaMotion.standard()) { it / 2 } + fadeIn(NovaMotion.fade(NovaMotion.FastMs)),
+        exit = slideOutVertically(tween(200)) { it / 2 } + fadeOut(tween(160)),
+    ) {
+        Row(
+            Modifier
+                .novaClickable(onClickLabel = "Dismiss") { visible.targetState = false }
+                .widthIn(max = 560.dp)
+                .heightIn(min = 44.dp)
+                .glass(CircleShape, glass, elevation = 12.dp)
+                .padding(horizontal = 20.dp, vertical = 11.dp)
+                .semantics { liveRegion = LiveRegionMode.Polite },
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (icon != null) {
+                Icon(painterResource(icon), contentDescription = null, modifier = Modifier.size(18.dp), tint = NovaColors.label)
+                Spacer(Modifier.width(8.dp))
+            }
+            Text(
+                text = shown,
+                style = NovaType.subheadSemibold,
+                color = NovaColors.label,
+                textAlign = TextAlign.Center,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
     }
 }

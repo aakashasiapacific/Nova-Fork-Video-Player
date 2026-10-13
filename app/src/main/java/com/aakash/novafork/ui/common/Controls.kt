@@ -76,9 +76,17 @@ import com.aakash.novafork.ui.theme.NovaRadius
 import com.aakash.novafork.ui.theme.NovaType
 import kotlin.math.roundToInt
 
+/** iOS 26 switch metrics. */
+private val ToggleWidth = 63.dp
+private val ToggleHeight = 28.dp
+private val ToggleInset = 2.dp
+private val KnobHeight = ToggleHeight - ToggleInset * 2
+private val KnobWidth = 37.dp
+private val KnobPressedWidth = 45.dp
+
 /**
- * The iOS switch: 51×31 track, green when on, with a 27dp white knob that stretches while held.
- * Pass onCheckedChange = null when the whole row handles the tap (ListToggleRow does).
+ * The iOS 26 switch: a 63×28 capsule track, green when on, with a white pill knob that stretches
+ * while held and springs across. Pass onCheckedChange = null when the whole row handles the tap.
  */
 @Composable
 fun IosToggle(
@@ -93,12 +101,12 @@ fun IosToggle(
     val pressed by source.collectIsPressedAsState()
     val track by animateColorAsState(if (checked) palette.green else palette.toggleOff, tween(200), label = "toggleTrack")
     val knobWidth by animateDpAsState(
-        if (pressed) 32.dp else 27.dp,
+        if (pressed) KnobPressedWidth else KnobWidth,
         spring(dampingRatio = 0.8f, stiffness = 700f),
         label = "toggleKnobWidth",
     )
     val x by animateDpAsState(
-        if (checked) 47.dp - knobWidth else 0.dp,
+        if (checked) ToggleWidth - ToggleInset * 2 - knobWidth else 0.dp,
         spring(dampingRatio = 0.72f, stiffness = 520f),
         label = "toggleKnobX",
     )
@@ -119,17 +127,17 @@ fun IosToggle(
     }
     Box(
         modifier
-            .size(width = 51.dp, height = 31.dp)
+            .size(width = ToggleWidth, height = ToggleHeight)
             .alpha(if (enabled) 1f else 0.4f)
             .clip(CircleShape)
             .background(track)
             .then(interaction)
-            .padding(2.dp),
+            .padding(ToggleInset),
     ) {
         Box(
             Modifier
                 .offset(x = x)
-                .size(width = knobWidth, height = 27.dp)
+                .size(width = knobWidth, height = KnobHeight)
                 .shadow(2.5.dp, CircleShape, ambientColor = Color.Black.copy(alpha = 0.12f), spotColor = Color.Black.copy(alpha = 0.22f))
                 .background(Color.White, CircleShape),
         )
@@ -274,23 +282,7 @@ fun SearchField(
                     inner()
                 }
                 if (value.isNotEmpty()) {
-                    Box(
-                        Modifier
-                            .size(30.dp)
-                            .novaClickable(pressScale = 1f, pressAlpha = 0.5f) { onValueChange("") }
-                            .semantics { contentDescription = "Clear text" },
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Box(
-                            Modifier
-                                .size(17.dp)
-                                .clip(CircleShape)
-                                .background(palette.tertiaryLabel),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Icon(NovaGlyphs.Close, contentDescription = null, modifier = Modifier.size(9.dp), tint = palette.searchField)
-                        }
-                    }
+                    FieldClearButton(onClick = { onValueChange("") }, glyphColor = palette.searchField)
                 }
             }
         },
@@ -302,6 +294,28 @@ fun SearchField(
             } catch (e: IllegalStateException) {
                 // Not attached yet (e.g. while the page animates in); the user can tap the field.
             }
+        }
+    }
+}
+
+/** The grey "⊗" that clears a text or search field (30dp touch target around a 17dp circle). */
+@Composable
+internal fun FieldClearButton(onClick: () -> Unit, glyphColor: Color, modifier: Modifier = Modifier) {
+    Box(
+        modifier
+            .size(30.dp)
+            .novaClickable(pressScale = 1f, pressAlpha = 0.5f, onClick = onClick)
+            .semantics { contentDescription = "Clear text" },
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            Modifier
+                .size(17.dp)
+                .clip(CircleShape)
+                .background(LocalNovaPalette.current.tertiaryLabel),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(NovaGlyphs.Close, contentDescription = null, modifier = Modifier.size(9.dp), tint = glyphColor)
         }
     }
 }

@@ -250,11 +250,10 @@ private fun SheetLayout(
                     return Offset.Zero
                 }
 
-                @Suppress("DEPRECATION")
                 override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
                     // The list is at its top and the finger keeps pulling down: move the sheet.
-                    // (Drag only: a fling that reaches the top must not push the sheet down.)
-                    if (available.y > 0f && source == NestedScrollSource.Drag) {
+                    // (Finger only: a fling that reaches the top must not push the sheet down.)
+                    if (available.y > 0f && source == NestedScrollSource.UserInput) {
                         dragBy(available.y)
                         return Offset(0f, available.y)
                     }

@@ -4,19 +4,23 @@ import androidx.annotation.DrawableRes
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.InteractionSource
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -33,6 +37,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
@@ -203,6 +208,49 @@ fun GlassCapsuleButton(
             Spacer(Modifier.width(5.dp))
             Icon(NovaGlyphs.ChevronDown, contentDescription = null, modifier = Modifier.size(11.dp), tint = content)
         }
+    }
+}
+
+/**
+ * A horizontally scrolling row of glass capsules with one selected (solid pill): the iPad Library
+ * categories ("All · Movies · TV Shows · Home Videos · Streams") and other single-choice filters.
+ * [trailing] adds controls after the capsules (e.g. PullDownButton "Sort"). The row adds 4dp above
+ * and below the capsules so their shadows are not clipped by the scroll.
+ */
+@Composable
+fun GlassCapsuleRow(
+    items: List<String>,
+    selectedIndex: Int,
+    onSelect: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+    contentPadding: PaddingValues = PaddingValues(horizontal = LocalNovaDimens.current.gutter),
+    spacing: Dp = 8.dp,
+    height: Dp = 40.dp,
+    style: GlassStyle = GlassStyle.Regular,
+    glass: GlassState? = LocalGlassState.current,
+    trailing: (@Composable RowScope.() -> Unit)? = null,
+) {
+    Row(
+        modifier
+            .horizontalScroll(rememberScrollState())
+            .padding(contentPadding)
+            .padding(vertical = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(spacing),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        items.forEachIndexed { index, label ->
+            val isSelected = index == selectedIndex
+            GlassCapsuleButton(
+                text = label,
+                onClick = { onSelect(index) },
+                modifier = Modifier.semantics { selected = isSelected },
+                selected = isSelected,
+                height = height,
+                style = style,
+                glass = glass,
+            )
+        }
+        if (trailing != null) trailing()
     }
 }
 
