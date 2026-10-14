@@ -17,6 +17,26 @@ object VideoFiles {
             n == "system volume information" || n == "lost+found" || n == "sample" || n == "samples"
     }
 
+    /**
+     * Whether a folder is skipped, given its path from the storage (or picked folder) root, root
+     * first. Like [isIgnoredFolder] for every part, except that "Android/media" is kept: on Android
+     * 11+ messaging apps keep their videos there
+     * ("Android/media/com.whatsapp/WhatsApp/Media/WhatsApp Video"). The rest of "Android"
+     * (data, obb) stays skipped; "Android" itself is not, so a folder walk can reach "media".
+     */
+    fun isIgnoredPath(segments: List<String>): Boolean {
+        val parts = segments.filter { it.isNotEmpty() }
+        parts.forEachIndexed { i, name ->
+            if (i == 0 && name.equals("android", ignoreCase = true)) {
+                val next = parts.getOrNull(1)
+                if (next != null && !next.equals("media", ignoreCase = true)) return true
+            } else if (isIgnoredFolder(name)) {
+                return true
+            }
+        }
+        return false
+    }
+
     /** Sample clips that ship with releases ("movie-sample.mkv", "sample.mkv"). */
     fun isSample(name: String): Boolean {
         val b = baseName(name).lowercase()

@@ -75,7 +75,10 @@ class FolderScanner(context: Context) : SourceScanner {
             for (doc in docs) {
                 when {
                     doc.isDirectory -> {
-                        if (folder.depth < MAX_FOLDER_DEPTH && !VideoFiles.isIgnoredFolder(doc.name)) {
+                        // Path from the picked folder, so a picked storage root keeps Android/media.
+                        val path = generateSequence(folder) { it.parent }.takeWhile { it.parent != null }
+                            .map { it.name }.toList().asReversed() + doc.name
+                        if (folder.depth < MAX_FOLDER_DEPTH && !VideoFiles.isIgnoredPath(path)) {
                             queue.addLast(
                                 Folder(
                                     documentId = doc.id,

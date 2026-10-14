@@ -174,8 +174,8 @@ private fun HomeFeed(home: HomeUi, scan: ScanUi, permission: PermissionUi, layou
 }
 
 private fun AppActions.seeAll(filter: LibraryFilter) {
-    setLibraryFilter(filter)
     selectTab(TopDestination.LIBRARY)
+    setLibraryFilter(filter)
 }
 
 private fun AppActions.openHero(target: HeroTarget) {

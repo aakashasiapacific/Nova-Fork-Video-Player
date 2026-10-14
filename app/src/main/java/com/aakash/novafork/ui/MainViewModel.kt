@@ -227,7 +227,12 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
         }
         // Other tabs sit on top of Home, so system back from a tab's root returns Home first.
         val stack = if (root == Route.Home) listOf(Route.Home) else listOf(Route.Home, root)
-        local.update { it.copy(backStack = stack) }
+        local.update {
+            // Coming to Library from another tab shows everything again: a "See all" from Home
+            // used to leave it stuck on Movies, which hid home videos. (See all sets its filter after this.)
+            val freshLibrary = root == Route.Library && it.backStack.lastOrNull() != Route.Library
+            it.copy(backStack = stack, filter = if (freshLibrary) LibraryFilter.ALL else it.filter)
+        }
     }
 
     override fun preview(item: LibraryItemUi) {

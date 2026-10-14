@@ -127,7 +127,7 @@ class DeviceScanner(context: Context) : SourceScanner {
                     dir = Dir("", dirPath)
                 }
                 if (name.isBlank() || name.startsWith("._") || VideoFiles.isSample(name)) continue
-                if (folder.split('/').any { it.isNotEmpty() && VideoFiles.isIgnoredFolder(it) }) continue
+                if (VideoFiles.isIgnoredPath(folder.split('/'))) continue
                 rows += VideoRow(
                     uri = ContentUris.withAppendedId(collection, c.getLong(idCol)).toString(),
                     name = name,
