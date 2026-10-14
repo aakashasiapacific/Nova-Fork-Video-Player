@@ -7,7 +7,33 @@ import androidx.room.Index
 import androidx.room.PrimaryKey
 import androidx.room.Relation
 
-enum class SourceType { DEVICE, FOLDER, SMB, STREAM }
+/**
+ * Stored by name: new types go at the end, and none is ever renamed. Every network type keeps its
+ * base URI in [SourceEntity.location] (see there).
+ */
+enum class SourceType {
+    DEVICE,
+    FOLDER,
+    SMB,
+    STREAM,
+    FTP,
+    SFTP,
+    NFS,
+    UPNP,
+    WEBDAV,
+    JELLYFIN,
+    EMBY,
+    PLEX,
+    ;
+
+    /** Jellyfin, Emby and Plex: the server has its own library, metadata and watch state. */
+    val isMediaServer: Boolean
+        get() = this == JELLYFIN || this == EMBY || this == PLEX
+
+    /** SMB, FTP, SFTP, NFS, WebDAV and UPnP: servers browsed as folders of files. */
+    val isNetworkShare: Boolean
+        get() = this == SMB || this == FTP || this == SFTP || this == NFS || this == WEBDAV || this == UPNP
+}
 
 /** What a video is, after parsing and matching. VIDEO = home video / unidentified. */
 enum class VideoKind { MOVIE, EPISODE, VIDEO }
@@ -29,6 +55,17 @@ enum class MatchState {
  * FOLDER – a SAF tree; location is the tree URI (persisted permission).
  * SMB    – location is "smb://host[:port]/share/optional/path" (see core SmbUris); credentials below.
  * STREAM – one row per saved network stream; location is the stream URL (it also gets one VideoEntity).
+ *
+ * The other network types (schema version 3) keep a percent-encoded base URI without credentials
+ * in [location], as [com.aakash.novafork.data.NetworkSources] normalises it:
+ * FTP      – "ftp://host[:port]/path" (also ftps:// and ftpes://);
+ * SFTP     – "sftp://host[:port]/path";
+ * NFS      – "nfs://host/export/path";
+ * UPNP     – the device description URL ("http://192.168.1.5:49152/rootDesc.xml") or its UDN ("uuid:…");
+ * WEBDAV   – "https://dav.example.com/path" (or http://);
+ * JELLYFIN, EMBY, PLEX – the server's base URL ("http://jellyfin.local:8096", "https://example.com/jellyfin").
+ * Secrets stay in the columns below, as for SMB: [username]/[password] for logins, [token] for the
+ * access token a media server hands out.
  */
 @Entity(tableName = "sources")
 data class SourceEntity(
@@ -43,6 +80,16 @@ data class SourceEntity(
     val addedAt: Long = 0,
     val lastScanAt: Long? = null,
     val lastError: String? = null,
+    /** The port in [location]; null for the scheme's default. Kept in step with [location]. */
+    val port: Int? = null,
+    /** Jellyfin/Emby access token, Plex X-Plex-Token. Null until signed in. */
+    val token: String? = null,
+    /** Jellyfin/Emby user id the token belongs to. */
+    val userId: String? = null,
+    /** The server's own id (Jellyfin/Emby ServerId, Plex machineIdentifier, UPnP UDN). */
+    val serverId: String? = null,
+    /** Comma-separated ids of the server libraries to scan; null = all of them. */
+    val libraryIds: String? = null,
 )
 
 @Entity(
@@ -57,7 +104,7 @@ data class SourceEntity(
 data class VideoEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val sourceId: Long,
-    /** content://…, file://…, smb://…, http(s)://…, rtsp://… */
+    /** content://…, file://…, smb://…, ftp://…, sftp://…, nfs://…, http(s)://…, rtsp://… */
     val uri: String,
     val fileName: String,
     /** Human folder path for display and folder browsing, root → leaf, '/'-separated, e.g. "Movies/Action". */
@@ -78,14 +125,17 @@ data class VideoEntity(
     val episode: Int? = null,
     val episodeEnd: Int? = null,
 
-    // Matching (TMDB)
-    /** "movie:603" for movies, "tv:1396" for episodes (the show), null when unmatched. */
+    // Matching (TMDB, or the media server the video comes from)
+    /**
+     * "movie:603" for movies, "tv:1396" for episodes (the show), null when unmatched. Videos a
+     * media server described carry its key instead ("server:<sourceId>:movie:<id>"), MATCHED.
+     */
     val metadataKey: String? = null,
-    /** Episodes only: grouping key (see core LibraryKeys.showKey). */
+    /** Episodes only: grouping key (see core LibraryKeys.showKey; a server show's metadataKey). */
     val showKey: String? = null,
     val episodeTitle: String? = null,
     val episodeOverview: String? = null,
-    /** TMDB still path ("/abc.jpg"), not a full URL. */
+    /** TMDB still path ("/abc.jpg"), or a full http(s) URL from a media server. */
     val episodeStillPath: String? = null,
     val episodeAirDate: String? = null,
     val matchState: MatchState = MatchState.PENDING,
@@ -107,13 +157,24 @@ data class VideoEntity(
 
     /** False when the last scan of its source did not see the file (kept for watch history). */
     val present: Boolean = true,
+
+    /**
+     * The item's id on its server (schema version 3): Jellyfin/Emby item id, Plex ratingKey, UPnP
+     * object id. Null for files, whose URI is all there is.
+     */
+    val remoteId: String? = null,
 )
 
-/** One row per matched TMDB movie or show. */
+/**
+ * One row per matched TMDB movie or show, or per movie or show a media server described
+ * (key "server:<sourceId>:movie:<id>" / "server:<sourceId>:tv:<id>", see
+ * [com.aakash.novafork.data.ServerMetadata.key]).
+ */
 @Entity(tableName = "metadata")
 data class MetadataEntity(
-    /** "movie:603" or "tv:1396" (core LibraryKeys). */
+    /** "movie:603" or "tv:1396" (core LibraryKeys), or a server key. */
     @PrimaryKey val key: String,
+    /** The TMDB id; for a server row the one the server knows, else 0. */
     val tmdbId: Int,
     /** "movie" or "tv". */
     val type: String,
@@ -122,14 +183,17 @@ data class MetadataEntity(
     val year: Int? = null,
     val overview: String? = null,
     val tagline: String? = null,
-    /** TMDB paths ("/xyz.jpg"), turned into URLs with TmdbClient.posterUrl/backdropUrl. */
+    /**
+     * TMDB paths ("/xyz.jpg"), turned into URLs with TmdbClient.posterUrl/backdropUrl; a server
+     * row holds full http(s) URLs, which those return unchanged.
+     */
     val posterPath: String? = null,
     val backdropPath: String? = null,
     val rating: Double? = null,
     /** Comma-separated genre names. */
     val genres: String = "",
     val runtimeMin: Int? = null,
-    /** Shows only: JSON object season number → poster path, e.g. {"1":"/a.jpg","2":"/b.jpg"}. */
+    /** Shows only: JSON object season number → poster path (or URL), e.g. {"1":"/a.jpg","2":"/b.jpg"}. */
     val seasonPostersJson: String? = null,
     val updatedAt: Long = 0,
 )

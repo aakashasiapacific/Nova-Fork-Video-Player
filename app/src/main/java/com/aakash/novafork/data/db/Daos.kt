@@ -13,6 +13,9 @@ import kotlinx.coroutines.flow.Flow
 /** SQLite allows 999 bound arguments per statement on older Android versions; stay well below. */
 const val SQL_CHUNK = 900
 
+// Metadata rows a media server described have keys starting "server:" (ServerMetadata.KEY_PREFIX);
+// the queries below that must leave them to their server spell the prefix as the literal 'server:%'.
+
 @Dao
 interface SourceDao {
     @Query("SELECT * FROM sources WHERE enabled = 1 ORDER BY type, name COLLATE NOCASE, id")
@@ -48,6 +51,10 @@ interface SourceDao {
 
     @Query("UPDATE sources SET lastError = :error WHERE id = :id")
     suspend fun markFailed(id: Long, error: String)
+
+    /** What signing in to a media server gave; the other columns stay as they are. */
+    @Query("UPDATE sources SET token = :token, userId = :userId, serverId = :serverId WHERE id = :id")
+    suspend fun updateAuth(id: Long, token: String?, userId: String?, serverId: String?)
 
     @Query("DELETE FROM sources WHERE id = :id")
     suspend fun delete(id: Long)
@@ -94,8 +101,14 @@ interface VideoDao {
     @Query("SELECT * FROM videos WHERE uri IN (:uris)")
     suspend fun byUris(uris: List<String>): List<VideoEntity>
 
-    /** Episodes whose numbering came from automatic matching (may hold resolved absolute numbers). */
-    @Query("SELECT * FROM videos WHERE kind = 'EPISODE' AND matchState != 'MANUAL'")
+    /**
+     * Episodes whose numbering came from automatic matching (may hold resolved absolute numbers).
+     * A media server's numbering is its own and not included.
+     */
+    @Query(
+        "SELECT * FROM videos WHERE kind = 'EPISODE' AND matchState != 'MANUAL' " +
+            "AND (metadataKey IS NULL OR metadataKey NOT LIKE 'server:%')",
+    )
     suspend fun automaticEpisodes(): List<VideoEntity>
 
     /** Movies and episodes to look up: never tried, or tried without success before [retryBefore]. */
@@ -105,14 +118,20 @@ interface VideoDao {
     )
     suspend fun needingMatch(retryBefore: Long): List<VideoEntity>
 
-    /** Keys that videos point at but whose metadata row is missing (cleared, or a failed write). */
+    /**
+     * TMDB keys that videos point at but whose metadata row is missing (cleared, or a failed
+     * write). A server's rows come back with the next scan of its source, not from TMDB.
+     */
     @Query(
         "SELECT DISTINCT metadataKey FROM videos WHERE metadataKey IS NOT NULL " +
-            "AND metadataKey NOT IN (SELECT `key` FROM metadata)",
+            "AND metadataKey NOT LIKE 'server:%' AND metadataKey NOT IN (SELECT `key` FROM metadata)",
     )
     suspend fun orphanMetadataKeys(): List<String>
 
-    @Query("SELECT DISTINCT parsedTitle FROM videos WHERE kind = 'EPISODE' AND matchState != 'MANUAL'")
+    @Query(
+        "SELECT DISTINCT parsedTitle FROM videos WHERE kind = 'EPISODE' AND matchState != 'MANUAL' " +
+            "AND (metadataKey IS NULL OR metadataKey NOT LIKE 'server:%')",
+    )
     suspend fun automaticEpisodeTitles(): List<String>
 
     // Queues
@@ -245,15 +264,23 @@ interface VideoDao {
     @Query("UPDATE videos SET matchState = 'PENDING' WHERE matchState = 'UNMATCHED' AND kind != 'VIDEO'")
     suspend fun resetUnmatched()
 
-    /** Forgets every automatic match. Episode show keys are reset separately ([setShowKeyForTitle]). */
+    /**
+     * Forgets every automatic TMDB match; what a media server described stays. Episode show keys are
+     * reset separately ([setShowKeyForTitle]).
+     */
     @Query(
         "UPDATE videos SET matchState = 'PENDING', matchAttemptAt = NULL, metadataKey = NULL, episodeTitle = NULL, " +
             "episodeOverview = NULL, episodeStillPath = NULL, episodeAirDate = NULL " +
-            "WHERE kind IN ('MOVIE', 'EPISODE') AND matchState != 'MANUAL'",
+            "WHERE kind IN ('MOVIE', 'EPISODE') AND matchState != 'MANUAL' " +
+            "AND (metadataKey IS NULL OR metadataKey NOT LIKE 'server:%')",
     )
     suspend fun resetAutomaticMatches()
 
-    @Query("UPDATE videos SET showKey = :showKey WHERE kind = 'EPISODE' AND matchState != 'MANUAL' AND parsedTitle = :parsedTitle")
+    /** Leaves a media server's shows (and manual matches) alone. */
+    @Query(
+        "UPDATE videos SET showKey = :showKey WHERE kind = 'EPISODE' AND matchState != 'MANUAL' " +
+            "AND parsedTitle = :parsedTitle AND (showKey IS NULL OR showKey NOT LIKE 'server:%')",
+    )
     suspend fun setShowKeyForTitle(parsedTitle: String, showKey: String)
 
     /** Puts back the numbering from the file name (absolute anime numbers are re-placed on the next match). */
@@ -348,6 +375,10 @@ interface MetadataDao {
 
     @Query("DELETE FROM metadata")
     suspend fun clear()
+
+    /** Drops what came from TMDB; the rows media servers described stay. */
+    @Query("DELETE FROM metadata WHERE `key` NOT LIKE 'server:%'")
+    suspend fun clearTmdb()
 
     @Query("DELETE FROM metadata WHERE `key` NOT IN (SELECT metadataKey FROM videos WHERE metadataKey IS NOT NULL)")
     suspend fun deleteUnreferenced()
