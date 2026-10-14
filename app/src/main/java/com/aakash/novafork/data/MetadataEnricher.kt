@@ -14,6 +14,7 @@ import com.aakash.novafork.core.tmdb.TmdbSeasonDetails
 import com.aakash.novafork.core.tmdb.TmdbSeasonSummary
 import com.aakash.novafork.core.tmdb.TmdbTvDetails
 import com.aakash.novafork.data.db.MatchCacheEntity
+import com.aakash.novafork.data.db.MatchState
 import com.aakash.novafork.data.db.MetadataEntity
 import com.aakash.novafork.data.db.NovaDatabase
 import com.aakash.novafork.data.db.SQL_CHUNK
@@ -48,7 +49,8 @@ private val PASS_ERRORS = setOf(KEY_REJECTED, UNREACHABLE)
 
 /**
  * Matches movies and episodes against TMDB in the background: PENDING ones, and UNMATCHED ones
- * last tried a week ago (never MANUAL). Each distinct title is looked up once per pass and the
+ * last tried a week ago (never MANUAL, nor the MATCHED ones a media server described: the scan
+ * stores those with [withServerMetadata]). Each distinct title is looked up once per pass and the
  * answer is kept in the match cache. A pass also re-fetches metadata that videos point at but the
  * database lacks, which is how manual matches get their data back after [LibraryRepository.clearMetadata].
  *
@@ -425,6 +427,101 @@ internal fun TmdbTvDetails.toMetadata(now: Long): MetadataEntity {
         genres = genres.joinToString(", ") { it.name },
         runtimeMin = episodeRunTime.firstOrNull { it > 0 },
         seasonPostersJson = if (seasonPosters.isEmpty()) null else seasonPosters.toString(),
+        updatedAt = now,
+    )
+}
+
+/** Metadata worth storing: it names the item and has an id to group by. */
+internal fun ServerMetadata.isUsable(): Boolean = id.isNotBlank() && title.isNotBlank()
+
+/**
+ * The video as its media server describes it: kind, numbering and episode data from [metadata],
+ * MATCHED under [ServerMetadata.key], so TMDB is never asked about it. Returns [this] unchanged
+ * (no write) when the server says what the row holds already.
+ */
+internal fun VideoEntity.withServerMetadata(sourceId: Long, metadata: ServerMetadata, now: Long): VideoEntity {
+    val key = ServerMetadata.key(sourceId, metadata)
+    val matched = when (metadata.type) {
+        ServerItemType.MOVIE -> copy(
+            kind = VideoKind.MOVIE,
+            metadataKey = key,
+            showKey = null,
+            season = null,
+            episode = null,
+            episodeEnd = null,
+            episodeTitle = null,
+            episodeOverview = null,
+            episodeStillPath = null,
+            episodeAirDate = null,
+            matchState = MatchState.MATCHED,
+            matchAttemptAt = now,
+        )
+        ServerItemType.EPISODE -> {
+            val first = metadata.episode
+            copy(
+                kind = VideoKind.EPISODE,
+                metadataKey = key,
+                showKey = key,
+                season = metadata.season,
+                episode = first,
+                episodeEnd = metadata.episodeEnd?.takeIf { first != null && it > first },
+                episodeTitle = metadata.episodeTitle.nonBlank(),
+                episodeOverview = metadata.episodeOverview.nonBlank(),
+                episodeStillPath = metadata.episodeStillUrl.nonBlank(),
+                episodeAirDate = metadata.episodeAirDate.nonBlank(),
+                matchState = MatchState.MATCHED,
+                matchAttemptAt = now,
+            )
+        }
+    }
+    return if (matched.copy(matchAttemptAt = matchAttemptAt) == this) this else matched
+}
+
+/**
+ * One metadata row per movie or show that [scanned] (one scan of source [sourceId]) describes. A
+ * show's fields come from its first episode that has them; its season posters from all of them.
+ */
+internal fun serverMetadataRows(sourceId: Long, scanned: List<ScannedVideo>, now: Long): List<MetadataEntity> {
+    val byKey = LinkedHashMap<String, MutableList<ServerMetadata>>()
+    for (file in scanned) {
+        val metadata = file.serverMetadata?.takeIf { it.isUsable() } ?: continue
+        byKey.getOrPut(ServerMetadata.key(sourceId, metadata)) { ArrayList() }.add(metadata)
+    }
+    return byKey.map { (key, items) -> serverMetadataRow(key, items, now) }
+}
+
+private fun serverMetadataRow(key: String, items: List<ServerMetadata>, now: Long): MetadataEntity {
+    val first = items.first()
+    val isShow = first.type == ServerItemType.EPISODE
+    val seasonPosters = sortedMapOf<Int, String>()
+    if (isShow) {
+        for (item in items) {
+            val season = item.season ?: continue
+            val poster = item.seasonPosterUrl.nonBlank() ?: continue
+            seasonPosters.getOrPut(season) { poster }
+        }
+    }
+    val seasonPostersJson = buildJsonObject {
+        for ((season, poster) in seasonPosters) put(season.toString(), poster)
+    }
+    val tmdbId = items.firstNotNullOfOrNull { item ->
+        item.providerIds.entries.firstOrNull { it.key.equals("tmdb", ignoreCase = true) }?.value?.trim()?.toIntOrNull()
+    }
+    return MetadataEntity(
+        key = key,
+        tmdbId = tmdbId ?: 0,
+        type = if (isShow) "tv" else "movie",
+        title = first.title.trim(),
+        originalTitle = items.firstNotNullOfOrNull { it.originalTitle.nonBlank() },
+        year = items.firstNotNullOfOrNull { it.year },
+        overview = items.firstNotNullOfOrNull { it.overview.nonBlank() },
+        tagline = items.firstNotNullOfOrNull { it.tagline.nonBlank() },
+        posterPath = items.firstNotNullOfOrNull { it.posterUrl.nonBlank() },
+        backdropPath = items.firstNotNullOfOrNull { it.backdropUrl.nonBlank() },
+        rating = items.firstNotNullOfOrNull { item -> item.rating?.takeIf { it > 0.0 && it <= 10.0 } },
+        genres = items.flatMap { it.genres }.map { it.trim() }.filter { it.isNotEmpty() }.distinct().joinToString(", "),
+        runtimeMin = items.firstNotNullOfOrNull { item -> item.runtimeMin?.takeIf { it > 0 } },
+        seasonPostersJson = if (seasonPostersJson.isEmpty()) null else seasonPostersJson.toString(),
         updatedAt = now,
     )
 }

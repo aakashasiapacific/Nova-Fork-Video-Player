@@ -8,9 +8,13 @@ import com.aakash.novafork.core.tmdb.TmdbCredentials
 import com.aakash.novafork.data.LibraryRepository
 import com.aakash.novafork.data.LibraryRepositoryImpl
 import com.aakash.novafork.data.Network
+import com.aakash.novafork.data.NetworkBrowser
+import com.aakash.novafork.data.PlaybackOptions
 import com.aakash.novafork.data.PrefsSettingsStore
+import com.aakash.novafork.data.RemoteProgressReporter
 import com.aakash.novafork.data.SettingsStore
 import com.aakash.novafork.data.SmbBrowser
+import com.aakash.novafork.data.SourceModule
 import com.aakash.novafork.data.SourceScanner
 import com.aakash.novafork.data.db.NovaDatabase
 import com.aakash.novafork.data.db.SourceType
@@ -18,6 +22,8 @@ import com.aakash.novafork.sources.DeviceScanner
 import com.aakash.novafork.sources.FolderScanner
 import com.aakash.novafork.sources.SmbBrowserImpl
 import com.aakash.novafork.sources.SmbScanner
+import com.aakash.novafork.sources.media.MediaServerSources
+import com.aakash.novafork.sources.net.FileServerSources
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -57,12 +63,35 @@ class AppGraph(val app: Application) {
         SmbBrowserImpl(credentialsFor = { host, share -> library.smbCredentials(host, share) })
     }
 
+    /**
+     * FTP, SFTP, NFS, UPnP and WebDAV (sources/net), and Jellyfin, Emby and Plex (sources/media):
+     * each family registers its scanners, browsers and playback hooks in its own file. Their
+     * factories must not read [library] while being created (it is built from [scanners]); a
+     * lambda reading it later is fine.
+     */
+    private val fileServers: SourceModule by lazy { FileServerSources.create(this) }
+    private val mediaServers: SourceModule by lazy { MediaServerSources.create(this) }
+
+    /** A source type without a scanner is saved but not scanned. */
     val scanners: Map<SourceType, SourceScanner> by lazy {
         mapOf(
             SourceType.DEVICE to DeviceScanner(app),
             SourceType.FOLDER to FolderScanner(app),
             SourceType.SMB to SmbScanner(smb),
-        )
+        ) + fileServers.scanners + mediaServers.scanners
+    }
+
+    /** Folder listings and connection tests for the network types (SMB has [smb]). */
+    val browsers: Map<SourceType, NetworkBrowser> by lazy { fileServers.browsers + mediaServers.browsers }
+
+    /** What the player adds to a network video of these types (SMB credentials come from [smb]'s source). */
+    val playbackOptions: Map<SourceType, PlaybackOptions> by lazy {
+        fileServers.playbackOptions + mediaServers.playbackOptions
+    }
+
+    /** Media servers told about playback progress; the library calls them after each save. */
+    val progressReporters: Map<SourceType, RemoteProgressReporter> by lazy {
+        fileServers.progressReporters + mediaServers.progressReporters
     }
 
     private val repository: Lazy<LibraryRepositoryImpl> = lazy {
@@ -73,6 +102,7 @@ class AppGraph(val app: Application) {
             tmdb = tmdb,
             settings = settings,
             scope = appScope,
+            progressReporters = progressReporters,
         ).also { it.watchDeviceStorage() }
     }
 

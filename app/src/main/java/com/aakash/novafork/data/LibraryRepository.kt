@@ -82,9 +82,25 @@ interface LibraryRepository {
     ): Long
 
     /**
-     * Removes a folder, share or stream with its videos. Videos another share also covers move to
-     * that share instead. The DEVICE source can't be removed (IllegalArgumentException): turn off
-     * Settings.scanDeviceStorage to hide it.
+     * Adds or updates (id != null) an FTP, SFTP, NFS, UPnP, WebDAV, Jellyfin, Emby or Plex source,
+     * then scans it (once a scanner for its type is registered). [input] goes through
+     * [NetworkSources.toSource]: IllegalArgumentException carries a message for the user. Adding
+     * what exists already (same type, location and user name) updates that source instead. An edit
+     * that keeps the location and user name keeps the stored token, user id and server id unless
+     * [input] brings new ones; changing either forgets them (the next scan signs in again).
+     */
+    suspend fun saveNetworkSource(id: Long?, input: NetworkSourceInput): Long
+
+    /**
+     * Stores what signing in to a media server gave (null clears a value); the media-server
+     * scanners and browsers call it. An unknown id is ignored.
+     */
+    suspend fun updateSourceAuth(sourceId: Long, token: String?, userId: String?, serverId: String?)
+
+    /**
+     * Removes a folder, share, server or stream with its videos. Videos another share (SMB, FTP,
+     * SFTP, NFS, WebDAV) of the same type also covers move to that share instead. The DEVICE
+     * source can't be removed (IllegalArgumentException): turn off Settings.scanDeviceStorage to hide it.
      */
     suspend fun removeSource(sourceId: Long)
 
@@ -95,13 +111,29 @@ interface LibraryRepository {
     suspend fun smbCredentials(host: String, share: String): SmbCredentials?
 
     /**
+     * The source a video belongs to, with its credentials and token: what [PlaybackOptions] and
+     * [RemoteProgressReporter] are given. Null for an unknown id.
+     */
+    suspend fun sourceForVideo(videoId: Long): SourceEntity?
+
+    /**
+     * The source [uri] belongs to: the one of the video stored under [uri], else the network
+     * source whose location contains it (artwork or subtitles next to a video on an FTP server),
+     * an enabled one and then the deepest location first. Null when none does.
+     */
+    suspend fun sourceForUri(uri: String): SourceEntity?
+
+    /**
      * Stores progress. Marks watched (and resets position to 0) when within 3% or 90 seconds of the
-     * end, whichever is larger; increments playCount then. Also updates lastPlayedAt.
+     * end, whichever is larger; increments playCount then. Also updates lastPlayedAt. A video of a
+     * source with a [RemoteProgressReporter] then has the progress reported to its server, in the
+     * background.
      */
     suspend fun savePlayback(videoId: Long, positionMs: Long, durationMs: Long)
 
     suspend fun saveTracks(videoId: Long, audioTrackId: Int?, subtitleTrackId: Int?)
 
+    /** Also reported to the video's server, as [savePlayback] does. */
     suspend fun setWatched(videoId: Long, watched: Boolean)
 
     /** The episode after this one in the same show (next episode, else first of next season). */
@@ -116,7 +148,10 @@ interface LibraryRepository {
      */
     suspend fun identify(videoId: Long, result: TmdbSearchResult)
 
-    /** Drops all TMDB data and match cache; marks every non-manual video PENDING and re-matches. */
+    /**
+     * Drops all TMDB data and match cache; marks every non-manual video PENDING and re-matches.
+     * What media servers described (ScannedVideo.serverMetadata) stays as it is.
+     */
     suspend fun clearMetadata()
 
     /** Re-runs matching for UNMATCHED videos now (e.g. after a TMDB key was added). */

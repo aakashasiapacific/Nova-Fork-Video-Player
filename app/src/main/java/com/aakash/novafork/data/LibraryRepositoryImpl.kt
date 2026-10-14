@@ -43,6 +43,8 @@ import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -83,6 +85,10 @@ private const val NO_LAUNCH = Long.MIN_VALUE
 private const val STATE_PREFS = "library_state"
 private const val KEY_METADATA_LANGUAGE = "metadata_language"
 
+/**
+ * [progressReporters]: media servers told about playback progress (see [RemoteProgressReporter]);
+ * a source type without one reports nothing.
+ */
 class LibraryRepositoryImpl(
     context: Context,
     private val database: NovaDatabase,
@@ -90,6 +96,7 @@ class LibraryRepositoryImpl(
     private val tmdb: TmdbClient,
     private val settings: SettingsStore,
     private val scope: CoroutineScope,
+    private val progressReporters: Map<SourceType, RemoteProgressReporter> = emptyMap(),
 ) : LibraryRepository {
     private val context: Context = context.applicationContext
     private val sourceDao = database.sourceDao()
@@ -132,11 +139,16 @@ class LibraryRepositoryImpl(
 
     @Volatile private var deviceScanStartedAt = 0L
 
+    /** Progress waiting to be reported to media servers: the latest per video id. */
+    private val pendingReports = ConcurrentHashMap<Long, RemoteReport>()
+    private val reportsQueued = Channel<Unit>(Channel.CONFLATED)
+
     init {
         launchLogged("Device source setup") { syncDeviceSource(settings.settings.value.scanDeviceStorage) }
         observeSettings()
         // Picks up lookups an earlier process did not finish.
         enricher.request()
+        if (progressReporters.isNotEmpty()) scope.launch(Dispatchers.IO) { deliverReports() }
     }
 
     override fun observeVideos(): Flow<List<VideoWithMeta>> = videoDao.observePresent().distinctUntilChanged()
@@ -221,10 +233,12 @@ class LibraryRepositoryImpl(
         return at != NO_LAUNCH && SystemClock.elapsedRealtime() - at <= LAUNCH_WINDOW_MS
     }
 
-    /** A folder or share scanned, or tried, within [LAUNCH_RESCAN_AFTER_MS]. */
+    /** A folder, share or server scanned, or tried, within [LAUNCH_RESCAN_AFTER_MS]. */
     private fun scannedRecently(source: SourceEntity): Boolean {
         val walksFiles = when (source.type) {
-            SourceType.FOLDER, SourceType.SMB -> true
+            SourceType.FOLDER, SourceType.SMB, SourceType.FTP, SourceType.SFTP, SourceType.NFS, SourceType.UPNP,
+            SourceType.WEBDAV, SourceType.JELLYFIN, SourceType.EMBY, SourceType.PLEX,
+            -> true
             SourceType.DEVICE, SourceType.STREAM -> false
         }
         if (!walksFiles) return false
@@ -254,7 +268,9 @@ class LibraryRepositoryImpl(
         return when (source.type) {
             SourceType.DEVICE ->
                 settings.settings.value.scanDeviceStorage && StoragePermissions.hasAnyVideoAccess(context)
-            SourceType.FOLDER, SourceType.SMB -> true
+            SourceType.FOLDER, SourceType.SMB, SourceType.FTP, SourceType.SFTP, SourceType.NFS, SourceType.UPNP,
+            SourceType.WEBDAV, SourceType.JELLYFIN, SourceType.EMBY, SourceType.PLEX,
+            -> true
             SourceType.STREAM -> false
         }
     }
@@ -290,8 +306,10 @@ class LibraryRepositoryImpl(
     /**
      * Upserts the files of one scan by URI. Known files keep their id, date added, playback state
      * and match; files of the source the scan did not see are kept (watch history) but hidden.
+     * Metadata a media server supplied is stored with them (see [ScannedVideo.serverMetadata]).
      */
     private suspend fun merge(source: SourceEntity, scanned: List<ScannedVideo>) {
+        val now = System.currentTimeMillis()
         database.withTransaction {
             // The source may have been removed while its scan was running.
             if (sourceDao.byId(source.id) == null) return@withTransaction
@@ -306,7 +324,7 @@ class LibraryRepositoryImpl(
                 if (old == null) {
                     fresh += file
                 } else {
-                    val merged = refreshed(old, file)
+                    val merged = refreshed(old, file, source.id, now)
                     if (merged != old) updates += merged
                 }
             }
@@ -318,9 +336,9 @@ class LibraryRepositoryImpl(
                 for (file in fresh) {
                     val other = elsewhere[file.uri]
                     when {
-                        other == null -> inserts += newVideo(source.id, file)
+                        other == null -> inserts += newVideo(source.id, file, now)
                         other.sourceId !in enabledSources || !other.present ->
-                            updates += refreshed(other, file).copy(sourceId = source.id)
+                            updates += refreshed(other, file, source.id, now).copy(sourceId = source.id)
                         else -> Unit
                     }
                 }
@@ -329,12 +347,21 @@ class LibraryRepositoryImpl(
             if (updates.isNotEmpty()) videoDao.updateAll(updates)
             val missing = existing.values.filter { it.present && it.uri !in seen }.map { it.id }
             for (chunk in missing.chunked(SQL_CHUNK)) videoDao.markMissing(chunk)
+            storeServerMetadata(source.id, scanned, now)
         }
     }
 
-    private fun newVideo(sourceId: Long, file: ScannedVideo): VideoEntity {
+    /** Writes the movies and shows a media server described; unchanged rows are left alone. */
+    private suspend fun storeServerMetadata(sourceId: Long, scanned: List<ScannedVideo>, now: Long) {
+        for (row in serverMetadataRows(sourceId, scanned, now)) {
+            val current = metadataDao.get(row.key)
+            if (current == null || row.copy(updatedAt = current.updatedAt) != current) metadataDao.upsert(row)
+        }
+    }
+
+    private fun newVideo(sourceId: Long, file: ScannedVideo, now: Long): VideoEntity {
         val parsed = parseName(file.fileName, file.parentFolders)
-        return VideoEntity(
+        val video = VideoEntity(
             sourceId = sourceId,
             uri = file.uri,
             fileName = file.fileName,
@@ -349,10 +376,14 @@ class LibraryRepositoryImpl(
             localPoster = file.localPoster,
             localBackdrop = file.localBackdrop,
             localThumb = file.localThumb,
+            remoteId = file.remoteId,
         ).withParse(parsed)
+        val server = file.serverMetadata?.takeIf { it.isUsable() }
+        return if (server != null) video.withServerMetadata(sourceId, server, now) else video
     }
 
-    private fun refreshed(old: VideoEntity, file: ScannedVideo): VideoEntity {
+    /** [old] as the scan saw it again, for source [sourceId] (the one scanned). */
+    private fun refreshed(old: VideoEntity, file: ScannedVideo, sourceId: Long, now: Long): VideoEntity {
         val updated = old.copy(
             fileName = file.fileName,
             folder = file.folder,
@@ -364,11 +395,20 @@ class LibraryRepositoryImpl(
             localPoster = file.localPoster,
             localBackdrop = file.localBackdrop,
             localThumb = file.localThumb,
+            remoteId = file.remoteId ?: old.remoteId,
             present = true,
         )
-        // A renamed file (same MediaStore id) may now be something else entirely.
-        val renamed = file.fileName != old.fileName && old.matchState != MatchState.MANUAL
-        return if (renamed) updated.withParse(parseName(file.fileName, file.parentFolders)) else updated
+        val server = file.serverMetadata?.takeIf { it.isUsable() }
+        return when {
+            // The user's Identify outranks both the server and the file name.
+            old.matchState == MatchState.MANUAL -> updated
+            server != null -> updated.withServerMetadata(sourceId, server, now)
+            // The server no longer describes it: the file name and TMDB take over.
+            ServerMetadata.isServerKey(old.metadataKey) -> updated.withParse(parseName(file.fileName, file.parentFolders))
+            // A renamed file (same MediaStore id) may now be something else entirely.
+            file.fileName != old.fileName -> updated.withParse(parseName(file.fileName, file.parentFolders))
+            else -> updated
+        }
     }
 
     /**
@@ -509,6 +549,56 @@ class LibraryRepositoryImpl(
         sourceId
     }
 
+    override suspend fun saveNetworkSource(id: Long?, input: NetworkSourceInput): Long {
+        val typed = NetworkSources.toSource(input)
+        return withContext(Dispatchers.IO) {
+            val sourceId = database.withTransaction {
+                val existing = if (id != null) {
+                    sourceDao.byId(id)
+                } else {
+                    sourceDao.all().firstOrNull {
+                        it.type == typed.type && it.location == typed.location && it.username == typed.username
+                    }
+                }?.takeIf { it.type == typed.type }
+                if (existing != null) {
+                    // A token belongs to one account on one server.
+                    val sameAccount = existing.location == typed.location && existing.username == typed.username
+                    sourceDao.update(
+                        existing.copy(
+                            name = typed.name,
+                            location = typed.location,
+                            port = typed.port,
+                            username = typed.username,
+                            password = typed.password,
+                            domain = typed.domain,
+                            token = typed.token ?: existing.token.takeIf { sameAccount },
+                            userId = typed.userId ?: existing.userId.takeIf { sameAccount },
+                            serverId = typed.serverId ?: existing.serverId.takeIf { sameAccount },
+                            libraryIds = typed.libraryIds,
+                            lastError = null,
+                        ),
+                    )
+                    existing.id
+                } else {
+                    sourceDao.insert(typed.copy(addedAt = System.currentTimeMillis()))
+                }
+            }
+            launchLogged("${typed.type.name} scan") { scanSource(sourceId) }
+            sourceId
+        }
+    }
+
+    override suspend fun updateSourceAuth(sourceId: Long, token: String?, userId: String?, serverId: String?) {
+        withContext(Dispatchers.IO) {
+            sourceDao.updateAuth(
+                id = sourceId,
+                token = token?.trim()?.takeIf { it.isNotEmpty() },
+                userId = userId?.trim()?.takeIf { it.isNotEmpty() },
+                serverId = serverId?.trim()?.takeIf { it.isNotEmpty() },
+            )
+        }
+    }
+
     override suspend fun removeSource(sourceId: Long) {
         withContext(Dispatchers.IO) {
             val source = sourceDao.byId(sourceId) ?: return@withContext
@@ -518,7 +608,13 @@ class LibraryRepositoryImpl(
                 "Device storage can't be removed. Turn off \"Scan device storage\" in Settings instead."
             }
             database.withTransaction {
-                if (source.type == SourceType.SMB) handOverCoveredVideos(source)
+                when (source.type) {
+                    SourceType.SMB -> handOverCoveredVideos(source)
+                    SourceType.FTP, SourceType.SFTP, SourceType.NFS, SourceType.WEBDAV -> handOverCoveredFiles(source)
+                    SourceType.DEVICE, SourceType.FOLDER, SourceType.STREAM, SourceType.UPNP, SourceType.JELLYFIN,
+                    SourceType.EMBY, SourceType.PLEX,
+                    -> Unit
+                }
                 videoDao.deleteBySource(sourceId)
                 sourceDao.delete(sourceId)
                 metadataDao.deleteUnreferenced()
@@ -546,6 +642,27 @@ class LibraryRepositoryImpl(
         val moves = HashMap<Long, MutableList<Long>>()
         for (video in videoDao.bySource(source.id)) {
             val file = SmbUris.parse(video.uri) ?: continue
+            val target = others.firstOrNull { (_, root) -> root.covers(file) }?.first ?: continue
+            moves.getOrPut(target.id) { ArrayList() } += video.id
+        }
+        for ((targetId, ids) in moves) {
+            for (chunk in ids.chunked(SQL_CHUNK)) videoDao.moveToSource(chunk, targetId)
+        }
+    }
+
+    /**
+     * The same for FTP, SFTP, NFS and WebDAV, whose video URIs are paths below their source's
+     * location: another source of the type whose location contains a video takes it over.
+     */
+    private suspend fun handOverCoveredFiles(source: SourceEntity) {
+        val others = sourceDao.all()
+            .filter { it.type == source.type && it.id != source.id }
+            .sortedByDescending { it.enabled }
+            .mapNotNull { other -> NetworkLocation.parse(other.location)?.let { other to it } }
+        if (others.isEmpty()) return
+        val moves = HashMap<Long, MutableList<Long>>()
+        for (video in videoDao.bySource(source.id)) {
+            val file = NetworkLocation.parse(video.uri) ?: continue
             val target = others.firstOrNull { (_, root) -> root.covers(file) }?.first ?: continue
             moves.getOrPut(target.id) { ArrayList() } += video.id
         }
@@ -601,6 +718,25 @@ class LibraryRepositoryImpl(
             ?.let { SmbCredentials(username = it.username, password = it.password, domain = it.domain) }
     }
 
+    override suspend fun sourceForVideo(videoId: Long): SourceEntity? = withContext(Dispatchers.IO) {
+        videoDao.byId(videoId)?.let { sourceDao.byId(it.sourceId) }
+    }
+
+    override suspend fun sourceForUri(uri: String): SourceEntity? = withContext(Dispatchers.IO) {
+        val owner = videoDao.byUri(uri)?.let { sourceDao.byId(it.sourceId) }
+        if (owner != null) return@withContext owner
+        val target = NetworkLocation.parse(uri) ?: return@withContext null
+        sourceDao.all()
+            .filter { it.type.isNetworkShare || it.type.isMediaServer }
+            .mapNotNull { source -> NetworkLocation.parse(source.location)?.takeIf { it.covers(target) }?.let { source to it } }
+            .sortedWith(
+                compareByDescending<Pair<SourceEntity, NetworkLocation>> { it.first.enabled }
+                    .thenByDescending { it.second.path.length },
+            )
+            .firstOrNull()
+            ?.first
+    }
+
     // Playback
 
     override suspend fun savePlayback(videoId: Long, positionMs: Long, durationMs: Long) {
@@ -620,6 +756,7 @@ class LibraryRepositoryImpl(
                     videoDao.updatePosition(videoId, position, now)
                 }
             }
+            reportRemote(RemoteReport(videoId, position, durationMs.takeIf { it > 0 }, finished))
         }
     }
 
@@ -629,6 +766,46 @@ class LibraryRepositoryImpl(
 
     override suspend fun setWatched(videoId: Long, watched: Boolean) {
         withContext(Dispatchers.IO) { videoDao.setWatched(videoId, watched) }
+        reportRemote(RemoteReport(videoId, positionMs = 0L, durationMs = null, finished = watched))
+    }
+
+    // Progress on media servers
+
+    private class RemoteReport(val videoId: Long, val positionMs: Long, val durationMs: Long?, val finished: Boolean)
+
+    /** Queues [report] for the video's server; a newer report of the same video replaces a waiting one. */
+    private fun reportRemote(report: RemoteReport) {
+        if (progressReporters.isEmpty()) return
+        pendingReports[report.videoId] = report
+        reportsQueued.trySend(Unit)
+    }
+
+    /** Sends queued reports one at a time, for as long as the repository's scope lives. */
+    private suspend fun deliverReports() {
+        while (true) {
+            reportsQueued.receive()
+            while (true) {
+                val videoId = pendingReports.keys.firstOrNull() ?: break
+                val report = pendingReports.remove(videoId) ?: continue
+                try {
+                    deliver(report)
+                } catch (e: CancellationException) {
+                    // A reporter's own timeout must not end the delivery; the scope ending does.
+                    currentCoroutineContext().ensureActive()
+                    Log.w(TAG, "Reporting progress timed out", e)
+                } catch (e: Exception) {
+                    Log.w(TAG, "Reporting progress failed", e)
+                    CrashReporter.log("Reporting progress failed", e)
+                }
+            }
+        }
+    }
+
+    private suspend fun deliver(report: RemoteReport) {
+        val video = videoDao.byId(report.videoId) ?: return
+        val source = sourceDao.byId(video.sourceId) ?: return
+        val reporter = progressReporters[source.type] ?: return
+        reporter.report(source, video, report.positionMs, report.durationMs ?: video.durationMs, report.finished)
     }
 
     override suspend fun nextEpisode(videoId: Long): VideoWithMeta? = withContext(Dispatchers.IO) {
@@ -787,7 +964,8 @@ class LibraryRepositoryImpl(
         enricher.invalidate()
         withContext(Dispatchers.IO) {
             database.withTransaction {
-                metadataDao.clear()
+                // What media servers described is not TMDB's, and no TMDB language change touches it.
+                metadataDao.clearTmdb()
                 matchCacheDao.clear()
                 videoDao.resetAutomaticMatches()
                 for (title in videoDao.automaticEpisodeTitles()) {
@@ -1051,7 +1229,8 @@ private fun SmbLocation.covers(file: SmbLocation): Boolean =
 /**
  * A video's folder as Browse lists it, relative to its source's root: device folders as they are,
  * a picked folder's paths without the folder's own name, share paths below the source's folder
- * ([smbRoot], the path inside the share). The same rules as the UI's relativeFolder, so
+ * ([smbRoot], the path inside the share); the other network sources report their folders below
+ * their location already. The same rules as the UI's relativeFolder, so
  * [LibraryRepository.folderQueue] takes Browse's paths.
  */
 internal fun browseFolder(type: SourceType, smbRoot: String, folder: String): String {
@@ -1069,6 +1248,9 @@ internal fun browseFolder(type: SourceType, smbRoot: String, folder: String): St
             }
         }
         SourceType.STREAM -> ""
+        SourceType.FTP, SourceType.SFTP, SourceType.NFS, SourceType.UPNP, SourceType.WEBDAV, SourceType.JELLYFIN,
+        SourceType.EMBY, SourceType.PLEX,
+        -> clean
     }
 }
 
