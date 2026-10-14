@@ -59,6 +59,7 @@ import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.RatingPill
 import com.aakash.novafork.ui.common.ScanBanner
 import com.aakash.novafork.ui.common.SectionHeader
+import com.aakash.novafork.ui.common.VideoMenuBox
 import com.aakash.novafork.ui.common.bottomScrim
 import com.aakash.novafork.ui.common.metaLine
 import com.aakash.novafork.ui.model.AppActions
@@ -434,12 +435,14 @@ private fun LandscapeRow(cards: List<VideoCardUi>, actions: AppActions) {
         horizontalArrangement = Arrangement.spacedBy(dims.rowSpacing),
     ) {
         items(cards) { card ->
-            PhoneLandscapeCard(
-                card = card,
-                onClick = { actions.play(card.id) },
-                onLongClick = { actions.openVideo(card.id) },
-                subtitle = metaLine(card.displaySubtitle(), remainingLabel(card)).ifEmpty { null },
-            )
+            VideoMenuBox(videoId = card.id, title = card.displayTitle(), actions = actions) { openMenu ->
+                PhoneLandscapeCard(
+                    card = card,
+                    onClick = { actions.play(card.id) },
+                    onLongClick = openMenu,
+                    subtitle = metaLine(card.displaySubtitle(), remainingLabel(card)).ifEmpty { null },
+                )
+            }
         }
     }
 }
@@ -452,11 +455,14 @@ private fun VideoPosterRow(cards: List<VideoCardUi>, actions: AppActions) {
         horizontalArrangement = Arrangement.spacedBy(dims.rowSpacing),
     ) {
         items(cards) { card ->
-            PhonePosterCard(
-                card = card,
-                onClick = { actions.openVideo(card.id) },
-                modifier = Modifier.width(dims.posterWidth),
-            )
+            VideoMenuBox(videoId = card.id, title = card.displayTitle(), actions = actions, showDetails = false) { openMenu ->
+                PhonePosterCard(
+                    card = card,
+                    onClick = { actions.openVideo(card.id) },
+                    modifier = Modifier.width(dims.posterWidth),
+                    onLongClick = openMenu,
+                )
+            }
         }
     }
 }

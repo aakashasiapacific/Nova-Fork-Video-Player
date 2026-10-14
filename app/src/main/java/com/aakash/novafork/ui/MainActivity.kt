@@ -18,8 +18,10 @@ import androidx.activity.viewModels
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import com.aakash.novafork.data.StoragePermissions
 import com.aakash.novafork.data.ThemeMode
 import com.aakash.novafork.player.PlayerIntents
@@ -103,6 +105,16 @@ class MainActivity : ComponentActivity() {
             // System bar icons follow the app's theme, which need not match the system's.
             LaunchedEffect(dark) { applySystemBarStyle(dark) }
             NovaRoot(state = state, actions = actions)
+        }
+        lifecycleScope.launch {
+            // Queues resolve in the background (folder, season, playlist); play each one once.
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.queueRequests.collect { queue ->
+                    startActivity(
+                        PlayerIntents.forQueue(this@MainActivity, queue.videoIds.toLongArray(), queue.startIndex, queue.shuffle),
+                    )
+                }
+            }
         }
         val askedOnce = uiPrefs.getBoolean(KEY_ASKED_STORAGE, false)
         if (savedInstanceState == null && !askedOnce && !StoragePermissions.hasAnyVideoAccess(this)) {

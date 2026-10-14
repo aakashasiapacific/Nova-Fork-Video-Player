@@ -4,6 +4,13 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- Chromecast discovery (libVLC, mDNS): many devices drop multicast answers without a lock -->
+    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
+    <!-- Background audio: PlaybackService plays on in the foreground with a media notification
+         (media notifications show without POST_NOTIFICATIONS; other ones would need it). -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- Android 13+: videos, plus images so poster.jpg / fanart.jpg next to a video can be shown -->
     <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
@@ -100,5 +107,12 @@
                 <data android:scheme="rtp" />
             </intent-filter>
         </activity>
+
+        <!-- Owns the player; bound by PlayerActivity, in the foreground while the sound plays
+             without it (background audio). Media buttons reach it through its MediaSession. -->
+        <service
+            android:name=".player.PlaybackService"
+            android:exported="false"
+            android:foregroundServiceType="mediaPlayback" />
     </application>
 </manifest>

@@ -240,6 +240,27 @@ data class BrowseUi(
     val sources: List<SourceUi> = emptyList(),
     /** Saved network streams. */
     val streams: List<VideoCardUi> = emptyList(),
+    /** Most recently changed first. */
+    val playlists: List<PlaylistUi> = emptyList(),
+)
+
+/** A playlist as Browse lists it. */
+@Immutable
+data class PlaylistUi(
+    val id: Long,
+    val name: String,
+    /** Videos the library shows (missing files are left out until they are back). */
+    val itemCount: Int = 0,
+    /** Art of its first video; null while it has none. */
+    val artwork: Artwork? = null,
+)
+
+/** One playlist's videos in playlist order (route Playlist). */
+@Immutable
+data class PlaylistDetailsUi(
+    val id: Long,
+    val name: String,
+    val videos: List<VideoCardUi> = emptyList(),
 )
 
 /** Contents of one folder of a source (device/folder sources come from the library, SMB is listed live). */

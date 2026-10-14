@@ -38,7 +38,7 @@ internal class PlayQueue(private val random: Random = Random.Default) {
         ids = videoIds.toList()
         val start = if (ids.isEmpty()) 0 else startIndex.coerceIn(0, ids.lastIndex)
         shuffled = shuffle
-        if (shuffle) {
+        if (shuffle && ids.isNotEmpty()) {
             order = shuffledOrder(first = start)
             position = 0
         } else {

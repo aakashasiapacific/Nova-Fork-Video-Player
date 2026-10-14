@@ -33,13 +33,15 @@ import com.aakash.novafork.R
 import com.aakash.novafork.ui.adaptive.DeviceLayout
 import com.aakash.novafork.ui.model.PlayerActions
 import com.aakash.novafork.ui.model.PlayerUiState
+import com.aakash.novafork.ui.model.RepeatMode
 
 private val TransportButtonSize = 64.dp
 private val TransportIconSize = 40.dp
 
 /**
- * Tablet controls: larger targets, title top-left, transport in the centre, a full-width seek bar
- * and one row of labelled buttons. Track options open in the side [TrackPanel] via [onOpenPanel].
+ * Tablet controls: larger targets, title top-left with cast, queue and more on the right,
+ * transport in the centre, a full-width seek bar and one row of labelled buttons. Track options
+ * open in the side [TrackPanel] via [onOpenPanel]; the queue and cast devices via [onOpenSheet].
  */
 @Composable
 internal fun TabletPlayerControls(
@@ -49,6 +51,7 @@ internal fun TabletPlayerControls(
     showRemaining: Boolean,
     onToggleRemaining: () -> Unit,
     onOpenPanel: (PlayerPanel) -> Unit,
+    onOpenSheet: (PlayerSheet) -> Unit,
     onBottomBarHeightChanged: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -59,7 +62,12 @@ internal fun TabletPlayerControls(
                 .fillMaxSize()
                 .safeDrawingPadding(),
         ) {
-            TabletTopBar(state = state, actions = actions, modifier = Modifier.align(Alignment.TopCenter))
+            TabletTopBar(
+                state = state,
+                actions = actions,
+                onOpenSheet = onOpenSheet,
+                modifier = Modifier.align(Alignment.TopCenter),
+            )
             if (state.error == null) {
                 TabletTransportRow(state = state, actions = actions, modifier = Modifier.align(Alignment.Center))
             }
@@ -80,7 +88,12 @@ internal fun TabletPlayerControls(
 }
 
 @Composable
-private fun TabletTopBar(state: PlayerUiState, actions: PlayerActions, modifier: Modifier = Modifier) {
+private fun TabletTopBar(
+    state: PlayerUiState,
+    actions: PlayerActions,
+    onOpenSheet: (PlayerSheet) -> Unit,
+    modifier: Modifier = Modifier,
+) {
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -113,6 +126,27 @@ private fun TabletTopBar(state: PlayerUiState, actions: PlayerActions, modifier:
                 )
             }
         }
+        Spacer(Modifier.width(12.dp))
+        CastButton(
+            castingTo = state.castingTo,
+            onClick = { onOpenSheet(PlayerSheet.CAST) },
+            buttonSize = 56.dp,
+            iconSize = 26.dp,
+        )
+        if (state.queue.size > 1) {
+            PlayerIconButton(
+                icon = R.drawable.ic_playlist_play,
+                contentDescription = "Queue",
+                onClick = { onOpenSheet(PlayerSheet.QUEUE) },
+                buttonSize = 56.dp,
+                iconSize = 26.dp,
+            )
+        }
+        PlayerMoreMenu(
+            items = listOf(PlayerMenuItem(R.drawable.ic_volume_up, "Play in background", actions::playInBackground)),
+            buttonSize = 56.dp,
+            iconSize = 26.dp,
+        )
     }
 }
 
@@ -237,6 +271,24 @@ private fun TabletBottomBar(
                 )
             }
             Spacer(Modifier.width(8.dp))
+            if (state.canShuffle) {
+                PlayerToggleButton(
+                    icon = R.drawable.ic_shuffle,
+                    contentDescription = "Shuffle",
+                    checked = state.shuffle,
+                    onClick = actions::toggleShuffle,
+                    buttonSize = 56.dp,
+                    iconSize = 26.dp,
+                )
+            }
+            PlayerToggleButton(
+                icon = state.repeatMode.iconRes(),
+                contentDescription = state.repeatMode.label,
+                checked = state.repeatMode != RepeatMode.OFF,
+                onClick = actions::cycleRepeat,
+                buttonSize = 56.dp,
+                iconSize = 26.dp,
+            )
             LabelledButton(
                 icon = R.drawable.ic_lock,
                 label = "Lock",

@@ -65,7 +65,7 @@ fun NovaRoot(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
                             .padding(bottom = if (layout.isTablet) 16.dp else PhoneNavigationBarHeight + 8.dp),
                     )
                 }
-                NovaDialogs(dialog = state.dialog, actions = actions)
+                NovaDialogs(dialog = state.dialog, actions = actions, playlists = state.browse.playlists)
                 state.crashReport?.let { report -> CrashReportDialog(report, actions) }
             }
 

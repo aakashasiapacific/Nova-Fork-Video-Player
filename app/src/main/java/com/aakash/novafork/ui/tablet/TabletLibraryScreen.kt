@@ -42,6 +42,7 @@ import com.aakash.novafork.ui.adaptive.LocalNovaDimens
 import com.aakash.novafork.ui.common.EmptyState
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.ScanBanner
+import com.aakash.novafork.ui.common.VideoMenuBox
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.AppUiState
 import com.aakash.novafork.ui.model.LibraryFilter
@@ -112,6 +113,7 @@ internal fun TabletLibraryScreen(
                         top = 8.dp,
                         bottom = navigationBarBottom() + 24.dp,
                     ),
+                    actions = actions,
                     modifier = Modifier
                         .weight(0.58f)
                         .fillMaxHeight(),
@@ -144,6 +146,7 @@ internal fun TabletLibraryScreen(
                     top = 8.dp,
                     bottom = navigationBarBottom() + 24.dp,
                 ),
+                actions = actions,
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth(),
@@ -251,6 +254,7 @@ private fun LibraryGrid(
     onLongClick: (LibraryItemUi) -> Unit,
     longClickLabel: (LibraryItemUi) -> String,
     contentPadding: PaddingValues,
+    actions: AppActions,
     modifier: Modifier = Modifier,
 ) {
     val dims = LocalNovaDimens.current
@@ -262,13 +266,39 @@ private fun LibraryGrid(
         verticalArrangement = Arrangement.spacedBy(24.dp),
     ) {
         items(items, key = { it.key }, contentType = { "poster" }) { item ->
-            TabletLibraryItemCard(
-                item = item,
-                onClick = { onClick(item) },
-                onLongClick = { onLongClick(item) },
-                onLongClickLabel = longClickLabel(item),
-                selected = item.key == selectedKey,
-            )
+            when (item) {
+                // Videos get a menu (Play, Details, Add to playlist) instead of one long-press action.
+                is LibraryItemUi.Video -> VideoMenuBox(
+                    videoId = item.card.id,
+                    title = item.card.primaryLine(),
+                    actions = actions,
+                    extraItems = { close ->
+                        DropdownMenuItem(
+                            text = { Text("Play") },
+                            leadingIcon = { NovaIcon(R.drawable.ic_play_arrow, contentDescription = null) },
+                            onClick = {
+                                close()
+                                actions.play(item.card.id)
+                            },
+                        )
+                    },
+                ) { openMenu ->
+                    TabletLibraryItemCard(
+                        item = item,
+                        onClick = { onClick(item) },
+                        onLongClick = openMenu,
+                        onLongClickLabel = "More options",
+                        selected = item.key == selectedKey,
+                    )
+                }
+                is LibraryItemUi.Show -> TabletLibraryItemCard(
+                    item = item,
+                    onClick = { onClick(item) },
+                    onLongClick = { onLongClick(item) },
+                    onLongClickLabel = longClickLabel(item),
+                    selected = item.key == selectedKey,
+                )
+            }
         }
     }
 }

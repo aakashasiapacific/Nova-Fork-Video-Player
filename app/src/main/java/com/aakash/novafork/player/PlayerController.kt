@@ -25,6 +25,7 @@ import com.aakash.novafork.data.db.VideoKind
 import com.aakash.novafork.data.db.VideoWithMeta
 import com.aakash.novafork.sources.SubtitleFinder
 import com.aakash.novafork.ui.model.Artwork
+import com.aakash.novafork.ui.model.CastDeviceUi
 import com.aakash.novafork.ui.model.GestureFeedback
 import com.aakash.novafork.ui.model.PlayerActions
 import com.aakash.novafork.ui.model.PlayerUiState
@@ -50,6 +51,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import org.videolan.libvlc.MediaPlayer
+import org.videolan.libvlc.RendererItem
 import org.videolan.libvlc.interfaces.IMedia
 import org.videolan.libvlc.util.VLCVideoLayout
 import android.provider.Settings as SystemSettings
@@ -65,6 +67,12 @@ data class VideoSize(val width: Int, val height: Int) {
  * so the sound can go on without a screen; the player screen attaches itself as the [Host] while
  * it exists. Created on the main thread; every call is expected on the main thread (libVLC
  * delivers its events there too).
+ *
+ * Casting goes through libVLC's renderers (Chromecast, no Play Services): [CastDiscovery] lists
+ * the devices while the screen is shown or a cast runs, and [startCasting] / [stopCasting] move
+ * playback with MediaPlayer.setRenderer. While casting nothing is decoded for this screen: no
+ * surface, audio focus, picture-in-picture or "no picture" watch, and leaving the screen keeps
+ * the cast going in the service.
  */
 class PlayerController(
     context: Context,
@@ -130,6 +138,18 @@ class PlayerController(
 
     /** Artwork of the library video playing; null for a link. For the notification and media session. */
     val artwork: StateFlow<Artwork?> = _artwork.asStateFlow()
+
+    /** The cast devices on the network, while the screen is shown or a cast runs. */
+    private val castDiscovery = CastDiscovery(appContext, libVLC, scope) { devices -> onCastDevicesChanged(devices) }
+
+    /**
+     * The renderer set on the player, with a reference of its own (discovery may drop its one
+     * at any time); null = playing on this device.
+     */
+    private var castTarget: RendererItem? = null
+
+    /** The player screen is visible (see [onScreenVisibilityChanged]). */
+    private var screenVisible = false
 
     private val _playRequested = MutableStateFlow(false)
 
@@ -305,6 +325,16 @@ class PlayerController(
     val wantsToPlay: Boolean
         get() = !released && hasContent && _playRequested.value && _state.value.error == null
 
+    /**
+     * Leaving the player screen now would keep playback going (see [enterBackground]): the sound
+     * when it is wanted in the background, a cast always (paused or not).
+     */
+    val canPlayInBackground: Boolean
+        get() = inBackground || (isCasting && hasContent && !released) || (continuesInBackground && wantsToPlay)
+
+    /** Playback goes to a cast device ([PlayerUiState.castingTo]) rather than this screen. */
+    val isCasting: Boolean get() = castTarget != null
+
     /** Opens one video (or link); it replaces the queue. */
     fun open(request: PlayRequest) {
         if (released) return
@@ -328,7 +358,7 @@ class PlayerController(
         val brightness = currentBrightness(host)
         _state.update {
             it.copy(
-                canEnterPictureInPicture = host.supportsPictureInPicture,
+                canEnterPictureInPicture = host.supportsPictureInPicture && !isCasting,
                 canRotate = canRotateScreen(host.screenConfiguration),
                 inPictureInPicture = false,
                 brightness = brightness,
@@ -344,13 +374,22 @@ class PlayerController(
     }
 
     /**
+     * The player screen became visible or stopped being visible. Cast devices are looked for
+     * only while it is, or while a cast runs.
+     */
+    fun onScreenVisibilityChanged(visible: Boolean) {
+        screenVisible = visible
+        updateCastDiscovery()
+    }
+
+    /**
      * The player screen is going away while something plays (or is about to): keeps the sound
      * playing without a picture when [continuesInBackground]. False when it doesn't; the screen
      * then pauses as before.
      */
     fun enterBackground(): Boolean {
         if (inBackground) return true
-        if (!continuesInBackground || !wantsToPlay) return false
+        if (!canPlayInBackground) return false
         inBackground = true
         PlayerDiagnostics.record("background: sound only")
         hostPaused = false
@@ -373,8 +412,14 @@ class PlayerController(
         if (!inBackground) return
         inBackground = false
         PlayerDiagnostics.record("background: picture back")
-        restoreVideo()
-        if (mediaPlayer.isPlaying) watchForPicture()
+        val restored = restoreVideo()
+        if (mediaPlayer.isPlaying) {
+            watchForPicture()
+        } else if (restored && playbackStarted && !ended && mediaPlayer.isSeekable) {
+            // Paused: a video track turned back on shows nothing until a frame is decoded; a seek
+            // to where it is decodes one.
+            mediaPlayer.setTime(currentPositionMs())
+        }
     }
 
     /**
@@ -396,6 +441,8 @@ class PlayerController(
             mediaPlayer.stop()
             dropStaleEvents()
         }
+        // The session is over, and with it the cast: the device goes back to idle.
+        dropCastTarget()
         descriptor.closeQuietly()
         descriptor = null
         audio.release()
@@ -491,10 +538,24 @@ class PlayerController(
         val ids = queue.playOrder.distinct().filter { it !in queueItems }
         val settings = graph.settings.settings.value
         queueJob = scope.launch {
+            // One read of the library for the whole queue; the few it doesn't show (a source
+            // turned off, a file missing at the last scan) are looked up one by one.
+            val shown = try {
+                val videos = graph.library.observeVideos().first()
+                val wanted = ids.toHashSet()
+                withContext(Dispatchers.Default) {
+                    videos.filter { it.video.id in wanted }.associateBy { it.video.id }
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.w(TAG, "Queue lookup failed", e)
+                emptyMap()
+            }
             val found = HashMap<Long, QueueItemUi>()
             val gone = HashSet<Long>()
             for (id in ids) {
-                val entry = try {
+                val entry = shown[id] ?: try {
                     graph.library.video(id)
                 } catch (e: CancellationException) {
                     throw e
@@ -647,10 +708,11 @@ class PlayerController(
     /** Builds the media off the main thread; never leaks a descriptor when the open is cancelled. */
     private suspend fun openMedia(uri: String, kind: UriKind, settings: Settings, decoding: HwDecoding): OpenedMedia? {
         val credentials = if (kind == UriKind.SMB) smbCredentialsFor(uri) else null
+        val forRenderer = isCasting
         val result = AtomicReference<OpenedMedia?>(null)
         try {
             withContext(Dispatchers.IO) {
-                result.set(MediaSource.open(appContext, libVLC, uri, settings, decoding, credentials))
+                result.set(MediaSource.open(appContext, libVLC, uri, settings, decoding, credentials, forRenderer))
             }
         } catch (e: CancellationException) {
             result.getAndSet(null)?.discard()
@@ -688,7 +750,8 @@ class PlayerController(
     /**
      * Starts playback once it can be seen: without a surface libVLC would open the video output
      * blind and play sound only, and a screen left while the video was loading must not start
-     * playing in the background. In the background (see [enterBackground]) sound only is the point.
+     * playing in the background. In the background (see [enterBackground]) sound only is the
+     * point, and a cast needs no surface at all.
      */
     private fun requestStart() {
         when {
@@ -696,7 +759,7 @@ class PlayerController(
                 playOnResume = true
                 PlayerDiagnostics.record("start: waiting for the screen to come back")
             }
-            inBackground -> startPlayback()
+            inBackground || isCasting -> startPlayback()
             attachedLayout == null -> {
                 playWhenAttached = true
                 PlayerDiagnostics.record("start: waiting for the video surface")
@@ -708,11 +771,13 @@ class PlayerController(
     /**
      * The player screen was left without background playback (paused, or stopped outside
      * picture-in-picture): a start waits until it is back in front, or until [enterBackground].
+     * Never while casting: the video is on the TV, not on this screen.
      */
-    val isHidden: Boolean get() = hostPaused && !_state.value.inPictureInPicture
+    val isHidden: Boolean get() = hostPaused && !_state.value.inPictureInPicture && !isCasting
 
     private fun startPlayback() {
-        audio.requestFocus()
+        // A cast plays on the TV: this device's audio (and other apps playing on it) is left alone.
+        if (!isCasting) audio.requestFocus()
         mediaPlayer.play()
     }
 
@@ -762,6 +827,8 @@ class PlayerController(
         repeatMode = old.repeatMode,
         queue = old.queue,
         queueIndex = old.queueIndex,
+        castDevices = old.castDevices,
+        castingTo = old.castingTo,
     )
 
     /**
@@ -807,7 +874,8 @@ class PlayerController(
         if (!hostPaused) PlayerDiagnostics.record("screen left")
         hostPaused = true
         pausedByFocusLoss = false
-        if (mediaPlayer.isPlaying) {
+        // A cast goes on without the screen.
+        if (mediaPlayer.isPlaying && !isCasting) {
             _playRequested.value = false
             mediaPlayer.pause()
         }
@@ -842,7 +910,13 @@ class PlayerController(
     }
 
     fun onBackPressed() {
-        if (_state.value.locked) showLabel("Unlock to leave the player") else close()
+        val host = host
+        when {
+            _state.value.locked -> showLabel("Unlock to leave the player")
+            // The video goes on on the TV: back only leaves the screen, the notification brings it back.
+            isCasting && hasContent && host != null -> host.leavePlayer()
+            else -> close()
+        }
     }
 
     fun onSubtitleFilePicked(uri: Uri?) {
@@ -896,11 +970,15 @@ class PlayerController(
         host = null
         _playRequested.value = false
         audio.release()
+        castDiscovery.release()
         mediaPlayer.setEventListener(null)
         mediaPlayer.stop()
         attachedLayout?.let { mediaPlayer.detachViews() }
         attachedLayout = null
+        // The player lets go of its own reference to the renderer; this one goes after it.
         mediaPlayer.release()
+        castTarget?.release()
+        castTarget = null
         descriptor.closeQuietly()
         descriptor = null
     }
@@ -1096,7 +1174,8 @@ class PlayerController(
 
     override fun enterPictureInPicture() {
         val host = host
-        if (!released && host != null && host.supportsPictureInPicture) host.enterPictureInPicture()
+        // Casting, this screen shows no video to put in a window.
+        if (!released && !isCasting && host != null && host.supportsPictureInPicture) host.enterPictureInPicture()
     }
 
     override fun startOver() {
@@ -1182,13 +1261,121 @@ class PlayerController(
         if (released || !hasContent || host == null) return
         PlayerDiagnostics.record("user: play in background")
         backgroundRequested = true
-        if (!mediaPlayer.isPlaying) play()
+        when {
+            // Ended with the up-next card up: what follows starts now rather than this one again.
+            ended && _state.value.upNext != null -> playNext()
+            !mediaPlayer.isPlaying -> play()
+        }
         host.leavePlayer()
+    }
+
+    override fun startCasting(id: String) {
+        if (released || castTarget?.name == id) return
+        // A reference of its own, kept while the player uses it: discovery may drop its one any time.
+        val item = castDiscovery.find(id)?.takeIf { it.retain() }
+        if (item == null) {
+            showLabel("That device is no longer available")
+            return
+        }
+        val name = CastDiscovery.displayNameOf(item, id)
+        PlayerDiagnostics.record("user: cast to a ${item.type ?: "renderer"}")
+        CrashReporter.log("Player: casting")
+        if (moveToRenderer(item, name)) {
+            showLabel("Casting to $name")
+        } else {
+            item.release()
+            showLabel("Couldn't cast to $name")
+        }
+    }
+
+    /** Called from the player screen: the video comes back to it. */
+    override fun stopCasting() {
+        if (released || castTarget == null) return
+        PlayerDiagnostics.record("user: stop casting")
+        CrashReporter.log("Player: casting stopped")
+        if (moveToRenderer(null, null)) showLabel("Playing on this device")
+    }
+
+    override fun scanForCastDevices() {
+        if (released) return
+        PlayerDiagnostics.record("user: look for cast devices")
+        // Asked from the screen, so it is shown: looks even if its visibility hasn't been reported yet.
+        castDiscovery.rescan()
     }
 
     override fun close() {
         saveProgress()
         onFinished()
+    }
+
+    /**
+     * Moves playback to [target] (null = this device) named [targetName]; [target] carries a
+     * reference for the player, released here once it is replaced. libVLC 3 sends an input to
+     * the renderer that was set when it started, so the media is stopped, the renderer set and
+     * the video opened again where it was, with the user's track choices (libVLC converts what
+     * the device can't play). An ended video only gets the renderer: replaying it opens it anew.
+     * False when libVLC refused the renderer; playback then goes on where it was.
+     */
+    private fun moveToRenderer(target: RendererItem?, targetName: String?): Boolean {
+        val request = lastRequest
+        val reopen = hasContent && request != null && !ended
+        val current = _state.value
+        val resumeAtMs = when {
+            !playbackStarted -> null
+            current.error != null -> current.positionMs
+            else -> currentPositionMs()
+        }?.takeIf { it > 0 }
+        val carry = CarriedChoices(
+            audioTrack = rememberedAudio ?: carried?.audioTrack,
+            subtitleTrack = rememberedSubtitle ?: carried?.subtitleTrack,
+            subtitleDelayMs = current.subtitleDelayMs,
+        )
+        if (hasContent && mediaPlayer.hasMedia()) {
+            // Stopped before the switch: setting a renderer on a running input would move it
+            // there by itself, just before it is stopped and opened again.
+            saveProgress()
+            mediaPlayer.stop()
+            dropStaleEvents()
+        }
+        val moved = mediaPlayer.setRenderer(target) == 0
+        if (moved) {
+            val previous = castTarget
+            castTarget = target
+            previous?.release()
+            // The TV plays the sound: no audio focus or headphone handling on this device.
+            if (target != null) audio.release()
+            val pip = target == null && host?.supportsPictureInPicture == true
+            _state.update { it.copy(castingTo = targetName, canEnterPictureInPicture = pip) }
+            PlayerDiagnostics.record(if (target != null) "cast: renderer set" else "cast: back on this device")
+            updateCastDiscovery()
+        } else {
+            PlayerDiagnostics.record("cast: renderer refused")
+        }
+        if (reopen && request != null) {
+            openSession(request.copy(startPositionMs = resumeAtMs ?: request.startPositionMs), carry)
+        }
+        return moved
+    }
+
+    /** Ends a cast without reopening anything (the session is over). */
+    private fun dropCastTarget() {
+        val target = castTarget ?: return
+        mediaPlayer.setRenderer(null)
+        castTarget = null
+        target.release()
+        PlayerDiagnostics.record("cast: ended with the session")
+        val pip = host?.supportsPictureInPicture == true
+        _state.update { it.copy(castingTo = null, canEnterPictureInPicture = pip) }
+        updateCastDiscovery()
+    }
+
+    /** Discovery runs while the screen is visible or a cast runs. */
+    private fun updateCastDiscovery() {
+        if (!released && (screenVisible || isCasting)) castDiscovery.start() else castDiscovery.stop()
+    }
+
+    private fun onCastDevicesChanged(devices: List<CastDeviceUi>) {
+        if (devices != _state.value.castDevices) _state.update { it.copy(castDevices = devices) }
     }
 
     private fun onPlayerEvent(event: MediaPlayer.Event) {
@@ -1257,7 +1444,7 @@ class PlayerController(
         // Left while the media was still opening: the setup below runs, then it waits paused.
         val unseen = isHidden
         _state.update { it.copy(isPlaying = !unseen, error = null) }
-        if (!unseen) {
+        if (!unseen && !isCasting) {
             audio.requestFocus()
             audio.registerNoisyReceiver()
         }
@@ -1400,9 +1587,11 @@ class PlayerController(
         reportPlaybackError(fallingBack = fallBack)
         if (fallBack && fallBackToSoftwareDecoding("playback error")) return
         val kind = nowPlaying?.kind
+        val castingTo = _state.value.castingTo
+        val message = if (castingTo != null) castErrorMessage(castingTo) else errorMessage(kind)
         audio.unregisterNoisyReceiver()
         _playRequested.value = false
-        _state.update { it.copy(isPlaying = false, isBuffering = false, error = errorMessage(kind)) }
+        _state.update { it.copy(isPlaying = false, isBuffering = false, error = message) }
         mediaPlayer.stop()
     }
 
@@ -1414,7 +1603,8 @@ class PlayerController(
      */
     private fun errorMayBeHardwareDecoding(): Boolean {
         val current = nowPlaying ?: return false
-        if (decoding != HwDecoding.AUTO || !videoTrackSeen) return false
+        // Casting, an error is almost always the device or the network, not this device's decoder.
+        if (isCasting || decoding != HwDecoding.AUTO || !videoTrackSeen) return false
         return !videoOutputSeen || current.kind.isLocal
     }
 
@@ -1477,7 +1667,9 @@ class PlayerController(
      * attached: opening, buffering, pauses and a hidden screen don't.
      */
     private fun watchForPicture() {
-        if (inBackground || videoOutputSeen || decoding != HwDecoding.AUTO || pictureWatchJob?.isActive == true) return
+        // Casting, no picture is ever shown here.
+        if (isCasting || inBackground || videoOutputSeen) return
+        if (decoding != HwDecoding.AUTO || pictureWatchJob?.isActive == true) return
         val watched = session
         pictureWatchJob = scope.launch {
             var lastTime = mediaPlayer.time
@@ -1552,9 +1744,12 @@ class PlayerController(
         }
     }
 
-    /** No video output in the background: saves decoding work, and there is no surface for it. */
+    /**
+     * No video output in the background: saves decoding work, and there is no surface for it.
+     * Never while casting: the video track is what the cast device shows.
+     */
     private fun disableVideo() {
-        if (!mediaReady) return
+        if (!mediaReady || isCasting) return
         val track = mediaPlayer.videoTrack
         if (track == DISABLED_TRACK) return
         savedVideoTrack = track
@@ -1562,15 +1757,16 @@ class PlayerController(
         PlayerDiagnostics.record("background: video track off")
     }
 
-    /** The track [disableVideo] turned off (or the first one) back on. */
-    private fun restoreVideo() {
+    /** The track [disableVideo] turned off (or the first one) back on; false when nothing changed. */
+    private fun restoreVideo(): Boolean {
         val saved = savedVideoTrack
         savedVideoTrack = null
-        if (!mediaReady || mediaPlayer.videoTrack != DISABLED_TRACK) return
+        if (!mediaReady || mediaPlayer.videoTrack != DISABLED_TRACK) return false
         val tracks = realTracks(mediaPlayer.videoTracks)
-        val target = tracks.firstOrNull { it.id == saved }?.id ?: tracks.firstOrNull()?.id ?: return
+        val target = tracks.firstOrNull { it.id == saved }?.id ?: tracks.firstOrNull()?.id ?: return false
         mediaPlayer.setVideoTrack(target)
         PlayerDiagnostics.record("background: video track on")
+        return true
     }
 
     private fun onTracksChanged(added: Boolean) {
@@ -1966,6 +2162,9 @@ class PlayerController(
                 configuration.smallestScreenWidthDp < LARGE_SCREEN_DP
 
         fun seekStepMs(settings: Settings): Long = settings.seekStepSeconds.coerceAtLeast(1) * 1_000L
+
+        fun castErrorMessage(deviceName: String): String =
+            "Can't play this on $deviceName — check that it is on and on the same network"
 
         fun errorMessage(kind: UriKind?): String = when (kind) {
             UriKind.SMB -> "Can't play this file — check the share and login"

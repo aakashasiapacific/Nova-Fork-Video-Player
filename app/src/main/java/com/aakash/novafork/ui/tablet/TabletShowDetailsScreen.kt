@@ -18,9 +18,11 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -32,9 +34,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.aakash.novafork.R
 import com.aakash.novafork.ui.adaptive.DeviceLayout
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
 import com.aakash.novafork.ui.common.RatingPill
+import com.aakash.novafork.ui.common.VideoMenuBox
 import com.aakash.novafork.ui.common.metaLine
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.SeasonUi
@@ -97,13 +101,31 @@ internal fun TabletShowDetailsScreen(
                         modifier = Modifier.padding(top = 8.dp),
                     )
                 }
+                if (season.episodes.isNotEmpty()) {
+                    item(key = "playSeason", span = { GridItemSpan(maxLineSpan) }, contentType = "playSeason") {
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            FilledTonalButton(onClick = { actions.playSeason(details.key, season.number) }) {
+                                ButtonLabel(R.drawable.ic_play_arrow, if (seasons.size > 1) "Play ${season.title}" else "Play all")
+                            }
+                            OutlinedButton(onClick = { actions.playSeason(details.key, season.number, shuffle = true) }) {
+                                ButtonLabel(R.drawable.ic_shuffle, "Shuffle")
+                            }
+                        }
+                    }
+                }
                 items(season.episodes, key = { "${it.season}:${it.episode}:${it.videoId}" }, contentType = { "episode" }) { episode ->
-                    TabletEpisodeCard(
-                        episode = episode,
-                        onClick = { actions.play(episode.videoId) },
-                        onLongClick = { actions.openVideo(episode.videoId) },
-                        isNextUp = episode.videoId == nextUpId,
-                    )
+                    VideoMenuBox(
+                        videoId = episode.videoId,
+                        title = metaLine(details.title, episode.code, episode.title),
+                        actions = actions,
+                    ) { openMenu ->
+                        TabletEpisodeCard(
+                            episode = episode,
+                            onClick = { actions.play(episode.videoId) },
+                            onLongClick = openMenu,
+                            isNextUp = episode.videoId == nextUpId,
+                        )
+                    }
                 }
             } else {
                 item(key = "noEpisodes", span = { GridItemSpan(maxLineSpan) }, contentType = "empty") {

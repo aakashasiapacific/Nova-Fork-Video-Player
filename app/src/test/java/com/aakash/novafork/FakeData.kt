@@ -1,5 +1,6 @@
 package com.aakash.novafork
 
+import com.aakash.novafork.data.PlaylistWithCount
 import com.aakash.novafork.data.ScanState
 import com.aakash.novafork.data.Settings
 import com.aakash.novafork.data.TmdbHost
@@ -13,6 +14,7 @@ import com.aakash.novafork.data.db.VideoWithMeta
 import com.aakash.novafork.ui.LibraryIndex
 import com.aakash.novafork.ui.UiMappers
 import com.aakash.novafork.ui.model.AppUiState
+import com.aakash.novafork.ui.model.CastDeviceUi
 import com.aakash.novafork.ui.model.DialogUi
 import com.aakash.novafork.ui.model.GestureFeedback
 import com.aakash.novafork.ui.model.IdentifyResultUi
@@ -21,6 +23,8 @@ import com.aakash.novafork.ui.model.LibraryFilter
 import com.aakash.novafork.ui.model.LibrarySort
 import com.aakash.novafork.ui.model.PermissionUi
 import com.aakash.novafork.ui.model.PlayerUiState
+import com.aakash.novafork.ui.model.QueueItemUi
+import com.aakash.novafork.ui.model.RepeatMode
 import com.aakash.novafork.ui.model.Route
 import com.aakash.novafork.ui.model.SettingsUi
 import com.aakash.novafork.ui.model.SmbForm
@@ -77,6 +81,29 @@ object FakeLibrary {
     const val SHOGUN_KEY = "tv:126308"
 
     const val MOVIES_TREE = "content://com.android.externalstorage.documents/tree/primary%3AMovies"
+
+    // Playlists
+    const val SEVERANCE_REWATCH = 1L
+    const val MOVIE_NIGHT = 2L
+    const val CLIPS_TO_SORT = 3L
+
+    /** As the playlist DAO lists them: most recently changed first, counting the videos shown. */
+    val playlists: List<PlaylistWithCount> by lazy {
+        listOf(
+            PlaylistWithCount(SEVERANCE_REWATCH, "Severance rewatch", itemCount = 8, updatedAt = NOW - 2 * HOUR, coverVideoId = SEVERANCE_S1E1),
+            PlaylistWithCount(MOVIE_NIGHT, "Movie night", itemCount = 4, updatedAt = NOW - 3 * DAY, coverVideoId = DUNE),
+            PlaylistWithCount(CLIPS_TO_SORT, "Clips to sort", itemCount = 0, updatedAt = NOW - 9 * DAY, coverVideoId = null),
+        )
+    }
+
+    /** Each playlist's videos in playlist order. */
+    val playlistItems: Map<Long, List<Long>> by lazy {
+        mapOf(
+            SEVERANCE_REWATCH to (SEVERANCE_S1E1..SEVERANCE_S2E4).toList(),
+            MOVIE_NIGHT to listOf(DUNE, INTERSTELLAR, SPIRITED_AWAY, RRR),
+            CLIPS_TO_SORT to emptyList(),
+        )
+    }
 
     val sources: List<SourceEntity> = listOf(
         SourceEntity(id = DEVICE, type = SourceType.DEVICE, name = "Device storage", location = "device", addedAt = NOW - 60 * DAY),
@@ -588,7 +615,7 @@ object FakeScreens {
         canGoBack = route !in TOP_LEVEL,
         home = index.home,
         library = UiMappers.library(index, LibraryFilter.ALL, LibrarySort.RECENT),
-        browse = UiMappers.browse(index, idle),
+        browse = UiMappers.browse(index, idle, FakeLibrary.playlists),
         settings = settings,
         permission = PermissionUi(granted = true),
     )
@@ -623,6 +650,14 @@ object FakeScreens {
     )
 
     fun search(query: String): AppUiState = app(Route.Search).copy(search = UiMappers.search(index, query))
+
+    fun playlist(playlistId: Long): AppUiState {
+        val playlist = FakeLibrary.playlists.first { it.id == playlistId }
+        val videoIds = FakeLibrary.playlistItems.getValue(playlistId)
+        return app(Route.Playlist(playlistId)).copy(
+            playlist = UiMappers.playlistDetails(index, playlistId, playlist.name, videoIds),
+        )
+    }
 
     fun settingsPage(): AppUiState = app(Route.Settings)
 
@@ -754,6 +789,46 @@ object FakePlayer {
             hasNext = true,
         )
     }
+
+    private val castDevices = listOf(
+        CastDeviceUi(id = "chromecast-living-room", name = "Living Room TV"),
+        CastDeviceUi(id = "chromecast-bedroom", name = "Bedroom"),
+    )
+
+    /**
+     * Severance S2E3 from the shuffled "Severance rewatch" playlist, repeating it all; paused, so
+     * the controls (with shuffle and repeat lit) stay up while the queue sheet is closed.
+     */
+    fun queued(): PlayerUiState {
+        val index = FakeLibrary.index()
+        val shuffled = listOf(205L, FakeLibrary.SEVERANCE_S2E3, 202L, FakeLibrary.SEVERANCE_S2E4, FakeLibrary.SEVERANCE_S1E1, 204L, 203L, 206L)
+        val queue = shuffled.map { id ->
+            val card = requireNotNull(index.videosById[id]) { "Missing episode $id" }.card
+            QueueItemUi(videoId = id, title = card.title, subtitle = card.subtitle, artwork = card.artwork)
+        }
+        return PlayerUiState(
+            title = "Severance",
+            subtitle = "S2 · E3 · Who Is Alive?",
+            isPlaying = false,
+            positionMs = 31 * 60_000L + 40_000L,
+            durationMs = EPISODE_DURATION,
+            audioTracks = audio.take(2),
+            subtitleTracks = subtitles.take(2),
+            hasPrevious = true,
+            hasNext = true,
+            shuffle = true,
+            repeatMode = RepeatMode.ALL,
+            queue = queue,
+            queueIndex = 1,
+            castDevices = castDevices,
+        )
+    }
+
+    /** Dune playing on the living-room Chromecast: the screen shows where instead of the video. */
+    fun casting(): PlayerUiState = paused().copy(
+        castDevices = castDevices,
+        castingTo = "Living Room TV",
+    )
 
     /** The share went away before the file could open. */
     fun error(): PlayerUiState = PlayerUiState(

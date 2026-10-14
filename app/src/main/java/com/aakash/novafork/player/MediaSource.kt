@@ -82,9 +82,9 @@ internal object MediaSource {
     }
 
     /**
-     * Builds the libVLC media for [uri] with the playback settings and [decoding] applied.
-     * Blocking: a content provider may fetch the whole file before it hands out a descriptor,
-     * so call this off the main thread.
+     * Builds the libVLC media for [uri] with the playback settings and [decoding] applied;
+     * [forRenderer] = it will play on a cast device. Blocking: a content provider may fetch the
+     * whole file before it hands out a descriptor, so call this off the main thread.
      */
     fun open(
         context: Context,
@@ -93,9 +93,10 @@ internal object MediaSource {
         settings: Settings,
         decoding: HwDecoding,
         smbCredentials: SmbCredentials?,
+        forRenderer: Boolean = false,
     ): OpenedMedia {
         val media = when (UriKind.of(uri)) {
-            UriKind.CONTENT -> return openContent(context, libVLC, uri, settings, decoding)
+            UriKind.CONTENT -> return openContent(context, libVLC, uri, settings, decoding, forRenderer)
             UriKind.FILE -> Media(libVLC, localPath(uri))
             UriKind.SMB -> Media(libVLC, Uri.parse(uri)).apply {
                 smbCredentials?.username?.takeIf { it.isNotBlank() }?.let { addOption(":smb-user=$it") }
@@ -107,7 +108,7 @@ internal object MediaSource {
                 addOption(":network-caching=$NETWORK_CACHING_MS")
             }
         }
-        applySettings(media, settings, decoding)
+        applySettings(media, settings, decoding, forRenderer)
         return OpenedMedia(media, descriptor = null)
     }
 
@@ -117,6 +118,7 @@ internal object MediaSource {
         uri: String,
         settings: Settings,
         decoding: HwDecoding,
+        forRenderer: Boolean,
     ): OpenedMedia {
         val started = SystemClock.elapsedRealtime()
         val descriptor = context.contentResolver.openFileDescriptor(Uri.parse(uri), "r")
@@ -125,7 +127,7 @@ internal object MediaSource {
         PlayerDiagnostics.record("open: provider gave a descriptor in ${SystemClock.elapsedRealtime() - started} ms")
         return try {
             val media = Media(libVLC, descriptor.fileDescriptor)
-            applySettings(media, settings, decoding)
+            applySettings(media, settings, decoding, forRenderer)
             OpenedMedia(media, descriptor)
         } catch (e: RuntimeException) {
             descriptor.closeQuietly()
@@ -133,11 +135,17 @@ internal object MediaSource {
         }
     }
 
-    private fun applySettings(media: Media, settings: Settings, decoding: HwDecoding) {
+    private fun applySettings(media: Media, settings: Settings, decoding: HwDecoding, forRenderer: Boolean) {
         when (decoding) {
             HwDecoding.AUTO -> media.setHWDecoderEnabled(true, false)
             HwDecoding.DISABLED -> media.setHWDecoderEnabled(false, false)
             HwDecoding.FORCED -> media.setHWDecoderEnabled(true, true)
+        }
+        if (forRenderer && decoding != HwDecoding.DISABLED) {
+            // A video the cast device can't play is decoded here and re-encoded: the hardware
+            // decoder must hand its frames over in memory, there is no surface to draw them on.
+            media.addOption(":no-mediacodec-dr")
+            media.addOption(":no-omxil-dr")
         }
         val encoding = settings.subtitleEncoding.trim()
         if (encoding.isNotEmpty()) media.addOption(":subsdec-encoding=$encoding")

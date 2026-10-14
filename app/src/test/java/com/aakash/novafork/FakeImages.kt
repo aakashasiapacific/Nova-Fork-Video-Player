@@ -227,7 +227,7 @@ fun AppUnderTest(state: AppUiState, onLayout: (DeviceLayout) -> Unit) {
                 } else {
                     PhoneApp(state = state, actions = actions)
                 }
-                NovaDialogs(dialog = state.dialog, actions = actions)
+                NovaDialogs(dialog = state.dialog, actions = actions, playlists = state.browse.playlists)
             }
         }
     }

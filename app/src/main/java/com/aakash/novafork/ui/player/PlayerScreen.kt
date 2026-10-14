@@ -61,6 +61,15 @@ fun PlayerScreen(
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             surface()
         }
+        val castingTo = state.castingTo
+        if (castingTo != null) {
+            CastingPlaceholder(
+                deviceName = castingTo,
+                title = state.title,
+                compact = state.inPictureInPicture,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
         if (state.inPictureInPicture) {
             if (state.isBuffering) BufferingIndicator(Modifier.align(Alignment.Center))
         } else {
@@ -73,6 +82,7 @@ fun PlayerScreen(
 private fun PlayerChrome(state: PlayerUiState, actions: PlayerActions, layout: DeviceLayout) {
     var controlsRequested by rememberSaveable { mutableStateOf(true) }
     var panel by rememberSaveable { mutableStateOf<PlayerPanel?>(null) }
+    var sheet by rememberSaveable { mutableStateOf<PlayerSheet?>(null) }
     var showRemaining by rememberSaveable { mutableStateOf(false) }
     var touching by remember { mutableStateOf(false) }
     var unlockHintRequests by remember { mutableIntStateOf(0) }
@@ -81,7 +91,7 @@ private fun PlayerChrome(state: PlayerUiState, actions: PlayerActions, layout: D
     var bottomBarHeightPx by remember { mutableIntStateOf(0) }
 
     // Paused, failed or with options open, the controls stay up whatever was tapped.
-    val forcedVisible = !state.isPlaying || state.error != null || panel != null
+    val forcedVisible = !state.isPlaying || state.error != null || panel != null || sheet != null
     val controlsVisible = !state.locked && (controlsRequested || forcedVisible)
 
     // Keep them requested across a pause so resuming doesn't make them vanish under the finger.
@@ -91,6 +101,7 @@ private fun PlayerChrome(state: PlayerUiState, actions: PlayerActions, layout: D
     LaunchedEffect(state.locked) {
         if (state.locked) {
             panel = null
+            sheet = null
             unlockHintRequests += 1
         } else {
             controlsRequested = true
@@ -146,7 +157,14 @@ private fun PlayerChrome(state: PlayerUiState, actions: PlayerActions, layout: D
             TapZone.RIGHT -> seekStep(forward = true)
         }
     }
-    val openPanel: (PlayerPanel) -> Unit = { panel = it }
+    val openPanel: (PlayerPanel) -> Unit = {
+        sheet = null
+        panel = it
+    }
+    val openSheet: (PlayerSheet) -> Unit = {
+        panel = null
+        sheet = it
+    }
 
     val density = LocalDensity.current
     val bannerLift by animateDpAsState(
@@ -193,6 +211,7 @@ private fun PlayerChrome(state: PlayerUiState, actions: PlayerActions, layout: D
                         showRemaining = showRemaining,
                         onToggleRemaining = { showRemaining = !showRemaining },
                         onOpenPanel = openPanel,
+                        onOpenSheet = openSheet,
                         onBottomBarHeightChanged = { bottomBarHeightPx = it },
                     )
                 } else {
@@ -202,6 +221,7 @@ private fun PlayerChrome(state: PlayerUiState, actions: PlayerActions, layout: D
                         showRemaining = showRemaining,
                         onToggleRemaining = { showRemaining = !showRemaining },
                         onOpenPanel = openPanel,
+                        onOpenSheet = openSheet,
                         onBottomBarHeightChanged = { bottomBarHeightPx = it },
                     )
                 }
@@ -252,20 +272,38 @@ private fun PlayerChrome(state: PlayerUiState, actions: PlayerActions, layout: D
                     actions = actions,
                     onDismiss = { panel = null },
                 )
+                PlayerSheetPanel(
+                    sheet = sheet,
+                    state = state,
+                    actions = actions,
+                    onDismiss = { sheet = null },
+                )
             }
         }
 
-        val sheet = panel
-        if (!layout.isTablet && sheet != null) {
+        val trackSheet = panel
+        if (!layout.isTablet && trackSheet != null) {
             TrackSheet(
-                initial = sheet,
+                initial = trackSheet,
                 state = state,
                 actions = actions,
                 onDismiss = { panel = null },
             )
         }
+        val listSheet = sheet
+        if (!layout.isTablet && listSheet != null) {
+            PlayerListSheet(
+                sheet = listSheet,
+                state = state,
+                actions = actions,
+                onDismiss = { sheet = null },
+            )
+        }
     }
 
-    // The phone sheet handles back itself; this closes the tablet panel before back leaves the player.
-    BackHandler(enabled = panel != null) { panel = null }
+    // The phone sheets handle back themselves; this closes the tablet panels before back leaves the player.
+    BackHandler(enabled = panel != null || sheet != null) {
+        panel = null
+        sheet = null
+    }
 }

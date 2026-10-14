@@ -38,6 +38,7 @@ import com.aakash.novafork.R
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
 import com.aakash.novafork.ui.common.EmptyState
 import com.aakash.novafork.ui.common.NovaIcon
+import com.aakash.novafork.ui.common.VideoMenuBox
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.BrowseDirUi
 import com.aakash.novafork.ui.model.FolderUi
@@ -111,15 +112,27 @@ private fun BrowseDirContent(dir: BrowseDirUi, actions: AppActions) {
                     )
                 }
             }
+            if (dir.videos.isNotEmpty()) {
+                item(key = "playAll") {
+                    // Plays the videos directly in this folder, not those in its subfolders.
+                    PhonePlayAllRow(
+                        onPlayAll = { actions.playFolder(dir.sourceId, dir.path) },
+                        onShuffle = { actions.playFolder(dir.sourceId, dir.path, shuffle = true) },
+                        modifier = Modifier.padding(horizontal = dims.gutter, vertical = 8.dp),
+                    )
+                }
+            }
             items(dir.folders, key = { "folder:${it.path}" }) { folder ->
                 FolderRow(folder = folder, onClick = { actions.openFolder(folder) })
             }
             items(dir.videos, key = { "video:${it.id}" }) { video ->
-                PhoneVideoRow(
-                    card = video,
-                    onClick = { actions.play(video.id) },
-                    onLongClick = { actions.openVideo(video.id) },
-                )
+                VideoMenuBox(videoId = video.id, title = video.displayTitle(), actions = actions) { openMenu ->
+                    PhoneVideoRow(
+                        card = video,
+                        onClick = { actions.play(video.id) },
+                        onLongClick = openMenu,
+                    )
+                }
             }
         }
     }

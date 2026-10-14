@@ -146,6 +146,14 @@ fun PhoneVideoDetailsScreen(
                         actions.setWatched(details.id, !details.watched)
                     },
                 )
+                DropdownMenuItem(
+                    text = { Text("Add to playlist") },
+                    leadingIcon = { NovaIcon(R.drawable.ic_playlist_add, contentDescription = null) },
+                    onClick = {
+                        close()
+                        actions.addToPlaylist(listOf(details.id), details.title)
+                    },
+                )
             },
         )
     }

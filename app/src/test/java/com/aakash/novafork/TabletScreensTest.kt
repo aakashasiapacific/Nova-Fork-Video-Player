@@ -4,6 +4,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.test.core.app.ApplicationProvider
 import com.aakash.novafork.FakeLibrary.DUNE
 import com.aakash.novafork.FakeLibrary.MOVIES_FOLDER
+import com.aakash.novafork.FakeLibrary.MOVIE_NIGHT
 import com.aakash.novafork.FakeLibrary.SEVERANCE_KEY
 import com.aakash.novafork.ui.adaptive.DeviceLayout
 import com.aakash.novafork.ui.model.AppUiState
@@ -58,6 +59,9 @@ class TabletScreensTest {
     @Test fun showDetails() = capture("tablet_show_details", FakeScreens.showDetails(SEVERANCE_KEY))
 
     @Test fun browseDir() = capture("tablet_browse_dir", FakeScreens.browseDir(MOVIES_FOLDER))
+
+    /** Browse with a playlist open in the right pane. */
+    @Test fun playlist() = capture("tablet_playlist", FakeScreens.playlist(MOVIE_NIGHT))
 
     @Test fun settings() = capture("tablet_settings", FakeScreens.settingsPage())
 

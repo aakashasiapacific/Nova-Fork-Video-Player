@@ -35,6 +35,7 @@ import com.aakash.novafork.R
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.SectionHeader
+import com.aakash.novafork.ui.common.VideoMenuBox
 import com.aakash.novafork.ui.common.metaLine
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.ShowDetailsUi
@@ -170,12 +171,28 @@ fun PhoneShowDetailsScreen(
                     )
                 }
             } else {
+                if (season != null) {
+                    item(key = "playSeason") {
+                        PhonePlayAllRow(
+                            onPlayAll = { actions.playSeason(details.key, season.number) },
+                            onShuffle = { actions.playSeason(details.key, season.number, shuffle = true) },
+                            playLabel = if (seasons.size > 1) "Play season" else "Play all",
+                            modifier = Modifier.padding(start = dims.gutter, end = dims.gutter, bottom = 8.dp),
+                        )
+                    }
+                }
                 items(episodes, key = { "ep:${it.videoId}" }) { episode ->
-                    PhoneEpisodeRow(
-                        episode = episode,
-                        onClick = { actions.play(episode.videoId) },
-                        onLongClick = { actions.openVideo(episode.videoId) },
-                    )
+                    VideoMenuBox(
+                        videoId = episode.videoId,
+                        title = metaLine(details.title, episode.code, episode.title),
+                        actions = actions,
+                    ) { openMenu ->
+                        PhoneEpisodeRow(
+                            episode = episode,
+                            onClick = { actions.play(episode.videoId) },
+                            onLongClick = openMenu,
+                        )
+                    }
                 }
             }
         }

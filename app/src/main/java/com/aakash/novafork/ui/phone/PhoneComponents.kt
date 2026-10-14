@@ -32,8 +32,10 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -63,6 +65,7 @@ import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.PosterArt
 import com.aakash.novafork.ui.common.ProgressStrip
 import com.aakash.novafork.ui.common.RatingPill
+import com.aakash.novafork.ui.common.VideoMenuBox
 import com.aakash.novafork.ui.common.WatchedBadge
 import com.aakash.novafork.ui.common.metaLine
 import com.aakash.novafork.ui.model.AppActions
@@ -282,13 +285,14 @@ internal fun PhoneLandscapeCard(
     }
 }
 
-/** List row for a video in a folder: 16:9 thumbnail, title, subtitle. */
+/** List row for a video in a folder: 16:9 thumbnail, title, subtitle, then [trailing] (a button). */
 @Composable
 internal fun PhoneVideoRow(
     card: VideoCardUi,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     onLongClick: (() -> Unit)? = null,
+    trailing: (@Composable () -> Unit)? = null,
 ) {
     val dims = LocalNovaDimens.current
     Row(
@@ -328,6 +332,28 @@ internal fun PhoneVideoRow(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
+        }
+        if (trailing != null) {
+            Spacer(Modifier.width(4.dp))
+            trailing()
+        }
+    }
+}
+
+/** "Play all" and "Shuffle" side by side, for a folder, a season or a playlist. */
+@Composable
+internal fun PhonePlayAllRow(
+    onPlayAll: () -> Unit,
+    onShuffle: () -> Unit,
+    modifier: Modifier = Modifier,
+    playLabel: String = "Play all",
+) {
+    Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        FilledTonalButton(onClick = onPlayAll, modifier = Modifier.weight(1f)) {
+            ButtonContent(R.drawable.ic_play_arrow, playLabel)
+        }
+        OutlinedButton(onClick = onShuffle, modifier = Modifier.weight(1f)) {
+            ButtonContent(R.drawable.ic_shuffle, "Shuffle")
         }
     }
 }
@@ -419,7 +445,14 @@ internal fun PhoneLibraryGrid(
     ) {
         items(items, key = { it.key }) { item ->
             when (item) {
-                is LibraryItemUi.Video -> PhonePosterCard(item.card, onClick = { actions.openVideo(item.card.id) })
+                is LibraryItemUi.Video -> VideoMenuBox(
+                    videoId = item.card.id,
+                    title = item.card.displayTitle(),
+                    actions = actions,
+                    showDetails = false,
+                ) { openMenu ->
+                    PhonePosterCard(item.card, onClick = { actions.openVideo(item.card.id) }, onLongClick = openMenu)
+                }
                 is LibraryItemUi.Show -> PhoneShowCard(item.card, onClick = { actions.openShow(item.card.key) })
             }
         }

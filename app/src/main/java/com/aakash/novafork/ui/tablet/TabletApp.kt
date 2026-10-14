@@ -84,9 +84,9 @@ fun TabletApp(state: AppUiState, actions: AppActions, layout: DeviceLayout, modi
     }
 }
 
-/** Browse and its folders share one page so the sources pane stays put while folders change. */
+/** Browse, its folders and playlists share one page so the sources pane stays put while they change. */
 private fun Route.pageKey(): Any = when (this) {
-    Route.Browse, is Route.BrowseDir -> Route.Browse
+    Route.Browse, is Route.BrowseDir, is Route.Playlist -> Route.Browse
     else -> this
 }
 
@@ -108,7 +108,7 @@ private fun TabletPage(state: AppUiState, actions: AppActions, layout: DeviceLay
             actions = actions,
             modifier = pageModifier,
         )
-        Route.Browse, is Route.BrowseDir -> TabletBrowseScreen(
+        Route.Browse, is Route.BrowseDir, is Route.Playlist -> TabletBrowseScreen(
             state = state,
             layout = layout,
             actions = actions,

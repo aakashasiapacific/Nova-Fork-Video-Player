@@ -52,6 +52,15 @@ data class QueueItemUi(
     val artwork: Artwork,
 )
 
+/** A device on the local network the video can be cast to (Chromecast), as libVLC found it. */
+@Immutable
+data class CastDeviceUi(
+    /** Pass to [PlayerActions.startCasting]; stays the same while the device is on the network. */
+    val id: String,
+    /** "Living Room TV" */
+    val name: String,
+)
+
 @Immutable
 data class PlayerUiState(
     val title: String = "",
@@ -96,6 +105,13 @@ data class PlayerUiState(
     val queue: List<QueueItemUi> = emptyList(),
     /** Index of the playing item in [queue]; 0 while [queue] is empty. */
     val queueIndex: Int = 0,
+    /** Cast devices on the local network; looked for while the player is shown or casting. */
+    val castDevices: List<CastDeviceUi> = emptyList(),
+    /**
+     * Name of the device the video plays on; null = it plays here. While set, the screen shows
+     * a casting placeholder instead of the video surface (nothing is drawn there).
+     */
+    val castingTo: String? = null,
 )
 
 /**
@@ -154,6 +170,18 @@ interface PlayerActions {
     /** Leaves the player screen and keeps the sound playing, with controls in a notification. */
     fun playInBackground()
 
+    /**
+     * Plays on [id] of [PlayerUiState.castDevices] from where it is now (libVLC converts what
+     * the device can't play). Also switches from one cast device to another.
+     */
+    fun startCasting(id: String)
+
+    /** Plays on this device again, from where the cast was. */
+    fun stopCasting()
+
+    /** Looks for cast devices again; [PlayerUiState.castDevices] refills within a few seconds. */
+    fun scanForCastDevices()
+
     fun close()
 }
 
@@ -186,5 +214,8 @@ open class NoOpPlayerActions : PlayerActions {
     override fun cycleRepeat() {}
     override fun playQueueItem(index: Int) {}
     override fun playInBackground() {}
+    override fun startCasting(id: String) {}
+    override fun stopCasting() {}
+    override fun scanForCastDevices() {}
     override fun close() {}
 }

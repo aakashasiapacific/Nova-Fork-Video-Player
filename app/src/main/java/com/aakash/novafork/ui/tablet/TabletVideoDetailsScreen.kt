@@ -173,6 +173,12 @@ private fun VideoBody(details: VideoDetailsUi, actions: AppActions) {
                     }
                 }
             }
+            OutlinedButton(
+                onClick = { actions.addToPlaylist(listOf(details.id), details.title) },
+                modifier = Modifier.height(48.dp),
+            ) {
+                ButtonLabel(R.drawable.ic_playlist_add, "Add to playlist")
+            }
         }
         WatchProgress(progress = details.progress, positionMs = details.positionMs, durationMs = details.durationMs)
         val showKey = details.showKey

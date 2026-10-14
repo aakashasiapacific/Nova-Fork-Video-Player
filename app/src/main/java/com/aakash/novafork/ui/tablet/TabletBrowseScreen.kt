@@ -39,10 +39,12 @@ import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -66,6 +68,7 @@ import com.aakash.novafork.ui.adaptive.DeviceLayout
 import com.aakash.novafork.ui.common.EmptyState
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.ScanBanner
+import com.aakash.novafork.ui.common.VideoMenuBox
 import com.aakash.novafork.ui.common.metaLine
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.AppUiState
@@ -74,6 +77,8 @@ import com.aakash.novafork.ui.model.BrowseUi
 import com.aakash.novafork.ui.model.DialogUi
 import com.aakash.novafork.ui.model.FolderUi
 import com.aakash.novafork.ui.model.PermissionUi
+import com.aakash.novafork.ui.model.PlaylistDetailsUi
+import com.aakash.novafork.ui.model.PlaylistUi
 import com.aakash.novafork.ui.model.Route
 import com.aakash.novafork.ui.model.ScanUi
 import com.aakash.novafork.ui.model.SourceUi
@@ -81,10 +86,11 @@ import com.aakash.novafork.ui.model.VideoCardUi
 
 private val PaneGutter = 28.dp
 
+/** What the right pane shows: [route] is a [Route.BrowseDir], a [Route.Playlist] or null (welcome). */
 @Immutable
-private data class DirPane(val route: Route.BrowseDir?, val dir: BrowseDirUi?)
+private data class DirPane(val route: Route?, val dir: BrowseDirUi?, val playlist: PlaylistDetailsUi?)
 
-/** Two panes: sources on the left, the open folder (or a welcome panel) on the right. */
+/** Two panes: sources and playlists on the left, the open folder or playlist (or a welcome panel) on the right. */
 @Composable
 internal fun TabletBrowseScreen(
     state: AppUiState,
@@ -95,6 +101,8 @@ internal fun TabletBrowseScreen(
     val dirRoute = state.route as? Route.BrowseDir
     // A listing left over from another folder must not show under this one's breadcrumbs.
     val dir = state.browseDir?.takeIf { dirRoute != null && it.isListingOf(dirRoute) }
+    val playlistRoute = state.route as? Route.Playlist
+    val playlist = state.playlist?.takeIf { playlistRoute != null && it.id == playlistRoute.playlistId }
     // Portrait uses a narrower sources pane and smaller cells so the folder grid keeps two columns.
     val dirCellMin = if (layout.isExpanded) 220.dp else 160.dp
     val dirStates = rememberSaveableStateHolder()
@@ -104,13 +112,14 @@ internal fun TabletBrowseScreen(
             scan = state.scan,
             permission = state.permission,
             selectedSourceId = dirRoute?.sourceId,
+            selectedPlaylistId = playlistRoute?.playlistId,
             actions = actions,
             modifier = Modifier
                 .width(if (layout.isExpanded) 340.dp else 300.dp)
                 .fillMaxHeight(),
         )
         AnimatedContent(
-            targetState = DirPane(dirRoute, dir),
+            targetState = DirPane(dirRoute ?: playlistRoute, dir, playlist),
             modifier = Modifier
                 .weight(1f)
                 .fillMaxHeight(),
@@ -118,12 +127,9 @@ internal fun TabletBrowseScreen(
             contentKey = { it.route },
             label = "browsePane",
         ) { pane ->
-            val route = pane.route
-            if (route == null) {
-                BrowseWelcome(actions = actions, modifier = Modifier.fillMaxSize())
-            } else {
-                // Each folder keeps its own scroll position when coming back to it.
-                dirStates.SaveableStateProvider(route.toString()) {
+            when (val route = pane.route) {
+                // Each folder and playlist keeps its own scroll position when coming back to it.
+                is Route.BrowseDir -> dirStates.SaveableStateProvider(route.toString()) {
                     val shown = pane.dir
                     if (shown == null) {
                         TabletLoading(Modifier.fillMaxSize())
@@ -131,6 +137,15 @@ internal fun TabletBrowseScreen(
                         BrowseDirPane(dir = shown, cellMin = dirCellMin, actions = actions, modifier = Modifier.fillMaxSize())
                     }
                 }
+                is Route.Playlist -> dirStates.SaveableStateProvider(route.toString()) {
+                    val shown = pane.playlist
+                    if (shown == null) {
+                        TabletLoading(Modifier.fillMaxSize())
+                    } else {
+                        TabletPlaylistPane(playlist = shown, actions = actions, modifier = Modifier.fillMaxSize())
+                    }
+                }
+                else -> BrowseWelcome(actions = actions, modifier = Modifier.fillMaxSize())
             }
         }
     }
@@ -149,6 +164,7 @@ private fun SourcesPane(
     scan: ScanUi,
     permission: PermissionUi,
     selectedSourceId: Long?,
+    selectedPlaylistId: Long?,
     actions: AppActions,
     modifier: Modifier = Modifier,
 ) {
@@ -218,6 +234,18 @@ private fun SourcesPane(
             }
             item(key = "openUrl", contentType = "action") {
                 ActionRow(R.drawable.ic_link, "Open network stream") { actions.showDialog(DialogUi.OpenUrl) }
+            }
+
+            sectionHeader("playlists", "Playlists")
+            items(browse.playlists, key = { "playlist:${it.id}" }, contentType = { "playlist" }) { playlist ->
+                PlaylistRow(
+                    playlist = playlist,
+                    selected = playlist.id == selectedPlaylistId,
+                    onClick = { actions.openPlaylist(playlist.id) },
+                )
+            }
+            item(key = "newPlaylist", contentType = "action") {
+                ActionRow(R.drawable.ic_playlist_add, "New playlist") { actions.showDialog(DialogUi.NewPlaylist()) }
             }
         }
     }
@@ -371,6 +399,38 @@ private fun StreamRow(stream: VideoCardUi, onClick: () -> Unit, onLongClick: () 
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.size(22.dp),
         )
+    }
+}
+
+@Composable
+private fun PlaylistRow(playlist: PlaylistUi, selected: Boolean, onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        color = if (selected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent,
+        contentColor = if (selected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurface,
+    ) {
+        Row(
+            Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            RowIcon(R.drawable.ic_playlist_play)
+            Spacer(Modifier.width(14.dp))
+            Text(
+                text = playlist.name,
+                style = MaterialTheme.typography.titleSmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                text = playlist.itemCount.toString(),
+                style = MaterialTheme.typography.labelLarge,
+                color = LocalContentColor.current.copy(alpha = 0.7f),
+            )
+        }
     }
 }
 
@@ -551,6 +611,17 @@ private fun BrowseDirHeader(dir: BrowseDirUi, actions: AppActions, modifier: Mod
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
             )
+            if (dir.videos.isNotEmpty()) {
+                // Plays the videos directly in this folder, not those in its subfolders.
+                FilledTonalButton(onClick = { actions.playFolder(dir.sourceId, dir.path) }) {
+                    ButtonLabel(R.drawable.ic_play_arrow, "Play all")
+                }
+                Spacer(Modifier.width(8.dp))
+                OutlinedButton(onClick = { actions.playFolder(dir.sourceId, dir.path, shuffle = true) }) {
+                    ButtonLabel(R.drawable.ic_shuffle, "Shuffle")
+                }
+                Spacer(Modifier.width(4.dp))
+            }
             IconButton(onClick = { actions.rescanSource(dir.sourceId) }, enabled = !dir.isLoading) {
                 NovaIcon(R.drawable.ic_refresh, contentDescription = "Refresh")
             }
@@ -633,16 +704,18 @@ private fun DirGrid(dir: BrowseDirUi, error: String?, cellMin: Dp, actions: AppA
         if (dir.videos.isNotEmpty()) {
             fullWidthItem("videosHeader") { GridHeader("Videos") }
             items(dir.videos, key = { "video:${it.id}" }, contentType = { "video" }) { video ->
-                TabletStillCard(
-                    artwork = video.artwork,
-                    title = video.primaryLine(),
-                    subtitle = video.secondaryLine(),
-                    cornerLabel = durationLabel(video.durationMs),
-                    progress = video.progress,
-                    watched = video.watched,
-                    onClick = { actions.play(video.id) },
-                    onLongClick = { actions.openVideo(video.id) },
-                )
+                VideoMenuBox(videoId = video.id, title = video.primaryLine(), actions = actions) { openMenu ->
+                    TabletStillCard(
+                        artwork = video.artwork,
+                        title = video.primaryLine(),
+                        subtitle = video.secondaryLine(),
+                        cornerLabel = durationLabel(video.durationMs),
+                        progress = video.progress,
+                        watched = video.watched,
+                        onClick = { actions.play(video.id) },
+                        onLongClick = openMenu,
+                    )
+                }
             }
         }
     }

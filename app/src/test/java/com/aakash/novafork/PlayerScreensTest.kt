@@ -93,6 +93,12 @@ class PlayerScreensTest {
     /** Just resumed: the banner sits above the controls, which are still up from opening. */
     @Test fun phoneResume() = capture("resume", FakePlayer.resumed(), DeviceLayout.PHONE)
 
+    /** A shuffled queue repeating all: shuffle and repeat lit in the bottom row, the queue sheet closed. */
+    @Test fun phoneQueue() = capture("queue", FakePlayer.queued(), DeviceLayout.PHONE, frame = episodeFrame)
+
+    /** Playing on a Chromecast: a placeholder names the device where the video would be. */
+    @Test fun phoneCasting() = capture("casting", FakePlayer.casting(), DeviceLayout.PHONE)
+
     // Tablet, landscape
 
     @Test
@@ -115,6 +121,10 @@ class PlayerScreensTest {
     @Test
     @Config(qualifiers = TABLET)
     fun tabletResume() = capture("resume", FakePlayer.resumed(), DeviceLayout.TABLET_EXPANDED)
+
+    @Test
+    @Config(qualifiers = TABLET)
+    fun tabletQueue() = capture("queue", FakePlayer.queued(), DeviceLayout.TABLET_EXPANDED, frame = episodeFrame)
 }
 
 /** Stands in for libVLC's video layout: one decoded frame, fitted like the default "Fit" aspect. */

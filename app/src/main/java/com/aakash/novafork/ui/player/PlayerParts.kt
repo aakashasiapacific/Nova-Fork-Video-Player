@@ -12,12 +12,19 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -27,11 +34,15 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
 import com.aakash.novafork.core.format.Formats
+import com.aakash.novafork.ui.model.PlayerUiState
+import com.aakash.novafork.ui.model.RepeatMode
 import com.aakash.novafork.ui.model.TrackUi
 import com.aakash.novafork.ui.theme.NovaColors
 import kotlin.math.abs
@@ -39,6 +50,12 @@ import kotlin.math.roundToInt
 
 /** Option groups of the phone track sheet and the tablet side panel, in panel order. */
 internal enum class PlayerPanel { AUDIO, SUBTITLES, SPEED, ASPECT }
+
+/** Lists that open over the player (phone bottom sheet, tablet side panel), apart from the track options. */
+internal enum class PlayerSheet(val title: String) {
+    QUEUE("Queue"),
+    CAST("Cast to a device"),
+}
 
 /** Physical third of the screen a tap hit (not mirrored for RTL: right always seeks forward). */
 internal enum class TapZone { LEFT, CENTER, RIGHT }
@@ -87,6 +104,19 @@ internal fun trackLabel(track: TrackUi): String = if (track.id == DISABLED_TRACK
 
 internal fun subtitlesOn(tracks: List<TrackUi>): Boolean = tracks.any { it.selected && it.id != DISABLED_TRACK_ID }
 
+@DrawableRes
+internal fun RepeatMode.iconRes(): Int = if (this == RepeatMode.ONE) R.drawable.ic_repeat_one else R.drawable.ic_repeat
+
+internal val RepeatMode.label: String
+    get() = when (this) {
+        RepeatMode.OFF -> "Repeat off"
+        RepeatMode.ALL -> "Repeat all"
+        RepeatMode.ONE -> "Repeat one"
+    }
+
+/** Shuffle only means something with more than one queued video. */
+internal val PlayerUiState.canShuffle: Boolean get() = queue.size > 1
+
 /** White icon button for chrome drawn over video; tint follows LocalContentColor (white in the player). */
 @Composable
 internal fun PlayerIconButton(
@@ -100,6 +130,100 @@ internal fun PlayerIconButton(
 ) {
     IconButton(onClick = onClick, modifier = modifier.size(buttonSize), enabled = enabled) {
         Icon(painterResource(icon), contentDescription = contentDescription, modifier = Modifier.size(iconSize))
+    }
+}
+
+/** One entry of the player's overflow menu. */
+internal class PlayerMenuItem(@DrawableRes val icon: Int, val label: String, val onClick: () -> Unit)
+
+/** The ⋮ button and its menu of [items]. */
+@Composable
+internal fun PlayerMoreMenu(
+    items: List<PlayerMenuItem>,
+    modifier: Modifier = Modifier,
+    buttonSize: Dp = 48.dp,
+    iconSize: Dp = 24.dp,
+) {
+    var open by remember { mutableStateOf(false) }
+    Box(modifier) {
+        PlayerIconButton(
+            icon = R.drawable.ic_more_vert,
+            contentDescription = "More options",
+            onClick = { open = true },
+            buttonSize = buttonSize,
+            iconSize = iconSize,
+        )
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            items.forEach { item ->
+                DropdownMenuItem(
+                    text = { Text(item.label) },
+                    leadingIcon = { Icon(painterResource(item.icon), contentDescription = null) },
+                    onClick = {
+                        open = false
+                        item.onClick()
+                    },
+                )
+            }
+        }
+    }
+}
+
+/** Cast icon; the "connected" glyph in the accent colour while the video plays on a cast device. */
+@Composable
+internal fun CastButton(
+    castingTo: String?,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    buttonSize: Dp = 48.dp,
+    iconSize: Dp = 24.dp,
+) {
+    val casting = castingTo != null
+    IconButton(onClick = onClick, modifier = modifier.size(buttonSize)) {
+        Icon(
+            painter = painterResource(if (casting) R.drawable.ic_cast_connected else R.drawable.ic_cast),
+            contentDescription = if (casting) "Casting to $castingTo" else "Cast",
+            modifier = Modifier.size(iconSize),
+            tint = if (casting) MaterialTheme.colorScheme.primary else LocalContentColor.current,
+        )
+    }
+}
+
+/** On/off icon (shuffle, repeat): the accent colour and a dot underneath while on, dimmed while off. */
+@Composable
+internal fun PlayerToggleButton(
+    @DrawableRes icon: Int,
+    contentDescription: String,
+    checked: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    buttonSize: Dp = 48.dp,
+    iconSize: Dp = 24.dp,
+) {
+    val accent = MaterialTheme.colorScheme.primary
+    IconButton(
+        onClick = onClick,
+        modifier = modifier
+            .size(buttonSize)
+            .semantics { stateDescription = if (checked) "On" else "Off" },
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Icon(
+                painter = painterResource(icon),
+                contentDescription = contentDescription,
+                modifier = Modifier.size(iconSize),
+                tint = if (checked) accent else LocalContentColor.current.copy(alpha = 0.7f),
+            )
+            if (checked) {
+                Box(
+                    Modifier
+                        .align(Alignment.BottomCenter)
+                        .offset(y = 7.dp)
+                        .size(4.dp)
+                        .clip(CircleShape)
+                        .background(accent),
+                )
+            }
+        }
     }
 }
 

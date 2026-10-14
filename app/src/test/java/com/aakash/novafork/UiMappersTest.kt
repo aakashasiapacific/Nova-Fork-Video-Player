@@ -386,6 +386,29 @@ class UiMappersTest {
         assertEquals(listOf(false, false, true), scanning.sources.map { it.isScanning })
     }
 
+    // Playlists
+
+    @Test
+    fun playlistsKeepTheirOrderAndTakeTheCoverVideosArt() {
+        val browse = UiMappers.browse(index, idle, FakeLibrary.playlists)
+        assertEquals(listOf("Severance rewatch", "Movie night", "Clips to sort"), browse.playlists.map { it.name })
+        assertEquals(listOf(8, 4, 0), browse.playlists.map { it.itemCount })
+        assertEquals(card(SEVERANCE_S1E1).artwork, browse.playlists[0].artwork)
+        assertEquals(card(DUNE).artwork, browse.playlists[1].artwork)
+        assertNull(browse.playlists[2].artwork)
+        assertTrue(UiMappers.browse(index, idle).playlists.isEmpty())
+    }
+
+    @Test
+    fun playlistDetailsListShownVideosInPlaylistOrderOnce() {
+        val details = UiMappers.playlistDetails(index, id = 9L, name = "Mix", videoIds = listOf(RRR, 999_999L, DUNE, RRR))
+        assertEquals(9L, details.id)
+        assertEquals("Mix", details.name)
+        // An id the library doesn't show (missing file) is left out, and a repeat is listed once.
+        assertEquals(listOf(RRR, DUNE), details.videos.map { it.id })
+        assertEquals(card(DUNE), details.videos[1])
+    }
+
     @Test
     fun pickedFolderLabels() {
         val tree = "content://com.android.externalstorage.documents/tree/"

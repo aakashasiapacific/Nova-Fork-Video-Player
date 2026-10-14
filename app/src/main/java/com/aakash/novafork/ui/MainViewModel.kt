@@ -11,6 +11,7 @@ import com.aakash.novafork.core.smb.SmbUris
 import com.aakash.novafork.core.tmdb.TmdbDisabledException
 import com.aakash.novafork.core.tmdb.TmdbException
 import com.aakash.novafork.data.IdentifyType
+import com.aakash.novafork.data.PlaylistWithCount
 import com.aakash.novafork.data.ScanState
 import com.aakash.novafork.data.Settings
 import com.aakash.novafork.data.SmbCredentials
@@ -37,7 +38,10 @@ import com.aakash.novafork.ui.model.TopDestination
 import java.io.IOException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -47,11 +51,16 @@ import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.mapLatest
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 private const val TAG = "MainViewModel"
+
+/** A queue for MainActivity to start the player with (PlayerIntents.forQueue). */
+data class QueueStart(val videoIds: List<Long>, val startIndex: Int, val shuffle: Boolean)
 
 /**
  * The app shell's state holder: navigation, what the user picked (filters, search, dialogs) and
@@ -100,17 +109,36 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
     }
     private val searchMemo = Memo<Pair<LibraryIndex, String>, SearchUi> { (index, query) -> UiMappers.search(index, query) }
 
+    /** The topmost playlist on the back stack, so it stays loaded under a details page opened from it. */
+    private val openPlaylistId: Flow<Long?> = local
+        .map { state -> state.backStack.filterIsInstance<Route.Playlist>().lastOrNull()?.playlistId }
+        .distinctUntilChanged()
+
+    /** Every playlist, plus the open one's videos, reloaded on any playlist or library change. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private val playlists: Flow<PlaylistsState> = combine(library.observePlaylists(), openPlaylistId) { all, openId -> all to openId }
+        .mapLatest { (all, openId) ->
+            val open = openId?.let { id -> all.firstOrNull { it.id == id } }
+            PlaylistsState(all = all, open = open, openVideoIds = if (open != null) playlistVideoIds(open.id) else emptyList())
+        }
+
     val state: StateFlow<AppUiState> = combine(
         libraryIndex,
         library.scanState,
         settingsStore.settings,
         local,
-    ) { index, scan, settings, user ->
-        assemble(index, scan, settings, user)
+        playlists,
+    ) { index, scan, settings, user, lists ->
+        assemble(index, scan, settings, user, lists)
     }
         .flowOn(Dispatchers.Default)
         // Seeded with the real settings so the first frame already has the right theme and layout.
         .stateIn(viewModelScope, SharingStarted.Eagerly, AppUiState(settings = SettingsUi(settings = settingsStore.settings.value)))
+
+    private val queueStarts = Channel<QueueStart>(Channel.BUFFERED)
+
+    /** Queues to play, each delivered once; MainActivity collects them while it is started. */
+    val queueRequests: Flow<QueueStart> = queueStarts.receiveAsFlow()
 
     private var identifyJob: Job? = null
     private var keyCheckJob: Job? = null
@@ -131,7 +159,13 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
         }
     }
 
-    private fun assemble(index: LibraryIndex, scan: ScanState, settings: Settings, user: LocalState): AppUiState {
+    private fun assemble(
+        index: LibraryIndex,
+        scan: ScanState,
+        settings: Settings,
+        user: LocalState,
+        lists: PlaylistsState,
+    ): AppUiState {
         val route = user.backStack.lastOrNull() ?: Route.Home
         val previewKey = user.previewKey
         // Details follow the route; on a tablet's library page they follow the preview pane.
@@ -139,7 +173,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
             ?: previewKey?.takeIf { it.startsWith("v:") }?.removePrefix("v:")?.toLongOrNull()
         val showKey = (route as? Route.ShowDetails)?.showKey
             ?: previewKey?.takeIf { it.startsWith("s:") }?.removePrefix("s:")
-        val browse = UiMappers.browse(index, scan)
+        val browse = UiMappers.browse(index, scan, lists.all)
+        val openPlaylist = lists.open
         return AppUiState(
             route = route,
             canGoBack = user.backStack.size > 1,
@@ -150,6 +185,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
             videoDetails = videoId?.let { UiMappers.videoDetails(index, it) },
             showDetails = showKey?.let { UiMappers.showDetails(index, it) },
             previewKey = previewKey,
+            playlist = openPlaylist?.let { UiMappers.playlistDetails(index, it.id, it.name, lists.openVideoIds) },
             search = searchMemo[index to user.query],
             settings = SettingsUi(
                 settings = settings,
@@ -579,6 +615,132 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
         }
     }
 
+    // Queues: resolved here, started by MainActivity (see queueRequests).
+
+    override fun playQueue(videoIds: List<Long>, startIndex: Int, shuffle: Boolean) {
+        if (videoIds.isEmpty()) return
+        queueStarts.trySend(QueueStart(videoIds, startIndex.coerceIn(0, videoIds.lastIndex), shuffle))
+    }
+
+    override fun playFolder(sourceId: Long, path: String, shuffle: Boolean) {
+        playResolved("Couldn't play this folder", "No videos to play in this folder", shuffle) {
+            library.folderQueue(sourceId, path)
+        }
+    }
+
+    override fun playSeason(showKey: String, season: Int?, shuffle: Boolean) {
+        playResolved("Couldn't play these episodes", "No episodes to play", shuffle) {
+            library.seasonQueue(showKey, season)
+        }
+    }
+
+    override fun playPlaylist(playlistId: Long, startIndex: Int, shuffle: Boolean) {
+        playResolved("Couldn't play the playlist", "This playlist has no videos to play", shuffle, startIndex) {
+            library.playlistVideos(playlistId).map { it.video.id }
+        }
+    }
+
+    /** Shuffled queues start anywhere, not always on their first video. */
+    private fun playResolved(
+        failure: String,
+        empty: String,
+        shuffle: Boolean,
+        startIndex: Int = 0,
+        resolve: suspend () -> List<Long>,
+    ) {
+        launchSafely(failure) {
+            val ids = resolve()
+            if (ids.isEmpty()) {
+                showMessage(empty)
+                return@launchSafely
+            }
+            val start = if (shuffle) ids.indices.random() else startIndex.coerceIn(0, ids.lastIndex)
+            queueStarts.send(QueueStart(ids, start, shuffle))
+        }
+    }
+
+    // Playlists
+
+    override fun addVideosToPlaylist(playlistId: Long, videoIds: List<Long>) {
+        val name = playlistName(playlistId)
+        launchSafely("Couldn't add to the playlist") {
+            library.addToPlaylist(playlistId, videoIds)
+            local.update { state ->
+                state.copy(
+                    dialog = state.dialog.takeUnless { it is DialogUi.AddToPlaylist },
+                    message = if (name != null) "Added to $name" else "Added to the playlist",
+                )
+            }
+        }
+    }
+
+    override fun createPlaylist(name: String, videoIds: List<Long>) {
+        val clean = name.trim()
+        if (clean.isEmpty()) {
+            showMessage("Give the playlist a name")
+            return
+        }
+        launchSafely("Couldn't create the playlist") {
+            val id = library.createPlaylist(clean)
+            if (videoIds.isNotEmpty()) library.addToPlaylist(id, videoIds)
+            local.update { state ->
+                state.copy(
+                    dialog = state.dialog.takeUnless { it is DialogUi.NewPlaylist || it is DialogUi.AddToPlaylist },
+                    message = if (videoIds.isEmpty()) "Created $clean" else "Added to $clean",
+                )
+            }
+        }
+    }
+
+    override fun renamePlaylist(playlistId: Long, name: String) {
+        val clean = name.trim()
+        if (clean.isEmpty()) {
+            showMessage("Give the playlist a name")
+            return
+        }
+        launchSafely("Couldn't rename the playlist") {
+            library.renamePlaylist(playlistId, clean)
+            local.update { state -> state.copy(dialog = state.dialog.takeUnless { it is DialogUi.RenamePlaylist }) }
+        }
+    }
+
+    override fun deletePlaylist(playlistId: Long) {
+        val name = playlistName(playlistId)
+        launchSafely("Couldn't delete the playlist") {
+            library.deletePlaylist(playlistId)
+            local.update { state ->
+                // A deleted playlist's page has nothing left to show.
+                val stack = state.backStack.filterNot { it is Route.Playlist && it.playlistId == playlistId }
+                state.copy(
+                    backStack = stack.ifEmpty { listOf(Route.Home) },
+                    dialog = state.dialog.takeUnless { it is DialogUi.ConfirmDeletePlaylist },
+                    message = if (name != null) "Deleted $name" else "Playlist deleted",
+                )
+            }
+        }
+    }
+
+    override fun removeFromPlaylist(playlistId: Long, videoId: Long) {
+        launchSafely("Couldn't remove the video") { library.removeFromPlaylist(playlistId, videoId) }
+    }
+
+    override fun movePlaylistItem(playlistId: Long, from: Int, to: Int) {
+        launchSafely("Couldn't move the video") { library.movePlaylistItem(playlistId, from, to) }
+    }
+
+    private fun playlistName(playlistId: Long): String? =
+        state.value.browse.playlists.firstOrNull { it.id == playlistId }?.name
+
+    private suspend fun playlistVideoIds(playlistId: Long): List<Long> =
+        try {
+            library.playlistVideos(playlistId).map { it.video.id }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.w(TAG, "Loading playlist $playlistId failed", e)
+            emptyList()
+        }
+
     // Activity-only actions: MainActivity overrides these.
 
     override fun play(videoId: Long, startOver: Boolean) {}
@@ -606,6 +768,13 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
         val TRAILING_YEAR = Regex("""\s*\(?(19|20)\d{2}\)?$""")
     }
 }
+
+/** Every playlist, and the videos of the one the back stack shows ([open] null = none). */
+private data class PlaylistsState(
+    val all: List<PlaylistWithCount> = emptyList(),
+    val open: PlaylistWithCount? = null,
+    val openVideoIds: List<Long> = emptyList(),
+)
 
 /** Caches the last result: the combined state is rebuilt on every change, most of it unchanged. */
 private class Memo<K, V>(private val compute: (K) -> V) {

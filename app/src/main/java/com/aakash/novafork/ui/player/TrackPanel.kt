@@ -10,6 +10,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
@@ -60,11 +61,43 @@ internal fun TrackPanel(
     modifier: Modifier = Modifier,
 ) {
     val shownSection = rememberLatestNonNull(section) ?: PlayerPanel.AUDIO
+    PlayerSidePanel(visible = section != null, title = "Playback settings", onDismiss = onDismiss, modifier = modifier) {
+        TrackPanelList(section = shownSection, state = state, actions = actions, onDismiss = onDismiss)
+    }
+}
+
+/** Tablet side panel for the queue or the cast devices; null closes it. */
+@Composable
+internal fun PlayerSheetPanel(
+    sheet: PlayerSheet?,
+    state: PlayerUiState,
+    actions: PlayerActions,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val shown = rememberLatestNonNull(sheet) ?: PlayerSheet.QUEUE
+    PlayerSidePanel(visible = sheet != null, title = shown.title, onDismiss = onDismiss, modifier = modifier) {
+        PlayerSheetContent(sheet = shown, state = state, actions = actions, onDismiss = onDismiss)
+    }
+}
+
+/**
+ * The tablet's side panel frame: a title with a close button over [content], sliding in from the
+ * end edge over a light scrim that closes it when tapped.
+ */
+@Composable
+private fun PlayerSidePanel(
+    visible: Boolean,
+    title: String,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit,
+) {
     // Slide from the end edge: right in LTR, left in RTL.
     val fromEnd = if (LocalLayoutDirection.current == LayoutDirection.Ltr) 1 else -1
 
     Box(modifier.fillMaxSize()) {
-        AnimatedVisibility(visible = section != null, enter = fadeIn(), exit = fadeOut()) {
+        AnimatedVisibility(visible = visible, enter = fadeIn(), exit = fadeOut()) {
             Box(
                 Modifier
                     .fillMaxSize()
@@ -78,25 +111,51 @@ internal fun TrackPanel(
             )
         }
         AnimatedVisibility(
-            visible = section != null,
+            visible = visible,
             modifier = Modifier
                 .align(Alignment.CenterEnd)
                 .fillMaxHeight(),
             enter = slideInHorizontally { it * fromEnd } + fadeIn(),
             exit = slideOutHorizontally { it * fromEnd } + fadeOut(),
         ) {
-            PanelContent(
-                section = shownSection,
-                state = state,
-                actions = actions,
-                onDismiss = onDismiss,
-            )
+            Surface(
+                modifier = Modifier
+                    .width(PanelWidth)
+                    .fillMaxHeight(),
+                shape = RoundedCornerShape(topStart = 24.dp, bottomStart = 24.dp),
+                color = NovaColors.PlayerSurface,
+                contentColor = Color.White,
+            ) {
+                Column(
+                    Modifier
+                        .fillMaxSize()
+                        .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Vertical + WindowInsetsSides.End)),
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = 20.dp, end = 8.dp, top = 8.dp, bottom = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = title,
+                            style = MaterialTheme.typography.titleLarge,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f),
+                        )
+                        PlayerIconButton(icon = R.drawable.ic_close, contentDescription = "Close", onClick = onDismiss)
+                    }
+                    HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
+                    content()
+                }
+            }
         }
     }
 }
 
 @Composable
-private fun PanelContent(
+private fun TrackPanelList(
     section: PlayerPanel,
     state: PlayerUiState,
     actions: PlayerActions,
@@ -108,74 +167,43 @@ private fun PanelContent(
         listState.animateScrollToItem(section.ordinal)
     }
 
-    Surface(
-        modifier = Modifier
-            .width(PanelWidth)
-            .fillMaxHeight(),
-        shape = RoundedCornerShape(topStart = 24.dp, bottomStart = 24.dp),
-        color = NovaColors.PlayerSurface,
-        contentColor = Color.White,
+    LazyColumn(
+        state = listState,
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(bottom = 24.dp),
     ) {
-        Column(
-            Modifier
-                .fillMaxSize()
-                .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Vertical + WindowInsetsSides.End)),
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 20.dp, end = 8.dp, top = 8.dp, bottom = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = "Playback settings",
-                    style = MaterialTheme.typography.titleLarge,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
-                )
-                PlayerIconButton(icon = R.drawable.ic_close, contentDescription = "Close", onClick = onDismiss)
-            }
-            HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
-            LazyColumn(
-                state = listState,
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(bottom = 24.dp),
-            ) {
-                items(PlayerPanel.entries, key = { it.name }) { item ->
-                    when (item) {
-                        PlayerPanel.AUDIO -> Column {
-                            OptionHeader("Audio")
-                            TrackOptions(
-                                tracks = state.audioTracks,
-                                emptyText = "No audio tracks",
-                                onSelect = actions::selectAudioTrack,
-                            )
-                        }
-                        PlayerPanel.SUBTITLES -> Column {
-                            OptionHeader("Subtitles")
-                            TrackOptions(
-                                tracks = state.subtitleTracks,
-                                emptyText = "No subtitles in this video",
-                                onSelect = actions::selectSubtitleTrack,
-                            )
-                            AddSubtitleRow(
-                                onClick = {
-                                    onDismiss()
-                                    actions.pickSubtitleFile()
-                                },
-                            )
-                            SubtitleDelayRow(delayMs = state.subtitleDelayMs, onChange = actions::setSubtitleDelay)
-                        }
-                        PlayerPanel.SPEED -> Column {
-                            OptionHeader("Speed")
-                            SpeedChips(rate = state.rate, onSelect = actions::setRate)
-                        }
-                        PlayerPanel.ASPECT -> Column {
-                            OptionHeader("Aspect ratio")
-                            AspectChips(aspect = state.aspect, onSelect = actions::setAspect)
-                        }
-                    }
+        items(PlayerPanel.entries, key = { it.name }) { item ->
+            when (item) {
+                PlayerPanel.AUDIO -> Column {
+                    OptionHeader("Audio")
+                    TrackOptions(
+                        tracks = state.audioTracks,
+                        emptyText = "No audio tracks",
+                        onSelect = actions::selectAudioTrack,
+                    )
+                }
+                PlayerPanel.SUBTITLES -> Column {
+                    OptionHeader("Subtitles")
+                    TrackOptions(
+                        tracks = state.subtitleTracks,
+                        emptyText = "No subtitles in this video",
+                        onSelect = actions::selectSubtitleTrack,
+                    )
+                    AddSubtitleRow(
+                        onClick = {
+                            onDismiss()
+                            actions.pickSubtitleFile()
+                        },
+                    )
+                    SubtitleDelayRow(delayMs = state.subtitleDelayMs, onChange = actions::setSubtitleDelay)
+                }
+                PlayerPanel.SPEED -> Column {
+                    OptionHeader("Speed")
+                    SpeedChips(rate = state.rate, onSelect = actions::setRate)
+                }
+                PlayerPanel.ASPECT -> Column {
+                    OptionHeader("Aspect ratio")
+                    AspectChips(aspect = state.aspect, onSelect = actions::setAspect)
                 }
             }
         }

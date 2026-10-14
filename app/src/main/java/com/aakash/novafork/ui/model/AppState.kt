@@ -16,6 +16,7 @@ sealed interface Route {
     data class VideoDetails(val videoId: Long) : Route
     data class ShowDetails(val showKey: String) : Route
     data class BrowseDir(val sourceId: Long, val path: String) : Route
+    data class Playlist(val playlistId: Long) : Route
 }
 
 /** The tab a route belongs to (for highlighting the nav bar / rail). */
@@ -23,7 +24,7 @@ val Route.top: TopDestination
     get() = when (this) {
         Route.Home, is Route.VideoDetails, is Route.ShowDetails, Route.Search -> TopDestination.HOME
         Route.Library -> TopDestination.LIBRARY
-        Route.Browse, is Route.BrowseDir -> TopDestination.BROWSE
+        Route.Browse, is Route.BrowseDir, is Route.Playlist -> TopDestination.BROWSE
         Route.Settings -> TopDestination.SETTINGS
     }
 
@@ -65,6 +66,19 @@ sealed interface DialogUi {
     ) : DialogUi
 
     data class ConfirmRemoveSource(val source: SourceUi) : DialogUi
+
+    /**
+     * Picks the playlist [videoIds] go into, or starts a new one. [label] names what is added
+     * ("Dune: Part Two", "Season 2"); empty = not named.
+     */
+    data class AddToPlaylist(val videoIds: List<Long>, val label: String = "") : DialogUi
+
+    /** Names a new playlist; [videoIds] go into it once it exists. */
+    data class NewPlaylist(val videoIds: List<Long> = emptyList()) : DialogUi
+
+    data class RenamePlaylist(val playlistId: Long, val name: String) : DialogUi
+
+    data class ConfirmDeletePlaylist(val playlistId: Long, val name: String) : DialogUi
 }
 
 @Immutable
@@ -84,6 +98,8 @@ data class AppUiState(
     val showDetails: ShowDetailsUi? = null,
     /** Key of the item in the tablet two-pane preview (LibraryItemUi.key), null = none. */
     val previewKey: String? = null,
+    /** The playlist being shown (route Playlist); null while it loads or after it was deleted. */
+    val playlist: PlaylistDetailsUi? = null,
     val search: SearchUi = SearchUi(),
     val settings: SettingsUi = SettingsUi(),
     val scan: ScanUi = ScanUi(),
@@ -151,6 +167,40 @@ interface AppActions {
     fun shareCrashReport()
     /** Forgets the crash report. */
     fun dismissCrashReport()
+
+    // Queues and playlists. Default bodies keep other implementations (previews, tests) compiling.
+
+    /** Plays library videos one after the other from [startIndex]; [shuffle] plays the rest in random order. */
+    fun playQueue(videoIds: List<Long>, startIndex: Int = 0, shuffle: Boolean = false) {}
+
+    /** Plays the videos directly in a Browse folder ([path] as in [Route.BrowseDir], "" = the source root). */
+    fun playFolder(sourceId: Long, path: String, shuffle: Boolean = false) {}
+
+    /** Plays a show's episodes in order: one season, or the whole show for a null [season]. */
+    fun playSeason(showKey: String, season: Int?, shuffle: Boolean = false) {}
+
+    /** Plays a playlist from its [startIndex]th video. */
+    fun playPlaylist(playlistId: Long, startIndex: Int = 0, shuffle: Boolean = false) {}
+
+    fun openPlaylist(playlistId: Long) = navigate(Route.Playlist(playlistId))
+
+    /** Opens the "Add to playlist" sheet for [videoIds]; [label] names them in the sheet's title. */
+    fun addToPlaylist(videoIds: List<Long>, label: String = "") = showDialog(DialogUi.AddToPlaylist(videoIds, label))
+
+    /** Appends [videoIds] to the playlist (videos already in it are skipped). */
+    fun addVideosToPlaylist(playlistId: Long, videoIds: List<Long>) {}
+
+    /** Creates a playlist named [name], then adds [videoIds] to it. */
+    fun createPlaylist(name: String, videoIds: List<Long> = emptyList()) {}
+
+    fun renamePlaylist(playlistId: Long, name: String) {}
+
+    fun deletePlaylist(playlistId: Long) {}
+
+    fun removeFromPlaylist(playlistId: Long, videoId: Long) {}
+
+    /** Moves the playlist's video at index [from] to index [to] (indices of [PlaylistDetailsUi.videos]). */
+    fun movePlaylistItem(playlistId: Long, from: Int, to: Int) {}
 }
 
 /** No-op actions for previews and screenshot tests. */

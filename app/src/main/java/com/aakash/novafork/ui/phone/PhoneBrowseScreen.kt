@@ -39,10 +39,12 @@ import com.aakash.novafork.data.db.SourceType
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.ScanBanner
+import com.aakash.novafork.ui.dialogs.playlistCountLabel
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.BrowseUi
 import com.aakash.novafork.ui.model.DialogUi
 import com.aakash.novafork.ui.model.PermissionUi
+import com.aakash.novafork.ui.model.PlaylistUi
 import com.aakash.novafork.ui.model.ScanUi
 import com.aakash.novafork.ui.model.SourceUi
 import com.aakash.novafork.ui.model.VideoCardUi
@@ -110,6 +112,14 @@ fun PhoneBrowseScreen(
             }
             item(key = "openUrl") {
                 ActionRow(R.drawable.ic_link, "Open network stream") { actions.showDialog(DialogUi.OpenUrl) }
+            }
+
+            sectionHeader("playlists", "Playlists")
+            items(browse.playlists, key = { "playlist:${it.id}" }) { playlist ->
+                PlaylistRow(playlist = playlist, onClick = { actions.openPlaylist(playlist.id) })
+            }
+            item(key = "newPlaylist") {
+                ActionRow(R.drawable.ic_playlist_add, "New playlist") { actions.showDialog(DialogUi.NewPlaylist()) }
             }
         }
     }
@@ -222,6 +232,20 @@ private fun StreamRow(stream: VideoCardUi, onClick: () -> Unit, onLongClick: () 
         },
         trailingContent = {
             NovaIcon(R.drawable.ic_play_arrow, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        },
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+    )
+}
+
+@Composable
+private fun PlaylistRow(playlist: PlaylistUi, onClick: () -> Unit) {
+    ListItem(
+        modifier = Modifier.clickable(onClick = onClick),
+        leadingContent = { RowIcon(R.drawable.ic_playlist_play) },
+        headlineContent = { Text(playlist.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+        supportingContent = { Text(playlistCountLabel(playlist.itemCount), maxLines = 1) },
+        trailingContent = {
+            NovaIcon(R.drawable.ic_chevron_right, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
         },
         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
     )

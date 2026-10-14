@@ -55,6 +55,7 @@ import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.RatingPill
 import com.aakash.novafork.ui.common.ScanBanner
 import com.aakash.novafork.ui.common.SectionHeader
+import com.aakash.novafork.ui.common.VideoMenuBox
 import com.aakash.novafork.ui.common.bottomScrim
 import com.aakash.novafork.ui.common.startScrim
 import com.aakash.novafork.ui.model.AppActions
@@ -207,12 +208,14 @@ private fun ContinueWatchingRow(cards: List<VideoCardUi>, actions: AppActions) {
         horizontalArrangement = Arrangement.spacedBy(dims.rowSpacing),
     ) {
         items(cards, key = { it.id }) { card ->
-            TabletLandscapeCard(
-                card = card,
-                onClick = { actions.play(card.id) },
-                onLongClick = { actions.openVideo(card.id) },
-                modifier = Modifier.width(dims.landscapeCardWidth),
-            )
+            VideoMenuBox(videoId = card.id, title = card.primaryLine(), actions = actions) { openMenu ->
+                TabletLandscapeCard(
+                    card = card,
+                    onClick = { actions.play(card.id) },
+                    onLongClick = openMenu,
+                    modifier = Modifier.width(dims.landscapeCardWidth),
+                )
+            }
         }
     }
 }

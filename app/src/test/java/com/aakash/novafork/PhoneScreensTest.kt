@@ -8,6 +8,7 @@ import androidx.test.core.app.ApplicationProvider
 import com.aakash.novafork.FakeLibrary.DUNE
 import com.aakash.novafork.FakeLibrary.MOVIES_FOLDER
 import com.aakash.novafork.FakeLibrary.SEVERANCE_KEY
+import com.aakash.novafork.FakeLibrary.SEVERANCE_REWATCH
 import com.aakash.novafork.FakeLibrary.SEVERANCE_S2E3
 import com.aakash.novafork.ui.adaptive.DeviceLayout
 import com.aakash.novafork.ui.model.AppUiState
@@ -74,6 +75,8 @@ class PhoneScreensTest {
     @Test fun browseDir() = capture("browse_dir", FakeScreens.browseDir(MOVIES_FOLDER))
 
     @Test fun search() = capture("search", FakeScreens.search("pa"))
+
+    @Test fun playlist() = capture("playlist", FakeScreens.playlist(SEVERANCE_REWATCH))
 
     @Test fun settings() = capture("settings", FakeScreens.settingsPage())
 

@@ -28,13 +28,15 @@ import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
 import com.aakash.novafork.ui.model.PlayerActions
 import com.aakash.novafork.ui.model.PlayerUiState
+import com.aakash.novafork.ui.model.RepeatMode
 
 private val CenterButtonSize = 52.dp
 private val CenterIconSize = 32.dp
 
 /**
- * Phone controls: compact top bar (back, title, subtitles, audio, more), centre transport row,
- * seek bar and an icon row at the bottom. Track pickers open in [TrackSheet] via [onOpenPanel].
+ * Phone controls: compact top bar (back, title, cast, subtitles, audio, more), centre transport
+ * row, seek bar and an icon row at the bottom. Track pickers open in [TrackSheet] via
+ * [onOpenPanel]; the queue and cast devices in a sheet via [onOpenSheet].
  */
 @Composable
 internal fun PhonePlayerControls(
@@ -43,6 +45,7 @@ internal fun PhonePlayerControls(
     showRemaining: Boolean,
     onToggleRemaining: () -> Unit,
     onOpenPanel: (PlayerPanel) -> Unit,
+    onOpenSheet: (PlayerSheet) -> Unit,
     onBottomBarHeightChanged: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -57,6 +60,7 @@ internal fun PhonePlayerControls(
                 state = state,
                 actions = actions,
                 onOpenPanel = onOpenPanel,
+                onOpenSheet = onOpenSheet,
                 modifier = Modifier.align(Alignment.TopCenter),
             )
             if (state.error == null) {
@@ -81,6 +85,7 @@ private fun PhoneTopBar(
     state: PlayerUiState,
     actions: PlayerActions,
     onOpenPanel: (PlayerPanel) -> Unit,
+    onOpenSheet: (PlayerSheet) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Row(
@@ -112,6 +117,7 @@ private fun PhoneTopBar(
                 )
             }
         }
+        CastButton(castingTo = state.castingTo, onClick = { onOpenSheet(PlayerSheet.CAST) })
         PlayerIconButton(
             icon = if (subtitlesOn(state.subtitleTracks)) R.drawable.ic_subtitles else R.drawable.ic_subtitles_off,
             contentDescription = "Subtitles",
@@ -122,10 +128,14 @@ private fun PhoneTopBar(
             contentDescription = "Audio track",
             onClick = { onOpenPanel(PlayerPanel.AUDIO) },
         )
-        PlayerIconButton(
-            icon = R.drawable.ic_more_vert,
-            contentDescription = "Speed and aspect ratio",
-            onClick = { onOpenPanel(PlayerPanel.SPEED) },
+        PlayerMoreMenu(
+            items = buildList {
+                add(PlayerMenuItem(R.drawable.ic_speed, "Speed and aspect ratio") { onOpenPanel(PlayerPanel.SPEED) })
+                if (state.queue.size > 1) {
+                    add(PlayerMenuItem(R.drawable.ic_playlist_play, "Queue") { onOpenSheet(PlayerSheet.QUEUE) })
+                }
+                add(PlayerMenuItem(R.drawable.ic_volume_up, "Play in background", actions::playInBackground))
+            },
         )
     }
 }
@@ -215,6 +225,20 @@ private fun PhoneBottomBar(
         )
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             PlayerIconButton(icon = R.drawable.ic_lock, contentDescription = "Lock screen", onClick = actions::toggleLock)
+            if (state.canShuffle) {
+                PlayerToggleButton(
+                    icon = R.drawable.ic_shuffle,
+                    contentDescription = "Shuffle",
+                    checked = state.shuffle,
+                    onClick = actions::toggleShuffle,
+                )
+            }
+            PlayerToggleButton(
+                icon = state.repeatMode.iconRes(),
+                contentDescription = state.repeatMode.label,
+                checked = state.repeatMode != RepeatMode.OFF,
+                onClick = actions::cycleRepeat,
+            )
             Spacer(Modifier.weight(1f))
             PlayerIconButton(
                 icon = R.drawable.ic_aspect_ratio,

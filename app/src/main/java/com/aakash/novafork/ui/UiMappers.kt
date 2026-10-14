@@ -3,6 +3,7 @@ package com.aakash.novafork.ui
 import com.aakash.novafork.core.format.Formats
 import com.aakash.novafork.core.smb.SmbUris
 import com.aakash.novafork.core.tmdb.TmdbClient
+import com.aakash.novafork.data.PlaylistWithCount
 import com.aakash.novafork.data.ScanState
 import com.aakash.novafork.data.db.SourceEntity
 import com.aakash.novafork.data.db.SourceType
@@ -19,6 +20,8 @@ import com.aakash.novafork.ui.model.LibraryItemUi
 import com.aakash.novafork.ui.model.LibrarySort
 import com.aakash.novafork.ui.model.LibraryUi
 import com.aakash.novafork.ui.model.MediaKind
+import com.aakash.novafork.ui.model.PlaylistDetailsUi
+import com.aakash.novafork.ui.model.PlaylistUi
 import com.aakash.novafork.ui.model.ScanUi
 import com.aakash.novafork.ui.model.SearchUi
 import com.aakash.novafork.ui.model.SeasonUi
@@ -394,10 +397,30 @@ object UiMappers {
 
     // Browse
 
-    fun browse(index: LibraryIndex, scan: ScanState): BrowseUi = BrowseUi(
+    fun browse(index: LibraryIndex, scan: ScanState, playlists: List<PlaylistWithCount> = emptyList()): BrowseUi = BrowseUi(
         sources = sources(index, scan),
         streams = index.videos.filter { it.kind == MediaKind.STREAM }.map { it.card },
+        playlists = playlists(index, playlists),
     )
+
+    // Playlists
+
+    fun playlists(index: LibraryIndex, playlists: List<PlaylistWithCount>): List<PlaylistUi> = playlists.map { playlist ->
+        PlaylistUi(
+            id = playlist.id,
+            name = playlist.name,
+            itemCount = playlist.itemCount,
+            artwork = playlist.coverVideoId?.let { index.videosById[it]?.card?.artwork },
+        )
+    }
+
+    /** [videoIds] in playlist order; videos the index doesn't show are left out. */
+    fun playlistDetails(index: LibraryIndex, id: Long, name: String, videoIds: List<Long>): PlaylistDetailsUi =
+        PlaylistDetailsUi(
+            id = id,
+            name = name,
+            videos = videoIds.distinct().mapNotNull { index.videosById[it]?.card },
+        )
 
     /** Device, then picked folders, then network shares; streams are listed as videos instead. */
     fun sources(index: LibraryIndex, scan: ScanState): List<SourceUi> =
