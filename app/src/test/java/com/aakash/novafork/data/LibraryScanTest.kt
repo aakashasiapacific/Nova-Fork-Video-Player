@@ -11,6 +11,7 @@ import com.aakash.novafork.data.db.SourceEntity
 import com.aakash.novafork.data.db.SourceType
 import com.aakash.novafork.data.db.VideoEntity
 import com.aakash.novafork.data.db.VideoKind
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -225,6 +226,81 @@ class LibraryScanTest {
     }
 
     @Test
+    fun refreshDuringALaunchRefreshJoinsItAndWalksWhatItSkipped() = runTest {
+        val recentId = repo.addFolder(TREE, "Library")
+        fx.folders.serve(TREE, INCEPTION)
+        repo.scanSource(recentId)
+        // Added since and never scanned: the launch refresh walks it, held open here.
+        fx.database.sourceDao().insert(SourceEntity(type = SourceType.FOLDER, name = "Other", location = OTHER_TREE))
+        fx.folders.serve(OTHER_TREE, SINTEL)
+        fx.folders.serve(TREE, INCEPTION, CAMERA_CLIP)
+        val gate = fx.folders.hold(OTHER_TREE)
+
+        val launchRefresh = async { repo.refreshAll() }
+        try {
+            gate.entered.await()
+            assertTrue(repo.scanState.value.running)
+            // Pull to refresh meanwhile: it returns at once instead of walking anything itself.
+            repo.refreshAll()
+            assertEquals(1, fx.folders.scanCount(TREE))
+        } finally {
+            gate.open()
+        }
+        launchRefresh.await()
+
+        // The running refresh then also walked the folder it had skipped as recently scanned.
+        assertEquals(2, fx.folders.scanCount(TREE))
+        assertEquals(1, fx.folders.scanCount(OTHER_TREE))
+        assertTrue(fx.videoAt(CAMERA_CLIP.uri).present)
+        assertTrue(fx.videoAt(SINTEL.uri).present)
+        assertFalse(repo.scanState.value.running)
+    }
+
+    @Test
+    fun addingAFolderTwiceKeepsOneSource() = runTest {
+        val id = repo.addFolder(TREE, "Library")
+
+        assertEquals(id, repo.addFolder(TREE, "Videos"))
+        assertEquals(1, fx.database.sourceDao().all().count { it.type == SourceType.FOLDER })
+        assertEquals("Library", repo.source(id)?.name)
+        // A blank name gets a generic one.
+        assertEquals("Folder", repo.source(repo.addFolder(OTHER_TREE, "  "))?.name)
+    }
+
+    @Test
+    fun editingAShareKeepsItsIdAndVideos() = runTest {
+        val id = repo.saveSmbServer(
+            id = null, name = "NAS", host = "nas.local", port = null, share = "media", path = "",
+            username = "alice", password = "secret", domain = null,
+        )
+        fx.shares.serve(SMB_ROOT, SMB_MOVIE)
+        repo.scanSource(id)
+        val movieId = fx.videoAt(SMB_MOVIE.uri).id
+        repo.savePlayback(movieId, 300_000, 6_000_000)
+        fx.database.sourceDao().markFailed(id, "Bad login")
+
+        val saved = repo.saveSmbServer(
+            id = id, name = " ", host = " nas.local ", port = null, share = "/media/", path = "/",
+            username = "  ", password = "", domain = " WORKGROUP ",
+        )
+
+        assertEquals(id, saved)
+        assertEquals(1, fx.database.sourceDao().smbSources().size)
+        val source = requireNotNull(repo.source(id))
+        assertEquals("nas.local/media", source.name)
+        assertEquals(SMB_ROOT, source.location)
+        assertNull(source.username)
+        assertNull(source.password)
+        assertEquals("WORKGROUP", source.domain)
+        assertNull(source.lastError)
+        assertEquals(SmbCredentials(null, null, "WORKGROUP"), repo.smbCredentials("nas.local", "media"))
+        val movie = fx.videoAt(SMB_MOVIE.uri)
+        assertEquals(movieId, movie.id)
+        assertEquals(id, movie.sourceId)
+        assertEquals(300_000L, movie.positionMs)
+    }
+
+    @Test
     fun deviceStorageFollowsTheSettingAndThePermission() = runTest {
         fx.device.serve(DEVICE_LOCATION, DEVICE_CLIP)
 
@@ -297,6 +373,23 @@ class LibraryScanTest {
         assertEquals(2, fx.database.sourceDao().all().count { it.type == SourceType.STREAM })
 
         assertTrue(runCatching { repo.addStream(null, "   ") }.exceptionOrNull() is IllegalArgumentException)
+    }
+
+    @Test
+    fun removingAStreamDeletesItsVideo() = runTest {
+        val url = "rtsp://camera.local:554/stream1"
+        val videoId = repo.addStream("Front door", url)
+        val streamId = requireNotNull(repo.video(videoId)).video.sourceId
+        assertEquals("Front door", repo.source(streamId)?.name)
+        assertEquals(listOf(url), repo.observeVideos().first().map { it.video.uri })
+
+        repo.removeSource(streamId)
+
+        assertNull(repo.source(streamId))
+        assertNull(repo.video(videoId))
+        assertNull(repo.findByUri(url))
+        assertTrue(repo.observeVideos().first().isEmpty())
+        assertTrue(repo.observeSources().first().isEmpty())
     }
 
     @Test

@@ -98,6 +98,59 @@ class LibraryMetadataTest {
     }
 
     @Test
+    fun identifyKeepsNumbersTmdbHasNoEpisodesFor() = runTest {
+        scan(SEV_1, SEV_DOUBLE, SEV_S3E1)
+
+        // TMDB knows season 1 only: season 3 answers 404.
+        repo.identify(fx.videoAt(SEV_S3E1.uri).id, severanceResult)
+
+        fx.videoAt(SEV_S3E1.uri).let {
+            assertEquals(MatchState.MANUAL, it.matchState)
+            assertEquals(SEVERANCE_KEY, it.metadataKey)
+            assertEquals(3, it.season)
+            assertEquals(1, it.episode)
+            assertNull(it.episodeTitle)
+            assertNull(it.episodeStillPath)
+        }
+        // A double episode keeps its last part and gets the first part's data.
+        fx.videoAt(SEV_DOUBLE.uri).let {
+            assertEquals(MatchState.MANUAL, it.matchState)
+            assertEquals(1, it.season)
+            assertEquals(4, it.episode)
+            assertEquals(5, it.episodeEnd)
+            assertEquals("Severance 1x4", it.episodeTitle)
+        }
+        assertEquals("Severance 1x1", fx.videoAt(SEV_1.uri).episodeTitle)
+        assertTrue(fx.tmdb.requests.contains("tv/${TmdbJson.SEVERANCE_ID}/season/3"))
+        // In order through the gap: S1E1, S1E4-5, S3E1.
+        assertEquals(SEV_DOUBLE.uri, repo.nextEpisode(fx.videoAt(SEV_1.uri).id)?.video?.uri)
+        assertEquals(SEV_S3E1.uri, repo.nextEpisode(fx.videoAt(SEV_DOUBLE.uri).id)?.video?.uri)
+    }
+
+    @Test
+    fun identifyingOneEpisodeAsAMovieTakesOnlyThatFile() = runTest {
+        scan(SEV_1, SEV_2)
+
+        repo.identify(fx.videoAt(SEV_2.uri).id, inceptionResult)
+
+        fx.videoAt(SEV_2.uri).let {
+            assertEquals(VideoKind.MOVIE, it.kind)
+            assertEquals(MatchState.MANUAL, it.matchState)
+            assertEquals(INCEPTION_KEY, it.metadataKey)
+            assertNull(it.showKey)
+            assertNull(it.season)
+            assertNull(it.episode)
+        }
+        fx.videoAt(SEV_1.uri).let {
+            assertEquals(VideoKind.EPISODE, it.kind)
+            assertEquals(MatchState.PENDING, it.matchState)
+            assertEquals(LibraryKeys.showKey(null, "Severance"), it.showKey)
+        }
+        assertNull(repo.nextEpisode(fx.videoAt(SEV_1.uri).id))
+        assertNull(repo.nextEpisode(fx.videoAt(SEV_2.uri).id))
+    }
+
+    @Test
     fun identifyingAHomeVideoAsAMovie() = runTest {
         scan(CLIP, SEV_1)
 
@@ -329,6 +382,8 @@ class LibraryMetadataTest {
         val SEV_1 = scannedVideo("$TREE/document/sev-1", "Severance.S01E01.mkv", "TV/Severance")
         val SEV_2 = scannedVideo("$TREE/document/sev-2", "Severance.S01E02.mkv", "TV/Severance")
         val SEV_3 = scannedVideo("$TREE/document/sev-3", "Severance.S01E03.mkv", "TV/Severance")
+        val SEV_DOUBLE = scannedVideo("$TREE/document/sev-4-5", "Severance.S01E04E05.mkv", "TV/Severance")
+        val SEV_S3E1 = scannedVideo("$TREE/document/sev-3-1", "Severance.S03E01.mkv", "TV/Severance")
         val FOUNDATION = scannedVideo("$TREE/document/foundation-1", "Foundation.S01E01.mkv", "TV/Foundation")
         val FRIEREN_5 = scannedVideo("$TREE/document/frieren-5", "[SubsPlease] Frieren - 05 (1080p).mkv", "Anime/Frieren")
         val FRIEREN_30 = scannedVideo("$TREE/document/frieren-30", "[SubsPlease] Frieren - 30 (1080p).mkv", "Anime/Frieren")

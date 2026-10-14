@@ -11,6 +11,7 @@ import com.aakash.novafork.data.db.NovaDatabase
 import com.aakash.novafork.data.db.SourceEntity
 import com.aakash.novafork.data.db.SourceType
 import com.aakash.novafork.data.db.VideoEntity
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -144,18 +145,45 @@ internal fun scannedVideo(
 internal class FakeScanner : SourceScanner {
     private val files = ConcurrentHashMap<String, List<ScannedVideo>>()
     private val scans = AtomicInteger()
+    private val scansByLocation = ConcurrentHashMap<String, AtomicInteger>()
+    private val gates = ConcurrentHashMap<String, Gate>()
 
     @Volatile
     var failure: Exception? = null
 
+    /** Scans started so far, of every source. */
     val scanCount: Int get() = scans.get()
+
+    fun scanCount(location: String): Int = scansByLocation[location]?.get() ?: 0
 
     fun serve(location: String, vararg videos: ScannedVideo) {
         files[location] = videos.toList()
     }
 
+    /** Scans of [location] wait from now on until the returned gate is opened. */
+    fun hold(location: String): Gate = Gate().also { gates[location] = it }
+
+    /** Holds a scan in progress, so a test can act while a refresh is running. */
+    class Gate {
+        private val released = CompletableDeferred<Unit>()
+
+        /** Completes once a scan is waiting at the gate. */
+        val entered = CompletableDeferred<Unit>()
+
+        fun open() {
+            released.complete(Unit)
+        }
+
+        suspend fun pass() {
+            entered.complete(Unit)
+            released.await()
+        }
+    }
+
     override suspend fun scan(source: SourceEntity, onProgress: (found: Int) -> Unit): List<ScannedVideo> {
         scans.incrementAndGet()
+        scansByLocation.getOrPut(source.location) { AtomicInteger() }.incrementAndGet()
+        gates[source.location]?.pass()
         failure?.let { throw it }
         val found = files[source.location].orEmpty()
         onProgress(found.size)
