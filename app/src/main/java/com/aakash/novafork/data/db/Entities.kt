@@ -2,6 +2,7 @@ package com.aakash.novafork.data.db
 
 import androidx.room.Embedded
 import androidx.room.Entity
+import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
 import androidx.room.Relation
@@ -141,6 +142,50 @@ data class MatchCacheEntity(
     /** Null = looked up, no match. */
     val metadataKey: String?,
     val checkedAt: Long,
+)
+
+/** A user playlist (schema version 2). Its videos are [PlaylistItemEntity] rows. */
+@Entity(tableName = "playlists")
+data class PlaylistEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val name: String,
+    val createdAt: Long,
+    /** Last change to the name or the items; epoch ms. */
+    val updatedAt: Long,
+)
+
+/**
+ * One video in a playlist; a video is in a playlist at most once. [position] orders the items
+ * (0, 1, 2, … as the repository writes them; deleting videos with their source can leave gaps).
+ * Deleting the playlist or the video's row deletes the item; a video that is only missing from
+ * its folder (present = false) keeps it.
+ */
+@Entity(
+    tableName = "playlist_items",
+    foreignKeys = [
+        ForeignKey(
+            entity = PlaylistEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["playlistId"],
+            onDelete = ForeignKey.CASCADE,
+        ),
+        ForeignKey(
+            entity = VideoEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["videoId"],
+            onDelete = ForeignKey.CASCADE,
+        ),
+    ],
+    indices = [
+        Index(value = ["playlistId"]),
+        Index(value = ["videoId"]),
+    ],
+)
+data class PlaylistItemEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val playlistId: Long,
+    val videoId: Long,
+    val position: Int,
 )
 
 data class VideoWithMeta(

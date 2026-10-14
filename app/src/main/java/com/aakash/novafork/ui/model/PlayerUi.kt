@@ -30,6 +30,28 @@ data class UpNextUi(
     val countdownSeconds: Int?,
 )
 
+/** What happens when the playing item ends; next/previous buttons are never affected. */
+enum class RepeatMode {
+    /** Play on to the next item; stop after the last one. */
+    OFF,
+
+    /** After the last item, start again from the first (a single video loops). */
+    ALL,
+
+    /** Play the same item again. */
+    ONE,
+}
+
+/** One library video of the play queue, in play order (shuffled order while shuffle is on). */
+@Immutable
+data class QueueItemUi(
+    val videoId: Long,
+    val title: String,
+    /** "S1 · E3 · Pilot", "2024 · 4K", folder name … */
+    val subtitle: String?,
+    val artwork: Artwork,
+)
+
 @Immutable
 data class PlayerUiState(
     val title: String = "",
@@ -64,6 +86,16 @@ data class PlayerUiState(
     /** Current volume/brightness 0–1 (for the gesture overlay start value). */
     val volume: Float = 0.5f,
     val brightness: Float = 0.5f,
+    /** The queue plays in a shuffled order ([queue] is listed in that order). */
+    val shuffle: Boolean = false,
+    val repeatMode: RepeatMode = RepeatMode.OFF,
+    /**
+     * The library videos queued, in play order, the playing one included. Empty for a link that
+     * isn't in the library; one item for a single video (next/previous then follow the episodes).
+     */
+    val queue: List<QueueItemUi> = emptyList(),
+    /** Index of the playing item in [queue]; 0 while [queue] is empty. */
+    val queueIndex: Int = 0,
 )
 
 /**
@@ -110,6 +142,18 @@ interface PlayerActions {
     fun playPrevious()
     fun cancelUpNext()
 
+    /** Shuffle on/off. The playing item stays where it is; the rest of the queue is reordered. */
+    fun toggleShuffle()
+
+    /** OFF → ALL → ONE → OFF. */
+    fun cycleRepeat()
+
+    /** Plays [index] of [PlayerUiState.queue]. */
+    fun playQueueItem(index: Int)
+
+    /** Leaves the player screen and keeps the sound playing, with controls in a notification. */
+    fun playInBackground()
+
     fun close()
 }
 
@@ -138,5 +182,9 @@ open class NoOpPlayerActions : PlayerActions {
     override fun playNext() {}
     override fun playPrevious() {}
     override fun cancelUpNext() {}
+    override fun toggleShuffle() {}
+    override fun cycleRepeat() {}
+    override fun playQueueItem(index: Int) {}
+    override fun playInBackground() {}
     override fun close() {}
 }

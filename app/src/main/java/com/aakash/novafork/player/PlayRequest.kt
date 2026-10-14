@@ -37,3 +37,44 @@ data class PlayRequest(
         }
     }
 }
+
+/** Library videos to play one after the other, read from [PlayerIntents.forQueue]. */
+data class QueueRequest(
+    /** Never empty; in the order they were queued. */
+    val videoIds: List<Long>,
+    /** Index into [videoIds] of the video that plays first. */
+    val startIndex: Int = 0,
+    val shuffle: Boolean = false,
+) {
+    /** The same queue, starting with [videoId] when it is in it. */
+    fun startingAt(videoId: Long?): QueueRequest {
+        val index = videoId?.let { videoIds.indexOf(it) } ?: -1
+        return if (index >= 0) copy(startIndex = index) else this
+    }
+
+    companion object {
+        fun fromIntent(intent: Intent): QueueRequest? = try {
+            val raw = intent.getLongArrayExtra(PlayerIntents.EXTRA_QUEUE)
+            if (raw == null || raw.isEmpty()) {
+                null
+            } else {
+                val start = intent.getIntExtra(PlayerIntents.EXTRA_QUEUE_INDEX, 0).coerceIn(0, raw.lastIndex)
+                val ids = raw.filter { it > 0 }
+                // Where the start video lands once invalid ids are gone.
+                val startIndex = if (raw[start] > 0) raw.take(start).count { it > 0 } else 0
+                if (ids.isEmpty()) {
+                    null
+                } else {
+                    QueueRequest(
+                        videoIds = ids,
+                        startIndex = startIndex,
+                        shuffle = intent.getBooleanExtra(PlayerIntents.EXTRA_SHUFFLE, false),
+                    )
+                }
+            }
+        } catch (e: RuntimeException) {
+            // Extras that fail to unparcel: read as a single video (or link) instead.
+            null
+        }
+    }
+}

@@ -50,6 +50,11 @@ data class Settings(
     val seekStepSeconds: Int = 10,
     /** Play the next episode automatically when one ends. */
     val autoPlayNext: Boolean = true,
+    /**
+     * Leaving the player while a video plays (Home, screen off, another app) keeps its sound
+     * playing, with controls in a notification. Off: it pauses, or goes picture-in-picture.
+     */
+    val backgroundAudio: Boolean = true,
 )
 
 interface SettingsStore {

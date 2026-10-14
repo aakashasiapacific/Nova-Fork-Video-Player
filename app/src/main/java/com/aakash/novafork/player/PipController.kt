@@ -24,6 +24,7 @@ internal class PipController(
     val isSupported: Boolean = activity.packageManager.hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE)
 
     private var playing = false
+    private var autoEnter = false
     private var aspectRatio = DEFAULT_ASPECT
     private var registered = false
 
@@ -63,9 +64,14 @@ internal class PipController(
         }
     }
 
-    /** Keeps the system's PiP parameters current, so auto-enter and the action icon match playback. */
-    fun update(playing: Boolean, videoSize: VideoSize?) {
+    /**
+     * Keeps the system's PiP parameters current, so auto-enter and the action icon match playback.
+     * [autoEnter] = leaving the app while this shows enters PiP (Android 12+); off while leaving
+     * plays the sound in the background instead.
+     */
+    fun update(playing: Boolean, videoSize: VideoSize?, autoEnter: Boolean = playing) {
         this.playing = playing
+        this.autoEnter = autoEnter
         aspectRatio = videoSize?.let { aspectFor(it.width, it.height) } ?: DEFAULT_ASPECT
         if (!isSupported) return
         try {
@@ -98,7 +104,7 @@ internal class PipController(
             .setAspectRatio(aspectRatio)
             .setActions(listOf(RemoteAction(icon, label, label, toggleIntent)))
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            builder.setAutoEnterEnabled(playing)
+            builder.setAutoEnterEnabled(autoEnter)
             builder.setSeamlessResizeEnabled(true)
         }
         return builder.build()

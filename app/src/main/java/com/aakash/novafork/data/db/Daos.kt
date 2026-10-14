@@ -7,6 +7,7 @@ import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Update
 import androidx.room.Upsert
+import com.aakash.novafork.data.PlaylistWithCount
 import kotlinx.coroutines.flow.Flow
 
 /** SQLite allows 999 bound arguments per statement on older Android versions; stay well below. */
@@ -113,6 +114,23 @@ interface VideoDao {
 
     @Query("SELECT DISTINCT parsedTitle FROM videos WHERE kind = 'EPISODE' AND matchState != 'MANUAL'")
     suspend fun automaticEpisodeTitles(): List<String>
+
+    // Queues
+
+    /** Present files of one source, the raw material of a folder queue. */
+    @Query("SELECT id, fileName, folder FROM videos WHERE sourceId = :sourceId AND present = 1")
+    suspend fun folderEntries(sourceId: Long): List<FolderEntry>
+
+    /** A show's episodes the library shows: present, from a source that is turned on. */
+    @Query(
+        "SELECT * FROM videos WHERE showKey = :showKey AND kind = 'EPISODE' AND present = 1 " +
+            "AND sourceId IN (SELECT id FROM sources WHERE enabled = 1)",
+    )
+    suspend fun shownEpisodesOf(showKey: String): List<VideoEntity>
+
+    /** Those of [ids] that still have a row. At most [SQL_CHUNK] ids per call. */
+    @Query("SELECT id FROM videos WHERE id IN (:ids)")
+    suspend fun existingIds(ids: List<Long>): List<Long>
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insert(video: VideoEntity): Long
@@ -241,6 +259,83 @@ interface VideoDao {
     /** Puts back the numbering from the file name (absolute anime numbers are re-placed on the next match). */
     @Query("UPDATE videos SET season = :season, episode = :episode, episodeEnd = :episodeEnd WHERE id = :id")
     suspend fun setEpisodeNumbers(id: Long, season: Int?, episode: Int?, episodeEnd: Int?)
+}
+
+/** A video's place in its source, for folder queues. */
+data class FolderEntry(
+    val id: Long,
+    val fileName: String,
+    /** [VideoEntity.folder]. */
+    val folder: String,
+)
+
+/**
+ * Playlists. Items whose video the library hides (missing from its folder, or from a source that
+ * is turned off) stay in the playlist but are left out of what [observeWithCounts] counts and
+ * [shownVideos] lists, so they come back with the file.
+ */
+@Dao
+interface PlaylistDao {
+    /** Most recently changed first; the cover is the first shown video. */
+    @Query(
+        "SELECT p.id AS id, p.name AS name, p.updatedAt AS updatedAt, " +
+            "(SELECT COUNT(*) FROM playlist_items i JOIN videos v ON v.id = i.videoId " +
+            "WHERE i.playlistId = p.id AND v.present = 1 " +
+            "AND v.sourceId IN (SELECT s.id FROM sources s WHERE s.enabled = 1)) AS itemCount, " +
+            "(SELECT i.videoId FROM playlist_items i JOIN videos v ON v.id = i.videoId " +
+            "WHERE i.playlistId = p.id AND v.present = 1 " +
+            "AND v.sourceId IN (SELECT s.id FROM sources s WHERE s.enabled = 1) " +
+            "ORDER BY i.`position`, i.id LIMIT 1) AS coverVideoId " +
+            "FROM playlists p ORDER BY p.updatedAt DESC, p.id DESC",
+    )
+    fun observeWithCounts(): Flow<List<PlaylistWithCount>>
+
+    @Query("SELECT * FROM playlists WHERE id = :id")
+    suspend fun byId(id: Long): PlaylistEntity?
+
+    @Insert
+    suspend fun insert(playlist: PlaylistEntity): Long
+
+    @Query("UPDATE playlists SET name = :name, updatedAt = :updatedAt WHERE id = :id")
+    suspend fun rename(id: Long, name: String, updatedAt: Long)
+
+    @Query("UPDATE playlists SET updatedAt = :updatedAt WHERE id = :id")
+    suspend fun touch(id: Long, updatedAt: Long)
+
+    /** Its items go with it (foreign key cascade). */
+    @Query("DELETE FROM playlists WHERE id = :id")
+    suspend fun delete(id: Long)
+
+    /** Every item, shown or not, in playlist order. */
+    @Query("SELECT * FROM playlist_items WHERE playlistId = :playlistId ORDER BY `position`, id")
+    suspend fun items(playlistId: Long): List<PlaylistItemEntity>
+
+    /** Item ids (not video ids) of the shown videos, in playlist order: the indices of [shownVideos]. */
+    @Query(
+        "SELECT i.id FROM playlist_items i JOIN videos v ON v.id = i.videoId " +
+            "WHERE i.playlistId = :playlistId AND v.present = 1 " +
+            "AND v.sourceId IN (SELECT s.id FROM sources s WHERE s.enabled = 1) " +
+            "ORDER BY i.`position`, i.id",
+    )
+    suspend fun shownItemIds(playlistId: Long): List<Long>
+
+    @Transaction
+    @Query(
+        "SELECT v.* FROM playlist_items i JOIN videos v ON v.id = i.videoId " +
+            "WHERE i.playlistId = :playlistId AND v.present = 1 " +
+            "AND v.sourceId IN (SELECT s.id FROM sources s WHERE s.enabled = 1) " +
+            "ORDER BY i.`position`, i.id",
+    )
+    suspend fun shownVideos(playlistId: Long): List<VideoWithMeta>
+
+    @Insert
+    suspend fun insertItems(items: List<PlaylistItemEntity>)
+
+    @Query("UPDATE playlist_items SET `position` = :position WHERE id = :id")
+    suspend fun setPosition(id: Long, position: Int)
+
+    @Query("DELETE FROM playlist_items WHERE playlistId = :playlistId AND videoId = :videoId")
+    suspend fun removeVideo(playlistId: Long, videoId: Long)
 }
 
 @Dao

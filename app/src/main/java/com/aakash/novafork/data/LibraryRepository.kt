@@ -29,6 +29,20 @@ data class TmdbSearchResult(
     val posterUrl: String?,
 )
 
+/**
+ * A playlist as lists show it. [itemCount] and [coverVideoId] only take the videos the library
+ * shows (present, from a source that is turned on); [LibraryRepository.playlistVideos] lists the same.
+ */
+data class PlaylistWithCount(
+    val id: Long,
+    val name: String,
+    val itemCount: Int,
+    /** Last change to the name or the items, epoch ms. */
+    val updatedAt: Long,
+    /** First shown video, for the playlist's artwork; null while it shows none. */
+    val coverVideoId: Long?,
+)
+
 interface LibraryRepository {
     /** Every present video with its metadata. Emits on any change. */
     fun observeVideos(): Flow<List<VideoWithMeta>>
@@ -107,4 +121,59 @@ interface LibraryRepository {
 
     /** Re-runs matching for UNMATCHED videos now (e.g. after a TMDB key was added). */
     suspend fun retryMatching()
+
+    // Playlists. A video is in a playlist at most once. Items whose file is missing (or whose source
+    // is turned off) are kept but left out of counts, lists and positions until the file is back;
+    // removing a source removes its videos from every playlist.
+
+    /** Most recently changed first. Emits on any change. */
+    fun observePlaylists(): Flow<List<PlaylistWithCount>>
+
+    /** The playlist's shown videos in playlist order (empty for an unknown id). */
+    suspend fun playlistVideos(playlistId: Long): List<VideoWithMeta>
+
+    /** Returns the new playlist's id. The name is trimmed and must not be blank (IllegalArgumentException). */
+    suspend fun createPlaylist(name: String): Long
+
+    /** Same name rules as [createPlaylist]; an unknown id is ignored. */
+    suspend fun renamePlaylist(id: Long, name: String)
+
+    suspend fun deletePlaylist(id: Long)
+
+    /**
+     * Appends [videoIds] in the given order, skipping videos already in the playlist, repeats and
+     * ids without a video. An unknown playlist is ignored.
+     */
+    suspend fun addToPlaylist(playlistId: Long, videoIds: List<Long>)
+
+    suspend fun removeFromPlaylist(playlistId: Long, videoId: Long)
+
+    /**
+     * Moves the item at index [from] of [playlistVideos] so it ends up at index [to]; indices out
+     * of range are ignored (the list may have changed under a drag).
+     */
+    suspend fun movePlaylistItem(playlistId: Long, from: Int, to: Int)
+
+    // Queues: ordered video ids to play, from what the library shows.
+
+    /**
+     * The videos directly in one folder of a source (not its subfolders), by file name with
+     * numbers in order ("Episode 2" before "Episode 10"). [path] is the folder as Browse lists it:
+     * relative to the source's root, '/'-separated, "" for the root.
+     */
+    suspend fun folderQueue(sourceId: Long, path: String): List<Long>
+
+    /**
+     * A show's episodes in watching order: by season (specials, season 0, last), then episode.
+     * [season] null = the whole show; season 1 includes episodes without a season. Of two copies
+     * of an episode (720p and 1080p) the first by file name plays, and a double episode
+     * (S01E01E02) stands in for the episodes it contains.
+     */
+    suspend fun seasonQueue(showKey: String, season: Int?): List<Long>
+
+    /**
+     * What to play from [videoId] on: for an episode, it and the rest of its show after it (as in
+     * [seasonQueue]); for anything else just the video itself. Empty for an unknown id.
+     */
+    suspend fun nextUpQueue(videoId: Long): List<Long>
 }

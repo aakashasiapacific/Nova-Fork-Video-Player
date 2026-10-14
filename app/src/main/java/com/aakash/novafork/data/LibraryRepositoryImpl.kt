@@ -13,6 +13,7 @@ import androidx.core.content.edit
 import androidx.room.withTransaction
 import com.aakash.novafork.CrashReporter
 import com.aakash.novafork.core.library.LibraryKeys
+import com.aakash.novafork.core.library.NaturalOrder
 import com.aakash.novafork.core.library.VideoFiles
 import com.aakash.novafork.core.parse.NameParser
 import com.aakash.novafork.core.parse.ParsedKind
@@ -24,9 +25,12 @@ import com.aakash.novafork.core.tmdb.TmdbEpisode
 import com.aakash.novafork.core.tmdb.TmdbException
 import com.aakash.novafork.core.tmdb.TmdbMovieSummary
 import com.aakash.novafork.core.tmdb.TmdbTvSummary
+import com.aakash.novafork.data.db.FolderEntry
 import com.aakash.novafork.data.db.MatchCacheEntity
 import com.aakash.novafork.data.db.MatchState
 import com.aakash.novafork.data.db.NovaDatabase
+import com.aakash.novafork.data.db.PlaylistEntity
+import com.aakash.novafork.data.db.PlaylistItemEntity
 import com.aakash.novafork.data.db.SQL_CHUNK
 import com.aakash.novafork.data.db.SourceEntity
 import com.aakash.novafork.data.db.SourceType
@@ -92,6 +96,7 @@ class LibraryRepositoryImpl(
     private val videoDao = database.videoDao()
     private val metadataDao = database.metadataDao()
     private val matchCacheDao = database.matchCacheDao()
+    private val playlistDao = database.playlistDao()
 
     private val state = MutableStateFlow(ScanState())
     override val scanState: StateFlow<ScanState> = state.asStateFlow()
@@ -811,6 +816,122 @@ class LibraryRepositoryImpl(
         enricher.request()
     }
 
+    // Playlists
+
+    override fun observePlaylists(): Flow<List<PlaylistWithCount>> =
+        playlistDao.observeWithCounts().distinctUntilChanged()
+
+    override suspend fun playlistVideos(playlistId: Long): List<VideoWithMeta> =
+        withContext(Dispatchers.IO) { playlistDao.shownVideos(playlistId) }
+
+    override suspend fun createPlaylist(name: String): Long {
+        val clean = playlistName(name)
+        return withContext(Dispatchers.IO) {
+            val now = System.currentTimeMillis()
+            playlistDao.insert(PlaylistEntity(name = clean, createdAt = now, updatedAt = now))
+        }
+    }
+
+    override suspend fun renamePlaylist(id: Long, name: String) {
+        val clean = playlistName(name)
+        withContext(Dispatchers.IO) { playlistDao.rename(id, clean, System.currentTimeMillis()) }
+    }
+
+    override suspend fun deletePlaylist(id: Long) {
+        withContext(Dispatchers.IO) { playlistDao.delete(id) }
+    }
+
+    override suspend fun addToPlaylist(playlistId: Long, videoIds: List<Long>) {
+        if (videoIds.isEmpty()) return
+        withContext(Dispatchers.IO) {
+            database.withTransaction {
+                if (playlistDao.byId(playlistId) == null) return@withTransaction
+                val items = playlistDao.items(playlistId)
+                val taken = items.mapTo(HashSet<Long>()) { it.videoId }
+                // Keeps the given order, without what the playlist already has or a second copy.
+                val wanted = videoIds.filter { taken.add(it) }
+                if (wanted.isEmpty()) return@withTransaction
+                // A video removed meanwhile would fail the foreign key.
+                val existing = wanted.chunked(SQL_CHUNK).flatMapTo(HashSet<Long>()) { videoDao.existingIds(it) }
+                val start = (items.maxOfOrNull { it.position } ?: -1) + 1
+                val added = wanted.filter { it in existing }.mapIndexed { index, videoId ->
+                    PlaylistItemEntity(playlistId = playlistId, videoId = videoId, position = start + index)
+                }
+                if (added.isEmpty()) return@withTransaction
+                playlistDao.insertItems(added)
+                playlistDao.touch(playlistId, System.currentTimeMillis())
+            }
+        }
+    }
+
+    override suspend fun removeFromPlaylist(playlistId: Long, videoId: Long) {
+        withContext(Dispatchers.IO) {
+            database.withTransaction {
+                val items = playlistDao.items(playlistId)
+                if (items.none { it.videoId == videoId }) return@withTransaction
+                playlistDao.removeVideo(playlistId, videoId)
+                renumber(items.filter { it.videoId != videoId })
+                playlistDao.touch(playlistId, System.currentTimeMillis())
+            }
+        }
+    }
+
+    override suspend fun movePlaylistItem(playlistId: Long, from: Int, to: Int) {
+        if (from == to) return
+        withContext(Dispatchers.IO) {
+            database.withTransaction {
+                // Indices count shown videos only; hidden items keep their place among the others.
+                val shown = playlistDao.shownItemIds(playlistId)
+                if (from !in shown.indices || to !in shown.indices) return@withTransaction
+                val items = playlistDao.items(playlistId)
+                val moving = items.firstOrNull { it.id == shown[from] } ?: return@withTransaction
+                val reordered = items.filterTo(ArrayList()) { it.id != moving.id }
+                val target = reordered.indexOfFirst { it.id == shown[to] }
+                if (target < 0) return@withTransaction
+                // Moving down it goes after the item it lands on, moving up before it.
+                reordered.add(if (from < to) target + 1 else target, moving)
+                renumber(reordered)
+                playlistDao.touch(playlistId, System.currentTimeMillis())
+            }
+        }
+    }
+
+    /** Gives [ordered] the positions 0, 1, 2, …, writing only the items that move. */
+    private suspend fun renumber(ordered: List<PlaylistItemEntity>) {
+        ordered.forEachIndexed { index, item ->
+            if (item.position != index) playlistDao.setPosition(item.id, index)
+        }
+    }
+
+    // Queues
+
+    override suspend fun folderQueue(sourceId: Long, path: String): List<Long> = withContext(Dispatchers.IO) {
+        val source = sourceDao.byId(sourceId)?.takeIf { it.enabled } ?: return@withContext emptyList()
+        val dir = path.trim('/')
+        val smbRoot = if (source.type == SourceType.SMB) SmbUris.parse(source.location)?.path.orEmpty() else ""
+        videoDao.folderEntries(sourceId)
+            .filter { browseFolder(source.type, smbRoot, it.folder) == dir }
+            .sortedWith(compareBy<FolderEntry, String>(NaturalOrder) { it.fileName }.thenBy { it.id })
+            .map { it.id }
+    }
+
+    override suspend fun seasonQueue(showKey: String, season: Int?): List<Long> = withContext(Dispatchers.IO) {
+        val episodes = videoDao.shownEpisodesOf(showKey)
+            .filter { season == null || listedSeason(it.season) == season }
+        withoutRepeats(episodes.sortedWith(WATCHING_ORDER)).map { it.id }
+    }
+
+    override suspend fun nextUpQueue(videoId: Long): List<Long> = withContext(Dispatchers.IO) {
+        val current = videoDao.byId(videoId) ?: return@withContext emptyList()
+        val showKey = current.showKey
+        if (current.kind != VideoKind.EPISODE || showKey == null) return@withContext listOf(current.id)
+        // The episode asked for plays even when the library does not show it (a missing file).
+        val ordered = (videoDao.shownEpisodesOf(showKey).filter { it.id != current.id } + current)
+            .sortedWith(WATCHING_ORDER)
+        val start = ordered.indexOfFirst { it.id == current.id }
+        withoutRepeats(ordered.subList(start, ordered.size)).map { it.id }
+    }
+
     // Settings reactions
 
     @OptIn(FlowPreview::class)
@@ -926,6 +1047,77 @@ private fun SmbLocation.covers(file: SmbLocation): Boolean =
         (port ?: DEFAULT_SMB_PORT) == (file.port ?: DEFAULT_SMB_PORT) &&
         share.equals(file.share, ignoreCase = true) &&
         (path.isEmpty() || file.path.startsWith("$path/", ignoreCase = true))
+
+/**
+ * A video's folder as Browse lists it, relative to its source's root: device folders as they are,
+ * a picked folder's paths without the folder's own name, share paths below the source's folder
+ * ([smbRoot], the path inside the share). The same rules as the UI's relativeFolder, so
+ * [LibraryRepository.folderQueue] takes Browse's paths.
+ */
+internal fun browseFolder(type: SourceType, smbRoot: String, folder: String): String {
+    val clean = folder.trim('/')
+    return when (type) {
+        SourceType.DEVICE -> clean
+        SourceType.FOLDER -> if ('/' in clean) clean.substringAfter('/') else ""
+        SourceType.SMB -> {
+            val root = smbRoot.trim('/')
+            when {
+                root.isEmpty() -> clean
+                clean.equals(root, ignoreCase = true) -> ""
+                clean.startsWith("$root/", ignoreCase = true) -> clean.substring(root.length + 1)
+                else -> clean
+            }
+        }
+        SourceType.STREAM -> ""
+    }
+}
+
+/** The season an episode is listed under: absolute-numbered ones (no season yet) sit in season 1. */
+private fun listedSeason(season: Int?): Int = season ?: 1
+
+/** Episodes in watching order, as the show's page lists them: season (specials last), episode, file name. */
+private val WATCHING_ORDER: Comparator<VideoEntity> =
+    compareBy<VideoEntity>(
+        { if (it.season == 0) Int.MAX_VALUE else listedSeason(it.season) },
+        { it.episode ?: Int.MAX_VALUE },
+    )
+        .thenBy(NaturalOrder) { it.fileName }
+        .thenBy { it.id }
+
+/**
+ * Drops what a queue would play twice, keeping the first of each in [ordered]: another copy of an
+ * episode (720p and 1080p), or an episode a double episode before it (S01E01E02) already covers.
+ * Episodes without a number are all kept.
+ */
+private fun withoutRepeats(ordered: List<VideoEntity>): List<VideoEntity> {
+    val kept = ArrayList<VideoEntity>(ordered.size)
+    var season: Int? = null
+    var coveredUpTo = Int.MIN_VALUE
+    for (video in ordered) {
+        val episode = video.episode
+        if (episode == null) {
+            kept += video
+            continue
+        }
+        val listed = listedSeason(video.season)
+        if (listed != season) {
+            season = listed
+            coveredUpTo = Int.MIN_VALUE
+        } else if (episode <= coveredUpTo) {
+            continue
+        }
+        kept += video
+        coveredUpTo = max(coveredUpTo, max(episode, video.episodeEnd ?: episode))
+    }
+    return kept
+}
+
+/** Trimmed playlist name; blank is refused. */
+private fun playlistName(name: String): String {
+    val clean = name.trim()
+    require(clean.isNotEmpty()) { "Enter a playlist name" }
+    return clean
+}
 
 /** A bug in the parser must not fail a whole scan: such a file becomes a plain video. */
 private fun parseName(fileName: String, parentFolders: List<String>): ParsedName =

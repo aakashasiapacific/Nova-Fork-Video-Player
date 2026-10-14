@@ -65,6 +65,7 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
             putString(KEY_PREFERRED_SUBTITLE_LANGUAGE, s.preferredSubtitleLanguage)
             putInt(KEY_SEEK_STEP_SECONDS, s.seekStepSeconds)
             putBoolean(KEY_AUTO_PLAY_NEXT, s.autoPlayNext)
+            putBoolean(KEY_BACKGROUND_AUDIO, s.backgroundAudio)
         }
     }
 
@@ -89,6 +90,7 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
         const val KEY_PREFERRED_SUBTITLE_LANGUAGE = "preferred_subtitle_language"
         const val KEY_SEEK_STEP_SECONDS = "seek_step_seconds"
         const val KEY_AUTO_PLAY_NEXT = "auto_play_next"
+        const val KEY_BACKGROUND_AUDIO = "background_audio"
 
         /**
          * Whether the stored TMDB language is the user's pick. Settings saved before the flag
@@ -130,6 +132,7 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
                     ?: defaults.preferredSubtitleLanguage,
                 seekStepSeconds = prefs.getInt(KEY_SEEK_STEP_SECONDS, defaults.seekStepSeconds),
                 autoPlayNext = prefs.getBoolean(KEY_AUTO_PLAY_NEXT, defaults.autoPlayNext),
+                backgroundAudio = prefs.getBoolean(KEY_BACKGROUND_AUDIO, defaults.backgroundAudio),
             )
         }
 

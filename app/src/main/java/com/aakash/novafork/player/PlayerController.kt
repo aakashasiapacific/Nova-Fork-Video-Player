@@ -1,6 +1,6 @@
 package com.aakash.novafork.player
 
-import android.app.Activity
+import android.content.Context
 import android.content.pm.ActivityInfo
 import android.content.res.Configuration
 import android.media.AudioManager
@@ -24,9 +24,12 @@ import com.aakash.novafork.data.db.VideoEntity
 import com.aakash.novafork.data.db.VideoKind
 import com.aakash.novafork.data.db.VideoWithMeta
 import com.aakash.novafork.sources.SubtitleFinder
+import com.aakash.novafork.ui.model.Artwork
 import com.aakash.novafork.ui.model.GestureFeedback
 import com.aakash.novafork.ui.model.PlayerActions
 import com.aakash.novafork.ui.model.PlayerUiState
+import com.aakash.novafork.ui.model.QueueItemUi
+import com.aakash.novafork.ui.model.RepeatMode
 import com.aakash.novafork.ui.model.TrackUi
 import com.aakash.novafork.ui.model.UpNextUi
 import java.io.File
@@ -57,18 +60,21 @@ data class VideoSize(val width: Int, val height: Int) {
 }
 
 /**
- * Owns one libVLC MediaPlayer and turns its events into [PlayerUiState]; implements everything
- * the player UI can ask for. Created by [PlayerActivity] on the main thread; every call is
- * expected on the main thread (libVLC delivers its events there too).
+ * Owns one libVLC MediaPlayer and the play queue, and turns the player's events into
+ * [PlayerUiState]; implements everything the player UI can ask for. Lives in [PlaybackService]
+ * so the sound can go on without a screen; the player screen attaches itself as the [Host] while
+ * it exists. Created on the main thread; every call is expected on the main thread (libVLC
+ * delivers its events there too).
  */
 class PlayerController(
-    private val activity: Activity,
+    context: Context,
     private val graph: AppGraph,
     private val scope: CoroutineScope,
-    private val host: Host,
+    /** Playback is over (closed, stopped, nothing left to play): the service ends the session. */
+    private val onFinished: () -> Unit,
 ) : PlayerActions {
 
-    /** What the controller needs from the screen that owns it. */
+    /** What the controller needs from the screen that shows it. */
     interface Host {
         val supportsPictureInPicture: Boolean
 
@@ -79,6 +85,18 @@ class PlayerController(
 
         /** Playback is over: closed by the user, nothing left to play, or nothing to open. */
         fun finishPlayback()
+
+        /** Leaves the player screen without closing the player ("Play in background"). */
+        fun leavePlayer()
+
+        /** The window's brightness 0–1, or a negative value while it follows the system's. */
+        var windowBrightness: Float
+
+        /** The screen orientation the player asks for, an ActivityInfo.SCREEN_ORIENTATION_* value. */
+        var screenOrientation: Int
+
+        /** The configuration of the screen the player is shown on. */
+        val screenConfiguration: Configuration
     }
 
     private class NowPlaying(val uri: String, val kind: UriKind, val fileName: String, val entry: VideoWithMeta?) {
@@ -88,13 +106,17 @@ class PlayerController(
     /** What the user chose in a session that is reopened in software, handed to the new one. */
     private class CarriedChoices(val audioTrack: Int?, val subtitleTrack: Int?, val subtitleDelayMs: Long)
 
-    private val libVLC = VlcEngine.libVLC(activity)
-    private val mediaPlayer: MediaPlayer = VlcEngine.newMediaPlayer(activity)
-    private val audioManager: AudioManager = checkNotNull(activity.getSystemService(AudioManager::class.java))
+    private val appContext: Context = context.applicationContext
+    private val libVLC = VlcEngine.libVLC(appContext)
+    private val mediaPlayer: MediaPlayer = VlcEngine.newMediaPlayer(appContext)
+    private val audioManager: AudioManager = checkNotNull(appContext.getSystemService(AudioManager::class.java))
     private val mainHandler = Handler(Looper.getMainLooper())
-    private val subtitleFinder = SubtitleFinder(activity.applicationContext, graph.smb) { server, share ->
+    private val subtitleFinder = SubtitleFinder(appContext, graph.smb) { server, share ->
         graph.library.smbCredentials(server, share)
     }
+
+    /** The player screen, while one is shown. */
+    private var host: Host? = null
 
     private val _state = MutableStateFlow(PlayerUiState())
     val state: StateFlow<PlayerUiState> = _state.asStateFlow()
@@ -103,6 +125,42 @@ class PlayerController(
 
     /** Null until the first picture is shown (and for audio-only media). */
     val videoSize: StateFlow<VideoSize?> = _videoSize.asStateFlow()
+
+    private val _artwork = MutableStateFlow<Artwork?>(null)
+
+    /** Artwork of the library video playing; null for a link. For the notification and media session. */
+    val artwork: StateFlow<Artwork?> = _artwork.asStateFlow()
+
+    private val _playRequested = MutableStateFlow(false)
+
+    /**
+     * The user wants playback to run: true from open or play until a pause (by the user, the
+     * headphones, a lasting audio focus loss), an error, the end with nothing to follow, or stop.
+     * Stays true while a video loads and through a short focus loss (a call).
+     */
+    val playRequested: StateFlow<Boolean> = _playRequested.asStateFlow()
+
+    /** Something was opened and playback hasn't been stopped. */
+    var hasContent = false
+        private set
+
+    /** Playing without the screen: sound only, the video track off. See [enterBackground]. */
+    var inBackground = false
+        private set
+
+    /** "Play in background" was picked: the next leave keeps playing even with the setting off. */
+    private var backgroundRequested = false
+
+    /** The video track turned off for the background, turned back on when the screen returns. */
+    private var savedVideoTrack: Int? = null
+
+    // The play queue: library video ids; next/previous follow the episodes while it holds one.
+    private val queue = PlayQueue()
+    private val queueItems = HashMap<Long, QueueItemUi>()
+
+    /** All items of the queue were looked up; until then [PlayerUiState.queue] stays empty. */
+    private var queueItemsReady = false
+    private var queueJob: Job? = null
 
     /** Bumped by every open(): work that finishes later must not land in the next video. */
     private var session = 0
@@ -184,12 +242,13 @@ class PlayerController(
     }
 
     private val audio = PlaybackAudio(
-        activity,
+        appContext,
         object : PlaybackAudio.Listener {
             override fun onFocusLost(transient: Boolean) {
                 PlayerDiagnostics.record(if (transient) "audio focus lost for a while" else "audio focus lost")
                 if (released || !mediaPlayer.isPlaying) return
                 pausedByFocusLoss = transient
+                if (!transient) _playRequested.value = false
                 mediaPlayer.pause()
             }
 
@@ -197,6 +256,7 @@ class PlayerController(
                 PlayerDiagnostics.record("audio focus regained")
                 if (released || !pausedByFocusLoss) return
                 pausedByFocusLoss = false
+                _playRequested.value = true
                 mediaPlayer.play()
             }
 
@@ -218,10 +278,10 @@ class PlayerController(
         _state.value = PlayerUiState(
             aspect = settings.defaultAspect,
             seekStepMs = seekStepMs(settings),
-            canEnterPictureInPicture = host.supportsPictureInPicture,
-            canRotate = canRotateScreen(activity.resources.configuration),
+            // Both come from the screen once one attaches.
+            canEnterPictureInPicture = false,
+            canRotate = canRotateScreen(appContext.resources.configuration),
             volume = volumeLevel,
-            brightness = currentBrightness(),
         )
         scope.launch {
             while (true) {
@@ -234,11 +294,141 @@ class PlayerController(
     /** Current position for the activity's saved state. */
     val positionMs: Long get() = if (released) _state.value.positionMs else currentPositionMs()
 
+    /** The library video playing (or opening), if it is one. */
+    val currentVideoId: Long? get() = nowPlaying?.videoId ?: lastRequest?.videoId
+
+    /** Leaving the player screen keeps the sound playing: the setting, or "Play in background" just picked. */
+    val continuesInBackground: Boolean
+        get() = backgroundRequested || graph.settings.settings.value.backgroundAudio
+
+    /** Playing, or about to (loading, a short audio focus loss), with nothing gone wrong. */
+    val wantsToPlay: Boolean
+        get() = !released && hasContent && _playRequested.value && _state.value.error == null
+
+    /** Opens one video (or link); it replaces the queue. */
     fun open(request: PlayRequest) {
+        if (released) return
+        setQueue(listOfNotNull(request.videoId), startIndex = 0, shuffle = queue.shuffled)
         openSession(request, carry = null)
     }
 
-    /** Starts a new session for [request]; [carry] keeps the user's choices across a software reopen. */
+    /** Plays [request]'s videos one after the other; [startPositionMs] continues the first one exactly there. */
+    fun openQueue(request: QueueRequest, startPositionMs: Long? = null) {
+        if (released) return
+        setQueue(request.videoIds, request.startIndex, request.shuffle)
+        val videoId = queue.currentId ?: return
+        openSession(PlayRequest(videoId = videoId, startPositionMs = startPositionMs), carry = null)
+        if (queue.size > 1) loadQueueItems()
+    }
+
+    /** The player screen is shown: it gets the brightness, rotation and picture-in-picture calls. */
+    fun attachHost(host: Host) {
+        this.host = host
+        userRotated = false
+        val brightness = currentBrightness(host)
+        _state.update {
+            it.copy(
+                canEnterPictureInPicture = host.supportsPictureInPicture,
+                canRotate = canRotateScreen(host.screenConfiguration),
+                inPictureInPicture = false,
+                brightness = brightness,
+            )
+        }
+        _videoSize.value?.let { applyOrientation(it) }
+    }
+
+    fun detachHost(host: Host) {
+        if (this.host !== host) return
+        this.host = null
+        _state.update { it.copy(inPictureInPicture = false) }
+    }
+
+    /**
+     * The player screen is going away while something plays (or is about to): keeps the sound
+     * playing without a picture when [continuesInBackground]. False when it doesn't; the screen
+     * then pauses as before.
+     */
+    fun enterBackground(): Boolean {
+        if (inBackground) return true
+        if (!continuesInBackground || !wantsToPlay) return false
+        inBackground = true
+        PlayerDiagnostics.record("background: sound only")
+        hostPaused = false
+        pictureWatchJob?.cancel()
+        scrubStartMs = null
+        volumeGestureActive = false
+        // Off before the surface goes: a decoder writing to a vanished surface can fail.
+        disableVideo()
+        detachSurface()
+        val startHeldBack = playWhenAttached || playOnResume
+        playWhenAttached = false
+        playOnResume = false
+        if (startHeldBack && mediaReady) startPlayback()
+        return true
+    }
+
+    /** The player screen is back (call after [attachSurface]): the picture returns. */
+    fun exitBackground() {
+        backgroundRequested = false
+        if (!inBackground) return
+        inBackground = false
+        PlayerDiagnostics.record("background: picture back")
+        restoreVideo()
+        if (mediaPlayer.isPlaying) watchForPicture()
+    }
+
+    /**
+     * Ends the session for good: saves the position, stops the media, lets go of audio focus,
+     * empties the queue and closes the player screen. The controller can open something new after.
+     */
+    fun stop() {
+        if (released) return
+        val hadContent = hasContent
+        saveProgress()
+        openJob?.cancel()
+        subtitleJob?.cancel()
+        upNextJob?.cancel()
+        resumeBannerJob?.cancel()
+        feedbackJob?.cancel()
+        pictureWatchJob?.cancel()
+        queueJob?.cancel()
+        if (mediaPlayer.hasMedia()) {
+            mediaPlayer.stop()
+            dropStaleEvents()
+        }
+        descriptor.closeQuietly()
+        descriptor = null
+        audio.release()
+        session++
+        resetSession()
+        nowPlaying = null
+        lastRequest = null
+        mediaReady = false
+        hasContent = false
+        inBackground = false
+        backgroundRequested = false
+        hostPaused = false
+        _playRequested.value = false
+        queue.clear()
+        queueItems.clear()
+        queueItemsReady = false
+        _artwork.value = null
+        _state.update { old ->
+            freshState(old, title = "").copy(
+                isBuffering = false,
+                queue = emptyList(),
+                queueIndex = 0,
+                feedback = null,
+            )
+        }
+        if (hadContent) PlayerDiagnostics.record("playback stopped")
+        host?.finishPlayback()
+    }
+
+    /**
+     * Starts a new session for [request] without touching the queue (an item of it, a retry, a
+     * restart); [carry] keeps the user's choices across a software reopen.
+     */
     private fun openSession(request: PlayRequest, carry: CarriedChoices?) {
         if (released) return
         saveProgress()
@@ -257,11 +447,15 @@ class PlayerController(
         lastRequest = request
         nowPlaying = null
         mediaReady = false
+        hasContent = true
+        _playRequested.value = true
         session++
         resetSession()
         carried = carry
         val subtitleDelayMs = carry?.subtitleDelayMs ?: 0L
         _state.update { old -> freshState(old, title = request.title.orEmpty()).copy(subtitleDelayMs = subtitleDelayMs) }
+        publishQueue()
+        updateNavigation()
         val what = if (request.videoId != null) "library video" else "link"
         CrashReporter.log("Player: opening a $what")
         PlayerDiagnostics.record("open: a $what${if (request.startPositionMs != null) " at a set position" else ""}")
@@ -284,6 +478,89 @@ class PlayerController(
         }
     }
 
+    private fun setQueue(videoIds: List<Long>, startIndex: Int, shuffle: Boolean) {
+        queueJob?.cancel()
+        queue.set(videoIds, startIndex, shuffle)
+        queueItems.clear()
+        queueItemsReady = false
+    }
+
+    /** Looks up every queued video for [PlayerUiState.queue]; drops the ones gone from the library. */
+    private fun loadQueueItems() {
+        queueJob?.cancel()
+        val ids = queue.playOrder.distinct().filter { it !in queueItems }
+        val settings = graph.settings.settings.value
+        queueJob = scope.launch {
+            val found = HashMap<Long, QueueItemUi>()
+            val gone = HashSet<Long>()
+            for (id in ids) {
+                val entry = try {
+                    graph.library.video(id)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    // Kept: it may well play; only its row in the list stays blank.
+                    Log.w(TAG, "Queue lookup failed", e)
+                    continue
+                }
+                if (entry == null) gone.add(id) else found[id] = queueItemFor(entry, settings)
+            }
+            if (released) return@launch
+            queueItems.putAll(found)
+            queue.remove(gone)
+            queueItemsReady = true
+            publishQueue()
+            updateNavigation()
+        }
+    }
+
+    private fun queueItemFor(entry: VideoWithMeta, settings: Settings): QueueItemUi {
+        val titles = PlayerText.titlesFor(entry, size = null)
+        return QueueItemUi(
+            videoId = entry.video.id,
+            title = titles.title,
+            subtitle = titles.subtitle,
+            artwork = PlayerText.artworkFor(entry, titles.title, settings.preferLocalArtwork),
+        )
+    }
+
+    private fun publishQueue() {
+        val items = if (queueItemsReady) {
+            queue.playOrder.map { id ->
+                queueItems[id] ?: QueueItemUi(videoId = id, title = "", subtitle = null, artwork = Artwork())
+            }
+        } else {
+            emptyList()
+        }
+        val index = if (items.isEmpty()) 0 else queue.position
+        _state.update { it.copy(queue = items, queueIndex = index, shuffle = queue.shuffled) }
+    }
+
+    /** A queue of two or more moves through itself; a single video follows its episodes. */
+    private val usesQueue: Boolean get() = queue.size > 1
+
+    private val wrapsQueue: Boolean get() = _state.value.repeatMode == RepeatMode.ALL
+
+    private fun updateNavigation() {
+        val hasPrevious: Boolean
+        val hasNext: Boolean
+        if (usesQueue) {
+            hasPrevious = queue.previousPosition(wrapsQueue) != null
+            hasNext = queue.nextPosition(wrapsQueue) != null
+        } else {
+            hasPrevious = previousVideoId != null
+            hasNext = nextEntry != null
+        }
+        _state.update { it.copy(hasPrevious = hasPrevious, hasNext = hasNext) }
+    }
+
+    /** Plays the queue item at [position] of the play order. */
+    private fun playQueuePosition(position: Int) {
+        val videoId = queue.moveTo(position) ?: return
+        PlayerDiagnostics.record("queue: item ${position + 1} of ${queue.size}")
+        openSession(PlayRequest(videoId = videoId), carry = null)
+    }
+
     private suspend fun load(request: PlayRequest) {
         val settings = graph.settings.settings.value
         val entry = findEntry(request)
@@ -302,6 +579,17 @@ class PlayerController(
         val current = NowPlaying(uri, kind, fileName, entry)
         nowPlaying = current
         _state.update { it.copy(title = titles.title, subtitle = titles.subtitle) }
+        if (entry != null) {
+            val videoId = entry.video.id
+            // A link that turned out to be a library video becomes a queue of one.
+            if (queue.isEmpty) queue.set(listOf(videoId), startIndex = 0, shuffle = queue.shuffled)
+            queueItems[videoId] = queueItemFor(entry, settings)
+            if (queue.size == 1) queueItemsReady = true
+            publishQueue()
+            _artwork.value = PlayerText.artworkFor(entry, titles.title, settings.preferLocalArtwork)
+        } else {
+            _artwork.value = null
+        }
 
         val video = entry?.video
         val carry = carried
@@ -362,7 +650,7 @@ class PlayerController(
         val result = AtomicReference<OpenedMedia?>(null)
         try {
             withContext(Dispatchers.IO) {
-                result.set(MediaSource.open(activity.applicationContext, libVLC, uri, settings, decoding, credentials))
+                result.set(MediaSource.open(appContext, libVLC, uri, settings, decoding, credentials))
             }
         } catch (e: CancellationException) {
             result.getAndSet(null)?.discard()
@@ -400,7 +688,7 @@ class PlayerController(
     /**
      * Starts playback once it can be seen: without a surface libVLC would open the video output
      * blind and play sound only, and a screen left while the video was loading must not start
-     * playing in the background.
+     * playing in the background. In the background (see [enterBackground]) sound only is the point.
      */
     private fun requestStart() {
         when {
@@ -408,6 +696,7 @@ class PlayerController(
                 playOnResume = true
                 PlayerDiagnostics.record("start: waiting for the screen to come back")
             }
+            inBackground -> startPlayback()
             attachedLayout == null -> {
                 playWhenAttached = true
                 PlayerDiagnostics.record("start: waiting for the video surface")
@@ -416,7 +705,11 @@ class PlayerController(
         }
     }
 
-    private val isHidden: Boolean get() = hostPaused && !_state.value.inPictureInPicture
+    /**
+     * The player screen was left without background playback (paused, or stopped outside
+     * picture-in-picture): a start waits until it is back in front, or until [enterBackground].
+     */
+    val isHidden: Boolean get() = hostPaused && !_state.value.inPictureInPicture
 
     private fun startPlayback() {
         audio.requestFocus()
@@ -449,6 +742,7 @@ class PlayerController(
         videoOutputSeen = false
         noPictureMs = 0L
         carried = null
+        savedVideoTrack = null
         _videoSize.value = null
     }
 
@@ -464,6 +758,10 @@ class PlayerController(
         seekStepMs = seekStepMs(graph.settings.settings.value),
         volume = old.volume,
         brightness = old.brightness,
+        shuffle = old.shuffle,
+        repeatMode = old.repeatMode,
+        queue = old.queue,
+        queueIndex = old.queueIndex,
     )
 
     /**
@@ -509,7 +807,10 @@ class PlayerController(
         if (!hostPaused) PlayerDiagnostics.record("screen left")
         hostPaused = true
         pausedByFocusLoss = false
-        if (mediaPlayer.isPlaying) mediaPlayer.pause()
+        if (mediaPlayer.isPlaying) {
+            _playRequested.value = false
+            mediaPlayer.pause()
+        }
         saveProgress()
     }
 
@@ -589,8 +890,11 @@ class PlayerController(
         resumeBannerJob?.cancel()
         feedbackJob?.cancel()
         pictureWatchJob?.cancel()
+        queueJob?.cancel()
         mainHandler.removeCallbacksAndMessages(null)
         PlayerDiagnostics.record("player released")
+        host = null
+        _playRequested.value = false
         audio.release()
         mediaPlayer.setEventListener(null)
         mediaPlayer.stop()
@@ -607,28 +911,35 @@ class PlayerController(
     }
 
     override fun play() {
-        if (released) return
+        if (released || !hasContent) return
         pausedByFocusLoss = false
         val request = lastRequest
         if (_state.value.error != null && request != null) {
             // Retry, continuing where it stopped when it had started.
             val position = _state.value.positionMs.takeIf { playbackStarted && it > 0 }
-            open(request.copy(startPositionMs = position ?: request.startPositionMs))
+            openSession(request.copy(startPositionMs = position ?: request.startPositionMs), carry = null)
             return
         }
         if (ended) {
             restartFromEnd(startAtMs = 0)
             return
         }
+        _playRequested.value = true
         // Still loading: the player holds the previous media (already closed), and the new one
         // starts by itself once it is set.
         if (!mediaReady) return
+        if (isHidden) {
+            // A headset button with the screen gone: plays once it is back (or in the background).
+            playOnResume = true
+            return
+        }
         startPlayback()
     }
 
     override fun pause() {
         if (released) return
         pausedByFocusLoss = false
+        _playRequested.value = false
         if (mediaPlayer.isPlaying) mediaPlayer.pause()
     }
 
@@ -689,12 +1000,10 @@ class PlayerController(
     }
 
     override fun adjustBrightness(delta: Float) {
-        if (released) return
+        val host = host
+        if (released || host == null) return
         val level = (_state.value.brightness + delta).coerceIn(MIN_BRIGHTNESS, 1f)
-        val window = activity.window
-        val attributes = window.attributes
-        attributes.screenBrightness = level
-        window.attributes = attributes
+        host.windowBrightness = level
         _state.update { it.copy(brightness = level) }
         showFeedback(GestureFeedback.Brightness(level), hideAfterMs = null)
     }
@@ -733,7 +1042,7 @@ class PlayerController(
         if (released) return
         resumeAfterPicker = mediaPlayer.isPlaying
         if (resumeAfterPicker) mediaPlayer.pause()
-        if (!host.launchSubtitlePicker()) {
+        if (host?.launchSubtitlePicker() != true) {
             showLabel("No file picker on this device")
             resumeAfterPicking()
         }
@@ -773,19 +1082,21 @@ class PlayerController(
     }
 
     override fun rotate() {
-        if (released || !_state.value.canRotate) return
-        val (orientation, label) = when (activity.requestedOrientation) {
+        val host = host
+        if (released || host == null || !_state.value.canRotate) return
+        val (orientation, label) = when (host.screenOrientation) {
             ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE -> ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT to "Portrait"
             ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT -> ActivityInfo.SCREEN_ORIENTATION_FULL_SENSOR to "Auto-rotate"
             else -> ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE to "Landscape"
         }
         userRotated = true
-        activity.requestedOrientation = orientation
+        host.screenOrientation = orientation
         showLabel(label)
     }
 
     override fun enterPictureInPicture() {
-        if (!released && host.supportsPictureInPicture) host.enterPictureInPicture()
+        val host = host
+        if (!released && host != null && host.supportsPictureInPicture) host.enterPictureInPicture()
     }
 
     override fun startOver() {
@@ -800,23 +1111,84 @@ class PlayerController(
     }
 
     override fun playNext() {
+        if (released || !hasContent) return
+        if (usesQueue) {
+            queue.nextPosition(wrap = wrapsQueue)?.let { playQueuePosition(it) }
+            return
+        }
         val videoId = _state.value.upNext?.videoId ?: nextEntry?.video?.id ?: return
         open(PlayRequest(videoId = videoId))
     }
 
     override fun playPrevious() {
+        if (released || !hasContent) return
+        if (usesQueue) {
+            queue.previousPosition(wrap = wrapsQueue)?.let { playQueuePosition(it) }
+            return
+        }
         val videoId = previousVideoId ?: return
         open(PlayRequest(videoId = videoId))
     }
 
     override fun cancelUpNext() {
         upNextJob?.cancel()
+        // Ended, and nothing follows now.
+        if (ended) _playRequested.value = false
         _state.update { it.copy(upNext = null) }
+    }
+
+    override fun toggleShuffle() {
+        if (released) return
+        val on = !queue.shuffled
+        queue.setShuffled(on)
+        PlayerDiagnostics.record(if (on) "user: shuffle on" else "user: shuffle off")
+        publishQueue()
+        updateNavigation()
+        showLabel(if (on) "Shuffle on" else "Shuffle off")
+        reofferAfterEnd()
+    }
+
+    override fun cycleRepeat() {
+        if (released) return
+        val mode = when (_state.value.repeatMode) {
+            RepeatMode.OFF -> RepeatMode.ALL
+            RepeatMode.ALL -> RepeatMode.ONE
+            RepeatMode.ONE -> RepeatMode.OFF
+        }
+        PlayerDiagnostics.record("user: repeat ${mode.name.lowercase(Locale.ROOT)}")
+        _state.update { it.copy(repeatMode = mode) }
+        updateNavigation()
+        showLabel(
+            when (mode) {
+                RepeatMode.OFF -> "Repeat off"
+                RepeatMode.ALL -> if (usesQueue) "Repeat all" else "Repeat on"
+                RepeatMode.ONE -> "Repeat this video"
+            },
+        )
+        reofferAfterEnd()
+    }
+
+    override fun playQueueItem(index: Int) {
+        if (released || !hasContent || index !in 0 until queue.size) return
+        if (index == queue.position && !ended && _state.value.error == null) {
+            play()
+            return
+        }
+        playQueuePosition(index)
+    }
+
+    override fun playInBackground() {
+        val host = host
+        if (released || !hasContent || host == null) return
+        PlayerDiagnostics.record("user: play in background")
+        backgroundRequested = true
+        if (!mediaPlayer.isPlaying) play()
+        host.leavePlayer()
     }
 
     override fun close() {
         saveProgress()
-        host.finishPlayback()
+        onFinished()
     }
 
     private fun onPlayerEvent(event: MediaPlayer.Event) {
@@ -845,12 +1217,19 @@ class PlayerController(
                 val seekable = event.seekable
                 _state.update { it.copy(seekable = seekable) }
             }
-            MediaPlayer.Event.Vout -> onVideoOutputsChanged(event.voutCount)
+            MediaPlayer.Event.Vout -> {
+                onVideoOutputsChanged(event.voutCount)
+                if (inBackground && event.voutCount > 0) disableVideo()
+            }
             MediaPlayer.Event.ESAdded -> {
                 if (event.esChangedType == IMedia.Track.Type.Video) videoTrackSeen = true
                 onTracksChanged(added = true)
             }
-            MediaPlayer.Event.ESDeleted, MediaPlayer.Event.ESSelected -> onTracksChanged(added = false)
+            MediaPlayer.Event.ESDeleted, MediaPlayer.Event.ESSelected -> {
+                onTracksChanged(added = false)
+                // A video that starts in the background gets its track turned off as soon as it has one.
+                if (inBackground && event.esChangedType == IMedia.Track.Type.Video) disableVideo()
+            }
         }
     }
 
@@ -904,11 +1283,13 @@ class PlayerController(
             if (audioChoicePending) applyAudioChoice()
             trySetupSubtitles()
         }
-        if (unseen) {
-            playOnResume = true
-            mediaPlayer.pause()
-        } else {
-            watchForPicture()
+        when {
+            unseen -> {
+                playOnResume = true
+                mediaPlayer.pause()
+            }
+            inBackground -> disableVideo()
+            else -> watchForPicture()
         }
     }
 
@@ -938,12 +1319,80 @@ class PlayerController(
         val videoId = nowPlaying?.videoId
         // Saving the full length marks it watched.
         if (videoId != null && duration > 0) persistPlayback(videoId, duration, duration)
+        continueAfterEnd()
+    }
+
+    /**
+     * What follows an ended video: itself again (repeat), the next queue item, or the next
+     * episode; offered on the up-next card, started at once in the background when it would
+     * start by itself. With nothing to follow the player closes.
+     */
+    private fun continueAfterEnd() {
+        val videoId = nowPlaying?.videoId
+        val repeat = _state.value.repeatMode
         upNextJob?.cancel()
+        _state.update { it.copy(upNext = null) }
+        if (repeat == RepeatMode.ONE || (repeat == RepeatMode.ALL && !usesQueue)) {
+            _playRequested.value = true
+            restartFromEnd(startAtMs = 0)
+            return
+        }
         upNextJob = scope.launch {
-            val next = if (videoId != null) nextEntry ?: fetchNextEpisode(videoId) else null
-            if (next == null) host.finishPlayback() else offerUpNext(next)
+            val next: VideoWithMeta?
+            // A queue the user built plays through; episodes follow the "play next" setting.
+            val automatic: Boolean
+            if (usesQueue) {
+                val position = queue.nextPosition(wrap = repeat == RepeatMode.ALL)
+                if (position == null) {
+                    finishPlayback()
+                    return@launch
+                }
+                if (inBackground) {
+                    playQueuePosition(position)
+                    return@launch
+                }
+                next = queue.idAt(position)?.let { lookUp(it) }
+                if (next == null) {
+                    playQueuePosition(position)
+                    return@launch
+                }
+                automatic = true
+            } else {
+                next = if (videoId != null) nextEntry ?: fetchNextEpisode(videoId) else null
+                if (next == null) {
+                    finishPlayback()
+                    return@launch
+                }
+                automatic = graph.settings.settings.value.autoPlayNext
+                if (inBackground && automatic) {
+                    open(PlayRequest(videoId = next.video.id))
+                    return@launch
+                }
+            }
+            _playRequested.value = automatic
+            offerUpNext(next, countdown = if (automatic) UP_NEXT_COUNTDOWN_SECONDS else null)
         }
     }
+
+    /** Shuffle or repeat changed while the up-next card waits: it offers what follows now. */
+    private fun reofferAfterEnd() {
+        if (ended && hasContent && _state.value.error == null) continueAfterEnd()
+    }
+
+    private fun finishPlayback() {
+        PlayerDiagnostics.record("nothing left to play")
+        onFinished()
+    }
+
+    private suspend fun lookUp(videoId: Long): VideoWithMeta? =
+        try {
+            graph.library.video(videoId)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.w(TAG, "Library lookup failed", e)
+            null
+        }
 
     private fun onError() {
         pictureWatchJob?.cancel()
@@ -952,6 +1401,7 @@ class PlayerController(
         if (fallBack && fallBackToSoftwareDecoding("playback error")) return
         val kind = nowPlaying?.kind
         audio.unregisterNoisyReceiver()
+        _playRequested.value = false
         _state.update { it.copy(isPlaying = false, isBuffering = false, error = errorMessage(kind)) }
         mediaPlayer.stop()
     }
@@ -1027,7 +1477,7 @@ class PlayerController(
      * attached: opening, buffering, pauses and a hidden screen don't.
      */
     private fun watchForPicture() {
-        if (videoOutputSeen || decoding != HwDecoding.AUTO || pictureWatchJob?.isActive == true) return
+        if (inBackground || videoOutputSeen || decoding != HwDecoding.AUTO || pictureWatchJob?.isActive == true) return
         val watched = session
         pictureWatchJob = scope.launch {
             var lastTime = mediaPlayer.time
@@ -1082,19 +1532,45 @@ class PlayerController(
         }
         val size = VideoSize(width, height)
         _videoSize.value = size
-        if (!userRotated && !_state.value.inPictureInPicture && _state.value.canRotate) {
-            activity.requestedOrientation = if (size.isPortrait) {
-                ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT
-            } else {
-                ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
-            }
-        }
+        applyOrientation(size)
         // Movies show their resolution; take it from the picture when the scan didn't know it.
         val entry = nowPlaying?.entry
         if (entry != null && entry.video.kind == VideoKind.MOVIE && (entry.video.width == null || entry.video.height == null)) {
             val subtitle = PlayerText.titlesFor(entry, size).subtitle
             _state.update { it.copy(subtitle = subtitle) }
         }
+    }
+
+    /** Turns the screen to the video's shape, unless the user turned it themselves. */
+    private fun applyOrientation(size: VideoSize) {
+        val host = host ?: return
+        if (userRotated || _state.value.inPictureInPicture || !_state.value.canRotate) return
+        host.screenOrientation = if (size.isPortrait) {
+            ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT
+        } else {
+            ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+        }
+    }
+
+    /** No video output in the background: saves decoding work, and there is no surface for it. */
+    private fun disableVideo() {
+        if (!mediaReady) return
+        val track = mediaPlayer.videoTrack
+        if (track == DISABLED_TRACK) return
+        savedVideoTrack = track
+        mediaPlayer.setVideoTrack(DISABLED_TRACK)
+        PlayerDiagnostics.record("background: video track off")
+    }
+
+    /** The track [disableVideo] turned off (or the first one) back on. */
+    private fun restoreVideo() {
+        val saved = savedVideoTrack
+        savedVideoTrack = null
+        if (!mediaReady || mediaPlayer.videoTrack != DISABLED_TRACK) return
+        val tracks = realTracks(mediaPlayer.videoTracks)
+        val target = tracks.firstOrNull { it.id == saved }?.id ?: tracks.firstOrNull()?.id ?: return
+        mediaPlayer.setVideoTrack(target)
+        PlayerDiagnostics.record("background: video track on")
     }
 
     private fun onTracksChanged(added: Boolean) {
@@ -1250,7 +1726,7 @@ class PlayerController(
         }
         nextEntry = next
         previousVideoId = previous?.id
-        _state.update { it.copy(hasNext = next != null, hasPrevious = previous != null) }
+        updateNavigation()
     }
 
     private suspend fun fetchNextEpisode(videoId: Long): VideoWithMeta? =
@@ -1290,10 +1766,10 @@ class PlayerController(
         }
     }
 
-    private suspend fun offerUpNext(next: VideoWithMeta) {
+    /** Shows [next] on the up-next card; plays it after [countdown] seconds, or waits for a tap when null. */
+    private suspend fun offerUpNext(next: VideoWithMeta, countdown: Int?) {
         val settings = graph.settings.settings.value
         val titles = PlayerText.titlesFor(next, size = null)
-        val countdown = if (settings.autoPlayNext) UP_NEXT_COUNTDOWN_SECONDS else null
         val upNext = UpNextUi(
             videoId = next.video.id,
             title = titles.title,
@@ -1324,7 +1800,7 @@ class PlayerController(
         val videoId = current?.videoId ?: request?.videoId
         val uri = current?.uri ?: request?.uri
         if (videoId == null && uri == null) return
-        open(
+        openSession(
             PlayRequest(
                 videoId = videoId,
                 uri = uri,
@@ -1332,6 +1808,7 @@ class PlayerController(
                 startOver = startAtMs <= 0L,
                 startPositionMs = startAtMs.takeIf { it > 0 },
             ),
+            carry = null,
         )
     }
 
@@ -1377,6 +1854,7 @@ class PlayerController(
     }
 
     private fun showError(message: String) {
+        _playRequested.value = false
         _state.update { it.copy(error = message, isPlaying = false, isBuffering = false) }
     }
 
@@ -1412,11 +1890,11 @@ class PlayerController(
         return if (max > 0) audioManager.getStreamVolume(AudioManager.STREAM_MUSIC).toFloat() / max else 0f
     }
 
-    private fun currentBrightness(): Float {
-        val windowBrightness = activity.window.attributes.screenBrightness
+    private fun currentBrightness(host: Host): Float {
+        val windowBrightness = host.windowBrightness
         if (windowBrightness >= 0f) return windowBrightness.coerceIn(MIN_BRIGHTNESS, 1f)
         val system = SystemSettings.System.getInt(
-            activity.contentResolver,
+            appContext.contentResolver,
             SystemSettings.System.SCREEN_BRIGHTNESS,
             DEFAULT_SYSTEM_BRIGHTNESS,
         )
@@ -1431,7 +1909,7 @@ class PlayerController(
 
     private suspend fun queryDisplayName(uri: Uri): String? = withContext(Dispatchers.IO) {
         try {
-            activity.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
+            appContext.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
                 if (cursor.moveToFirst() && !cursor.isNull(0)) cursor.getString(0) else null
             }
         } catch (e: RuntimeException) {
