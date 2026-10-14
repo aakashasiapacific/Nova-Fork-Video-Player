@@ -37,6 +37,7 @@ import com.aakash.novafork.ui.model.RepeatMode
 
 private val TransportButtonSize = 64.dp
 private val TransportIconSize = 40.dp
+private val ToggleButtonSize = 56.dp
 
 /**
  * Tablet controls: larger targets, title top-left with cast, queue and more on the right,
@@ -152,13 +153,26 @@ private fun TabletTopBar(
 
 @Composable
 private fun TabletTransportRow(state: PlayerUiState, actions: PlayerActions, modifier: Modifier = Modifier) {
-    // Previous/next keep both slots when either exists so play/pause stays centred.
+    // Previous/next keep both slots when either exists so play/pause stays centred; shuffle and
+    // repeat flank the row the same way.
     val showSkips = state.hasPrevious || state.hasNext
     Row(
         modifier = modifier,
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(32.dp),
     ) {
+        if (state.canShuffle) {
+            PlayerToggleButton(
+                icon = R.drawable.ic_shuffle,
+                contentDescription = "Shuffle",
+                checked = state.shuffle,
+                onClick = actions::toggleShuffle,
+                buttonSize = ToggleButtonSize,
+                iconSize = 26.dp,
+            )
+        } else {
+            Spacer(Modifier.size(ToggleButtonSize))
+        }
         if (showSkips) {
             if (state.hasPrevious) {
                 PlayerIconButton(
@@ -207,6 +221,14 @@ private fun TabletTransportRow(state: PlayerUiState, actions: PlayerActions, mod
                 Spacer(Modifier.size(TransportButtonSize))
             }
         }
+        PlayerToggleButton(
+            icon = state.repeatMode.iconRes(),
+            contentDescription = state.repeatMode.label,
+            checked = state.repeatMode != RepeatMode.OFF,
+            onClick = actions::cycleRepeat,
+            buttonSize = ToggleButtonSize,
+            iconSize = 26.dp,
+        )
     }
 }
 
@@ -271,24 +293,6 @@ private fun TabletBottomBar(
                 )
             }
             Spacer(Modifier.width(8.dp))
-            if (state.canShuffle) {
-                PlayerToggleButton(
-                    icon = R.drawable.ic_shuffle,
-                    contentDescription = "Shuffle",
-                    checked = state.shuffle,
-                    onClick = actions::toggleShuffle,
-                    buttonSize = 56.dp,
-                    iconSize = 26.dp,
-                )
-            }
-            PlayerToggleButton(
-                icon = state.repeatMode.iconRes(),
-                contentDescription = state.repeatMode.label,
-                checked = state.repeatMode != RepeatMode.OFF,
-                onClick = actions::cycleRepeat,
-                buttonSize = 56.dp,
-                iconSize = 26.dp,
-            )
             LabelledButton(
                 icon = R.drawable.ic_lock,
                 label = "Lock",

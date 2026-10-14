@@ -31,6 +31,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.BiasAlignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -321,43 +322,67 @@ private fun CastRow(
 }
 
 /**
- * Drawn over the (empty) video surface while the video plays on a cast device. In
- * picture-in-picture only the icon and the device name fit.
+ * Drawn over the (empty) video surface while the video plays on a cast device: above the centre,
+ * clear of the transport buttons. In picture-in-picture only the icon and the device name fit.
  */
 @Composable
 internal fun CastingPlaceholder(deviceName: String, title: String, compact: Boolean, modifier: Modifier = Modifier) {
-    Box(
-        modifier.background(Color.Black),
-        contentAlignment = Alignment.Center,
-    ) {
-        Column(
-            modifier = Modifier.padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(if (compact) 4.dp else 12.dp),
-        ) {
-            Icon(
-                painter = painterResource(R.drawable.ic_cast_connected),
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(if (compact) 32.dp else 72.dp),
-            )
-            Text(
-                text = "Casting to $deviceName",
-                style = if (compact) MaterialTheme.typography.labelMedium else MaterialTheme.typography.titleLarge,
-                color = Color.White,
-                textAlign = TextAlign.Center,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-            if (!compact && title.isNotBlank()) {
+    Box(modifier.background(Color.Black)) {
+        if (compact) {
+            Column(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .padding(8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Icon(
+                    painter = painterResource(R.drawable.ic_cast_connected),
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(32.dp),
+                )
                 Text(
-                    text = title,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Color.White.copy(alpha = 0.7f),
+                    text = deviceName,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = Color.White,
                     textAlign = TextAlign.Center,
-                    maxLines = 1,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
+            }
+        } else {
+            Row(
+                modifier = Modifier
+                    .align(BiasAlignment(horizontalBias = 0f, verticalBias = -0.45f))
+                    .padding(horizontal = 32.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    painter = painterResource(R.drawable.ic_cast_connected),
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(48.dp),
+                )
+                Spacer(Modifier.width(16.dp))
+                Column {
+                    Text(
+                        text = "Casting to $deviceName",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = Color.White,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    if (title.isNotBlank()) {
+                        Text(
+                            text = title,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Color.White.copy(alpha = 0.7f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
             }
         }
     }

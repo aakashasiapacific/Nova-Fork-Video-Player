@@ -140,7 +140,7 @@ private fun PlaylistHeader(playlist: PlaylistDetailsUi, actions: AppActions, mod
     }
 }
 
-/** Position, 16:9 still, title and subtitle, duration, and a remove button. Tap plays from here. */
+/** Position, 16:9 still, title and subtitle, and a remove button. Tap plays from here. */
 @Composable
 private fun PlaylistItemRow(
     position: Int,
@@ -195,15 +195,6 @@ private fun PlaylistItemRow(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-        }
-        val duration = durationLabel(video.durationMs)
-        if (duration != null) {
-            Spacer(Modifier.width(12.dp))
-            Text(
-                text = duration,
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
         }
         Spacer(Modifier.width(8.dp))
         IconButton(onClick = onRemove) {
