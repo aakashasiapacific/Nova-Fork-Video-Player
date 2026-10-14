@@ -37,7 +37,7 @@ app/    com.aakash.novafork.*          Android app
   data/                                Settings, repository, Room, network, metadata enrichment
   data/db/                             Room entities (contract), DAOs, database
   sources/                             scanners: MediaStore, SAF folders, SMB (smbj), Coil smb fetcher
-  player/                              libVLC engine, PlayerController, PlayerActivity
+  player/                              libVLC engine, PlaybackService, PlayerController, queue, casting, PlayerActivity
   ui/model/                            UI state + action contracts (shared by everything below)
   ui/theme/, ui/adaptive/, ui/common/  theme, phone/tablet detection + dimens, shared art/components
   ui/phone/                            phone-only screens and components
@@ -109,6 +109,30 @@ Aspect: `mediaPlayer.setVideoScale(MediaPlayer.ScaleType.SURFACE_BEST_FIT|SURFAC
 Video view: `org.videolan.libvlc.util.VLCVideoLayout` inside `AndroidView`, attached with
 `mediaPlayer.attachViews(layout, null, true /*subtitles*/, false /*textureView*/)`.
 
+### Playback service, queue and casting
+- `PlaybackService` (foreground type `mediaPlayback`, not exported) owns the `PlayerController`
+  (libVLC player, media, queue). `PlayerActivity` binds to it with a local Binder, lends it the
+  video surface while visible and implements `PlayerController.Host` (PiP, brightness,
+  orientation, `leavePlayer`). With `Settings.backgroundAudio` (or "Play in background"),
+  leaving the player turns the video track off and keeps the sound playing; the service goes
+  foreground with a MediaStyle notification. `PlaybackSession` wraps
+  `android.media.session.MediaSession` (lock screen, headset and Bluetooth buttons);
+  `PlaybackArtwork` loads the notification art through Coil.
+- Queue: `PlayerIntents.forQueue(context, videoIds, startIndex, shuffle)`; `PlayQueue` keeps the
+  given order and the play order (shuffled with the playing item first). Next/previous follow the
+  queue, or the episodes when it holds one video. Repeat: `RepeatMode.OFF/ALL/ONE`. Queue
+  sources come from `LibraryRepository.folderQueue/seasonQueue/nextUpQueue` and playlists.
+- Casting: `CastDiscovery` runs libVLC `RendererDiscoverer`s (mDNS, Wi-Fi multicast lock) while
+  the player is visible; `startCasting(id)` = `mediaPlayer.setRenderer(item)` and reopen at the
+  current position, `stopCasting()` = `setRenderer(null)` and reopen locally. While casting the
+  service stays in the foreground ("Casting to …"); the UI covers the surface with a placeholder.
+
+### Playlists (Room v2)
+`playlists` and `playlist_items` (FK cascade to playlists and videos), added by the manual
+`NovaDatabase.MIGRATION_1_2`. Schemas are committed under `app/schemas/` (CI publishes the
+generated JSON to the `screens` branch; copy a new version's file from there). Every future
+version adds a migration to `NovaDatabase.MIGRATIONS`.
+
 ## Phone vs tablet UI
 
 Decided once per composition with `rememberDeviceLayout(settings.layoutMode)`; provided through
@@ -145,13 +169,13 @@ resume banner, up-next card, buffering spinner, error card.
 ## Icons (res/drawable, Material Icons Round, white fill — tint with `Icon`)
 
 `ic_add ic_arrow_back ic_aspect_ratio ic_audiotrack ic_brightness_6 ic_cast_connected ic_check
-ic_check_circle ic_chevron_right ic_close ic_cloud ic_computer ic_create_new_folder ic_dark_mode
+ic_cast ic_check_circle ic_chevron_right ic_close ic_cloud ic_computer ic_create_new_folder ic_dark_mode
 ic_delete ic_dns ic_done_all ic_edit ic_error ic_expand_more ic_filter_list ic_folder
 ic_folder_open ic_folder_special ic_forward_10 ic_fullscreen ic_fullscreen_exit ic_grid_view ic_hd
 ic_hide_image ic_history ic_home ic_image ic_info ic_key ic_lan ic_language ic_link ic_live_tv
 ic_lock ic_lock_open ic_more_vert ic_movie ic_pause ic_phone_android ic_picture_in_picture_alt
-ic_play_arrow ic_playlist_play ic_public ic_refresh ic_replay ic_replay_10 ic_restart_alt
-ic_screen_rotation ic_sd_storage ic_search ic_settings ic_skip_next ic_skip_previous
+ic_play_arrow ic_playlist_add ic_playlist_play ic_public ic_refresh ic_repeat ic_repeat_one ic_replay ic_replay_10 ic_restart_alt
+ic_screen_rotation ic_sd_storage ic_search ic_settings ic_shuffle ic_skip_next ic_skip_previous
 ic_smart_display ic_sort ic_speed ic_star ic_storage ic_subtitles ic_subtitles_off ic_theaters
 ic_timer ic_tune ic_tv ic_video_file ic_video_library ic_view_list ic_visibility
 ic_visibility_off ic_volume_off ic_volume_up ic_wifi`
