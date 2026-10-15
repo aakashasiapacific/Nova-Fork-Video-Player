@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 11 and older (Android 12+ reads data_extraction_rules.xml): the same files as there.
+     Settings, the library database and downloaded subtitles go; the crash report, the
+     storage-prompt flag (ui.xml), the media-server install id (media_servers.xml) and the time of
+     the last backup file saved here (backup.xml) stay with this install. Caches under cacheDir
+     are never backed up by Android. -->
+<full-backup-content>
+    <exclude domain="file" path="last_crash.txt" />
+    <exclude domain="sharedpref" path="ui.xml" />
+    <exclude domain="sharedpref" path="media_servers.xml" />
+    <exclude domain="sharedpref" path="backup.xml" />
+</full-backup-content>

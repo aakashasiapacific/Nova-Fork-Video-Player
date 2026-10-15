@@ -25,6 +25,7 @@ import com.aakash.novafork.core.tmdb.TmdbEpisode
 import com.aakash.novafork.core.tmdb.TmdbException
 import com.aakash.novafork.core.tmdb.TmdbMovieSummary
 import com.aakash.novafork.core.tmdb.TmdbTvSummary
+import com.aakash.novafork.data.backup.PendingRestore
 import com.aakash.novafork.data.db.FolderEntry
 import com.aakash.novafork.data.db.MatchCacheEntity
 import com.aakash.novafork.data.db.MatchState
@@ -114,6 +115,9 @@ class LibraryRepositoryImpl(
      */
     private val scanMutex = Mutex()
     private val enricher = MetadataEnricher(database, tmdb, state, scope, Connectivity(this.context))
+
+    /** A restored backup's entries waiting for their videos; applied after each scan of a source. */
+    private val pendingRestore = PendingRestore(this.context, database)
     private val statePrefs: SharedPreferences = this.context.getSharedPreferences(STATE_PREFS, Context.MODE_PRIVATE)
 
     /** Source id → wall-clock start of its latest scan in this process, failed ones included. */
@@ -285,6 +289,7 @@ class LibraryRepositoryImpl(
             val found = scanner.scan(source) { count -> state.update { it.copy(found = count) } }
             merge(source, found)
             sourceDao.markScanned(source.id, System.currentTimeMillis())
+            applyPendingRestore()
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -292,6 +297,21 @@ class LibraryRepositoryImpl(
         } catch (e: LinkageError) {
             // A library class missing on this Android version fails this source, not the app.
             recordFailure(source, e)
+        }
+    }
+
+    /**
+     * Gives the videos a scan just found what a restored backup holds for them (see
+     * [PendingRestore]). Its manual matches ask TMDB, so they are applied in the background
+     * rather than holding up the next source's scan. A failure here never fails the scan.
+     */
+    private suspend fun applyPendingRestore() {
+        if (!pendingRestore.exists()) return
+        logFailure("Applying a restored backup") {
+            val result = pendingRestore.apply(this, identify = false)
+            if (result.matchesReady > 0) {
+                launchLogged("Restoring matches") { pendingRestore.apply(this, identify = true) }
+            }
         }
     }
 

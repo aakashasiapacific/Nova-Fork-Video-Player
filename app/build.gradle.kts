@@ -19,6 +19,15 @@ val tmdbKey: String = (
     )
     .filter { it.isLetterOrDigit() || it == '.' || it == '_' || it == '-' }
 
+// Optional built-in OpenSubtitles.com API key, found the same way: the OPENSUBTITLES_API_KEY
+// environment variable (CI secret), else the gradle property. A key pasted in Settings wins over it.
+val openSubtitlesKey: String = (
+    System.getenv("OPENSUBTITLES_API_KEY")?.takeIf { it.isNotBlank() }
+        ?: (project.findProperty("OPENSUBTITLES_API_KEY") as String?)
+        ?: ""
+    )
+    .filter { it.isLetterOrDigit() || it == '.' || it == '_' || it == '-' }
+
 android {
     namespace = "com.aakash.novafork"
     compileSdk = 36
@@ -30,6 +39,7 @@ android {
         versionCode = buildNumber
         versionName = "1.0.$buildNumber"
         buildConfigField("String", "TMDB_API_KEY", "\"$tmdbKey\"")
+        buildConfigField("String", "OPENSUBTITLES_API_KEY", "\"$openSubtitlesKey\"")
     }
 
     signingConfigs {

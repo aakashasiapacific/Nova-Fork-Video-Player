@@ -61,6 +61,40 @@ data class CastDeviceUi(
     val name: String,
 )
 
+/** One subtitle OpenSubtitles offers for the playing video. */
+@Immutable
+data class SubtitleResultUi(
+    /** Pass to [PlayerActions.downloadSubtitle]. */
+    val id: String,
+    /** "English", "Portuguese (Brazil)". */
+    val language: String,
+    /** The release it was made for ("Dune.2021.1080p.WEBRip.x264-RARBG"); may be blank. */
+    val release: String,
+    /** Timed for exactly this file (OpenSubtitles knows its movie hash): "Matches this file". */
+    val matchesFile: Boolean = false,
+    val hearingImpaired: Boolean = false,
+    val downloadCount: Int = 0,
+    /** Translated by AI or a machine rather than by people. */
+    val machineTranslated: Boolean = false,
+    /** Already downloaded for this video: picking it again costs no download. */
+    val downloaded: Boolean = false,
+)
+
+/** The "Download subtitles" list over the player; see [PlayerActions.searchSubtitles]. */
+@Immutable
+data class SubtitleSearchUi(
+    /** Looking for subtitles. */
+    val loading: Boolean = false,
+    /** Best first. Empty while loading, after an error, or when nothing was found. */
+    val results: List<SubtitleResultUi> = emptyList(),
+    /** What went wrong ("Download limit reached, resets at 13:03"); results may still be shown. */
+    val error: String? = null,
+    /** The result being downloaded; the others wait. */
+    val downloadingId: String? = null,
+    /** The languages searched, for the header ("English, French"). */
+    val languages: String = "",
+)
+
 @Immutable
 data class PlayerUiState(
     val title: String = "",
@@ -112,6 +146,8 @@ data class PlayerUiState(
      * a casting placeholder instead of the video surface (nothing is drawn there).
      */
     val castingTo: String? = null,
+    /** The subtitle download list while it is open; null = closed. */
+    val subtitleSearch: SubtitleSearchUi? = null,
 )
 
 /**
@@ -183,6 +219,20 @@ interface PlayerActions {
     fun scanForCastDevices()
 
     fun close()
+
+    // Subtitle downloads (OpenSubtitles). Default bodies keep other implementations compiling.
+
+    /**
+     * Opens [PlayerUiState.subtitleSearch] and looks for subtitles for the playing video (its
+     * library details, and the file's movie hash when it is on this device). Also "try again".
+     */
+    fun searchSubtitles() {}
+
+    /** Downloads [id] of [SubtitleSearchUi.results], turns it on and closes the list. */
+    fun downloadSubtitle(id: String) {}
+
+    /** Closes the list; a download already running still finishes and turns its subtitle on. */
+    fun dismissSubtitleSearch() {}
 }
 
 open class NoOpPlayerActions : PlayerActions {
@@ -218,4 +268,7 @@ open class NoOpPlayerActions : PlayerActions {
     override fun stopCasting() {}
     override fun scanForCastDevices() {}
     override fun close() {}
+    override fun searchSubtitles() {}
+    override fun downloadSubtitle(id: String) {}
+    override fun dismissSubtitleSearch() {}
 }

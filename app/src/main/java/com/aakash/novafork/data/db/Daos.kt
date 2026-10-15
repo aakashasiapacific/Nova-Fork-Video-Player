@@ -286,7 +286,51 @@ interface VideoDao {
     /** Puts back the numbering from the file name (absolute anime numbers are re-placed on the next match). */
     @Query("UPDATE videos SET season = :season, episode = :episode, episodeEnd = :episodeEnd WHERE id = :id")
     suspend fun setEpisodeNumbers(id: Long, season: Int?, episode: Int?, episodeEnd: Int?)
+
+    // Backup and restore (data.backup)
+
+    /** Videos with something of the user's to back up: progress, plays, track choices or a manual match. */
+    @Query(
+        "SELECT * FROM videos WHERE positionMs > 0 OR watched = 1 OR lastPlayedAt IS NOT NULL OR playCount > 0 " +
+            "OR audioTrackId IS NOT NULL OR subtitleTrackId IS NOT NULL OR matchState = 'MANUAL'",
+    )
+    suspend fun withUserState(): List<VideoEntity>
+
+    /** Every video, present or not, as a restored backup's entries are matched against it. */
+    @Query("SELECT id, sourceId, uri, folder, fileName, sizeBytes, present FROM videos")
+    suspend fun identities(): List<VideoIdentity>
+
+    /** At most [SQL_CHUNK] ids per call. */
+    @Query("SELECT * FROM videos WHERE id IN (:ids)")
+    suspend fun byIds(ids: List<Long>): List<VideoEntity>
+
+    /** Puts back a video's playback state from a backup. */
+    @Query(
+        "UPDATE videos SET positionMs = :positionMs, watched = :watched, lastPlayedAt = :lastPlayedAt, " +
+            "playCount = :playCount, audioTrackId = :audioTrackId, subtitleTrackId = :subtitleTrackId WHERE id = :id",
+    )
+    suspend fun restorePlayback(
+        id: Long,
+        positionMs: Long,
+        watched: Boolean,
+        lastPlayedAt: Long?,
+        playCount: Int,
+        audioTrackId: Int?,
+        subtitleTrackId: Int?,
+    )
 }
+
+/** What identifies a video when a restored backup's entries are matched to the library. */
+data class VideoIdentity(
+    val id: Long,
+    val sourceId: Long,
+    val uri: String,
+    /** [VideoEntity.folder]. */
+    val folder: String,
+    val fileName: String,
+    val sizeBytes: Long?,
+    val present: Boolean,
+)
 
 /** A video's place in its source, for folder queues. */
 data class FolderEntry(
@@ -319,6 +363,10 @@ interface PlaylistDao {
 
     @Query("SELECT * FROM playlists WHERE id = :id")
     suspend fun byId(id: Long): PlaylistEntity?
+
+    /** Every playlist, oldest first (backup and restore). */
+    @Query("SELECT * FROM playlists ORDER BY id")
+    suspend fun all(): List<PlaylistEntity>
 
     @Insert
     suspend fun insert(playlist: PlaylistEntity): Long

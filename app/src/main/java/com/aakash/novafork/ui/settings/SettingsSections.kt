@@ -161,6 +161,7 @@ private fun libraryGroups(state: SettingsUi, actions: AppActions): List<Settings
                 },
             ),
         ),
+        backupGroup(actions),
     )
 }
 
@@ -600,6 +601,7 @@ private fun playerGroups(settings: Settings, actions: AppActions): List<Settings
             },
         ),
     ),
+    subtitleDownloadGroup(settings, actions),
 )
 
 // Appearance

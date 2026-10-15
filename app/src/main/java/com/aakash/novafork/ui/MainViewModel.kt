@@ -1,6 +1,8 @@
 package com.aakash.novafork.ui
 
 import android.app.Application
+import android.content.ContentResolver
+import android.net.Uri
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -22,6 +24,11 @@ import com.aakash.novafork.data.Settings
 import com.aakash.novafork.data.SmbCredentials
 import com.aakash.novafork.data.StoragePermissions
 import com.aakash.novafork.data.TmdbSearchResult
+import com.aakash.novafork.data.backup.BackupFormatException
+import com.aakash.novafork.data.backup.BackupManager
+import com.aakash.novafork.data.backup.BackupSummary
+import com.aakash.novafork.data.backup.NovaBackup
+import com.aakash.novafork.data.backup.RestoreReport
 import com.aakash.novafork.data.db.SourceEntity
 import com.aakash.novafork.data.db.SourceType
 import com.aakash.novafork.data.db.VideoKind
@@ -30,6 +37,7 @@ import com.aakash.novafork.sources.media.PlexSignIn
 import com.aakash.novafork.sources.net.FileServerSources
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.AppUiState
+import com.aakash.novafork.ui.model.BackupUi
 import com.aakash.novafork.ui.model.BrowseDirUi
 import com.aakash.novafork.ui.model.DialogUi
 import com.aakash.novafork.ui.model.IdentifyResultUi
@@ -42,6 +50,7 @@ import com.aakash.novafork.ui.model.NetworkSourceForm
 import com.aakash.novafork.ui.model.PermissionUi
 import com.aakash.novafork.ui.model.PlexServerUi
 import com.aakash.novafork.ui.model.PlexSignInUi
+import com.aakash.novafork.ui.model.RestorePreviewUi
 import com.aakash.novafork.ui.model.Route
 import com.aakash.novafork.ui.model.SearchUi
 import com.aakash.novafork.ui.model.ServerLibraryUi
@@ -50,8 +59,11 @@ import com.aakash.novafork.ui.model.SmbForm
 import com.aakash.novafork.ui.model.SourceUi
 import com.aakash.novafork.ui.model.TopDestination
 import com.aakash.novafork.ui.model.UpnpServerUi
+import java.io.FileNotFoundException
 import java.io.IOException
+import java.io.OutputStream
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -61,6 +73,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
@@ -72,6 +85,7 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 private const val TAG = "MainViewModel"
 
@@ -173,6 +187,18 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
     private var plexAccount: PlexAccount? = null
     private val plexSignIn: PlexSignIn by lazy { MediaServerSources.plexSignIn(graph) }
 
+    private val backups: BackupManager by lazy {
+        BackupManager(getApplication<Application>(), graph.database, settingsStore, library, BuildConfig.VERSION_NAME)
+    }
+    private val backup = MutableStateFlow(BackupUi())
+    private val backupUi: StateFlow<BackupUi> = backup.asStateFlow()
+
+    /** "Include passwords and sign-ins" of the backup being saved, from the dialog until the picker returns. */
+    private var exportSecrets = false
+
+    /** The backup file read and checked, waiting for the user's go ([BackupUi.confirm]). Memory only. */
+    private var restoreCandidate: NovaBackup? = null
+
     init {
         launchSafely("Couldn't scan the library") { library.refreshAll() }
         viewModelScope.launch {
@@ -192,6 +218,13 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
                 .map { it.backStack.lastOrNull() as? Route.BrowseDir }
                 .distinctUntilChanged()
                 .collect { route -> if (route != null) openListing(route.sourceId, route.path, refresh = false) }
+        }
+        viewModelScope.launch {
+            // A finished scan may have given entries of a restored backup their videos.
+            library.scanState
+                .map { it.running }
+                .distinctUntilChanged()
+                .collect { running -> if (!running) refreshBackupInfo() }
         }
     }
 
@@ -1124,6 +1157,175 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
             emptyList()
         }
 
+    // Backup & restore: MainActivity runs the file pickers (exportBackup, importBackup) and hands
+    // the picked files to writeBackup and readBackup.
+
+    override fun backupState(): StateFlow<BackupUi> = backupUi
+
+    /** Remembers the backup dialog's choice while MainActivity's "create document" picker is open. */
+    fun prepareExport(includeSecrets: Boolean) {
+        exportSecrets = includeSecrets
+    }
+
+    /** Writes a backup into [uri], a document the picker created. */
+    fun writeBackup(uri: Uri) {
+        val includeSecrets = exportSecrets
+        exportSecrets = false
+        val resolver = getApplication<Application>().contentResolver
+        runBackupJob("Couldn't save the backup", viewModelScope) {
+            val summary = withContext(Dispatchers.IO) { backups.export(openForWriting(resolver, uri), includeSecrets) }
+            backup.update { it.copy(lastBackupAt = summary.createdAt) }
+            showMessage(backupMessage(summary))
+        }
+    }
+
+    /** Reads and checks the backup file at [uri]; [BackupUi.confirm] then asks before restoring it. */
+    fun readBackup(uri: Uri) {
+        val resolver = getApplication<Application>().contentResolver
+        runBackupJob("Couldn't read the backup", viewModelScope) {
+            val read = withContext(Dispatchers.IO) {
+                val input = resolver.openInputStream(uri) ?: throw IOException("The file couldn't be opened")
+                input.use { backups.read(it) }
+            }
+            restoreCandidate = read
+            backup.update { it.copy(confirm = read.summary().toPreview()) }
+        }
+    }
+
+    override fun confirmRestore() {
+        // The summary stays up meanwhile, so the restore can be confirmed again once the job is done.
+        if (backup.value.working) {
+            showMessage(BACKUP_BUSY)
+            return
+        }
+        val candidate = restoreCandidate
+        restoreCandidate = null
+        backup.update { it.copy(confirm = null) }
+        if (candidate == null) return
+        // In the app's scope: leaving the screen must not stop a restore halfway.
+        runBackupJob("Couldn't restore the backup", graph.appScope) {
+            val report = backups.restore(candidate)
+            backup.update { it.copy(waiting = report.waiting.total) }
+            showMessage(restoreMessage(report))
+            if (report.addedSourceIds.isNotEmpty()) scanRestoredSources(report.addedSourceIds)
+        }
+    }
+
+    override fun cancelRestore() {
+        restoreCandidate = null
+        backup.update { it.copy(confirm = null) }
+    }
+
+    /** One backup job at a time; [BackupUi.working] shows it. */
+    private fun runBackupJob(failure: String, scope: CoroutineScope, block: suspend () -> Unit) {
+        if (backup.value.working) {
+            showMessage(BACKUP_BUSY)
+            return
+        }
+        backup.update { it.copy(working = true) }
+        scope.launch {
+            try {
+                block()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: BackupFormatException) {
+                showMessage(e.message.nonBlank() ?: failure)
+            } catch (e: Exception) {
+                Log.w(TAG, failure, e)
+                showMessage(e.message.nonBlank()?.let { "$failure: $it" } ?: failure)
+            } finally {
+                backup.update { it.copy(working = false) }
+            }
+        }
+    }
+
+    /** Sources a restore added are scanned one after the other; their videos then get their history. */
+    private fun scanRestoredSources(sourceIds: List<Long>) {
+        graph.appScope.launch {
+            for (id in sourceIds) {
+                try {
+                    library.scanSource(id)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    Log.w(TAG, "Scanning a restored source failed", e)
+                }
+            }
+        }
+    }
+
+    private suspend fun refreshBackupInfo() {
+        try {
+            val last = backups.lastBackupAt()
+            val waiting = backups.waiting().total
+            backup.update { it.copy(lastBackupAt = last, waiting = waiting) }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.w(TAG, "Reading the backup state failed", e)
+        }
+    }
+
+    private fun backupMessage(summary: BackupSummary): String {
+        val what = listOf(
+            plural(summary.sources, "source", "sources"),
+            plural(summary.videos, "video with history", "videos with history"),
+            plural(summary.playlists, "playlist", "playlists"),
+        ).joinToString(", ")
+        return if (summary.includesSecrets) {
+            "Backup saved: $what. It holds your passwords, so keep it private."
+        } else {
+            "Backup saved: $what"
+        }
+    }
+
+    private fun restoreMessage(report: RestoreReport): String {
+        val restored = buildList {
+            if (report.settings > 0) add("settings")
+            if (report.sourcesAdded > 0) add(plural(report.sourcesAdded, "source", "sources"))
+            if (report.applied.videos > 0) add("history of ${plural(report.applied.videos, "video", "videos")}")
+            if (report.applied.matches > 0) add(plural(report.applied.matches, "match", "matches"))
+            if (report.playlistsCreated > 0 || report.applied.playlistItems > 0) add("playlists")
+        }
+        val sentences = ArrayList<String>()
+        sentences += if (restored.isEmpty()) "Nothing new to restore" else "Restored ${restored.joinToString(", ")}"
+        val waiting = report.waiting.total
+        if (waiting == 1) sentences += "1 item waits for its video to be scanned"
+        if (waiting > 1) sentences += "$waiting items wait for their videos to be scanned"
+        if (report.foldersToPick.isNotEmpty()) {
+            sentences += "Add ${report.foldersToPick.joinToString(", ")} again under Folders"
+        }
+        if (report.matchesFailed > 0) {
+            sentences += "Skipped ${plural(report.matchesFailed, "match", "matches")} TMDB no longer has"
+        }
+        return sentences.joinToString(". ") + "."
+    }
+
+    private fun plural(count: Int, one: String, many: String): String = if (count == 1) "1 $one" else "$count $many"
+
+    private fun BackupSummary.toPreview() = RestorePreviewUi(
+        createdAt = createdAt,
+        appVersion = appVersion,
+        includesSecrets = includesSecrets,
+        settings = settings,
+        sources = sources,
+        videos = videos,
+        matches = matches,
+        playlists = playlists,
+    )
+
+    /** "wt" truncates what a provider hands back; not every provider knows it, "w" is the fallback. */
+    private fun openForWriting(resolver: ContentResolver, uri: Uri): OutputStream {
+        val truncating = try {
+            resolver.openOutputStream(uri, "wt")
+        } catch (e: FileNotFoundException) {
+            null
+        } catch (e: IllegalArgumentException) {
+            null
+        }
+        return truncating ?: resolver.openOutputStream(uri, "w") ?: throw IOException("The file couldn't be opened")
+    }
+
     // Activity-only actions: MainActivity overrides these.
 
     override fun play(videoId: Long, startOver: Boolean) {}
@@ -1152,6 +1354,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
 
         /** Live folder listings kept for going back without listing again. */
         const val MAX_LISTINGS = 40
+
+        const val BACKUP_BUSY = "Wait for the backup or restore that is running"
     }
 }
 

@@ -44,6 +44,7 @@ import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
 import com.aakash.novafork.ui.model.PlayerActions
 import com.aakash.novafork.ui.model.PlayerUiState
+import com.aakash.novafork.ui.model.SubtitleSearchUi
 import com.aakash.novafork.ui.theme.NovaColors
 
 private val PanelWidth = 360.dp
@@ -78,6 +79,24 @@ internal fun PlayerSheetPanel(
     val shown = rememberLatestNonNull(sheet) ?: PlayerSheet.QUEUE
     PlayerSidePanel(visible = sheet != null, title = shown.title, onDismiss = onDismiss, modifier = modifier) {
         PlayerSheetContent(sheet = shown, state = state, actions = actions, onDismiss = onDismiss)
+    }
+}
+
+/** Tablet side panel with the subtitle download list; [search] null closes it (and closing it closes the search). */
+@Composable
+internal fun SubtitleSearchPanel(
+    search: SubtitleSearchUi?,
+    actions: PlayerActions,
+    modifier: Modifier = Modifier,
+) {
+    val shown = rememberLatestNonNull(search)
+    PlayerSidePanel(
+        visible = search != null,
+        title = SUBTITLE_SEARCH_TITLE,
+        onDismiss = actions::dismissSubtitleSearch,
+        modifier = modifier,
+    ) {
+        if (shown != null) SubtitleSearchContent(search = shown, actions = actions)
     }
 }
 
@@ -193,6 +212,12 @@ private fun TrackPanelList(
                         onClick = {
                             onDismiss()
                             actions.pickSubtitleFile()
+                        },
+                    )
+                    DownloadSubtitlesRow(
+                        onClick = {
+                            onDismiss()
+                            actions.searchSubtitles()
                         },
                     )
                     SubtitleDelayRow(delayMs = state.subtitleDelayMs, onChange = actions::setSubtitleDelay)

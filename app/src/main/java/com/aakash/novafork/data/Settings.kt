@@ -55,6 +55,18 @@ data class Settings(
      * playing, with controls in a notification. Off: it pauses, or goes picture-in-picture.
      */
     val backgroundAudio: Boolean = true,
+    /** OpenSubtitles.com API key pasted by the user. Empty = the built-in BuildConfig.OPENSUBTITLES_API_KEY, if any. */
+    val opensubtitlesApiKey: String = "",
+    /** Optional OpenSubtitles.com account; logged in, the daily download quota is bigger. */
+    val opensubtitlesUsername: String = "",
+    val opensubtitlesPassword: String = "",
+    /**
+     * Languages to download subtitles in, as typed ("en, fr"; codes or English names), most
+     * wanted first. "" = [preferredSubtitleLanguage], then the device's languages.
+     */
+    val subtitleLanguages: String = "",
+    /** Download the best subtitle (once per video) when a video has none in the first of those languages. */
+    val autoDownloadSubtitles: Boolean = false,
 )
 
 interface SettingsStore {

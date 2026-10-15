@@ -15,6 +15,10 @@ import android.util.Log
 import com.aakash.novafork.AppGraph
 import com.aakash.novafork.CrashReporter
 import com.aakash.novafork.core.library.VideoFiles
+import com.aakash.novafork.core.opensubtitles.OpenSubtitlesException
+import com.aakash.novafork.core.opensubtitles.OpenSubtitlesLanguages
+import com.aakash.novafork.core.opensubtitles.SubtitleRanking
+import com.aakash.novafork.core.opensubtitles.SubtitleResult
 import com.aakash.novafork.core.smb.SmbUris
 import com.aakash.novafork.data.AspectMode
 import com.aakash.novafork.data.HwDecoding
@@ -23,6 +27,7 @@ import com.aakash.novafork.data.SmbCredentials
 import com.aakash.novafork.data.db.VideoEntity
 import com.aakash.novafork.data.db.VideoKind
 import com.aakash.novafork.data.db.VideoWithMeta
+import com.aakash.novafork.sources.DownloadedSubtitles
 import com.aakash.novafork.sources.SubtitleFinder
 import com.aakash.novafork.ui.model.Artwork
 import com.aakash.novafork.ui.model.CastDeviceUi
@@ -31,6 +36,7 @@ import com.aakash.novafork.ui.model.PlayerActions
 import com.aakash.novafork.ui.model.PlayerUiState
 import com.aakash.novafork.ui.model.QueueItemUi
 import com.aakash.novafork.ui.model.RepeatMode
+import com.aakash.novafork.ui.model.SubtitleSearchUi
 import com.aakash.novafork.ui.model.TrackUi
 import com.aakash.novafork.ui.model.UpNextUi
 import java.io.File
@@ -109,7 +115,15 @@ class PlayerController(
 
     private class NowPlaying(val uri: String, val kind: UriKind, val fileName: String, val entry: VideoWithMeta?) {
         val videoId: Long? get() = entry?.video?.id
+
+        /** Where its downloaded subtitles are kept (see [DownloadedSubtitles]). */
+        val videoKey: String = DownloadedSubtitles.videoKey(entry?.video?.id, uri)
+
+        val subtitleTarget: SubtitleDownloads.Target get() = SubtitleDownloads.Target(videoKey, uri, kind, fileName, entry)
     }
+
+    /** A subtitle file just added and the subtitle tracks there were before it: the new one is its track. */
+    private class PendingTrack(val path: String, val before: Set<Int>)
 
     /** What the user chose in a session that is reopened in software, handed to the new one. */
     private class CarriedChoices(val audioTrack: Int?, val subtitleTrack: Int?, val subtitleDelayMs: Long)
@@ -122,6 +136,7 @@ class PlayerController(
     private val subtitleFinder = SubtitleFinder(appContext, graph.smb) { server, share ->
         graph.library.smbCredentials(server, share)
     }
+    private val subtitleDownloads = SubtitleDownloads(appContext, graph, subtitleFinder)
 
     /** The player screen, while one is shown. */
     private var host: Host? = null
@@ -217,6 +232,19 @@ class PlayerController(
     private var subtitleSetupDone = false
     private var pendingSubtitleRestore: Int? = null
 
+    /** Paths of the downloaded subtitle files added to this session: setup doesn't add them again. */
+    private val addedSubtitleFiles = HashSet<String>()
+
+    // Subtitle downloads (OpenSubtitles)
+    /** The results on the download list, by id. */
+    private var subtitleResults: Map<String, SubtitleResult> = emptyMap()
+
+    /** A downloaded file just added, waiting for libVLC to select its track. */
+    private var pendingDownloadTrack: PendingTrack? = null
+
+    /** The track of each downloaded file added to this session, by path. */
+    private val downloadedTracks = HashMap<String, Int>()
+
     // Episodes around this one
     private var nextEntry: VideoWithMeta? = null
     private var previousVideoId: Long? = null
@@ -252,6 +280,9 @@ class PlayerController(
 
     private var openJob: Job? = null
     private var subtitleJob: Job? = null
+    private var subtitleSearchJob: Job? = null
+    private var subtitleDownloadJob: Job? = null
+    private var autoSubtitleJob: Job? = null
     private var upNextJob: Job? = null
     private var resumeBannerJob: Job? = null
     private var feedbackJob: Job? = null
@@ -432,6 +463,9 @@ class PlayerController(
         saveProgress()
         openJob?.cancel()
         subtitleJob?.cancel()
+        subtitleSearchJob?.cancel()
+        subtitleDownloadJob?.cancel()
+        autoSubtitleJob?.cancel()
         upNextJob?.cancel()
         resumeBannerJob?.cancel()
         feedbackJob?.cancel()
@@ -481,6 +515,10 @@ class PlayerController(
         saveProgress()
         openJob?.cancel()
         subtitleJob?.cancel()
+        // Belong to the previous video. A download the user picked still finishes and is kept
+        // for that video, but is not added to this one (see downloadSubtitle).
+        subtitleSearchJob?.cancel()
+        autoSubtitleJob?.cancel()
         upNextJob?.cancel()
         resumeBannerJob?.cancel()
         pictureWatchJob?.cancel()
@@ -792,6 +830,10 @@ class PlayerController(
         externalSubtitles = null
         subtitleSetupDone = false
         pendingSubtitleRestore = null
+        addedSubtitleFiles.clear()
+        subtitleResults = emptyMap()
+        pendingDownloadTrack = null
+        downloadedTracks.clear()
         nextEntry = null
         previousVideoId = null
         pausedByFocusLoss = false
@@ -960,6 +1002,9 @@ class PlayerController(
         released = true
         openJob?.cancel()
         subtitleJob?.cancel()
+        subtitleSearchJob?.cancel()
+        subtitleDownloadJob?.cancel()
+        autoSubtitleJob?.cancel()
         upNextJob?.cancel()
         resumeBannerJob?.cancel()
         feedbackJob?.cancel()
@@ -1306,6 +1351,87 @@ class PlayerController(
     override fun close() {
         saveProgress()
         onFinished()
+    }
+
+    override fun searchSubtitles() {
+        if (released) return
+        subtitleSearchJob?.cancel()
+        val current = nowPlaying
+        val languages = subtitleDownloads.languages(graph.settings.settings.value)
+        val label = SubtitleDownloadRules.languagesLabel(languages)
+        val problem = when {
+            current == null -> "The video is still opening. Try again in a moment."
+            !subtitleDownloads.hasKey -> OpenSubtitlesException.NO_KEY_MESSAGE
+            else -> null
+        }
+        if (current == null || problem != null) {
+            _state.update { it.copy(subtitleSearch = SubtitleSearchUi(error = problem, languages = label)) }
+            return
+        }
+        PlayerDiagnostics.record("user: search subtitles (${if (current.kind.isLocal) "with" else "without"} movie hash)")
+        _state.update { it.copy(subtitleSearch = SubtitleSearchUi(loading = true, languages = label)) }
+        val forSession = session
+        subtitleSearchJob = scope.launch {
+            try {
+                val results = subtitleDownloads.search(current.subtitleTarget, languages)
+                val downloaded = subtitleDownloads.downloadedNames(current.videoKey)
+                if (released || session != forSession) return@launch
+                subtitleResults = results.associateBy { it.id }
+                val items = results.map { SubtitleDownloadRules.toUi(it, downloaded) }
+                _state.update { state ->
+                    state.copy(subtitleSearch = state.subtitleSearch?.copy(loading = false, results = items, error = null))
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.w(TAG, "Subtitle search failed", e)
+                if (released || session != forSession) return@launch
+                val message = SubtitleDownloadRules.errorMessage(e)
+                _state.update { state ->
+                    state.copy(subtitleSearch = state.subtitleSearch?.copy(loading = false, results = emptyList(), error = message))
+                }
+            }
+        }
+    }
+
+    override fun downloadSubtitle(id: String) {
+        if (released) return
+        val current = nowPlaying ?: return
+        val result = subtitleResults[id] ?: return
+        val search = _state.value.subtitleSearch ?: return
+        if (search.downloadingId != null) return
+        PlayerDiagnostics.record("user: download a subtitle${if (result.movieHashMatch) " matching the file" else ""}")
+        _state.update { state -> state.copy(subtitleSearch = state.subtitleSearch?.copy(downloadingId = id, error = null)) }
+        val forSession = session
+        subtitleDownloadJob = scope.launch {
+            val message = try {
+                val file = subtitleDownloads.download(current.subtitleTarget, result)
+                // Kept for its video either way; only that video's session gets the track.
+                if (released || session != forSession) return@launch
+                if (addDownloadedSubtitle(file)) null else "Couldn't load that subtitle file"
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.w(TAG, "Subtitle download failed", e)
+                if (released || session != forSession) return@launch
+                SubtitleDownloadRules.errorMessage(e)
+            }
+            val waiting = _state.value.subtitleSearch?.downloadingId == id
+            if (message == null) {
+                // The list closes once its subtitle is on; a list opened again meanwhile stays.
+                if (waiting) _state.update { it.copy(subtitleSearch = null) }
+                showLabel("Subtitles on: ${OpenSubtitlesLanguages.displayName(result.language)}")
+            } else if (waiting) {
+                _state.update { state -> state.copy(subtitleSearch = state.subtitleSearch?.copy(downloadingId = null, error = message)) }
+            } else {
+                showFeedback(GestureFeedback.Label(message), MESSAGE_LABEL_MS)
+            }
+        }
+    }
+
+    override fun dismissSubtitleSearch() {
+        subtitleSearchJob?.cancel()
+        if (_state.value.subtitleSearch != null) _state.update { it.copy(subtitleSearch = null) }
     }
 
     /**
@@ -1771,6 +1897,7 @@ class PlayerController(
 
     private fun onTracksChanged(added: Boolean) {
         refreshTracks()
+        rememberDownloadedTrack()
         if (!added || !playbackStarted) return
         if (audioChoicePending) applyAudioChoice()
         val restore = pendingSubtitleRestore
@@ -1818,17 +1945,22 @@ class PlayerController(
         }
     }
 
+    /**
+     * Looks for the subtitle files of [current]: the ones next to it (with auto-load on, not for
+     * streams) and the ones downloaded for it earlier, which always come back.
+     */
     private fun startSubtitleSearch(current: NowPlaying, settings: Settings) {
-        if (!settings.autoLoadSubtitles || current.kind == UriKind.NETWORK) {
-            externalSubtitles = emptyList()
-            return
-        }
+        val siblings = settings.autoLoadSubtitles && current.kind != UriKind.NETWORK
         val languages = listOf(settings.preferredSubtitleLanguage, Locale.getDefault().language, "en")
             .filter { it.isNotBlank() }
             .distinct()
         subtitleJob = scope.launch {
             val files = try {
-                subtitleFinder.find(current.uri, current.fileName, languages)
+                if (siblings) {
+                    subtitleFinder.find(current.uri, current.fileName, languages, current.videoKey)
+                } else {
+                    subtitleFinder.downloaded(current.videoKey)
+                }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -1868,9 +2000,100 @@ class PlayerController(
             }
         }
         for (file in external) {
+            if (!addedSubtitleFiles.add(file.absolutePath)) continue
             mediaPlayer.addSlave(IMedia.Slave.Type.Subtitle, Uri.fromFile(file), file == selected)
         }
         refreshTracks()
+        maybeDownloadSubtitles(embedded, external, remembered)
+    }
+
+    /**
+     * Adds a downloaded subtitle file to the playing video and turns it on; its track is
+     * remembered for the video once libVLC has selected it. A file added before in this session
+     * just gets its track turned on again. False when libVLC refused it.
+     */
+    private fun addDownloadedSubtitle(file: File): Boolean {
+        if (released || !mediaReady) return false
+        val path = file.absolutePath
+        val known = downloadedTracks[path]
+        if (known != null && realTracks(mediaPlayer.spuTracks).any { it.id == known }) {
+            mediaPlayer.setSpuTrack(known)
+            pendingSubtitleRestore = null
+            rememberedSubtitle = known
+            refreshTracks()
+            saveTrackChoice()
+            return true
+        }
+        val before = realTracks(mediaPlayer.spuTracks).map { it.id }.toSet()
+        if (!mediaPlayer.addSlave(IMedia.Slave.Type.Subtitle, Uri.fromFile(file), true)) return false
+        addedSubtitleFiles.add(path)
+        pendingDownloadTrack = PendingTrack(path, before)
+        pendingSubtitleRestore = null
+        return true
+    }
+
+    /** The track of a subtitle just downloaded, once libVLC selected it, becomes the video's remembered choice. */
+    private fun rememberDownloadedTrack() {
+        val pending = pendingDownloadTrack ?: return
+        val selected = mediaPlayer.spuTrack
+        if (selected == DISABLED_TRACK || selected in pending.before) return
+        pendingDownloadTrack = null
+        downloadedTracks[pending.path] = selected
+        rememberedSubtitle = selected
+        saveTrackChoice()
+    }
+
+    /**
+     * With automatic downloads on and nothing chosen for the video yet: when neither its own
+     * tracks nor its files are in the first download language, fetches the best match
+     * (timed for this file first, then the most downloaded) in the first language that has one,
+     * among those it lacks. Settled once per video: a download, or a search that found nothing.
+     */
+    private fun maybeDownloadSubtitles(embedded: List<MediaPlayer.TrackDescription>, external: List<File>, remembered: Int?) {
+        val current = nowPlaying ?: return
+        val settings = graph.settings.settings.value
+        if (!settings.autoDownloadSubtitles || remembered != null || !subtitleDownloads.hasKey) return
+        val languages = subtitleDownloads.languages(settings)
+        val missing = SubtitleDownloadRules.missingLanguages(languages) { language ->
+            val aliases = SubtitleDownloadRules.aliases(language)
+            embedded.any { TrackLanguages.matches(it.name, aliases) } ||
+                external.any { SubtitleDownloadRules.fileIsInLanguage(it.name, current.fileName, aliases) }
+        }
+        if (missing.isEmpty()) return
+        val forSession = session
+        autoSubtitleJob?.cancel()
+        autoSubtitleJob = scope.launch {
+            try {
+                if (subtitleDownloads.autoDownloadSettled(current.videoKey)) return@launch
+                val target = current.subtitleTarget
+                val best = SubtitleRanking.best(subtitleDownloads.search(target, missing), missing)
+                if (best == null) {
+                    PlayerDiagnostics.record("subtitles: nothing to download automatically")
+                    subtitleDownloads.settleAutoDownload(current.videoKey)
+                    return@launch
+                }
+                val file = subtitleDownloads.download(target, best)
+                subtitleDownloads.settleAutoDownload(current.videoKey)
+                if (released || session != forSession) return@launch
+                PlayerDiagnostics.record("subtitles: downloaded automatically")
+                if (addDownloadedSubtitle(file)) {
+                    showFeedback(
+                        GestureFeedback.Label("Downloaded ${OpenSubtitlesLanguages.displayName(best.language)} subtitles"),
+                        MESSAGE_LABEL_MS,
+                    )
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // Not settled: the next time the video plays tries again.
+                Log.w(TAG, "Automatic subtitle download failed", e)
+                if (released || session != forSession) return@launch
+                showFeedback(
+                    GestureFeedback.Label("Couldn't download subtitles: ${SubtitleDownloadRules.errorMessage(e)}"),
+                    MESSAGE_LABEL_MS,
+                )
+            }
+        }
     }
 
     /** "Movie.eng.srt" for "Movie.mkv": only the part after the video's own name says the language. */
@@ -2129,6 +2352,9 @@ class PlayerController(
         const val RESUME_BANNER_MS = 6_000L
         const val GESTURE_FEEDBACK_MS = 600L
         const val LABEL_MS = 1_200L
+
+        /** A sentence to read (a download failed, a subtitle was fetched) stays longer than a label. */
+        const val MESSAGE_LABEL_MS = 4_000L
         const val UP_NEXT_COUNTDOWN_SECONDS = 8
 
         const val MIN_RATE = 0.25f

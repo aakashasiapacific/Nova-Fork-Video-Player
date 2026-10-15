@@ -87,6 +87,13 @@ internal fun TrackSheet(
                             actions.pickSubtitleFile()
                         },
                     )
+                    DownloadSubtitlesRow(
+                        onClick = {
+                            // The download list opens in a sheet of its own.
+                            onDismiss()
+                            actions.searchSubtitles()
+                        },
+                    )
                     SubtitleDelayRow(delayMs = state.subtitleDelayMs, onChange = actions::setSubtitleDelay)
                 }
                 else -> {

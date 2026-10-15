@@ -23,12 +23,14 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.InputStream
+import java.security.MessageDigest
 import java.util.Locale
 
 /**
  * Finds external subtitle files next to a video (core SubtitleRules naming) and makes them
  * readable for libVLC: files on local storage are returned in place, files behind SAF or on SMB
- * shares are copied into the cache first.
+ * shares are copied into the cache first. Also keeps the subtitles downloaded for a video (see
+ * [DownloadedSubtitles]) and returns them with the others.
  */
 class SubtitleFinder(
     private val context: Context,
@@ -37,8 +39,17 @@ class SubtitleFinder(
 ) {
     private val resolver: ContentResolver get() = context.contentResolver
 
-    /** Best effort and never throws: whatever was found before a failure is returned. */
-    suspend fun find(videoUri: String, fileName: String, preferredLanguages: List<String>): List<File> =
+    /**
+     * Best effort and never throws: whatever was found before a failure is returned. With
+     * [videoKey] (see [DownloadedSubtitles.videoKey]) the subtitles downloaded for the video
+     * follow the files next to it, oldest first, so their track order stays the same.
+     */
+    suspend fun find(
+        videoUri: String,
+        fileName: String,
+        preferredLanguages: List<String>,
+        videoKey: String? = null,
+    ): List<File> =
         withContext(Dispatchers.IO) {
             val found = ArrayList<File>()
             try {
@@ -48,7 +59,46 @@ class SubtitleFinder(
             } catch (e: Exception) {
                 // Subtitles are optional; play without the rest.
             }
+            if (videoKey != null) found += listDownloaded(videoKey)
             found
+        }
+
+    /** The subtitles downloaded for [videoKey] earlier, oldest first. Never throws. */
+    suspend fun downloaded(videoKey: String): List<File> = withContext(Dispatchers.IO) { listDownloaded(videoKey) }
+
+    /** Where the subtitles downloaded for [videoKey] are kept: filesDir/subtitles/<videoKey>/. */
+    fun downloadDirectory(videoKey: String): File = DownloadedSubtitles.directory(context.filesDir, videoKey)
+
+    /**
+     * Stores a downloaded subtitle as [name] (made safe) among [videoKey]'s, replacing a file of
+     * that name. Null when it can't be written.
+     */
+    suspend fun saveDownloaded(videoKey: String, name: String, bytes: ByteArray): File? = withContext(Dispatchers.IO) {
+        val dir = downloadDirectory(videoKey)
+        val safeName = safeFileName(name) ?: return@withContext null
+        val target = File(dir, safeName)
+        val partial = File(dir, ".$safeName.part")
+        try {
+            if (!dir.isDirectory && !dir.mkdirs()) return@withContext null
+            partial.writeBytes(bytes)
+            // Written aside first: a half-written file must never be picked up next time.
+            if (target.exists() && !target.delete()) return@withContext null
+            if (!partial.renameTo(target)) return@withContext null
+            target
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            null
+        } finally {
+            if (partial.exists()) partial.delete()
+        }
+    }
+
+    private fun listDownloaded(videoKey: String): List<File> =
+        try {
+            DownloadedSubtitles.list(downloadDirectory(videoKey))
+        } catch (e: SecurityException) {
+            emptyList()
         }
 
     /** Copies a subtitle the user picked into the cache so libVLC can open it by path. */
@@ -387,5 +437,40 @@ class SubtitleFinder(
         const val DATA_COLUMN = MediaStore.MediaColumns.DATA
 
         val UNSAFE_NAME_CHARS = Regex("[\\\\/:*?\"<>|\\x00-\\x1F]")
+    }
+}
+
+/**
+ * Subtitles downloaded from OpenSubtitles live in filesDir/subtitles/<video key>/, so they come
+ * back whenever the video plays again (and are removed with the app's data).
+ */
+object DownloadedSubtitles {
+    const val FOLDER = "subtitles"
+
+    /** At most this many are loaded for one video: the newest ones. */
+    const val MAX_FILES = 16
+
+    private const val MAX_BYTES = 20L * 1024 * 1024
+    private const val LINK_HASH_CHARS = 24
+
+    /** A library video's id ("42"); for a link that isn't in the library, "link-" and a hash of its URI. */
+    fun videoKey(videoId: Long?, uri: String): String {
+        if (videoId != null) return videoId.toString()
+        val digest = MessageDigest.getInstance("SHA-256").digest(uri.toByteArray(Charsets.UTF_8))
+        return "link-" + digest.joinToString("") { "%02x".format(Locale.ROOT, it.toInt() and 0xff) }.take(LINK_HASH_CHARS)
+    }
+
+    fun directory(filesDir: File, videoKey: String): File =
+        File(File(filesDir, FOLDER), videoKey.filter { it.isLetterOrDigit() || it == '-' || it == '_' }.ifEmpty { "unknown" })
+
+    /** The subtitle files in [directory], oldest first (the newest [MAX_FILES]); hidden and partial files are left out. */
+    fun list(directory: File): List<File> {
+        val files = directory.listFiles() ?: return emptyList()
+        return files.asSequence()
+            .filter { it.isFile && !it.name.startsWith(".") && SubtitleRules.isSubtitle(it.name) }
+            .filter { it.length() in 1L..MAX_BYTES }
+            .sortedWith(compareBy<File>({ it.lastModified() }, { it.name }))
+            .toList()
+            .takeLast(MAX_FILES)
     }
 }

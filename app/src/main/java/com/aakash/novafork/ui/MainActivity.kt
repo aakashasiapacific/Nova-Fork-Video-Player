@@ -24,15 +24,18 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import com.aakash.novafork.data.StoragePermissions
 import com.aakash.novafork.data.ThemeMode
+import com.aakash.novafork.data.backup.BackupManager
 import com.aakash.novafork.player.PlayerIntents
 import com.aakash.novafork.ui.model.AppActions
+import java.time.LocalDate
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
  * The library. Hosts [NovaRoot] and adds the actions that need an Activity on top of
- * [MainViewModel]: starting the player, the folder picker and storage permission prompts.
+ * [MainViewModel]: starting the player, the folder and backup file pickers and storage
+ * permission prompts.
  */
 class MainActivity : ComponentActivity() {
     private val viewModel: MainViewModel by viewModels()
@@ -49,6 +52,15 @@ class MainActivity : ComponentActivity() {
 
     private val folderPicker = registerForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
         if (uri != null) onFolderPicked(uri)
+    }
+
+    private val backupSaver =
+        registerForActivityResult(ActivityResultContracts.CreateDocument(BackupManager.MIME_TYPE)) { uri ->
+            if (uri != null) viewModel.writeBackup(uri)
+        }
+
+    private val backupOpener = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) viewModel.readBackup(uri)
     }
 
     private val actions: AppActions by lazy {
@@ -95,6 +107,23 @@ class MainActivity : ComponentActivity() {
                     folderPicker.launch(null)
                 } catch (e: ActivityNotFoundException) {
                     viewModel.showMessage("This device has no folder picker")
+                }
+            }
+
+            override fun exportBackup(includeSecrets: Boolean) {
+                viewModel.prepareExport(includeSecrets)
+                try {
+                    backupSaver.launch(BackupManager.fileName(LocalDate.now()))
+                } catch (e: ActivityNotFoundException) {
+                    viewModel.showMessage("This device has no file picker to save the backup with")
+                }
+            }
+
+            override fun importBackup() {
+                try {
+                    backupOpener.launch(BackupManager.OPEN_MIME_TYPES)
+                } catch (e: ActivityNotFoundException) {
+                    viewModel.showMessage("This device has no file picker to open a backup with")
                 }
             }
         }

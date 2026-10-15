@@ -3,6 +3,8 @@ package com.aakash.novafork.ui.model
 import androidx.compose.runtime.Immutable
 import com.aakash.novafork.data.Settings
 import com.aakash.novafork.data.db.SourceType
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 
 /** Top-level tabs. Phone shows them in a bottom NavigationBar, tablet in a NavigationRail. */
 enum class TopDestination(val label: String) { HOME("Home"), LIBRARY("Library"), BROWSE("Browse"), SETTINGS("Settings") }
@@ -168,6 +170,37 @@ sealed interface DialogUi {
     data class ConfirmDeletePlaylist(val playlistId: Long, val name: String) : DialogUi
 }
 
+/** Settings › Backup & restore. */
+@Immutable
+data class BackupUi(
+    /** When the last backup was saved on this device (epoch ms); null = never. */
+    val lastBackupAt: Long? = null,
+    /** A backup is being written, read or restored. */
+    val working: Boolean = false,
+    /** A backup file read and checked, waiting for [AppActions.confirmRestore] or [AppActions.cancelRestore]. */
+    val confirm: RestorePreviewUi? = null,
+    /** Entries of a restore (watch history, matches, playlist items) still waiting for their videos to be scanned. */
+    val waiting: Int = 0,
+)
+
+/** What a backup file holds, shown before restoring it. */
+@Immutable
+data class RestorePreviewUi(
+    /** Epoch ms. */
+    val createdAt: Long,
+    val appVersion: String,
+    /** The file holds passwords, sign-ins and API keys. */
+    val includesSecrets: Boolean,
+    val settings: Int,
+    val sources: Int,
+    /** Videos with watch history. */
+    val videos: Int,
+    val matches: Int,
+    val playlists: Int,
+)
+
+private val IdleBackupState: StateFlow<BackupUi> = MutableStateFlow(BackupUi())
+
 @Immutable
 data class AppUiState(
     val route: Route = Route.Home,
@@ -326,6 +359,26 @@ interface AppActions {
 
     /** Opens [url] in the browser (plex.tv/link). */
     fun openWebPage(url: String) {}
+
+    // Backup & restore
+
+    /** Settings › Backup & restore; an idle state where nothing implements it (previews, tests). */
+    fun backupState(): StateFlow<BackupUi> = IdleBackupState
+
+    /**
+     * Saves a backup to a file the user picks (system "create document" picker). [includeSecrets]
+     * puts passwords, sign-in tokens and API keys into it, in plain text.
+     */
+    fun exportBackup(includeSecrets: Boolean) {}
+
+    /** Picks a backup file (system picker) and reads it; [BackupUi.confirm] then asks before restoring. */
+    fun importBackup() {}
+
+    /** Restores the backup [BackupUi.confirm] describes; the outcome comes as a message. */
+    fun confirmRestore() {}
+
+    /** Forgets the backup waiting in [BackupUi.confirm]. */
+    fun cancelRestore() {}
 }
 
 /** No-op actions for previews and screenshot tests. */

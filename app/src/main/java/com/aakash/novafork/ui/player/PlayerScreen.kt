@@ -91,7 +91,8 @@ private fun PlayerChrome(state: PlayerUiState, actions: PlayerActions, layout: D
     var bottomBarHeightPx by remember { mutableIntStateOf(0) }
 
     // Paused, failed or with options open, the controls stay up whatever was tapped.
-    val forcedVisible = !state.isPlaying || state.error != null || panel != null || sheet != null
+    val searchOpen = state.subtitleSearch != null
+    val forcedVisible = !state.isPlaying || state.error != null || panel != null || sheet != null || searchOpen
     val controlsVisible = !state.locked && (controlsRequested || forcedVisible)
 
     // Keep them requested across a pause so resuming doesn't make them vanish under the finger.
@@ -102,6 +103,7 @@ private fun PlayerChrome(state: PlayerUiState, actions: PlayerActions, layout: D
         if (state.locked) {
             panel = null
             sheet = null
+            if (state.subtitleSearch != null) actions.dismissSubtitleSearch()
             unlockHintRequests += 1
         } else {
             controlsRequested = true
@@ -278,6 +280,7 @@ private fun PlayerChrome(state: PlayerUiState, actions: PlayerActions, layout: D
                     actions = actions,
                     onDismiss = { sheet = null },
                 )
+                SubtitleSearchPanel(search = state.subtitleSearch, actions = actions)
             }
         }
 
@@ -299,10 +302,15 @@ private fun PlayerChrome(state: PlayerUiState, actions: PlayerActions, layout: D
                 onDismiss = { sheet = null },
             )
         }
+        val subtitleSearch = state.subtitleSearch
+        if (!layout.isTablet && subtitleSearch != null) {
+            SubtitleSearchSheet(search = subtitleSearch, actions = actions)
+        }
     }
 
     // The phone sheets handle back themselves; this closes the tablet panels before back leaves the player.
-    BackHandler(enabled = panel != null || sheet != null) {
+    BackHandler(enabled = panel != null || sheet != null || (layout.isTablet && searchOpen)) {
+        if (layout.isTablet && searchOpen) actions.dismissSubtitleSearch()
         panel = null
         sheet = null
     }

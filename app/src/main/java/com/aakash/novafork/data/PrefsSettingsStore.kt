@@ -66,6 +66,11 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
             putInt(KEY_SEEK_STEP_SECONDS, s.seekStepSeconds)
             putBoolean(KEY_AUTO_PLAY_NEXT, s.autoPlayNext)
             putBoolean(KEY_BACKGROUND_AUDIO, s.backgroundAudio)
+            putString(KEY_OPENSUBTITLES_API_KEY, s.opensubtitlesApiKey)
+            putString(KEY_OPENSUBTITLES_USERNAME, s.opensubtitlesUsername)
+            putString(KEY_OPENSUBTITLES_PASSWORD, s.opensubtitlesPassword)
+            putString(KEY_SUBTITLE_LANGUAGES, s.subtitleLanguages)
+            putBoolean(KEY_AUTO_DOWNLOAD_SUBTITLES, s.autoDownloadSubtitles)
         }
     }
 
@@ -91,6 +96,11 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
         const val KEY_SEEK_STEP_SECONDS = "seek_step_seconds"
         const val KEY_AUTO_PLAY_NEXT = "auto_play_next"
         const val KEY_BACKGROUND_AUDIO = "background_audio"
+        const val KEY_OPENSUBTITLES_API_KEY = "opensubtitles_api_key"
+        const val KEY_OPENSUBTITLES_USERNAME = "opensubtitles_username"
+        const val KEY_OPENSUBTITLES_PASSWORD = "opensubtitles_password"
+        const val KEY_SUBTITLE_LANGUAGES = "subtitle_languages"
+        const val KEY_AUTO_DOWNLOAD_SUBTITLES = "auto_download_subtitles"
 
         /**
          * Whether the stored TMDB language is the user's pick. Settings saved before the flag
@@ -133,6 +143,11 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
                 seekStepSeconds = prefs.getInt(KEY_SEEK_STEP_SECONDS, defaults.seekStepSeconds),
                 autoPlayNext = prefs.getBoolean(KEY_AUTO_PLAY_NEXT, defaults.autoPlayNext),
                 backgroundAudio = prefs.getBoolean(KEY_BACKGROUND_AUDIO, defaults.backgroundAudio),
+                opensubtitlesApiKey = prefs.getString(KEY_OPENSUBTITLES_API_KEY, null) ?: defaults.opensubtitlesApiKey,
+                opensubtitlesUsername = prefs.getString(KEY_OPENSUBTITLES_USERNAME, null) ?: defaults.opensubtitlesUsername,
+                opensubtitlesPassword = prefs.getString(KEY_OPENSUBTITLES_PASSWORD, null) ?: defaults.opensubtitlesPassword,
+                subtitleLanguages = prefs.getString(KEY_SUBTITLE_LANGUAGES, null) ?: defaults.subtitleLanguages,
+                autoDownloadSubtitles = prefs.getBoolean(KEY_AUTO_DOWNLOAD_SUBTITLES, defaults.autoDownloadSubtitles),
             )
         }
 

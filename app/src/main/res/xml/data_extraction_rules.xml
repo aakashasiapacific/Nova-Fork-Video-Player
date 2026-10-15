@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 12+: what Android's own backup (Google cloud backup and moving to a new phone) copies.
+     Everything in files/, databases/ and shared_prefs/ goes (settings, the library database,
+     downloaded subtitles in files/subtitles) except what belongs to this install only:
+     - last_crash.txt: the crash report waiting to be shared;
+     - ui.xml: "asked for the storage permission already", true on the new phone too would stop
+       the first-start prompt;
+     - media_servers.xml: the install id Jellyfin, Emby and Plex know this device by (two devices
+       with one id sign each other out);
+     - backup.xml: when a backup file was last saved on this device.
+     Caches (image_cache, http, doh, subs under cacheDir) are never backed up by Android.
+     The database holds share passwords and server sign-ins: cloud backups only run when Android
+     can encrypt them end to end (the device has a screen lock). -->
+<data-extraction-rules>
+    <cloud-backup disableIfNoEncryptionCapabilities="true">
+        <exclude domain="file" path="last_crash.txt" />
+        <exclude domain="sharedpref" path="ui.xml" />
+        <exclude domain="sharedpref" path="media_servers.xml" />
+        <exclude domain="sharedpref" path="backup.xml" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="file" path="last_crash.txt" />
+        <exclude domain="sharedpref" path="ui.xml" />
+        <exclude domain="sharedpref" path="media_servers.xml" />
+        <exclude domain="sharedpref" path="backup.xml" />
+    </device-transfer>
+</data-extraction-rules>
