@@ -15,6 +15,7 @@ import com.aakash.novafork.core.smb.SmbUris
 import com.aakash.novafork.core.tmdb.TmdbDisabledException
 import com.aakash.novafork.core.tmdb.TmdbException
 import com.aakash.novafork.data.IdentifyType
+import com.aakash.novafork.data.LibraryDiagnostics
 import com.aakash.novafork.data.NetworkLocation
 import com.aakash.novafork.data.NetworkSourceInput
 import com.aakash.novafork.data.NetworkSources
@@ -32,6 +33,7 @@ import com.aakash.novafork.data.backup.RestoreReport
 import com.aakash.novafork.data.db.SourceEntity
 import com.aakash.novafork.data.db.SourceType
 import com.aakash.novafork.data.db.VideoKind
+import com.aakash.novafork.sources.DeviceScanner
 import com.aakash.novafork.sources.media.MediaServerSources
 import com.aakash.novafork.sources.media.PlexSignIn
 import com.aakash.novafork.sources.net.FileServerSources
@@ -77,7 +79,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapLatest
@@ -181,6 +182,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
     private var networkTestJob: Job? = null
     private var upnpJob: Job? = null
     private var plexJob: Job? = null
+    private var diagnosticsJob: Job? = null
     private val listingJobs = HashMap<ListingKey, Job>()
 
     /** The Plex account a code signed in, until one of its servers is picked or the dialog goes away. Memory only. */
@@ -266,7 +268,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
                 canRequestAllFilesAccess = StoragePermissions.canRequestAllFilesAccess,
             ),
             scan = UiMappers.scan(scan),
-            permission = user.permission,
+            permission = user.permission.copy(deviceScanning = settings.scanDeviceStorage),
             dialog = user.dialog,
             message = user.message,
             crashReport = user.crashReport,
@@ -326,10 +328,19 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
     // Library
 
     override fun refresh() {
+        // The refresh still scans folders and shares; it just can't see device storage.
+        deviceScanBlocked()?.let(::showMessage)
         launchSafely("Couldn't scan the library") { library.refreshAll() }
     }
 
     override fun rescanSource(sourceId: Long) {
+        if (state.value.browse.sources.any { it.id == sourceId && it.type == SourceType.DEVICE }) {
+            val blocked = deviceScanBlocked()
+            if (blocked != null) {
+                showMessage(blocked)
+                return
+            }
+        }
         // Refresh on a live folder lists it again as well.
         val open = local.value.backStack.lastOrNull() as? Route.BrowseDir
         if (open != null && open.sourceId == sourceId) openListing(open.sourceId, open.path, refresh = true)
@@ -388,6 +399,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
             plexAccount = null
         }
         if (dialog !is DialogUi.UpnpServers) upnpJob?.cancel()
+        if (dialog !is DialogUi.LibraryDiagnostics) diagnosticsJob?.cancel()
         local.update { it.copy(dialog = dialog) }
     }
 
@@ -1004,27 +1016,48 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
 
     /**
      * Re-reads storage access (MainActivity calls this on resume and after a permission prompt).
-     * Gaining access rescans device storage; [rescan] forces that, e.g. after the user picked more
+     * The library rescans device storage when more of it became readable, whether the change was
+     * made here or in system settings; [rescan] forces that, e.g. after the user picked more
      * videos in Android 14's limited-access picker, which does not change any permission.
      */
     fun onPermissionsChanged(rescan: Boolean = false) {
         val permission = currentPermission()
         val allFiles = StoragePermissions.hasAllFilesAccess(getApplication<Application>())
-        val before = local.value
         local.update { it.copy(permission = permission, allFilesAccess = allFiles) }
-        val gainedMedia = permission.granted && (!before.permission.granted || (before.permission.partial && !permission.partial))
-        val gainedAllFiles = allFiles && !before.allFilesAccess
-        if (gainedMedia || gainedAllFiles || (rescan && permission.granted)) rescanDevice()
+        library.onStorageAccessChanged(rescan = rescan && permission.granted)
     }
 
-    /**
-     * refreshAll() returns at once while another scan runs, which would skip the device library
-     * that just became readable; scanning the device source directly waits for its turn.
-     */
-    private fun rescanDevice() {
-        launchSafely("Couldn't scan device storage") {
-            val device = library.observeSources().first().firstOrNull { it.type == SourceType.DEVICE }
-            if (device != null) library.scanSource(device.id) else library.refreshAll()
+    /** Why device storage can't be scanned right now; null when it can (or the user turned it off). */
+    private fun deviceScanBlocked(): String? {
+        if (!settingsStore.settings.value.scanDeviceStorage) return null
+        if (StoragePermissions.hasAnyVideoAccess(getApplication<Application>())) return null
+        return "Device storage isn't scanned: Nova has no access to videos. Allow it under Browse › Device storage."
+    }
+
+    // Library diagnostics
+
+    override fun openLibraryDiagnostics() {
+        showDialog(DialogUi.LibraryDiagnostics())
+        diagnosticsJob?.cancel()
+        diagnosticsJob = viewModelScope.launch {
+            val app = getApplication<Application>()
+            val report = try {
+                LibraryDiagnostics.collect(
+                    context = app,
+                    library = library,
+                    settings = settingsStore.settings.value,
+                    appVersion = BuildConfig.VERSION_NAME,
+                    census = { DeviceScanner(app).census() },
+                )
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.w(TAG, "Library diagnostics failed", e)
+                "Library diagnostics failed: ${e.message.nonBlank() ?: e.javaClass.simpleName}"
+            }
+            local.update { state ->
+                if (state.dialog is DialogUi.LibraryDiagnostics) state.copy(dialog = DialogUi.LibraryDiagnostics(report)) else state
+            }
         }
     }
 

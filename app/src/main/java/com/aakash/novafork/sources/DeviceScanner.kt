@@ -9,9 +9,11 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Environment
 import android.provider.MediaStore
+import android.util.Log
 import androidx.annotation.RequiresApi
 import com.aakash.novafork.core.artwork.ArtworkRules
 import com.aakash.novafork.core.library.VideoFiles
+import com.aakash.novafork.data.MediaStoreCensus
 import com.aakash.novafork.data.ScannedVideo
 import com.aakash.novafork.data.SourceScanner
 import com.aakash.novafork.data.StoragePermissions
@@ -35,17 +37,50 @@ class DeviceScanner(context: Context) : SourceScanner {
         withContext(Dispatchers.IO) {
             if (!StoragePermissions.hasAnyVideoAccess(context)) throw IOException(NO_ACCESS)
             val rows = try {
-                queryVideos(onProgress)
+                queryVideos(onProgress).filter { it.skip == null }
             } catch (e: SecurityException) {
                 throw IOException(NO_ACCESS, e)
             }
             val images = if (rows.isNotEmpty() && StoragePermissions.hasImageAccess(context)) imagesNear(rows) else emptyMap()
+            val folderImages = HashMap<Dir, FolderImages>()
+            val imagesOf = { dir: Dir? ->
+                dir?.let { key -> images[key]?.let { names -> folderImages.getOrPut(key) { FolderImages(names.keys) } } }
+            }
             val videosPerDir = rows.groupingBy { it.dir }.eachCount()
             val now = System.currentTimeMillis()
-            val videos = rows.map { row -> row.toScannedVideo(images, videosPerDir[row.dir] ?: 1, now) }
+            val videos = ArrayList<ScannedVideo>(rows.size)
+            for ((i, row) in rows.withIndex()) {
+                if (i % PROGRESS_EVERY == 0) currentCoroutineContext().ensureActive()
+                videos += row.toScannedVideo(images, imagesOf, videosPerDir[row.dir] ?: 1, now)
+            }
             onProgress(videos.size)
             videos
         }
+
+    /**
+     * What MediaStore lists right now, for Library diagnostics: how many videos, how many a scan
+     * would leave out and why, and the folders (never file names) they are in. Reads MediaStore
+     * exactly as [scan] does, so the two never disagree.
+     */
+    suspend fun census(): MediaStoreCensus = withContext(Dispatchers.IO) {
+        if (!StoragePermissions.hasAnyVideoAccess(context)) return@withContext MediaStoreCensus(error = NO_ACCESS)
+        val rows = try {
+            queryVideos { }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            return@withContext MediaStoreCensus(error = "${e.javaClass.simpleName}: ${e.message.orEmpty()}".trimEnd(' ', ':'))
+        }
+        MediaStoreCensus(
+            total = rows.size,
+            kept = rows.count { it.skip == null },
+            skipped = rows.mapNotNull { it.skip }.groupingBy { it }.eachCount(),
+            folders = rows.groupingBy { it.folder }.eachCount().entries
+                .sortedWith(compareByDescending<Map.Entry<String, Int>> { it.value }.thenBy { it.key })
+                .map { it.key to it.value },
+            volumes = rows.groupingBy { it.dir.volume }.eachCount().filterKeys { it.isNotEmpty() },
+        )
+    }
 
     /**
      * A MediaStore folder. On API 29+ [path] is the RELATIVE_PATH without slashes on [volume];
@@ -67,32 +102,38 @@ class DeviceScanner(context: Context) : SourceScanner {
         val height: Int?,
         val dateAdded: Long?,
         val dateModified: Long?,
+        /** Why a scan leaves this row out ([deviceSkipReason]); null for a video it keeps. */
+        val skip: String?,
     )
 
+    /** Every row of MediaStore's video table; [VideoRow.skip] tells which ones a scan keeps. */
     private suspend fun queryVideos(onProgress: (Int) -> Unit): List<VideoRow> {
         val collection = videoCollection()
         val modern = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
-        val projection = buildList {
-            add(MediaStore.Video.Media._ID)
-            add(MediaStore.Video.Media.DISPLAY_NAME)
-            add(MediaStore.Video.Media.SIZE)
-            add(MediaStore.Video.Media.DURATION)
-            add(MediaStore.Video.Media.WIDTH)
-            add(MediaStore.Video.Media.HEIGHT)
-            add(MediaStore.Video.Media.DATE_ADDED)
-            add(MediaStore.Video.Media.DATE_MODIFIED)
-            if (modern) {
-                add(MediaStore.MediaColumns.RELATIVE_PATH)
-                add(MediaStore.MediaColumns.VOLUME_NAME)
-            } else {
-                add(DATA_COLUMN)
-            }
-        }.toTypedArray()
+        val place = if (modern) {
+            listOf(MediaStore.MediaColumns.RELATIVE_PATH, MediaStore.MediaColumns.VOLUME_NAME)
+        } else {
+            listOf(DATA_COLUMN)
+        }
+        val projection = (
+            listOf(
+                MediaStore.Video.Media._ID,
+                MediaStore.Video.Media.DISPLAY_NAME,
+                MediaStore.Video.Media.SIZE,
+                MediaStore.Video.Media.DURATION,
+                MediaStore.Video.Media.WIDTH,
+                MediaStore.Video.Media.HEIGHT,
+                MediaStore.Video.Media.DATE_ADDED,
+                MediaStore.Video.Media.DATE_MODIFIED,
+            ) + place
+            ).toTypedArray()
         val storageRoot = if (modern) "" else legacyStorageRoot()
         val rows = ArrayList<VideoRow>()
+        val essentials = (listOf(MediaStore.Video.Media._ID, MediaStore.Video.Media.DISPLAY_NAME) + place).toTypedArray()
         // No cursor means MediaProvider isn't available (restarting, being updated), not an empty
         // device: failing the scan keeps the library as it is instead of hiding every video.
-        val cursor = query(collection, projection, null, null) ?: throw IOException(MEDIA_UNAVAILABLE)
+        val cursor = queryVideoTable(collection, projection, essentials) ?: throw IOException(MEDIA_UNAVAILABLE)
+        var kept = 0
         cursor.use { c ->
             val idCol = c.getColumnIndex(MediaStore.Video.Media._ID)
             if (idCol < 0) throw IOException(MEDIA_UNAVAILABLE)
@@ -108,26 +149,26 @@ class DeviceScanner(context: Context) : SourceScanner {
             val dataCol = if (modern) -1 else c.getColumnIndex(DATA_COLUMN)
             var seen = 0
             while (c.moveToNext()) {
-                if (++seen % 100 == 0) {
+                if (++seen % PROGRESS_EVERY == 0) {
                     currentCoroutineContext().ensureActive()
-                    onProgress(rows.size)
+                    onProgress(kept)
                 }
                 val dir: Dir
                 val folder: String
                 val name: String
                 if (modern) {
-                    name = c.stringAt(nameCol) ?: continue
+                    name = c.stringAt(nameCol).orEmpty()
                     folder = c.stringAt(relativeCol).orEmpty().trim('/')
                     dir = Dir(c.stringAt(volumeCol).orEmpty(), folder)
                 } else {
-                    val data = c.stringAt(dataCol) ?: continue
+                    val data = c.stringAt(dataCol).orEmpty()
                     val dirPath = data.substringBeforeLast('/', "")
                     name = c.stringAt(nameCol) ?: data.substringAfterLast('/')
                     folder = legacyDisplayFolder(dirPath, storageRoot)
                     dir = Dir("", dirPath)
                 }
-                if (name.isBlank() || name.startsWith("._") || VideoFiles.isSample(name)) continue
-                if (VideoFiles.isIgnoredPath(folder.split('/'))) continue
+                val skip = deviceSkipReason(name, folder)
+                if (skip == null) kept++
                 rows += VideoRow(
                     uri = ContentUris.withAppendedId(collection, c.getLong(idCol)).toString(),
                     name = name,
@@ -139,11 +180,24 @@ class DeviceScanner(context: Context) : SourceScanner {
                     height = c.intAt(heightCol)?.takeIf { it > 0 },
                     dateAdded = c.longAt(addedCol)?.takeIf { it > 0 }?.times(1000),
                     dateModified = c.longAt(modifiedCol)?.takeIf { it > 0 }?.times(1000),
+                    skip = skip,
                 )
             }
         }
         return rows
     }
+
+    /**
+     * The video table with [projection]; a MediaProvider that refuses one of its columns gets
+     * asked for [essentials] (id, name, folder) instead, enough to list every video.
+     */
+    private fun queryVideoTable(collection: Uri, projection: Array<String>, essentials: Array<String>): Cursor? =
+        try {
+            query(collection, projection, null, null)
+        } catch (e: IllegalArgumentException) {
+            Log.w(TAG, "MediaStore refused the full projection, retrying with the essentials", e)
+            query(collection, essentials, null, null)
+        }
 
     /** Folder → (image name → content URI) for the video folders and the folders above them. */
     private suspend fun imagesNear(rows: List<VideoRow>): Map<Dir, Map<String, String>> {
@@ -224,7 +278,12 @@ class DeviceScanner(context: Context) : SourceScanner {
         return result
     }
 
-    private fun VideoRow.toScannedVideo(images: Map<Dir, Map<String, String>>, videosInDir: Int, now: Long): ScannedVideo {
+    private fun VideoRow.toScannedVideo(
+        images: Map<Dir, Map<String, String>>,
+        imagesOf: (Dir?) -> FolderImages?,
+        videosInDir: Int,
+        now: Long,
+    ): ScannedVideo {
         val segments = folder.split('/').filter { it.isNotEmpty() }
         val here = images[dir].orEmpty()
         val above = dir.parent?.let { images[it] }.orEmpty()
@@ -234,9 +293,9 @@ class DeviceScanner(context: Context) : SourceScanner {
             LocalArtwork.choose(
                 videoFileName = name,
                 folderName = segments.lastOrNull(),
-                folderImages = here.keys.toList(),
+                folderImages = imagesOf(dir) ?: FolderImages(emptyList()),
                 folderVideoCount = videosInDir,
-                showFolderImages = { above.keys.toList() },
+                showFolderImages = { imagesOf(dir.parent)?.all.orEmpty() },
             )
         }
 
@@ -308,11 +367,28 @@ class DeviceScanner(context: Context) : SourceScanner {
     }
 
     private companion object {
+        const val TAG = "DeviceScanner"
         const val NO_ACCESS = "Allow access to videos to scan this device"
         const val MEDIA_UNAVAILABLE = "Media storage isn't available right now"
+
+        /** Rows between progress reports and cancellation checks. */
+        const val PROGRESS_EVERY = 100
 
         /** MediaColumns.DATA: deprecated on API 29+, but the only folder information before it. */
         @Suppress("DEPRECATION")
         const val DATA_COLUMN = MediaStore.MediaColumns.DATA
     }
+}
+
+/**
+ * Why a device scan leaves a MediaStore video out, null when it keeps it. [folder] is the display
+ * folder below the storage root ("DCIM/Camera", "" for the root). Camera, screen-recording and
+ * messaging-app folders (Android/media/…) are kept.
+ */
+internal fun deviceSkipReason(name: String, folder: String): String? = when {
+    name.isBlank() -> "no file name"
+    name.startsWith("._") -> "macOS metadata file (._)"
+    VideoFiles.isSample(name) -> "sample clip"
+    VideoFiles.isIgnoredPath(folder.split('/')) -> "hidden or system folder"
+    else -> null
 }

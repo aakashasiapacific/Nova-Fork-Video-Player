@@ -91,13 +91,19 @@ class MainActivity : ComponentActivity() {
 
             override fun requestAllFilesAccess() = openAllFilesAccess()
 
+            override fun openAppSettings() = openAppDetails()
+
             override fun shareCrashReport() {
                 val report = viewModel.state.value.crashReport ?: return
+                shareText("Nova Fork crash report", report)
+            }
+
+            override fun shareText(subject: String, text: String) {
                 val send = Intent(Intent.ACTION_SEND)
                     .setType("text/plain")
-                    .putExtra(Intent.EXTRA_SUBJECT, "Nova Fork crash report")
-                    .putExtra(Intent.EXTRA_TEXT, report)
-                if (!tryStart(Intent.createChooser(send, "Share crash report"))) {
+                    .putExtra(Intent.EXTRA_SUBJECT, subject)
+                    .putExtra(Intent.EXTRA_TEXT, text)
+                if (!tryStart(Intent.createChooser(send, "Share $subject"))) {
                     viewModel.showMessage("No app to share the report with")
                 }
             }
@@ -198,6 +204,7 @@ class MainActivity : ComponentActivity() {
 
     private fun primaryPermission(): String = StoragePermissions.required().first()
 
+    /** This app's page in system settings, where Permissions › Photos and videos can be set to "Allow all". */
     private fun openAppDetails() {
         val intent = Intent(AndroidSettings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", packageName, null))
         if (!tryStart(intent)) viewModel.showMessage("Open Settings › Apps to allow access to videos")

@@ -60,9 +60,12 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
+import java.io.IOException
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.atomic.AtomicReference
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.math.max
 
@@ -82,13 +85,24 @@ private const val LAUNCH_RESCAN_AFTER_MS = 30L * 60 * 1000
 private const val LAUNCH_WINDOW_MS = 10_000L
 private const val NO_LAUNCH = Long.MIN_VALUE
 
+/** A device scan reads MediaStore: a few minutes at most, even with tens of thousands of files. */
+private const val DEVICE_SCAN_TIMEOUT_MS = 5L * 60 * 1000
+
+/** Folder walks, shares and servers: a first walk of a big NAS over Wi-Fi can take a while. */
+private const val WALK_SCAN_TIMEOUT_MS = 30L * 60 * 1000
+
+/** How long one scan of a source may take before it is given up (see LibraryRepositoryImpl.scanBounded). */
+internal fun defaultScanTimeoutMs(type: SourceType): Long =
+    if (type == SourceType.DEVICE) DEVICE_SCAN_TIMEOUT_MS else WALK_SCAN_TIMEOUT_MS
+
 /** Repository state outside the database: the language the stored metadata was fetched in. */
 private const val STATE_PREFS = "library_state"
 private const val KEY_METADATA_LANGUAGE = "metadata_language"
 
 /**
  * [progressReporters]: media servers told about playback progress (see [RemoteProgressReporter]);
- * a source type without one reports nothing.
+ * a source type without one reports nothing. [scanTimeoutMs]: how long one scan of a source of a
+ * type may take before it is given up (tests shorten it).
  */
 class LibraryRepositoryImpl(
     context: Context,
@@ -98,6 +112,7 @@ class LibraryRepositoryImpl(
     private val settings: SettingsStore,
     private val scope: CoroutineScope,
     private val progressReporters: Map<SourceType, RemoteProgressReporter> = emptyMap(),
+    private val scanTimeoutMs: (SourceType) -> Long = ::defaultScanTimeoutMs,
 ) : LibraryRepository {
     private val context: Context = context.applicationContext
     private val sourceDao = database.sourceDao()
@@ -128,6 +143,22 @@ class LibraryRepositoryImpl(
 
     /** A forced refresh came while a launch refresh ran: that one also scans what it skipped. */
     private val forceRequested = AtomicBoolean(false)
+
+    /**
+     * A forced refresh came while a refresh ran: that one scans device storage again at its end
+     * (it scanned it first, possibly before what the user refreshed for). A device scan starting
+     * clears it.
+     */
+    private val deviceRescanRequested = AtomicBoolean(false)
+
+    /** The storage access [onStorageAccessChanged] last saw. */
+    private val seenAccess = AtomicReference(AccessSnapshot.of(this.context))
+
+    /** The latest scan of each source since the process started (Library diagnostics). */
+    private val scanSummaries = ConcurrentHashMap<Long, ScanSummary>()
+
+    /** The source being scanned and the wall-clock time its scan started; null while none is. */
+    @Volatile private var runningScan: Pair<String, Long>? = null
 
     /** True while refreshAll, not a single source's scan, holds [scanMutex]. */
     @Volatile private var refreshing = false
@@ -182,8 +213,12 @@ class LibraryRepositoryImpl(
         withContext(Dispatchers.IO) {
             if (!scanMutex.tryLock()) {
                 if (refreshing) {
-                    // Coalesces into the running refresh; a forced one makes it scan what it skipped too.
-                    if (force) forceRequested.set(true)
+                    // Coalesces into the running refresh; a forced one makes it scan what it skipped
+                    // too, and device storage once more (scanned first, maybe before what this is for).
+                    if (force) {
+                        forceRequested.set(true)
+                        deviceRescanRequested.set(true)
+                    }
                     return@withContext
                 }
                 // Only one source is being scanned (a new share, a MediaStore change): refresh after it.
@@ -215,6 +250,11 @@ class LibraryRepositoryImpl(
                         logFailure("Scanning a skipped source") {
                             sourceDao.byId(id)?.takeIf { isScannable(it) }?.let { scan(it) }
                         }
+                    }
+                }
+                if (deviceRescanRequested.getAndSet(false)) {
+                    logFailure("Scanning device storage again") {
+                        sourceDao.device()?.takeIf { isScannable(it) }?.let { scan(it) }
                     }
                 }
             } finally {
@@ -282,21 +322,66 @@ class LibraryRepositoryImpl(
     /** Scans one source and merges the result. Called with [scanMutex] held. */
     private suspend fun scan(source: SourceEntity) {
         val scanner = scanners[source.type] ?: return
-        if (source.type == SourceType.DEVICE) deviceScanStartedAt = SystemClock.elapsedRealtime()
-        scanStarts[source.id] = System.currentTimeMillis()
+        if (source.type == SourceType.DEVICE) {
+            deviceScanStartedAt = SystemClock.elapsedRealtime()
+            // This scan sees whatever a rescan was asked for so far.
+            deviceRescanRequested.set(false)
+        }
+        val startedAt = System.currentTimeMillis()
+        val clock = SystemClock.elapsedRealtime()
+        scanStarts[source.id] = startedAt
+        runningScan = source.name to startedAt
         state.update { it.copy(running = true, sourceName = source.name, found = 0) }
         try {
-            val found = scanner.scan(source) { count -> state.update { it.copy(found = count) } }
-            merge(source, found)
+            val found = scanBounded(scanner, source)
+            val merged = merge(source, found)
             sourceDao.markScanned(source.id, System.currentTimeMillis())
+            scanSummaries[source.id] = ScanSummary(
+                startedAt = startedAt,
+                durationMs = SystemClock.elapsedRealtime() - clock,
+                found = found.size,
+                added = merged.added,
+                ownedElsewhere = merged.ownedElsewhere,
+                hidden = merged.hidden,
+            )
             applyPendingRestore()
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            recordFailure(source, e)
+            recordFailure(source, e, startedAt, clock)
         } catch (e: LinkageError) {
             // A library class missing on this Android version fails this source, not the app.
-            recordFailure(source, e)
+            recordFailure(source, e, startedAt, clock)
+        } finally {
+            runningScan = null
+        }
+    }
+
+    /**
+     * Runs [scanner] on [source] for at most [scanTimeoutMs] of its type. A scan stuck in a call
+     * that never returns (a document provider or MediaProvider that hangs, a server that stops
+     * answering mid-listing) would otherwise hold [scanMutex], and with it every later scan,
+     * refresh and permission rescan, until the process ends. The scan runs apart from the caller,
+     * so even a blocking call that ignores cancellation is left behind (its result dropped)
+     * rather than waited for; the source then shows the time-out as its error.
+     */
+    private suspend fun scanBounded(scanner: SourceScanner, source: SourceEntity): List<ScannedVideo> {
+        val limitMs = scanTimeoutMs(source.type)
+        val abandoned = AtomicBoolean(false)
+        val work = CoroutineScope(Dispatchers.IO).async {
+            scanner.scan(source) { count -> if (!abandoned.get()) state.update { it.copy(found = count) } }
+        }
+        try {
+            return withTimeoutOrNull(limitMs) { work.await() }
+                ?: throw IOException("Scanning stopped: no result after ${durationLabel(limitMs)}. Rescan to try again.")
+        } catch (e: CancellationException) {
+            // This scan being cancelled rethrows here. Otherwise the scanner's own time-out leaked
+            // out of it: a failure of this source, not a reason to stop the whole refresh.
+            currentCoroutineContext().ensureActive()
+            throw IOException(e.message?.takeIf { it.isNotBlank() } ?: "The scan was interrupted", e)
+        } finally {
+            abandoned.set(true)
+            work.cancel()
         }
     }
 
@@ -315,10 +400,16 @@ class LibraryRepositoryImpl(
         }
     }
 
-    private suspend fun recordFailure(source: SourceEntity, e: Throwable) {
+    private suspend fun recordFailure(source: SourceEntity, e: Throwable, startedAt: Long, clock: Long) {
         Log.w(TAG, "Scanning ${source.name} failed", e)
         CrashReporter.log("Scanning a ${source.type.name} source failed", e)
         val message = e.message?.takeIf { it.isNotBlank() } ?: e.javaClass.simpleName
+        scanSummaries[source.id] = ScanSummary(
+            startedAt = startedAt,
+            durationMs = SystemClock.elapsedRealtime() - clock,
+            found = null,
+            error = message,
+        )
         sourceDao.markFailed(source.id, message)
         state.update { it.copy(lastError = "${source.name}: $message") }
     }
@@ -328,11 +419,11 @@ class LibraryRepositoryImpl(
      * and match; files of the source the scan did not see are kept (watch history) but hidden.
      * Metadata a media server supplied is stored with them (see [ScannedVideo.serverMetadata]).
      */
-    private suspend fun merge(source: SourceEntity, scanned: List<ScannedVideo>) {
+    private suspend fun merge(source: SourceEntity, scanned: List<ScannedVideo>): MergeCounts {
         val now = System.currentTimeMillis()
-        database.withTransaction {
+        return database.withTransaction {
             // The source may have been removed while its scan was running.
-            if (sourceDao.byId(source.id) == null) return@withTransaction
+            if (sourceDao.byId(source.id) == null) return@withTransaction MergeCounts(0, 0, 0)
             val existing = videoDao.bySource(source.id).associateBy { it.uri }
             val seen = HashSet<String>(scanned.size * 2)
             val fresh = ArrayList<ScannedVideo>()
@@ -348,6 +439,8 @@ class LibraryRepositoryImpl(
                     if (merged != old) updates += merged
                 }
             }
+            var takenOver = 0
+            var ownedElsewhere = 0
             if (fresh.isNotEmpty()) {
                 // URIs are unique across sources: a file another source already lists (overlapping
                 // shares) stays with that source, unless that one is off or no longer sees it.
@@ -357,9 +450,11 @@ class LibraryRepositoryImpl(
                     val other = elsewhere[file.uri]
                     when {
                         other == null -> inserts += newVideo(source.id, file, now)
-                        other.sourceId !in enabledSources || !other.present ->
+                        other.sourceId !in enabledSources || !other.present -> {
                             updates += refreshed(other, file, source.id, now).copy(sourceId = source.id)
-                        else -> Unit
+                            takenOver++
+                        }
+                        else -> ownedElsewhere++
                     }
                 }
             }
@@ -368,8 +463,12 @@ class LibraryRepositoryImpl(
             val missing = existing.values.filter { it.present && it.uri !in seen }.map { it.id }
             for (chunk in missing.chunked(SQL_CHUNK)) videoDao.markMissing(chunk)
             storeServerMetadata(source.id, scanned, now)
+            MergeCounts(added = inserts.size + takenOver, ownedElsewhere = ownedElsewhere, hidden = missing.size)
         }
     }
+
+    /** What [merge] did: videos new to the source, left with another source, and hidden. */
+    private class MergeCounts(val added: Int, val ownedElsewhere: Int, val hidden: Int)
 
     /** Writes the movies and shows a media server described; unchanged rows are left alone. */
     private suspend fun storeServerMetadata(sourceId: Long, scanned: List<ScannedVideo>, now: Long) {
@@ -464,21 +563,62 @@ class LibraryRepositoryImpl(
     private suspend fun rescanDeviceAfterChange() {
         val changedAt = mediaChangedAt
         if (!settings.settings.value.scanDeviceStorage || !StoragePermissions.hasAnyVideoAccess(context)) return
-        val scanned = withContext(Dispatchers.IO) {
-            val deviceId = sourceDao.device()?.id ?: return@withContext false
-            // Waits for a running scan instead of overlapping it.
-            scanMutex.withLock {
-                if (deviceScanStartedAt > changedAt) return@withLock false
-                val device = sourceDao.byId(deviceId)?.takeIf { isScannable(it) } ?: return@withLock false
-                try {
-                    scan(device)
-                } finally {
-                    state.update { it.copy(running = false, sourceName = null, found = 0) }
-                }
-                true
+        if (rescanDevice(changedAt)) enricher.request()
+    }
+
+    /**
+     * Scans device storage unless a device scan that started after [askedAt] (elapsedRealtime)
+     * has seen what the request is about. Waits for a running scan instead of overlapping it.
+     * True when it scanned.
+     */
+    private suspend fun rescanDevice(askedAt: Long): Boolean = withContext(Dispatchers.IO) {
+        val deviceId = sourceDao.device()?.id ?: return@withContext false
+        scanMutex.withLock {
+            if (deviceScanStartedAt > askedAt) return@withLock false
+            val device = sourceDao.byId(deviceId)?.takeIf { isScannable(it) } ?: return@withLock false
+            try {
+                scan(device)
+            } finally {
+                state.update { it.copy(running = false, sourceName = null, found = 0) }
             }
+            true
         }
-        if (scanned) enricher.request()
+    }
+
+    override fun onStorageAccessChanged(rescan: Boolean) {
+        val now = AccessSnapshot.of(context)
+        val before = seenAccess.getAndSet(now)
+        if (now.videos == VideoAccess.NONE) return
+        if (!rescan && !now.widens(before)) return
+        val askedAt = SystemClock.elapsedRealtime()
+        // In the app's scope: the scan finishes even if the screen that noticed the change goes away.
+        launchLogged("Device storage rescan after an access change") {
+            if (rescanDevice(askedAt)) enricher.request()
+        }
+    }
+
+    override suspend fun libraryStats(): LibraryStats = withContext(Dispatchers.IO) {
+        val present = HashMap<Long, Int>()
+        val missing = HashMap<Long, Int>()
+        for (row in videoDao.countsBySource()) {
+            val counts = if (row.present) present else missing
+            counts[row.sourceId] = (counts[row.sourceId] ?: 0) + row.count
+        }
+        val running = runningScan
+        LibraryStats(
+            sources = sourceDao.all().map { source ->
+                SourceStats(
+                    source = source,
+                    present = present[source.id] ?: 0,
+                    missing = missing[source.id] ?: 0,
+                    lastScan = scanSummaries[source.id],
+                )
+            },
+            kinds = videoDao.shownCountsByKind(),
+            deviceScannable = settings.settings.value.scanDeviceStorage && StoragePermissions.hasAnyVideoAccess(context),
+            scanningSource = running?.first,
+            scanningSince = running?.second,
+        )
     }
 
     /** Ensures the single DEVICE source exists while device scanning is on, and hides it while off. */
@@ -1189,6 +1329,29 @@ class LibraryRepositoryImpl(
             CrashReporter.log("$what failed", e)
         }
     }
+}
+
+/** What storage access looked like at one moment (see LibraryRepositoryImpl.onStorageAccessChanged). */
+private data class AccessSnapshot(val videos: VideoAccess, val images: Boolean, val allFiles: Boolean) {
+    /** More of device storage is readable now than with [before]. */
+    fun widens(before: AccessSnapshot): Boolean =
+        videos.ordinal > before.videos.ordinal || (images && !before.images) || (allFiles && !before.allFiles)
+
+    companion object {
+        fun of(context: Context): AccessSnapshot = AccessSnapshot(
+            videos = StoragePermissions.videoAccess(context),
+            images = StoragePermissions.hasImageAccess(context),
+            allFiles = StoragePermissions.hasAllFilesAccess(context),
+        )
+    }
+}
+
+/** "5 minutes", "1 minute", "30 seconds". */
+private fun durationLabel(ms: Long): String {
+    val minutes = ms / 60_000
+    if (minutes >= 1) return if (minutes == 1L) "1 minute" else "$minutes minutes"
+    val seconds = (ms / 1000).coerceAtLeast(1)
+    return if (seconds == 1L) "1 second" else "$seconds seconds"
 }
 
 /** Applies a fresh parse and forgets any automatic match, ready for (re)matching. */

@@ -661,8 +661,9 @@ object UiMappers {
         state.enriching -> {
             val total = state.enrichTotal
             val done = state.enrichDone.coerceIn(0, total.coerceAtLeast(0))
+            // Not "running": fetching posters never blocks a rescan (the refresh buttons stay on).
             ScanUi(
-                running = true,
+                fetchingArtwork = true,
                 label = if (total > 0) "Fetching posters $done / $total" else "Fetching posters",
                 progress = if (total > 0) done.toFloat() / total else null,
             )

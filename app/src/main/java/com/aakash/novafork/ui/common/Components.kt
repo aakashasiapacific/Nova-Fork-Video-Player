@@ -174,7 +174,7 @@ fun EmptyState(
 /** Slim progress line + label while the library scans or fetches artwork. Nothing when idle. */
 @Composable
 fun ScanBanner(scan: ScanUi, modifier: Modifier = Modifier) {
-    if (!scan.running) return
+    if (!scan.running && !scan.fetchingArtwork) return
     Column(modifier.fillMaxWidth()) {
         val p = scan.progress
         if (p == null) {

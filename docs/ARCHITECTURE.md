@@ -85,6 +85,22 @@ With `Settings.preferLocalArtwork`: local first, then TMDB. Same idea for backdr
 TMDB URLs: `TmdbClient.posterUrl(path)` (w500), `backdropUrl(path)` (w1280), `stillUrl(path)` (w780);
 use w342 posters for small cards when convenient.
 
+### Device storage access
+`StoragePermissions` decides what the DEVICE source can see: `READ_MEDIA_VIDEO` (or
+`READ_EXTERNAL_STORAGE` before Android 13), Android 14's limited access
+(`READ_MEDIA_VISUAL_USER_SELECTED`), or "All files access" alone (`MANAGE_EXTERNAL_STORAGE`,
+which MediaProvider treats as access to every media row). Any of them makes device storage
+scannable. `LibraryRepository.onStorageAccessChanged()` (MainActivity on resume and after a
+prompt) rescans it in the app scope as soon as more became readable. Missing or limited access is
+never silent: the Browse device row, the device folder's empty state and the Home feed show
+`ui/common/DeviceAccessCard` with "Allow" (prompt) and "App settings". Each source scan is
+bounded (`defaultScanTimeoutMs`: 5 min device, 30 min walks) so a hung provider or server can't
+hold the scan lock; fetching posters (`ScanUi.fetchingArtwork`) never disables a rescan.
+Settings › About › Library diagnostics (`data/LibraryDiagnostics`, `DeviceScanner.census()`) gives
+a plain-text report to copy or share: permissions, what MediaStore lists by folder, each source's
+counts, last scan and error, and the library by kind and match state. It holds no secrets and no
+file names.
+
 ### Network
 `Network.createOkHttp(context, settings)`: 15 s timeouts, 50 MB disk cache, User-Agent
 "NovaFork/<version>", a `Dns` that uses DNS-over-HTTPS (Cloudflare 1.1.1.1 / 1.0.0.1 bootstrap,

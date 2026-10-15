@@ -321,10 +321,16 @@ data class ScanUi(
 
 @Immutable
 data class PermissionUi(
+    /** Some or all device videos are visible (the video permission, limited access or All files access). */
     val granted: Boolean = false,
     /** Android 14 "limited access" (only some videos visible). */
     val partial: Boolean = false,
-)
+    /** Settings › "Scan device storage" is on, so missing access hides videos the user expects. */
+    val deviceScanning: Boolean = true,
+) {
+    /** Device storage can't be scanned, or only partly: the UI says so with a way to fix it. */
+    val needsAttention: Boolean get() = deviceScanning && (!granted || partial)
+}
 
 enum class KeyStatus { MISSING, UNKNOWN, CHECKING, VALID, INVALID, UNREACHABLE }
 

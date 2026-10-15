@@ -1,6 +1,8 @@
 package com.aakash.novafork.data
 
+import com.aakash.novafork.data.db.MatchState
 import com.aakash.novafork.data.db.SourceEntity
+import com.aakash.novafork.data.db.VideoKind
 import com.aakash.novafork.data.db.VideoWithMeta
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
@@ -43,6 +45,50 @@ data class PlaylistWithCount(
     val coverVideoId: Long?,
 )
 
+/** What one scan of a source found and did with it (Library diagnostics). */
+data class ScanSummary(
+    /** Wall-clock start, epoch ms. */
+    val startedAt: Long,
+    val durationMs: Long,
+    /** Videos the scanner reported; null when the scan failed. */
+    val found: Int?,
+    /** New to the library. */
+    val added: Int = 0,
+    /** Left with another source that lists the same file and still shows it. */
+    val ownedElsewhere: Int = 0,
+    /** Shown before, not found this time: hidden (kept for their watch history). */
+    val hidden: Int = 0,
+    /** Why the scan failed, null when it worked. */
+    val error: String? = null,
+)
+
+/** One source as Library diagnostics lists it. */
+data class SourceStats(
+    val source: SourceEntity,
+    /** Videos the library shows. */
+    val present: Int,
+    /** Videos kept for their history but hidden: the last scan did not find them. */
+    val missing: Int,
+    /** The latest scan of the source since the app started; null if none ran. */
+    val lastScan: ScanSummary?,
+)
+
+/** Shown videos of one kind in one match state. */
+data class KindCount(val kind: VideoKind, val matchState: MatchState, val count: Int)
+
+/** The library's make-up, for Settings › About › Library diagnostics. */
+data class LibraryStats(
+    /** Every source, turned off ones included, in [com.aakash.novafork.data.db.SourceDao.all] order. */
+    val sources: List<SourceStats>,
+    /** Videos the library shows (present, source turned on), by kind and match state. */
+    val kinds: List<KindCount>,
+    /** Device storage would be scanned now (setting on, some video access). */
+    val deviceScannable: Boolean,
+    /** The scan running right now ("Device storage") and since when (epoch ms); null when none runs. */
+    val scanningSource: String? = null,
+    val scanningSince: Long? = null,
+)
+
 interface LibraryRepository {
     /** Every present video with its metadata. Emits on any change. */
     fun observeVideos(): Flow<List<VideoWithMeta>>
@@ -56,14 +102,28 @@ interface LibraryRepository {
     suspend fun findByUri(uri: String): VideoWithMeta?
 
     /**
-     * Scans every enabled source (device storage only when Settings.scanDeviceStorage and the
-     * permission is granted), upserts videos (keeping playback state), marks missing ones
-     * present=false, then matches PENDING/stale videos against TMDB in the background.
-     * Concurrent calls coalesce into the running scan.
+     * Scans every enabled source (device storage only when Settings.scanDeviceStorage and some
+     * access to videos: the video permission, limited access or All files access), upserts videos
+     * (keeping playback state), marks missing ones present=false, then matches PENDING/stale videos
+     * against TMDB in the background. Concurrent calls coalesce into the running scan; a coalesced
+     * pull to refresh makes it scan device storage once more at its end.
      */
     suspend fun refreshAll()
 
     suspend fun scanSource(sourceId: Long)
+
+    /**
+     * Storage access may have changed: the app came back to the front (permissions are changed in
+     * system settings) or a permission prompt was answered. When device storage became readable,
+     * or more of it did (limited to all videos, images, All files access), or [rescan] asks for it
+     * (more videos picked under limited access), device storage is scanned in the background as
+     * soon as no other scan runs. That scan belongs to the app, not to a screen: leaving the
+     * screen does not stop it.
+     */
+    fun onStorageAccessChanged(rescan: Boolean = false)
+
+    /** Per-source counts, recent scans and the library's make-up (Settings › About › Library diagnostics). */
+    suspend fun libraryStats(): LibraryStats
 
     /** Adds a SAF tree (the caller already took the persistable permission) and scans it. */
     suspend fun addFolder(treeUri: String, displayName: String): Long

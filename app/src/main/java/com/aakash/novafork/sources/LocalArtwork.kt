@@ -22,6 +22,40 @@ internal data class LocalArtChoice(
 )
 
 /**
+ * One folder's image names, indexed once for every video in the folder. A camera folder holds
+ * tens of thousands of photos; matching each of them against each video's name made a device
+ * scan cost videos × photos string work.
+ */
+internal class FolderImages(names: Collection<String>) {
+    val all: List<String> = names.toList()
+
+    /** Indices into [all], ordered by their lower-case base name. */
+    private val order: IntArray
+    private val bases: Array<String>
+
+    init {
+        val lowered = Array(all.size) { i -> VideoFiles.baseName(all[i]).lowercase(Locale.ROOT) }
+        order = all.indices.sortedBy { lowered[it] }.toIntArray()
+        bases = Array(order.size) { i -> lowered[order[i]] }
+    }
+
+    /** The names whose lower-case base name starts with [prefix] (lower case), in [all]'s order. */
+    fun startingWith(prefix: String): List<String> {
+        // Names sharing a prefix sit next to each other in sorted order, from the first one not below it.
+        var low = 0
+        var high = bases.size
+        while (low < high) {
+            val mid = (low + high) ushr 1
+            if (bases[mid] < prefix) low = mid + 1 else high = mid
+        }
+        var end = low
+        while (end < bases.size && bases[end].startsWith(prefix)) end++
+        if (end == low) return emptyList()
+        return (low until end).map { order[it] }.sorted().map { all[it] }
+    }
+}
+
+/**
  * Applies core [ArtworkRules] to the folder listings a scanner already has. Scanners turn the
  * chosen names into URIs of their own kind.
  *
@@ -62,17 +96,45 @@ internal object LocalArtwork {
         folderImages: List<String>,
         folderVideoCount: Int,
         showFolderImages: () -> List<String>,
+    ): LocalArtChoice = choose(
+        videoFileName = videoFileName,
+        folderName = folderName,
+        folderImages = folderImages,
+        imagesStartingWith = { base -> folderImages.filter { VideoFiles.baseName(it).lowercase(Locale.ROOT).startsWith(base) } },
+        folderVideoCount = folderVideoCount,
+        showFolderImages = showFolderImages,
+    )
+
+    /** The same with the folder's images indexed once for all its videos (device scans). */
+    fun choose(
+        videoFileName: String,
+        folderName: String?,
+        folderImages: FolderImages,
+        folderVideoCount: Int,
+        showFolderImages: () -> List<String>,
+    ): LocalArtChoice = choose(
+        videoFileName = videoFileName,
+        folderName = folderName,
+        folderImages = folderImages.all,
+        imagesStartingWith = folderImages::startingWith,
+        folderVideoCount = folderVideoCount,
+        showFolderImages = showFolderImages,
+    )
+
+    private fun choose(
+        videoFileName: String,
+        folderName: String?,
+        folderImages: List<String>,
+        imagesStartingWith: (String) -> List<String>,
+        folderVideoCount: Int,
+        showFolderImages: () -> List<String>,
     ): LocalArtChoice {
         val base = VideoFiles.baseName(videoFileName).lowercase(Locale.ROOT)
         val markerSeason = EPISODE_MARKER.find(base)?.groupValues?.get(1)?.toIntOrNull()
         val folderSeason = folderName?.let(::seasonOfFolder)
 
         if (markerSeason == null && folderSeason == null) {
-            val candidates = if (folderVideoCount <= 1) {
-                folderImages
-            } else {
-                folderImages.filter { VideoFiles.baseName(it).lowercase(Locale.ROOT).startsWith(base) }
-            }
+            val candidates = if (folderVideoCount <= 1) folderImages else imagesStartingWith(base)
             val pick = ArtworkRules.pick(videoFileName, candidates, isEpisode = false)
             return LocalArtChoice(
                 poster = pick.poster.inVideoFolder(),

@@ -100,6 +100,7 @@ private fun PhonePage(state: AppUiState, actions: AppActions) {
             dir = state.browseDir,
             actions = actions,
             modifier = pageModifier,
+            permission = state.permission,
         )
         is Route.Playlist -> PhonePlaylistScreen(
             playlist = state.playlist?.takeIf { it.id == route.playlistId },

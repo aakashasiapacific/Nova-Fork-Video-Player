@@ -7,6 +7,7 @@ import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Update
 import androidx.room.Upsert
+import com.aakash.novafork.data.KindCount
 import com.aakash.novafork.data.PlaylistWithCount
 import kotlinx.coroutines.flow.Flow
 
@@ -174,6 +175,19 @@ interface VideoDao {
     @Query("UPDATE videos SET sourceId = :sourceId WHERE id IN (:ids)")
     suspend fun moveToSource(ids: List<Long>, sourceId: Long)
 
+    // Library diagnostics
+
+    /** Videos per source, shown (present) and hidden. */
+    @Query("SELECT sourceId, present, COUNT(*) AS count FROM videos GROUP BY sourceId, present")
+    suspend fun countsBySource(): List<SourceVideoCount>
+
+    /** Videos the library shows (present, source turned on) by kind and match state. */
+    @Query(
+        "SELECT kind, matchState, COUNT(*) AS count FROM videos WHERE present = 1 " +
+            "AND sourceId IN (SELECT id FROM sources WHERE enabled = 1) GROUP BY kind, matchState",
+    )
+    suspend fun shownCountsByKind(): List<KindCount>
+
     // Playback
 
     @Query("UPDATE videos SET positionMs = :positionMs, lastPlayedAt = :playedAt WHERE id = :id")
@@ -330,6 +344,13 @@ data class VideoIdentity(
     val fileName: String,
     val sizeBytes: Long?,
     val present: Boolean,
+)
+
+/** How many videos of a source are shown ([present]) or hidden. */
+data class SourceVideoCount(
+    val sourceId: Long,
+    val present: Boolean,
+    val count: Int,
 )
 
 /** A video's place in its source, for folder queues. */

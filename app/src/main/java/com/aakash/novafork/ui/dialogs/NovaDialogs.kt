@@ -82,6 +82,7 @@ fun NovaDialogs(dialog: DialogUi?, actions: AppActions, playlists: List<Playlist
             onConfirm = { actions.deletePlaylist(dialog.playlistId) },
             onDismiss = actions::dismissDialog,
         )
+        is DialogUi.LibraryDiagnostics -> LibraryDiagnosticsDialog(dialog = dialog, actions = actions)
     }
 }
 

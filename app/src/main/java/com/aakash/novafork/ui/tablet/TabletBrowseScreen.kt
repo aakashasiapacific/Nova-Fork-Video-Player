@@ -65,10 +65,13 @@ import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
 import com.aakash.novafork.data.db.SourceType
 import com.aakash.novafork.ui.adaptive.DeviceLayout
+import com.aakash.novafork.ui.common.DeviceAccessCard
+import com.aakash.novafork.ui.common.DeviceStorageEmptyState
 import com.aakash.novafork.ui.common.EmptyState
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.ScanBanner
 import com.aakash.novafork.ui.common.VideoMenuBox
+import com.aakash.novafork.ui.common.deviceAccessNotice
 import com.aakash.novafork.ui.common.metaLine
 import com.aakash.novafork.ui.common.sourceTypeIcon
 import com.aakash.novafork.ui.model.AppActions
@@ -136,7 +139,13 @@ internal fun TabletBrowseScreen(
                     if (shown == null) {
                         TabletLoading(Modifier.fillMaxSize())
                     } else {
-                        BrowseDirPane(dir = shown, cellMin = dirCellMin, actions = actions, modifier = Modifier.fillMaxSize())
+                        BrowseDirPane(
+                            dir = shown,
+                            permission = state.permission,
+                            cellMin = dirCellMin,
+                            actions = actions,
+                            modifier = Modifier.fillMaxSize(),
+                        )
                     }
                 }
                 is Route.Playlist -> dirStates.SaveableStateProvider(route.toString()) {
@@ -174,6 +183,7 @@ private fun SourcesPane(
     val device = remember(sources) { sources.filter { it.type == SourceType.DEVICE } }
     val folders = remember(sources) { sources.filter { it.type == SourceType.FOLDER } }
     val network = remember(sources) { sources.filter { it.type.isNetworkShare || it.type.isMediaServer } }
+    val deviceNotice = deviceAccessNotice(permission)
     Surface(modifier = modifier, color = MaterialTheme.colorScheme.surfaceContainerLow) {
         LazyColumn(
             contentPadding = PaddingValues(
@@ -200,7 +210,17 @@ private fun SourcesPane(
                 items(device, key = { "src:${it.id}" }, contentType = { "source" }) { source ->
                     SourceRow(source = source, selected = source.id == selectedSourceId, actions = actions)
                 }
-                if (!permission.granted) {
+                if (deviceNotice != null) {
+                    // Missing access hides camera videos, downloads and screen recordings: say so, with the fix.
+                    item(key = "deviceAccess", contentType = "deviceAccess") {
+                        DeviceAccessCard(
+                            notice = deviceNotice,
+                            onAllow = actions::requestPermission,
+                            onOpenSettings = actions::openAppSettings,
+                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp),
+                        )
+                    }
+                } else if (!permission.granted) {
                     item(key = "allowDevice", contentType = "action") {
                         ActionRow(R.drawable.ic_video_library, "Allow access to videos", actions::requestPermission)
                     }
@@ -552,7 +572,13 @@ private fun ActionTile(
 }
 
 @Composable
-private fun BrowseDirPane(dir: BrowseDirUi, cellMin: Dp, actions: AppActions, modifier: Modifier = Modifier) {
+private fun BrowseDirPane(
+    dir: BrowseDirUi,
+    permission: PermissionUi,
+    cellMin: Dp,
+    actions: AppActions,
+    modifier: Modifier = Modifier,
+) {
     val isEmpty = dir.isEmpty
     Column(modifier) {
         BrowseDirHeader(
@@ -573,6 +599,18 @@ private fun BrowseDirPane(dir: BrowseDirUi, cellMin: Dp, actions: AppActions, mo
         val error = dir.error
         when {
             isEmpty && dir.isLoading -> TabletLoading(Modifier.fillMaxSize())
+            // An empty device storage is never just "no videos here": it says what keeps them out.
+            isEmpty && dir.sourceType == SourceType.DEVICE && dir.path.isEmpty() ->
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    DeviceStorageEmptyState(
+                        permission = permission,
+                        error = error,
+                        onRescan = { actions.rescanSource(dir.sourceId) },
+                        onAllow = actions::requestPermission,
+                        onOpenSettings = actions::openAppSettings,
+                        onDiagnostics = actions::openLibraryDiagnostics,
+                    )
+                }
             isEmpty && !error.isNullOrBlank() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 EmptyState(
                     icon = R.drawable.ic_error,

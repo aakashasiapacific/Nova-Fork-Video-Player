@@ -37,8 +37,11 @@ import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
 import com.aakash.novafork.data.db.SourceType
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
+import com.aakash.novafork.ui.common.DeviceAccessCard
+import com.aakash.novafork.ui.common.DeviceAccessNotice
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.ScanBanner
+import com.aakash.novafork.ui.common.deviceAccessNotice
 import com.aakash.novafork.ui.dialogs.playlistCountLabel
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.BrowseUi
@@ -62,6 +65,7 @@ fun PhoneBrowseScreen(
     val device = remember(sources) { sources.filter { it.type == SourceType.DEVICE } }
     val folders = remember(sources) { sources.filter { it.type == SourceType.FOLDER } }
     val network = remember(sources) { sources.filter { it.type.isNetworkShare || it.type.isMediaServer } }
+    val deviceNotice = deviceAccessNotice(permission)
 
     Column(modifier.fillMaxSize()) {
         PhoneTopBar(
@@ -73,55 +77,92 @@ fun PhoneBrowseScreen(
             },
         )
         ScanBanner(scan)
-        LazyColumn(
+        PhonePullToRefresh(
+            scanning = scan.running,
+            onRefresh = actions::refresh,
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(bottom = dims.sectionSpacing),
         ) {
-            if (device.isNotEmpty() || !permission.granted) {
-                sectionHeader("device", "On this device")
-                items(device, key = { "src:${it.id}" }) { source -> SourceRow(source, actions) }
-                if (!permission.granted) {
-                    item(key = "allowDevice") {
-                        ActionRow(R.drawable.ic_phone_android, "Allow access to videos", actions::requestPermission)
-                    }
-                }
-            }
-
-            sectionHeader("folders", "Folders")
-            items(folders, key = { "src:${it.id}" }) { source -> SourceRow(source, actions) }
-            item(key = "addFolder") {
-                ActionRow(R.drawable.ic_create_new_folder, "Add folder", actions::addFolder)
-            }
-
-            sectionHeader("network", "Network")
-            items(network, key = { "src:${it.id}" }) { source -> SourceRow(source, actions) }
-            item(key = "addNetwork") {
-                ActionRow(R.drawable.ic_add, "Add network source", actions::addNetworkSource)
-            }
-
-            sectionHeader("streams", "Streams")
-            items(browse.streams, key = { "stream:${it.id}" }) { stream ->
-                StreamRow(
-                    stream = stream,
-                    onClick = { actions.play(stream.id) },
-                    onLongClick = { actions.openVideo(stream.id) },
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(bottom = dims.sectionSpacing),
+            ) {
+                browseItems(
+                    browse = browse,
+                    device = device,
+                    folders = folders,
+                    network = network,
+                    permission = permission,
+                    deviceNotice = deviceNotice,
+                    actions = actions,
                 )
             }
-            item(key = "addStream") {
-                ActionRow(R.drawable.ic_add, "Add stream") { actions.showDialog(DialogUi.AddStream) }
-            }
-            item(key = "openUrl") {
-                ActionRow(R.drawable.ic_link, "Open network stream") { actions.showDialog(DialogUi.OpenUrl) }
-            }
+        }
+    }
+}
 
-            sectionHeader("playlists", "Playlists")
-            items(browse.playlists, key = { "playlist:${it.id}" }) { playlist ->
-                PlaylistRow(playlist = playlist, onClick = { actions.openPlaylist(playlist.id) })
+private fun LazyListScope.browseItems(
+    browse: BrowseUi,
+    device: List<SourceUi>,
+    folders: List<SourceUi>,
+    network: List<SourceUi>,
+    permission: PermissionUi,
+    deviceNotice: DeviceAccessNotice?,
+    actions: AppActions,
+) {
+    if (device.isNotEmpty() || !permission.granted) {
+        sectionHeader("device", "On this device")
+        items(device, key = { "src:${it.id}" }) { source -> SourceRow(source, actions) }
+        if (deviceNotice != null) {
+            // Missing access hides camera videos, downloads and screen recordings: say so, with the fix.
+            item(key = "deviceAccess") {
+                val dims = LocalNovaDimens.current
+                DeviceAccessCard(
+                    notice = deviceNotice,
+                    onAllow = actions::requestPermission,
+                    onOpenSettings = actions::openAppSettings,
+                    modifier = Modifier.padding(horizontal = dims.gutter, vertical = 4.dp),
+                )
             }
-            item(key = "newPlaylist") {
-                ActionRow(R.drawable.ic_playlist_add, "New playlist") { actions.showDialog(DialogUi.NewPlaylist()) }
+        } else if (!permission.granted) {
+            item(key = "allowDevice") {
+                ActionRow(R.drawable.ic_phone_android, "Allow access to videos", actions::requestPermission)
             }
         }
+    }
+
+    sectionHeader("folders", "Folders")
+    items(folders, key = { "src:${it.id}" }) { source -> SourceRow(source, actions) }
+    item(key = "addFolder") {
+        ActionRow(R.drawable.ic_create_new_folder, "Add folder", actions::addFolder)
+    }
+
+    sectionHeader("network", "Network")
+    items(network, key = { "src:${it.id}" }) { source -> SourceRow(source, actions) }
+    item(key = "addNetwork") {
+        ActionRow(R.drawable.ic_add, "Add network source", actions::addNetworkSource)
+    }
+
+    sectionHeader("streams", "Streams")
+    items(browse.streams, key = { "stream:${it.id}" }) { stream ->
+        StreamRow(
+            stream = stream,
+            onClick = { actions.play(stream.id) },
+            onLongClick = { actions.openVideo(stream.id) },
+        )
+    }
+    item(key = "addStream") {
+        ActionRow(R.drawable.ic_add, "Add stream") { actions.showDialog(DialogUi.AddStream) }
+    }
+    item(key = "openUrl") {
+        ActionRow(R.drawable.ic_link, "Open network stream") { actions.showDialog(DialogUi.OpenUrl) }
+    }
+
+    sectionHeader("playlists", "Playlists")
+    items(browse.playlists, key = { "playlist:${it.id}" }) { playlist ->
+        PlaylistRow(playlist = playlist, onClick = { actions.openPlaylist(playlist.id) })
+    }
+    item(key = "newPlaylist") {
+        ActionRow(R.drawable.ic_playlist_add, "New playlist") { actions.showDialog(DialogUi.NewPlaylist()) }
     }
 }
 

@@ -1,6 +1,7 @@
 package com.aakash.novafork.data
 
 import android.Manifest
+import android.app.AppOpsManager
 import android.app.Application
 import android.content.Context
 import androidx.room.Room
@@ -34,6 +35,7 @@ import okhttp3.Response
 import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.Assert.assertTrue
 import org.robolectric.Shadows.shadowOf
+import org.robolectric.shadows.ShadowEnvironment
 import java.util.Collections
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
@@ -45,10 +47,12 @@ import java.util.concurrent.atomic.AtomicInteger
  * background work ever starts: metadata passes, the device-source sync, the reactions to settings
  * and the scan that addFolder / saveSmbServer launch. The database then changes only through the
  * calls a test makes, so assertions never race a lookup. Pass [LiveScope.scope] to run that work.
+ * [scanTimeoutMs] replaces the time one scan may take before it is given up.
  */
 internal class RepositoryFixture(
     scope: CoroutineScope = inertScope(),
     initialSettings: Settings = Settings(scanDeviceStorage = false),
+    scanTimeoutMs: Long? = null,
 ) {
     val context: Context = ApplicationProvider.getApplicationContext<Context>()
     val database: NovaDatabase = Room.inMemoryDatabaseBuilder(context, NovaDatabase::class.java)
@@ -66,6 +70,7 @@ internal class RepositoryFixture(
         tmdb = tmdb.client(),
         settings = settings,
         scope = scope,
+        scanTimeoutMs = scanTimeoutMs?.let { limit -> { _: SourceType -> limit } } ?: ::defaultScanTimeoutMs,
     )
 
     suspend fun videoAt(uri: String): VideoEntity =
@@ -122,6 +127,32 @@ internal fun grantVideoAccess() {
     shadowOf(ApplicationProvider.getApplicationContext<Application>())
         .grantPermissions(Manifest.permission.READ_MEDIA_VIDEO)
 }
+
+/** Android 14's "Allow limited access": only the videos the user picked are visible. */
+internal fun grantLimitedAccess() {
+    shadowOf(ApplicationProvider.getApplicationContext<Application>())
+        .grantPermissions(Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED)
+}
+
+/**
+ * "All files access" (Android 11+) turned on or off for the app: the MANAGE_EXTERNAL_STORAGE
+ * app-op that Environment.isExternalStorageManager() reads (for the first external storage
+ * directory, which Robolectric only has once one is added).
+ */
+internal fun setAllFilesAccess(allowed: Boolean) {
+    val app = ApplicationProvider.getApplicationContext<Application>()
+    ShadowEnvironment.addExternalDir("emulated-0")
+    val appOps = requireNotNull(app.getSystemService(AppOpsManager::class.java))
+    shadowOf(appOps).setMode(
+        OPSTR_MANAGE_EXTERNAL_STORAGE,
+        app.applicationInfo.uid,
+        app.packageName,
+        if (allowed) AppOpsManager.MODE_ALLOWED else AppOpsManager.MODE_IGNORED,
+    )
+}
+
+/** AppOpsManager.OPSTR_MANAGE_EXTERNAL_STORAGE, which the public SDK does not expose. */
+private const val OPSTR_MANAGE_EXTERNAL_STORAGE = "android:manage_external_storage"
 
 /** One file as a scanner reports it. [folder] is the display path, root → leaf. */
 internal fun scannedVideo(

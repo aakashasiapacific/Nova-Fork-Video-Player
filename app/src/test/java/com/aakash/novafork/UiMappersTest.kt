@@ -37,6 +37,7 @@ import com.aakash.novafork.ui.ListingKey
 import com.aakash.novafork.ui.NaturalOrder
 import com.aakash.novafork.ui.RemoteListing
 import com.aakash.novafork.ui.UiMappers
+import com.aakash.novafork.ui.common.deviceAccessNotice
 import com.aakash.novafork.ui.frameSourceOf
 import com.aakash.novafork.ui.model.Crumb
 import com.aakash.novafork.ui.model.FolderUi
@@ -45,6 +46,7 @@ import com.aakash.novafork.ui.model.LibraryFilter
 import com.aakash.novafork.ui.model.LibraryItemUi
 import com.aakash.novafork.ui.model.LibrarySort
 import com.aakash.novafork.ui.model.MediaKind
+import com.aakash.novafork.ui.model.PermissionUi
 import com.aakash.novafork.ui.model.ScanUi
 import com.aakash.novafork.ui.pick
 import com.aakash.novafork.ui.progressOf
@@ -589,6 +591,28 @@ class UiMappersTest {
         val enriching = UiMappers.scan(ScanState(enriching = true, enrichDone = 12, enrichTotal = 80))
         assertEquals("Fetching posters 12 / 80", enriching.label)
         assertEquals(0.15f, requireNotNull(enriching.progress), 1e-6f)
+        // Fetching posters shows in the banner but never disables pull to refresh or the rescan button.
+        assertFalse(enriching.running)
+        assertTrue(enriching.fetchingArtwork)
+        // A file scan during a poster fetch is what the buttons wait for.
+        val both = UiMappers.scan(ScanState(running = true, sourceName = "Device storage", enriching = true))
+        assertTrue(both.running)
+        assertEquals("Scanning Device storage", both.label)
+    }
+
+    @Test
+    fun deviceAccessNoticeSaysWhatKeepsDeviceVideosOut() {
+        assertNull(deviceAccessNotice(PermissionUi(granted = true)))
+        // The user turned device scanning off: nothing to nag about.
+        assertNull(deviceAccessNotice(PermissionUi(granted = false, deviceScanning = false)))
+        val none = requireNotNull(deviceAccessNotice(PermissionUi(granted = false)))
+        assertEquals("Nova can't see the videos on this device", none.title)
+        assertEquals("Allow access", none.allowLabel)
+        val limited = requireNotNull(deviceAccessNotice(PermissionUi(granted = true, partial = true)))
+        assertEquals("Nova sees only the videos you picked", limited.title)
+        assertEquals("Allow all", limited.allowLabel)
+        assertTrue(PermissionUi(granted = false).needsAttention)
+        assertFalse(PermissionUi(granted = true).needsAttention)
     }
 
     @Test

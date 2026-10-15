@@ -54,6 +54,7 @@ import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
 import com.aakash.novafork.ui.common.BackdropArt
+import com.aakash.novafork.ui.common.DeviceAccessCard
 import com.aakash.novafork.ui.common.EmptyState
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.RatingPill
@@ -61,6 +62,7 @@ import com.aakash.novafork.ui.common.ScanBanner
 import com.aakash.novafork.ui.common.SectionHeader
 import com.aakash.novafork.ui.common.VideoMenuBox
 import com.aakash.novafork.ui.common.bottomScrim
+import com.aakash.novafork.ui.common.deviceAccessNotice
 import com.aakash.novafork.ui.common.metaLine
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.DialogUi
@@ -138,10 +140,14 @@ private fun HomeFeed(home: HomeUi, scan: ScanUi, permission: PermissionUi, actio
                     }
                 }
             }
-            if (permission.partial) {
-                item(key = "partial", contentType = "partial") {
-                    PartialAccessCard(
-                        onAllowAll = actions::requestPermission,
+            val deviceNotice = deviceAccessNotice(permission)
+            if (deviceNotice != null) {
+                // Shown above folders' and shares' posters too: device videos missing must never be silent.
+                item(key = "deviceAccess", contentType = "deviceAccess") {
+                    DeviceAccessCard(
+                        notice = deviceNotice,
+                        onAllow = actions::requestPermission,
+                        onOpenSettings = actions::openAppSettings,
                         modifier = Modifier.padding(start = dims.gutter, end = dims.gutter, top = 16.dp),
                     )
                 }
@@ -500,8 +506,13 @@ private fun HomeOnboarding(scan: ScanUi, permission: PermissionUi, actions: AppA
                     .widthIn(max = 440.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                if (permission.partial) {
-                    PartialAccessCard(onAllowAll = actions::requestPermission)
+                val deviceNotice = deviceAccessNotice(permission)
+                if (deviceNotice != null && permission.granted) {
+                    DeviceAccessCard(
+                        notice = deviceNotice,
+                        onAllow = actions::requestPermission,
+                        onOpenSettings = actions::openAppSettings,
+                    )
                 }
                 EmptyState(
                     icon = R.drawable.ic_video_library,
@@ -510,6 +521,9 @@ private fun HomeOnboarding(scan: ScanUi, permission: PermissionUi, actions: AppA
                         "and dresses them up with posters, backdrops and details.",
                     actionLabel = if (permission.granted) "Scan again" else "Allow access to videos",
                     onAction = { if (permission.granted) actions.refresh() else actions.requestPermission() },
+                    // The prompt may no longer show (denied twice): the app's settings page always works.
+                    secondaryLabel = if (permission.granted) null else "App settings",
+                    onSecondary = actions::openAppSettings,
                 )
                 Column(
                     Modifier

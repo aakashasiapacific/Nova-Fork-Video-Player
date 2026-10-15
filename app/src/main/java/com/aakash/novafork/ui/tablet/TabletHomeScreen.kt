@@ -50,13 +50,14 @@ import com.aakash.novafork.R
 import com.aakash.novafork.ui.adaptive.DeviceLayout
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
 import com.aakash.novafork.ui.common.BackdropArt
+import com.aakash.novafork.ui.common.DeviceAccessCard
 import com.aakash.novafork.ui.common.LandscapeArt
-import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.RatingPill
 import com.aakash.novafork.ui.common.ScanBanner
 import com.aakash.novafork.ui.common.SectionHeader
 import com.aakash.novafork.ui.common.VideoMenuBox
 import com.aakash.novafork.ui.common.bottomScrim
+import com.aakash.novafork.ui.common.deviceAccessNotice
 import com.aakash.novafork.ui.common.startScrim
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.DialogUi
@@ -126,11 +127,17 @@ private fun HomeFeed(home: HomeUi, scan: ScanUi, permission: PermissionUi, layou
                     }
                 }
             }
-            if (permission.partial) {
-                item(key = "partial", contentType = "partial") {
-                    PartialAccessCard(
-                        onAllowAll = actions::requestPermission,
-                        modifier = Modifier.padding(start = dims.gutter, end = dims.gutter, top = 24.dp),
+            val deviceNotice = deviceAccessNotice(permission)
+            if (deviceNotice != null) {
+                // Shown above folders' and shares' posters too: device videos missing must never be silent.
+                item(key = "deviceAccess", contentType = "deviceAccess") {
+                    DeviceAccessCard(
+                        notice = deviceNotice,
+                        onAllow = actions::requestPermission,
+                        onOpenSettings = actions::openAppSettings,
+                        modifier = Modifier
+                            .padding(start = dims.gutter, end = dims.gutter, top = 24.dp)
+                            .widthIn(max = 720.dp),
                     )
                 }
             }
@@ -251,38 +258,6 @@ private fun ShowPosterRow(shows: List<ShowCardUi>, actions: AppActions) {
                 onClick = { actions.openShow(show.key) },
                 modifier = Modifier.width(dims.posterWidth),
             )
-        }
-    }
-}
-
-@Composable
-private fun PartialAccessCard(onAllowAll: () -> Unit, modifier: Modifier = Modifier) {
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-    ) {
-        Row(
-            Modifier.padding(horizontal = 20.dp, vertical = 16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            NovaIcon(
-                R.drawable.ic_info,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(28.dp),
-            )
-            Spacer(Modifier.width(16.dp))
-            Column(Modifier.weight(1f)) {
-                Text("Nova can see only some of your videos", style = MaterialTheme.typography.titleMedium)
-                Text(
-                    "Allow access to all videos so new ones show up in your library automatically.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            Spacer(Modifier.width(16.dp))
-            FilledTonalButton(onClick = onAllowAll) { Text("Allow all") }
         }
     }
 }

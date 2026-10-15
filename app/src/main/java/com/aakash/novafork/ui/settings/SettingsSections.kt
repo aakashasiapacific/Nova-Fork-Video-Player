@@ -58,7 +58,7 @@ internal enum class SettingsSection(val title: String, val summary: String, @Dra
     ARTWORK("Artwork & metadata", "TMDB key, language and server", R.drawable.ic_image),
     PLAYER("Player", "Decoding, subtitles and audio", R.drawable.ic_smart_display),
     APPEARANCE("Appearance", "Theme and layout", R.drawable.ic_dark_mode),
-    ABOUT("About", "Version and credits", R.drawable.ic_info),
+    ABOUT("About", "Version, library diagnostics and credits", R.drawable.ic_info),
 }
 
 /** The groups of one section. The first group has no title: the section's title stands for it. */
@@ -68,7 +68,7 @@ internal fun settingsGroups(section: SettingsSection, state: SettingsUi, actions
         SettingsSection.ARTWORK -> artworkGroups(state, actions)
         SettingsSection.PLAYER -> playerGroups(state.settings, actions)
         SettingsSection.APPEARANCE -> appearanceGroups(state.settings, actions)
-        SettingsSection.ABOUT -> aboutGroups(state)
+        SettingsSection.ABOUT -> aboutGroups(state, actions)
     }
 
 // Library
@@ -638,13 +638,22 @@ private fun appearanceGroups(settings: Settings, actions: AppActions): List<Sett
 
 // About
 
-private fun aboutGroups(state: SettingsUi): List<SettingsGroup> = listOf(
+private fun aboutGroups(state: SettingsUi, actions: AppActions): List<SettingsGroup> = listOf(
     SettingsGroup(
         key = "about",
         title = null,
         rows = listOf(
             SettingsRow("version") { shape ->
                 InfoRow(shape, R.drawable.ic_info, "Version", state.versionName.ifBlank { "Unknown" })
+            },
+            SettingsRow("diagnostics") { shape ->
+                ActionRow(
+                    shape = shape,
+                    icon = R.drawable.ic_tune,
+                    title = "Library diagnostics",
+                    summary = "What Nova sees: storage access, videos Android lists and each source. Copy or share it",
+                    onClick = actions::openLibraryDiagnostics,
+                )
             },
             SettingsRow("libvlc") { shape ->
                 InfoRow(shape, R.drawable.ic_play_arrow, "Playback by libVLC", "The engine behind VLC, licensed under the LGPL")

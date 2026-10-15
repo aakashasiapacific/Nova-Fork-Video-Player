@@ -36,22 +36,27 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
+import com.aakash.novafork.data.db.SourceType
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
+import com.aakash.novafork.ui.common.DeviceStorageEmptyState
 import com.aakash.novafork.ui.common.EmptyState
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.VideoMenuBox
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.BrowseDirUi
 import com.aakash.novafork.ui.model.FolderUi
+import com.aakash.novafork.ui.model.PermissionUi
 import com.aakash.novafork.ui.model.RemoteFileUi
 import com.aakash.novafork.ui.model.Route
 import com.aakash.novafork.ui.model.VideoCardUi
 
+/** [permission] explains an empty device storage (no access to videos, or only some). */
 @Composable
 fun PhoneBrowseDirScreen(
     dir: BrowseDirUi?,
     actions: AppActions,
     modifier: Modifier = Modifier,
+    permission: PermissionUi = PermissionUi(granted = true),
 ) {
     Column(modifier.fillMaxSize()) {
         PhoneTopBar(
@@ -68,13 +73,13 @@ fun PhoneBrowseDirScreen(
         if (dir == null) {
             LoadingBox()
         } else {
-            BrowseDirContent(dir = dir, actions = actions)
+            BrowseDirContent(dir = dir, permission = permission, actions = actions)
         }
     }
 }
 
 @Composable
-private fun BrowseDirContent(dir: BrowseDirUi, actions: AppActions) {
+private fun BrowseDirContent(dir: BrowseDirUi, permission: PermissionUi, actions: AppActions) {
     val dims = LocalNovaDimens.current
     val isEmpty = dir.isEmpty
     val error = dir.error
@@ -87,6 +92,17 @@ private fun BrowseDirContent(dir: BrowseDirUi, actions: AppActions) {
     }
     when {
         isEmpty && dir.isLoading -> LoadingBox()
+        // An empty device storage is never just "no videos here": it says what keeps them out.
+        isEmpty && dir.sourceType == SourceType.DEVICE && dir.path.isEmpty() -> CenteredScrollable {
+            DeviceStorageEmptyState(
+                permission = permission,
+                error = error,
+                onRescan = { actions.rescanSource(dir.sourceId) },
+                onAllow = actions::requestPermission,
+                onOpenSettings = actions::openAppSettings,
+                onDiagnostics = actions::openLibraryDiagnostics,
+            )
+        }
         isEmpty && !error.isNullOrBlank() -> CenteredScrollable {
             EmptyState(
                 icon = R.drawable.ic_error,

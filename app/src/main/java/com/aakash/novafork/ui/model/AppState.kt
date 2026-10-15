@@ -168,6 +168,12 @@ sealed interface DialogUi {
     data class RenamePlaylist(val playlistId: Long, val name: String) : DialogUi
 
     data class ConfirmDeletePlaylist(val playlistId: Long, val name: String) : DialogUi
+
+    /**
+     * Settings › About › Library diagnostics: a plain-text report to copy or share; [report] is
+     * null while it is being put together.
+     */
+    data class LibraryDiagnostics(val report: String? = null) : DialogUi
 }
 
 /** Settings › Backup & restore. */
@@ -287,6 +293,17 @@ interface AppActions {
     fun shareCrashReport()
     /** Forgets the crash report. */
     fun dismissCrashReport()
+
+    // Storage access and diagnostics. Default bodies keep other implementations (previews, tests) compiling.
+
+    /** Opens this app's page in system settings (Permissions › Photos and videos). */
+    fun openAppSettings() {}
+
+    /** Puts together the library diagnostics report and shows it ([DialogUi.LibraryDiagnostics]). */
+    fun openLibraryDiagnostics() {}
+
+    /** Shares plain [text] through the Android share sheet. */
+    fun shareText(subject: String, text: String) {}
 
     // Queues and playlists. Default bodies keep other implementations (previews, tests) compiling.
 
