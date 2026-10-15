@@ -10,6 +10,7 @@ import com.aakash.novafork.data.LiveScope
 import com.aakash.novafork.data.PrefsSettingsStore
 import com.aakash.novafork.data.RepositoryFixture
 import com.aakash.novafork.data.ScannedVideo
+import com.aakash.novafork.data.Settings
 import com.aakash.novafork.data.SettingsStore
 import com.aakash.novafork.data.ThemeMode
 import com.aakash.novafork.data.TmdbJson
@@ -19,6 +20,7 @@ import com.aakash.novafork.data.db.MatchState
 import com.aakash.novafork.data.db.SourceEntity
 import com.aakash.novafork.data.db.SourceType
 import com.aakash.novafork.data.db.VideoEntity
+import com.aakash.novafork.data.grantVideoAccess
 import com.aakash.novafork.data.inertScope
 import com.aakash.novafork.data.scannedVideo
 import kotlinx.coroutines.CoroutineScope
@@ -27,6 +29,7 @@ import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
@@ -37,6 +40,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import java.io.ByteArrayOutputStream
 import java.io.File
+import java.io.InputStream
 
 /**
  * Backups of one library ("device A") restored into another ("device B"): each a
@@ -59,7 +63,10 @@ class BackupRestoreTest {
         }
     }
 
-    private fun fixture(scope: CoroutineScope = inertScope()): RepositoryFixture = RepositoryFixture(scope).also { fixtures += it }
+    private fun fixture(
+        scope: CoroutineScope = inertScope(),
+        settings: Settings = Settings(scanDeviceStorage = false),
+    ): RepositoryFixture = RepositoryFixture(scope, settings).also { fixtures += it }
 
     private fun manager(
         fx: RepositoryFixture,
@@ -221,6 +228,48 @@ class BackupRestoreTest {
     }
 
     @Test
+    fun aMediaStoreIdOnAnotherDeviceIsAnotherFile() = runBlocking<Unit> {
+        grantVideoAccess()
+        val a = fixture(settings = Settings(scanDeviceStorage = true))
+        a.tmdb.route("movie/${TmdbJson.INCEPTION_ID}", TmdbJson.inception)
+        a.device.serve(DEVICE_LOCATION, scannedVideo(MEDIA_1000034, "Dune.mkv", "Movies", sizeBytes = 4_000_000L))
+        a.repository.refreshAll()
+        val duneA = a.videoAt(MEDIA_1000034).id
+        a.repository.savePlayback(duneA, 4_800_000L, 9_000_000L)
+        a.repository.saveTracks(duneA, 2, 4)
+        a.repository.identify(duneA, TmdbSearchResult(TmdbJson.INCEPTION_ID, IdentifyType.MOVIE, "Inception", 2010, null, null))
+        val sciFi = a.repository.createPlaylist("Sci-fi")
+        a.repository.addToPlaylist(sciFi, listOf(duneA))
+        val before = a.videoAt(MEDIA_1000034)
+        val text = exportText(manager(a), includeSecrets = false)
+
+        // Device B: MediaStore gave that id to another file, and Dune.mkv has an id of its own there.
+        val b = fixture(settings = Settings(scanDeviceStorage = true))
+        b.tmdb.route("movie/${TmdbJson.INCEPTION_ID}", TmdbJson.inception)
+        b.device.serve(
+            DEVICE_LOCATION,
+            scannedVideo(MEDIA_1000034, "Wedding.mp4", "DCIM/Camera", sizeBytes = 9_000_000L),
+            scannedVideo("content://media/external/video/media/52", "Dune.mkv", "Movies", sizeBytes = 4_000_000L),
+        )
+        b.repository.refreshAll()
+        val report = manager(b).restoreText(text)
+
+        assertEquals(RestoreCounts(), report.waiting)
+        val duneB = b.videoAt("content://media/external/video/media/52")
+        assertSamePlayback(before, duneB)
+        assertEquals(MatchState.MANUAL, duneB.matchState)
+        assertEquals("movie:${TmdbJson.INCEPTION_ID}", duneB.metadataKey)
+        val wedding = b.videoAt(MEDIA_1000034)
+        assertEquals(0L, wedding.positionMs)
+        assertNull(wedding.lastPlayedAt)
+        assertEquals(0, wedding.playCount)
+        assertNull(wedding.subtitleTrackId)
+        assertNotEquals(MatchState.MANUAL, wedding.matchState)
+        val playlist = b.repository.observePlaylists().first().single { it.name == "Sci-fi" }
+        assertEquals(listOf(duneB.uri), b.repository.playlistVideos(playlist.id).map { it.video.uri })
+    }
+
+    @Test
     fun waitingEntriesAreAppliedWhenTheirSourceIsScanned() = runBlocking<Unit> {
         val a = fixture()
         a.tmdb.route("movie/${TmdbJson.INCEPTION_ID}", TmdbJson.inception)
@@ -362,6 +411,71 @@ class BackupRestoreTest {
     }
 
     @Test
+    fun filesThatCantBeBackupsAreRefusedEarly() = runBlocking<Unit> {
+        val restorer = manager(fixture())
+
+        // A video or an archive picked by mistake: its first byte says enough.
+        val binary = EndlessStream(first = 0x1A, fill = 0)
+        val notJson = assertThrows(BackupFormatException::class.java) { runBlocking { restorer.read(binary) } }
+        assertEquals("This file isn't a Nova Fork backup", notJson.message)
+        assertTrue("read ${binary.served} bytes", binary.served <= 1024 * 1024)
+
+        // A file that announces its size is refused without being read.
+        val huge = object : InputStream() {
+            override fun available(): Int = 200 * 1024 * 1024
+
+            override fun read(): Int = throw AssertionError("read")
+        }
+        val announced = assertThrows(BackupFormatException::class.java) { runBlocking { restorer.read(huge) } }
+        assertTrue(requireNotNull(announced.message).contains("too large"))
+
+        // JSON that goes on and on is cut off at the limit.
+        val endless = EndlessStream(first = '{'.code.toByte(), fill = ' '.code.toByte())
+        val tooLarge = assertThrows(BackupFormatException::class.java) { runBlocking { restorer.read(endless) } }
+        assertTrue(requireNotNull(tooLarge.message).contains("too large"))
+        assertTrue("read ${endless.served} bytes", endless.served <= 17L * 1024 * 1024)
+
+        // A byte order mark and white space before the JSON are fine.
+        val backup = restorer.read(("\uFEFF \n" + BackupCodec.encode(NovaBackup(appVersion = "2.0"))).byteInputStream())
+        assertEquals("2.0", backup.appVersion)
+    }
+
+    @Test
+    fun settingsOfAnotherTypeAreNotRestored() = runBlocking<Unit> {
+        val store = newDeviceSettings()
+        store.update { it.copy(seekStepSeconds = 30) }
+        val text = """{"format":"$BACKUP_FORMAT","formatVersion":1,"settings":[
+            {"key":"secure_dns","type":"string","value":"true"},
+            {"key":"seek_step_seconds","type":"long","value":10},
+            {"key":"theme_mode","type":"string","value":"SYSTEM"},
+            {"key":"from_a_later_version","type":"long","value":7}
+        ]}"""
+
+        val report = manager(fixture(), store).restoreText(text)
+
+        assertEquals(2, report.settings)
+        assertEquals(ThemeMode.SYSTEM, store.settings.value.themeMode)
+        assertEquals(30, store.settings.value.seekStepSeconds)
+        assertTrue(store.settings.value.secureDns)
+        assertEquals(7L, settingsFile().getLong("from_a_later_version", 0L))
+
+        // A settings file damaged some other way still opens: such values read as their defaults.
+        settingsFile().edit().putString("secure_dns", "yes").putLong("seek_step_seconds", 5L).commit()
+        val reread = PrefsSettingsStore(context).settings.value
+        assertTrue(reread.secureDns)
+        assertEquals(10, reread.seekStepSeconds)
+        assertEquals(ThemeMode.SYSTEM, reread.themeMode)
+    }
+
+    @Test
+    fun everyStoredSettingHasItsTypeListed() {
+        val store = newDeviceSettings()
+        store.update { it.copy(tmdbLanguage = "fr-FR", seekStepSeconds = 20) }
+        val stored = SettingsBackup.export(settingsFile(), includeSecrets = true).associate { it.key to it.type }
+        assertEquals(PrefsSettingsStore.KEY_TYPES, stored)
+    }
+
+    @Test
     fun everySettingTypeSurvivesTheRoundTrip() = runBlocking<Unit> {
         val prefs = settingsFile()
         prefs.edit().clear()
@@ -411,8 +525,23 @@ class BackupRestoreTest {
         assertEquals(7, merged.subtitleTrackId)
     }
 
+    /** Endless bytes: [first], then [fill]; counts what was read. */
+    private class EndlessStream(private val first: Byte, private val fill: Byte) : InputStream() {
+        var served = 0L
+            private set
+
+        override fun read(): Int = (if (served++ == 0L) first else fill).toInt() and 0xFF
+
+        override fun read(b: ByteArray, off: Int, len: Int): Int {
+            for (i in off until off + len) b[i] = read().toByte()
+            return len
+        }
+    }
+
     private companion object {
         const val SMB_PASSWORD = "hunter2"
+        const val DEVICE_LOCATION = "device"
+        const val MEDIA_1000034 = "content://media/external/video/media/1000034"
         const val TREE = "content://com.android.externalstorage.documents/tree/primary%3AMovies"
 
         val DUNE = scannedVideo("smb://nas.local/Media/Movies/Dune.2021.mkv", "Dune.2021.mkv", "Media/Movies", sizeBytes = 4_000_000_000L)

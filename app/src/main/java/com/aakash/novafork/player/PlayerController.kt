@@ -17,7 +17,6 @@ import com.aakash.novafork.CrashReporter
 import com.aakash.novafork.core.library.VideoFiles
 import com.aakash.novafork.core.opensubtitles.OpenSubtitlesException
 import com.aakash.novafork.core.opensubtitles.OpenSubtitlesLanguages
-import com.aakash.novafork.core.opensubtitles.SubtitleRanking
 import com.aakash.novafork.core.opensubtitles.SubtitleResult
 import com.aakash.novafork.core.smb.SmbUris
 import com.aakash.novafork.data.AspectMode
@@ -232,8 +231,15 @@ class PlayerController(
     private var subtitleSetupDone = false
     private var pendingSubtitleRestore: Int? = null
 
-    /** Paths of the downloaded subtitle files added to this session: setup doesn't add them again. */
-    private val addedSubtitleFiles = HashSet<String>()
+    /**
+     * The paths of the subtitle files added to this session, in the order they were added (setup's,
+     * downloads, picked ones). Setup and downloads never add a file twice; [trackOfFile] finds the
+     * files' tracks from this order.
+     */
+    private val addedSubtitleFiles = ArrayList<String>()
+
+    /** The subtitle tracks the video had before the first file was added; null until then. */
+    private var tracksBeforeFiles: Set<Int>? = null
 
     // Subtitle downloads (OpenSubtitles)
     /** The results on the download list, by id. */
@@ -831,6 +837,7 @@ class PlayerController(
         subtitleSetupDone = false
         pendingSubtitleRestore = null
         addedSubtitleFiles.clear()
+        tracksBeforeFiles = null
         subtitleResults = emptyMap()
         pendingDownloadTrack = null
         downloadedTracks.clear()
@@ -979,7 +986,7 @@ class PlayerController(
             }
             // Another video started while the file was copied: it isn't that video's subtitle.
             if (released || session != pickedFor) return@launch
-            val added = file != null && mediaPlayer.addSlave(IMedia.Slave.Type.Subtitle, Uri.fromFile(file), true)
+            val added = file != null && addSubtitleFile(file, select = true)
             if (added) pendingSubtitleRestore = null
             showLabel(if (added) "Subtitles added" else "Couldn't load that subtitle file")
             resumeAfterPicking()
@@ -1408,7 +1415,7 @@ class PlayerController(
                 val file = subtitleDownloads.download(current.subtitleTarget, result)
                 // Kept for its video either way; only that video's session gets the track.
                 if (released || session != forSession) return@launch
-                if (addDownloadedSubtitle(file)) null else "Couldn't load that subtitle file"
+                addDownloadedSubtitle(file)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -2000,36 +2007,64 @@ class PlayerController(
             }
         }
         for (file in external) {
-            if (!addedSubtitleFiles.add(file.absolutePath)) continue
-            mediaPlayer.addSlave(IMedia.Slave.Type.Subtitle, Uri.fromFile(file), file == selected)
+            if (file.absolutePath !in addedSubtitleFiles) addSubtitleFile(file, select = file == selected)
         }
         refreshTracks()
         maybeDownloadSubtitles(embedded, external, remembered)
     }
 
     /**
-     * Adds a downloaded subtitle file to the playing video and turns it on; its track is
-     * remembered for the video once libVLC has selected it. A file added before in this session
-     * just gets its track turned on again. False when libVLC refused it.
+     * Turns on a downloaded subtitle file for the playing video. A file this session has loaded
+     * already (setup loads the ones downloaded before) gets its track turned on and remembered;
+     * adding it again would make a second track, one the next session doesn't have. Else the
+     * file is added, and its track remembered for the video once libVLC has selected it.
+     * Null when the subtitle is on (or about to be), else a message saying why not.
      */
-    private fun addDownloadedSubtitle(file: File): Boolean {
-        if (released || !mediaReady) return false
+    private fun addDownloadedSubtitle(file: File): String? {
+        if (released || !mediaReady) return "Couldn't load that subtitle file"
         val path = file.absolutePath
-        val known = downloadedTracks[path]
-        if (known != null && realTracks(mediaPlayer.spuTracks).any { it.id == known }) {
-            mediaPlayer.setSpuTrack(known)
+        if (path in addedSubtitleFiles) {
+            // Added just now, and libVLC turns it on once it is loaded.
+            if (pendingDownloadTrack?.path == path) return null
+            val tracks = realTracks(mediaPlayer.spuTracks)
+            val track = downloadedTracks[path]?.takeIf { known -> tracks.any { it.id == known } }
+                ?: trackOfFile(path)
+                ?: return "That subtitle is loaded already: choose it in the subtitle tracks"
+            mediaPlayer.setSpuTrack(track)
             pendingSubtitleRestore = null
-            rememberedSubtitle = known
+            rememberedSubtitle = track
             refreshTracks()
             saveTrackChoice()
-            return true
+            return null
         }
         val before = realTracks(mediaPlayer.spuTracks).map { it.id }.toSet()
-        if (!mediaPlayer.addSlave(IMedia.Slave.Type.Subtitle, Uri.fromFile(file), true)) return false
-        addedSubtitleFiles.add(path)
+        if (!addSubtitleFile(file, select = true)) return "Couldn't load that subtitle file"
         pendingDownloadTrack = PendingTrack(path, before)
         pendingSubtitleRestore = null
+        return null
+    }
+
+    /** Adds [file] to the playing video as a subtitle track ([select]: turned on); false when libVLC refused it. */
+    private fun addSubtitleFile(file: File, select: Boolean): Boolean {
+        if (tracksBeforeFiles == null) tracksBeforeFiles = realTracks(mediaPlayer.spuTracks).map { it.id }.toSet()
+        if (!mediaPlayer.addSlave(IMedia.Slave.Type.Subtitle, Uri.fromFile(file), select)) return false
+        addedSubtitleFiles += file.absolutePath
         return true
+    }
+
+    /**
+     * The subtitle track of a file added to this session, or null when it can't be told. libVLC
+     * opens added files one after the other, in the order they were added, and numbers each new
+     * track one higher than the last, so the n-th track after the video's own is the n-th file's,
+     * as long as every file got exactly one (none still loading, none refused, no captions found
+     * in the video since).
+     */
+    private fun trackOfFile(path: String): Int? {
+        val before = tracksBeforeFiles ?: return null
+        val index = addedSubtitleFiles.indexOf(path)
+        if (index < 0) return null
+        val added = realTracks(mediaPlayer.spuTracks).map { it.id }.filter { it !in before }.sorted()
+        return if (added.size == addedSubtitleFiles.size) added[index] else null
     }
 
     /** The track of a subtitle just downloaded, once libVLC selected it, becomes the video's remembered choice. */
@@ -2047,7 +2082,10 @@ class PlayerController(
      * With automatic downloads on and nothing chosen for the video yet: when neither its own
      * tracks nor its files are in the first download language, fetches the best match
      * (timed for this file first, then the most downloaded) in the first language that has one,
-     * among those it lacks. Settled once per video: a download, or a search that found nothing.
+     * among those it lacks. Only a match sure to fit is fetched: the video is matched in the
+     * library (its TMDB id), or the subtitle is timed for this very file (see
+     * [SubtitleDownloads.autoPick]). Settled once per video: a download, or a search by id that
+     * found nothing.
      */
     private fun maybeDownloadSubtitles(embedded: List<MediaPlayer.TrackDescription>, external: List<File>, remembered: Int?) {
         val current = nowPlaying ?: return
@@ -2066,17 +2104,24 @@ class PlayerController(
             try {
                 if (subtitleDownloads.autoDownloadSettled(current.videoKey)) return@launch
                 val target = current.subtitleTarget
-                val best = SubtitleRanking.best(subtitleDownloads.search(target, missing), missing)
-                if (best == null) {
-                    PlayerDiagnostics.record("subtitles: nothing to download automatically")
-                    subtitleDownloads.settleAutoDownload(current.videoKey)
-                    return@launch
+                val best = when (val pick = subtitleDownloads.autoPick(target, missing)) {
+                    is SubtitleDownloadRules.AutoPick.Download -> pick.result
+                    SubtitleDownloadRules.AutoPick.Settle -> {
+                        PlayerDiagnostics.record("subtitles: nothing to download automatically")
+                        subtitleDownloads.settleAutoDownload(current.videoKey)
+                        return@launch
+                    }
+                    // Not settled: a later play, once the library matched the video, tries again.
+                    SubtitleDownloadRules.AutoPick.Later -> {
+                        PlayerDiagnostics.record("subtitles: none sure to fit, not downloaded automatically")
+                        return@launch
+                    }
                 }
                 val file = subtitleDownloads.download(target, best)
                 subtitleDownloads.settleAutoDownload(current.videoKey)
                 if (released || session != forSession) return@launch
                 PlayerDiagnostics.record("subtitles: downloaded automatically")
-                if (addDownloadedSubtitle(file)) {
+                if (addDownloadedSubtitle(file) == null) {
                     showFeedback(
                         GestureFeedback.Label("Downloaded ${OpenSubtitlesLanguages.displayName(best.language)} subtitles"),
                         MESSAGE_LABEL_MS,

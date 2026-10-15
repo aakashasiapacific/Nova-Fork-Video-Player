@@ -6,6 +6,7 @@ import android.os.LocaleList
 import androidx.core.content.edit
 import com.aakash.novafork.BuildConfig
 import com.aakash.novafork.core.tmdb.TmdbLanguages
+import com.aakash.novafork.data.backup.SettingType
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -14,7 +15,8 @@ import kotlinx.coroutines.flow.asStateFlow
  * [SettingsStore] persisted in the "settings" SharedPreferences file. Enums are stored by name.
  *
  * Until the user picks a TMDB language, [Settings.tmdbLanguage] follows the device's languages
- * (see [TmdbLanguages]); picking one stores it for good.
+ * (see [TmdbLanguages]); picking one stores it for good. A value stored with another type than
+ * [KEY_TYPES] says (a damaged or hand-edited file) reads as the default instead of failing.
  */
 class PrefsSettingsStore(context: Context) : SettingsStore {
     private val prefs: SharedPreferences =
@@ -74,7 +76,7 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
         }
     }
 
-    private companion object {
+    internal companion object {
         const val PREFS_NAME = "settings"
 
         const val KEY_TMDB_API_KEY = "tmdb_api_key"
@@ -103,14 +105,45 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
         const val KEY_AUTO_DOWNLOAD_SUBTITLES = "auto_download_subtitles"
 
         /**
+         * The type [write] stores each key with. A restored backup's entry of another type is
+         * not written (see com.aakash.novafork.data.backup.SettingsBackup.restore).
+         */
+        val KEY_TYPES: Map<String, SettingType> = mapOf(
+            KEY_TMDB_API_KEY to SettingType.STRING,
+            KEY_TMDB_LANGUAGE to SettingType.STRING,
+            KEY_TMDB_LANGUAGE_CHOSEN to SettingType.BOOLEAN,
+            KEY_TMDB_HOST to SettingType.STRING,
+            KEY_SECURE_DNS to SettingType.BOOLEAN,
+            KEY_PREFER_LOCAL_ARTWORK to SettingType.BOOLEAN,
+            KEY_SCAN_DEVICE_STORAGE to SettingType.BOOLEAN,
+            KEY_LAYOUT_MODE to SettingType.STRING,
+            KEY_THEME_MODE to SettingType.STRING,
+            KEY_HARDWARE_DECODING to SettingType.STRING,
+            KEY_DEFAULT_ASPECT to SettingType.STRING,
+            KEY_RESUME_PLAYBACK to SettingType.BOOLEAN,
+            KEY_AUTO_LOAD_SUBTITLES to SettingType.BOOLEAN,
+            KEY_SUBTITLE_ENCODING to SettingType.STRING,
+            KEY_PREFERRED_AUDIO_LANGUAGE to SettingType.STRING,
+            KEY_PREFERRED_SUBTITLE_LANGUAGE to SettingType.STRING,
+            KEY_SEEK_STEP_SECONDS to SettingType.INT,
+            KEY_AUTO_PLAY_NEXT to SettingType.BOOLEAN,
+            KEY_BACKGROUND_AUDIO to SettingType.BOOLEAN,
+            KEY_OPENSUBTITLES_API_KEY to SettingType.STRING,
+            KEY_OPENSUBTITLES_USERNAME to SettingType.STRING,
+            KEY_OPENSUBTITLES_PASSWORD to SettingType.STRING,
+            KEY_SUBTITLE_LANGUAGES to SettingType.STRING,
+            KEY_AUTO_DOWNLOAD_SUBTITLES to SettingType.BOOLEAN,
+        )
+
+        /**
          * Whether the stored TMDB language is the user's pick. Settings saved before the flag
          * existed always stored a language; the library's metadata is in it, so it is kept.
          */
         fun readLanguageChosen(prefs: SharedPreferences): Boolean =
             if (prefs.contains(KEY_TMDB_LANGUAGE_CHOSEN)) {
-                prefs.getBoolean(KEY_TMDB_LANGUAGE_CHOSEN, false)
+                prefs.boolean(KEY_TMDB_LANGUAGE_CHOSEN, false)
             } else {
-                !prefs.getString(KEY_TMDB_LANGUAGE, null).isNullOrBlank()
+                !prefs.string(KEY_TMDB_LANGUAGE).isNullOrBlank()
             }
 
         /** The TMDB tag for the device's languages, most preferred first ("hi-IN", "en-GB", else "en-US"). */
@@ -121,37 +154,59 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
 
         fun read(prefs: SharedPreferences, languageChosen: Boolean, deviceLanguage: String): Settings {
             val defaults = Settings()
-            val storedLanguage = prefs.getString(KEY_TMDB_LANGUAGE, null)?.takeIf { it.isNotBlank() }
+            val storedLanguage = prefs.string(KEY_TMDB_LANGUAGE)?.takeIf { it.isNotBlank() }
             return Settings(
-                tmdbApiKey = prefs.getString(KEY_TMDB_API_KEY, null) ?: defaults.tmdbApiKey,
+                tmdbApiKey = prefs.string(KEY_TMDB_API_KEY) ?: defaults.tmdbApiKey,
                 tmdbLanguage = storedLanguage?.takeIf { languageChosen } ?: deviceLanguage,
-                tmdbHost = enumOrDefault(prefs.getString(KEY_TMDB_HOST, null), defaults.tmdbHost),
-                secureDns = prefs.getBoolean(KEY_SECURE_DNS, defaults.secureDns),
-                preferLocalArtwork = prefs.getBoolean(KEY_PREFER_LOCAL_ARTWORK, defaults.preferLocalArtwork),
-                scanDeviceStorage = prefs.getBoolean(KEY_SCAN_DEVICE_STORAGE, defaults.scanDeviceStorage),
-                layoutMode = enumOrDefault(prefs.getString(KEY_LAYOUT_MODE, null), defaults.layoutMode),
-                themeMode = enumOrDefault(prefs.getString(KEY_THEME_MODE, null), defaults.themeMode),
-                hardwareDecoding = enumOrDefault(prefs.getString(KEY_HARDWARE_DECODING, null), defaults.hardwareDecoding),
-                defaultAspect = enumOrDefault(prefs.getString(KEY_DEFAULT_ASPECT, null), defaults.defaultAspect),
-                resumePlayback = prefs.getBoolean(KEY_RESUME_PLAYBACK, defaults.resumePlayback),
-                autoLoadSubtitles = prefs.getBoolean(KEY_AUTO_LOAD_SUBTITLES, defaults.autoLoadSubtitles),
-                subtitleEncoding = prefs.getString(KEY_SUBTITLE_ENCODING, null) ?: defaults.subtitleEncoding,
-                preferredAudioLanguage = prefs.getString(KEY_PREFERRED_AUDIO_LANGUAGE, null)
+                tmdbHost = enumOrDefault(prefs.string(KEY_TMDB_HOST), defaults.tmdbHost),
+                secureDns = prefs.boolean(KEY_SECURE_DNS, defaults.secureDns),
+                preferLocalArtwork = prefs.boolean(KEY_PREFER_LOCAL_ARTWORK, defaults.preferLocalArtwork),
+                scanDeviceStorage = prefs.boolean(KEY_SCAN_DEVICE_STORAGE, defaults.scanDeviceStorage),
+                layoutMode = enumOrDefault(prefs.string(KEY_LAYOUT_MODE), defaults.layoutMode),
+                themeMode = enumOrDefault(prefs.string(KEY_THEME_MODE), defaults.themeMode),
+                hardwareDecoding = enumOrDefault(prefs.string(KEY_HARDWARE_DECODING), defaults.hardwareDecoding),
+                defaultAspect = enumOrDefault(prefs.string(KEY_DEFAULT_ASPECT), defaults.defaultAspect),
+                resumePlayback = prefs.boolean(KEY_RESUME_PLAYBACK, defaults.resumePlayback),
+                autoLoadSubtitles = prefs.boolean(KEY_AUTO_LOAD_SUBTITLES, defaults.autoLoadSubtitles),
+                subtitleEncoding = prefs.string(KEY_SUBTITLE_ENCODING) ?: defaults.subtitleEncoding,
+                preferredAudioLanguage = prefs.string(KEY_PREFERRED_AUDIO_LANGUAGE)
                     ?: defaults.preferredAudioLanguage,
-                preferredSubtitleLanguage = prefs.getString(KEY_PREFERRED_SUBTITLE_LANGUAGE, null)
+                preferredSubtitleLanguage = prefs.string(KEY_PREFERRED_SUBTITLE_LANGUAGE)
                     ?: defaults.preferredSubtitleLanguage,
-                seekStepSeconds = prefs.getInt(KEY_SEEK_STEP_SECONDS, defaults.seekStepSeconds),
-                autoPlayNext = prefs.getBoolean(KEY_AUTO_PLAY_NEXT, defaults.autoPlayNext),
-                backgroundAudio = prefs.getBoolean(KEY_BACKGROUND_AUDIO, defaults.backgroundAudio),
-                opensubtitlesApiKey = prefs.getString(KEY_OPENSUBTITLES_API_KEY, null) ?: defaults.opensubtitlesApiKey,
-                opensubtitlesUsername = prefs.getString(KEY_OPENSUBTITLES_USERNAME, null) ?: defaults.opensubtitlesUsername,
-                opensubtitlesPassword = prefs.getString(KEY_OPENSUBTITLES_PASSWORD, null) ?: defaults.opensubtitlesPassword,
-                subtitleLanguages = prefs.getString(KEY_SUBTITLE_LANGUAGES, null) ?: defaults.subtitleLanguages,
-                autoDownloadSubtitles = prefs.getBoolean(KEY_AUTO_DOWNLOAD_SUBTITLES, defaults.autoDownloadSubtitles),
+                seekStepSeconds = prefs.int(KEY_SEEK_STEP_SECONDS, defaults.seekStepSeconds),
+                autoPlayNext = prefs.boolean(KEY_AUTO_PLAY_NEXT, defaults.autoPlayNext),
+                backgroundAudio = prefs.boolean(KEY_BACKGROUND_AUDIO, defaults.backgroundAudio),
+                opensubtitlesApiKey = prefs.string(KEY_OPENSUBTITLES_API_KEY) ?: defaults.opensubtitlesApiKey,
+                opensubtitlesUsername = prefs.string(KEY_OPENSUBTITLES_USERNAME) ?: defaults.opensubtitlesUsername,
+                opensubtitlesPassword = prefs.string(KEY_OPENSUBTITLES_PASSWORD) ?: defaults.opensubtitlesPassword,
+                subtitleLanguages = prefs.string(KEY_SUBTITLE_LANGUAGES) ?: defaults.subtitleLanguages,
+                autoDownloadSubtitles = prefs.boolean(KEY_AUTO_DOWNLOAD_SUBTITLES, defaults.autoDownloadSubtitles),
             )
         }
 
         inline fun <reified E : Enum<E>> enumOrDefault(name: String?, default: E): E =
             enumValues<E>().firstOrNull { it.name == name } ?: default
+
+        // SharedPreferences casts what it holds to the type asked for: a key of another type throws.
+        private fun SharedPreferences.string(key: String): String? =
+            try {
+                getString(key, null)
+            } catch (e: ClassCastException) {
+                null
+            }
+
+        private fun SharedPreferences.boolean(key: String, default: Boolean): Boolean =
+            try {
+                getBoolean(key, default)
+            } catch (e: ClassCastException) {
+                default
+            }
+
+        private fun SharedPreferences.int(key: String, default: Int): Int =
+            try {
+                getInt(key, default)
+            } catch (e: ClassCastException) {
+                default
+            }
     }
 }

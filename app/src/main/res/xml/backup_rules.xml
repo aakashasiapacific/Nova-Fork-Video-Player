@@ -1,12 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Android 11 and older (Android 12+ reads data_extraction_rules.xml): the same files as there.
-     Settings, the library database and downloaded subtitles go; the crash report, the
-     storage-prompt flag (ui.xml), the media-server install id (media_servers.xml) and the time of
-     the last backup file saved here (backup.xml) stay with this install. Caches under cacheDir
-     are never backed up by Android. -->
+<!-- Android 8.x (Android 9-11 read xml-v28/backup_rules.xml, Android 12+ data_extraction_rules.xml).
+     Backups there are never end-to-end encrypted, so nothing of the user's goes: settings.xml
+     holds API keys and the OpenSubtitles password, the database share passwords and server
+     sign-ins, and what else the app keeps belongs to the database (library_state.xml describes
+     its metadata, the downloaded subtitles are filed under its video ids, a restore's waiting
+     entries are for its videos and playlists) or to this install only (the crash report, ui.xml,
+     media_servers.xml, backup.xml).
+     A new file of the app's has to be added here, or it is backed up unencrypted. Android adds
+     the database's -journal and -wal files to its entry itself.
+     Caches under cacheDir are never backed up by Android. -->
 <full-backup-content>
-    <exclude domain="file" path="last_crash.txt" />
+    <exclude domain="sharedpref" path="settings.xml" />
+    <exclude domain="sharedpref" path="library_state.xml" />
     <exclude domain="sharedpref" path="ui.xml" />
     <exclude domain="sharedpref" path="media_servers.xml" />
     <exclude domain="sharedpref" path="backup.xml" />
+    <exclude domain="database" path="nova.db" />
+    <exclude domain="database" path="nova.db-shm" />
+    <exclude domain="file" path="subtitles" />
+    <exclude domain="file" path="pending_restore.json" />
+    <exclude domain="file" path="last_crash.txt" />
 </full-backup-content>

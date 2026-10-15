@@ -92,8 +92,9 @@ data class BackupSource(
 )
 
 /**
- * Which video an entry is about. A restore looks for it by [uri] first, then by its place in its
- * source ([sourceType] + [sourceLocation], [folder], [fileName]), then by [fileName] + [sizeBytes].
+ * Which video an entry is about. A restore looks for it by [uri] first (when the video there has
+ * the same [fileName] and [sizeBytes]), then by its place in its source ([sourceType] +
+ * [sourceLocation], [folder], [fileName]), then by [fileName] + [sizeBytes].
  */
 @Serializable
 data class BackupVideoRef(

@@ -2,6 +2,7 @@ package com.aakash.novafork.player
 
 import com.aakash.novafork.core.opensubtitles.OpenSubtitlesException
 import com.aakash.novafork.core.opensubtitles.SubtitleResult
+import com.aakash.novafork.core.opensubtitles.SubtitleSearchRequest
 import com.aakash.novafork.data.db.MetadataEntity
 import com.aakash.novafork.data.db.VideoEntity
 import com.aakash.novafork.data.db.VideoKind
@@ -210,6 +211,36 @@ class SubtitleDownloadRulesTest {
         assertEquals(listOf("hi"), SubtitleDownloadRules.missingLanguages(listOf("hi", "en", "fr")) { it in present })
         assertEquals(emptyList<String>(), SubtitleDownloadRules.missingLanguages(listOf("en", "fr")) { it in present })
         assertEquals(listOf("hi", "fr"), SubtitleDownloadRules.missingLanguages(listOf("hi", "fr")) { it in present })
+    }
+
+    @Test
+    fun `automatic downloads need an id or the file's hash`() {
+        assertTrue(SubtitleDownloadRules.canAutoPick(SubtitleSearchRequest(tmdbId = 438631, title = "Dune")))
+        assertTrue(SubtitleDownloadRules.canAutoPick(SubtitleSearchRequest(imdbId = "tt1160419")))
+        assertTrue(SubtitleDownloadRules.canAutoPick(SubtitleSearchRequest(movieHash = "8e245d9679d31e12", title = "birthday party")))
+        // A home video on a share, a link called index.m3u8: only a name to go by.
+        assertFalse(SubtitleDownloadRules.canAutoPick(SubtitleSearchRequest(title = "birthday party")))
+        assertFalse(SubtitleDownloadRules.canAutoPick(SubtitleSearchRequest(imdbId = " ", title = "index")))
+    }
+
+    @Test
+    fun `searched by id the best one is taken, by name only one timed for the file`() {
+        val english = listOf("en")
+        val popular = result(id = "1").copy(movieHashMatch = false)
+        val timed = result(id = "2").copy(movieHashMatch = true, downloadCount = 10)
+        val byId = SubtitleSearchRequest(languages = english, tmdbId = 438631, title = "Dune")
+        assertEquals(SubtitleDownloadRules.AutoPick.Download(popular), SubtitleDownloadRules.autoPick(byId, listOf(popular), english))
+        assertEquals(SubtitleDownloadRules.AutoPick.Download(timed), SubtitleDownloadRules.autoPick(byId, listOf(popular, timed), english))
+        assertEquals(SubtitleDownloadRules.AutoPick.Settle, SubtitleDownloadRules.autoPick(byId, emptyList(), english))
+
+        val byName = SubtitleSearchRequest(languages = english, movieHash = "8e245d9679d31e12", title = "birthday party")
+        // Some film called "Birthday Party": not this video's.
+        assertEquals(SubtitleDownloadRules.AutoPick.Later, SubtitleDownloadRules.autoPick(byName, listOf(popular), english))
+        assertEquals(SubtitleDownloadRules.AutoPick.Later, SubtitleDownloadRules.autoPick(byName, emptyList(), english))
+        assertEquals(SubtitleDownloadRules.AutoPick.Download(timed), SubtitleDownloadRules.autoPick(byName, listOf(popular, timed), english))
+        // Timed for the file, but in a language nobody asked for.
+        val french = timed.copy(id = "3", language = "fr")
+        assertEquals(SubtitleDownloadRules.AutoPick.Later, SubtitleDownloadRules.autoPick(byName, listOf(popular, french), english))
     }
 
     @Test

@@ -6,24 +6,38 @@ import com.aakash.novafork.data.db.VideoEntity
 import com.aakash.novafork.data.db.VideoIdentity
 
 /**
- * Finds the library's video for a backup's [BackupVideoRef]: the same URI; else the same place
- * (source type and location, folder, file name), which survives a file's new MediaStore or
- * document id; else the same file name and size, which also finds it on another share or device.
- * Where several videos fit, one the library shows wins, then the oldest.
+ * Finds the library's video for a backup's [BackupVideoRef]: the same URI holding the same file
+ * (name, and size when both are known); else the same place (source type and location, folder,
+ * file name), which survives a file's new MediaStore or document id; else the same file name and
+ * size, which also finds it on another share or device. Where several videos fit, one the library
+ * shows wins, then the oldest.
+ *
+ * A URI alone proves nothing on another device: MediaStore and document ids are counters of the
+ * device, so there content://media/external/video/media/1000034 may well be another file.
  */
 internal class VideoMatcher(videos: List<VideoIdentity>, sources: List<SourceEntity>) {
     private data class Place(val sourceType: String, val sourceLocation: String, val folder: String, val fileName: String)
 
     private data class NameAndSize(val fileName: String, val sizeBytes: Long)
 
-    private val byUri = HashMap<String, Long>()
+    /** The video at a URI, with what tells whether it is the file a backup means. */
+    private class AtUri(val id: Long, val fileName: String, val sizeBytes: Long?) {
+        fun holds(ref: BackupVideoRef): Boolean {
+            if (fileName != ref.fileName) return false
+            val size = sizeBytes?.takeIf { it > 0 } ?: return true
+            val refSize = ref.sizeBytes?.takeIf { it > 0 } ?: return true
+            return size == refSize
+        }
+    }
+
+    private val byUri = HashMap<String, AtUri>()
     private val byPlace = HashMap<Place, Long>()
     private val byNameAndSize = HashMap<NameAndSize, Long>()
 
     init {
         val sourcesById = sources.associateBy { it.id }
         for (video in videos.sortedWith(compareByDescending<VideoIdentity> { it.present }.thenBy { it.id })) {
-            byUri.putIfAbsent(video.uri, video.id)
+            byUri.putIfAbsent(video.uri, AtUri(video.id, video.fileName, video.sizeBytes))
             val source = sourcesById[video.sourceId]
             if (source != null) {
                 byPlace.putIfAbsent(Place(source.type.name, source.location, cleanFolder(video.folder), video.fileName), video.id)
@@ -35,7 +49,7 @@ internal class VideoMatcher(videos: List<VideoIdentity>, sources: List<SourceEnt
 
     /** The id of [ref]'s video, or null while the library has none that fits. */
     fun match(ref: BackupVideoRef): Long? {
-        byUri[ref.uri]?.let { return it }
+        byUri[ref.uri]?.takeIf { it.holds(ref) }?.let { return it.id }
         val type = ref.sourceType
         val location = ref.sourceLocation
         if (type != null && location != null) {

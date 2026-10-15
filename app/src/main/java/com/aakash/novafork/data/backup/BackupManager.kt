@@ -18,7 +18,7 @@ import com.aakash.novafork.data.db.SourceType
 import com.aakash.novafork.data.db.VideoEntity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.io.ByteArrayOutputStream
+import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
 import java.time.LocalDate
@@ -125,17 +125,41 @@ class BackupManager(
 
     // Restoring
 
-    /** Reads and checks a backup file; BackupFormatException says what is wrong with it, for people. */
+    /**
+     * Reads and checks a backup file; BackupFormatException says what is wrong with it, for people.
+     * The picker offers any file, so one that can't be a backup is refused as early as possible:
+     * by the size it announces, by its first character (a backup is a JSON object), and once it
+     * grows past [MAX_BACKUP_BYTES] (backups are a few MB at most).
+     */
     suspend fun read(input: InputStream): NovaBackup = withContext(Dispatchers.IO) {
-        val buffer = ByteArrayOutputStream()
-        val chunk = ByteArray(BUFFER_BYTES)
-        while (true) {
-            val read = input.read(chunk)
-            if (read < 0) break
-            buffer.write(chunk, 0, read)
-            if (buffer.size() > MAX_BACKUP_BYTES) throw BackupFormatException("This file is too large to be a Nova Fork backup")
+        val announced = try {
+            input.available()
+        } catch (e: IOException) {
+            0
         }
-        BackupCodec.decode(buffer.toString(Charsets.UTF_8.name()))
+        if (announced > MAX_BACKUP_BYTES) throw BackupFormatException(TOO_LARGE)
+        // A file's stream announces what is left of it; one more byte of room finds its end without growing.
+        var bytes = ByteArray(announced.coerceIn(MIN_BUFFER_BYTES, MAX_BACKUP_BYTES - 1) + 1)
+        var size = 0
+        var start = -1
+        while (true) {
+            if (size == bytes.size) {
+                if (bytes.size >= MAX_BACKUP_BYTES) {
+                    if (input.read() < 0) break
+                    throw BackupFormatException(TOO_LARGE)
+                }
+                bytes = bytes.copyOf(minOf(bytes.size.toLong() * 2, MAX_BACKUP_BYTES.toLong()).toInt())
+            }
+            val read = input.read(bytes, size, bytes.size - size)
+            if (read < 0) break
+            size += read
+            if (start < 0) {
+                start = jsonStart(bytes, size)
+                if (start >= 0 && bytes[start] != '{'.code.toByte()) throw BackupFormatException(BackupCodec.NOT_A_BACKUP)
+            }
+        }
+        if (start < 0) throw BackupFormatException(BackupCodec.NOT_A_BACKUP)
+        BackupCodec.decode(bytes, start, size - start)
     }
 
     /**
@@ -260,6 +284,25 @@ class BackupManager(
             )
         }
 
+    /**
+     * Where the JSON in the first [size] bytes starts, past a UTF-8 byte order mark and white
+     * space; -1 while only those have been read.
+     */
+    private fun jsonStart(bytes: ByteArray, size: Int): Int {
+        var i = 0
+        if (size >= UTF8_BOM.size && UTF8_BOM.indices.all { bytes[it] == UTF8_BOM[it] }) {
+            i = UTF8_BOM.size
+        } else if (size < UTF8_BOM.size && (0 until size).all { bytes[it] == UTF8_BOM[it] }) {
+            return -1
+        }
+        while (i < size) {
+            val byte = bytes[i].toInt()
+            if (byte != ' '.code && byte != '\t'.code && byte != '\n'.code && byte != '\r'.code) return i
+            i++
+        }
+        return -1
+    }
+
     /** A picked folder is only readable with the persisted permission the system picker gave. */
     private fun canReadFolder(treeUri: String): Boolean =
         try {
@@ -279,8 +322,12 @@ class BackupManager(
 
         private const val STATE_PREFS = "backup"
         private const val KEY_LAST_BACKUP_AT = "last_backup_at"
-        private const val MAX_BACKUP_BYTES = 64 * 1024 * 1024
-        private const val BUFFER_BYTES = 64 * 1024
+        private const val TOO_LARGE = "This file is too large to be a Nova Fork backup"
+
+        /** Far above any real backup (some 400 bytes a video), low enough to read on any phone. */
+        private const val MAX_BACKUP_BYTES = 16 * 1024 * 1024
+        private const val MIN_BUFFER_BYTES = 64 * 1024
+        private val UTF8_BOM = byteArrayOf(0xEF.toByte(), 0xBB.toByte(), 0xBF.toByte())
         private const val MAX_PORT = 65535
     }
 }

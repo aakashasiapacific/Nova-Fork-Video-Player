@@ -3,6 +3,7 @@ package com.aakash.novafork.player
 import com.aakash.novafork.core.library.VideoFiles
 import com.aakash.novafork.core.opensubtitles.OpenSubtitlesException
 import com.aakash.novafork.core.opensubtitles.OpenSubtitlesLanguages
+import com.aakash.novafork.core.opensubtitles.SubtitleRanking
 import com.aakash.novafork.core.opensubtitles.SubtitleResult
 import com.aakash.novafork.core.opensubtitles.SubtitleSearchRequest
 import com.aakash.novafork.core.parse.NameParser
@@ -72,6 +73,44 @@ internal object SubtitleDownloadRules {
             season = video.season.takeIf { episode != null },
             episode = episode,
         )
+    }
+
+    /** What an automatic download does for a video ([autoPick]). */
+    sealed interface AutoPick {
+        /** Downloads [result]. */
+        data class Download(val result: SubtitleResult) : AutoPick
+
+        /** Nothing in the wanted languages: settled, not tried again. */
+        data object Settle : AutoPick
+
+        /**
+         * Nothing sure to fit: the video is known by its name only. Not settled, so a later play
+         * (once the library matched it) tries again; the user can still pick from the list.
+         */
+        data object Later : AutoPick
+    }
+
+    /** True when [request] names the video by a TMDB or IMDb id: its results are subtitles of that video. */
+    fun identifies(request: SubtitleSearchRequest): Boolean = request.tmdbId != null || !request.imdbId.isNullOrBlank()
+
+    /**
+     * Whether a search for [request] can bring a subtitle sure to fit without the user looking:
+     * it names the video by id, or carries the file's hash.
+     */
+    fun canAutoPick(request: SubtitleSearchRequest): Boolean = identifies(request) || request.movieHash != null
+
+    /**
+     * What to fetch unasked from the [results] of [request]. Searched by id: the best in
+     * [languages] ([SubtitleRanking.best]). Searched by name only (an unmatched home video, a link
+     * called "index.m3u8"), the results may be of any film of that name: only one timed for this
+     * very file (its hash) is taken.
+     */
+    fun autoPick(request: SubtitleSearchRequest, results: List<SubtitleResult>, languages: List<String>): AutoPick {
+        if (identifies(request)) {
+            return SubtitleRanking.best(results, languages)?.let { AutoPick.Download(it) } ?: AutoPick.Settle
+        }
+        return SubtitleRanking.best(results.filter { it.movieHashMatch }, languages)?.let { AutoPick.Download(it) }
+            ?: AutoPick.Later
     }
 
     /**

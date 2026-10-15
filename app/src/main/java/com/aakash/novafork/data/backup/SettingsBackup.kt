@@ -3,6 +3,7 @@ package com.aakash.novafork.data.backup
 import android.content.SharedPreferences
 import com.aakash.novafork.core.jellyfin.ServerSecrets
 import com.aakash.novafork.data.LayoutMode
+import com.aakash.novafork.data.PrefsSettingsStore
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
@@ -54,13 +55,16 @@ internal object SettingsBackup {
      * backup doesn't have keep their values here: a backup without secrets leaves this device's
      * keys alone, and so does an empty secret. A backup on "Automatic" layout keeps this device's
      * own layout choice (phone or tablet is a matter of the device). Entries of the wrong shape
-     * are skipped.
+     * are skipped, and so are those of another type than PrefsSettingsStore stores the key with
+     * (a damaged or hand-edited file, or a later version's): it could not read them back.
      */
     fun restore(prefs: SharedPreferences, entries: List<BackupSetting>): Int {
         val editor = prefs.edit()
         var written = 0
         for (entry in entries) {
             if (entry.key.isEmpty()) continue
+            val expected = PrefsSettingsStore.KEY_TYPES[entry.key]
+            if (expected != null && expected != entry.type) continue
             if (entry.key == KEY_LAYOUT_MODE && entry.value.string() == LayoutMode.AUTO.name) continue
             val value = entry.value
             val put = when (entry.type) {

@@ -59,7 +59,8 @@ internal fun subtitleDownloadGroup(settings: Settings, actions: AppActions): Set
                 shape = shape,
                 icon = R.drawable.ic_cloud,
                 title = "Download subtitles automatically",
-                summary = "When a video has none in your first language, fetch the best match once",
+                summary = "When a video has none in your first language, fetch one sure to fit: " +
+                    "the best match for a video matched with TMDB, else one timed for the file",
                 checked = settings.autoDownloadSubtitles,
                 onCheckedChange = { on -> actions.updateSettings { it.copy(autoDownloadSubtitles = on) } },
             )

@@ -15,12 +15,14 @@ import com.aakash.novafork.core.opensubtitles.SubtitleRanking
 import com.aakash.novafork.core.opensubtitles.SubtitleResult
 import com.aakash.novafork.data.Settings
 import com.aakash.novafork.data.db.VideoWithMeta
+import com.aakash.novafork.player.SubtitleDownloadRules.AutoPick
 import com.aakash.novafork.sources.SubtitleFinder
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.Locale
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * The one OpenSubtitles client of the process: its login token outlives the player sessions.
@@ -90,6 +92,26 @@ internal class SubtitleDownloads(
         return withContext(Dispatchers.Default) { SubtitleRanking.sort(results, languages) }
     }
 
+    /**
+     * What to download for [target] without asking, in [languages] (see
+     * [SubtitleDownloadRules.autoPick]). OpenSubtitles isn't asked when no answer could be sure to
+     * fit: a video known by its name only, without a movie hash (a file on a share, a link). Nor
+     * is it asked again in this process for one whose search by name and hash found nothing timed
+     * for it; the next play after the library matched the video does ask.
+     */
+    suspend fun autoPick(target: Target, languages: List<String>): AutoPick {
+        val byName = SubtitleDownloadRules.searchRequest(target.entry, target.fileName, languages, movieHash = null)
+        val identified = SubtitleDownloadRules.identifies(byName)
+        if (!identified && (!target.kind.isLocal || target.videoKey in unsureByName)) return AutoPick.Later
+        val hash = if (target.kind.isLocal) movieHash(target) else null
+        val request = byName.copy(movieHash = hash)
+        if (!SubtitleDownloadRules.canAutoPick(request)) return AutoPick.Later
+        val results = client.search(request)
+        val pick = withContext(Dispatchers.Default) { SubtitleDownloadRules.autoPick(request, results, languages) }
+        if (!identified && pick == AutoPick.Later) unsureByName += target.videoKey
+        return pick
+    }
+
     /** The names of the files downloaded for [videoKey] so far. */
     suspend fun downloadedNames(videoKey: String): List<String> = finder.downloaded(videoKey).map { it.name }
 
@@ -157,5 +179,8 @@ internal class SubtitleDownloads(
 
         /** In the video's download folder: its automatic download is settled. Hidden, so never loaded as a subtitle. */
         const val AUTO_MARKER = ".auto-download"
+
+        /** Videos searched by name and hash in this process without a result timed for them. */
+        val unsureByName: MutableSet<String> = ConcurrentHashMap.newKeySet()
     }
 }
