@@ -18,39 +18,47 @@ import java.util.concurrent.TimeUnit
 /**
  * What the Jellyfin, Emby and Plex sources share: the HTTP client, how this install introduces
  * itself to servers, and where sign-ins are stored. Everything is created on first use, off the
- * main thread (the install id is read from SharedPreferences); [graph]'s library only once a
+ * main thread (the install id is read from SharedPreferences); AppGraph's library only once a
  * sign-in is stored, never while AppGraph is still building it.
  */
-internal class MediaServerEnvironment(private val graph: AppGraph) {
+internal class MediaServerEnvironment(
+    baseHttp: () -> OkHttpClient,
+    readInstallId: () -> String,
+    /** Keeps a sign-in with a saved source (LibraryRepository.updateSourceAuth). */
+    private val saveAuth: suspend (sourceId: Long, token: String?, userId: String?, serverId: String?) -> Unit,
+    private val appVersion: String = BuildConfig.VERSION_NAME,
+) {
+    constructor(graph: AppGraph) : this(
+        baseHttp = { graph.http },
+        readInstallId = { installIdOf(graph.app) },
+        saveAuth = { sourceId, token, userId, serverId -> graph.library.updateSourceAuth(sourceId, token, userId, serverId) },
+    )
+
     /**
      * The app's client (user agent, secure DNS) without its disk cache: listings and tokens of a
      * personal server don't belong on disk. Big libraries get time to answer.
      */
     val http: OkHttpClient by lazy {
-        graph.http.newBuilder()
+        baseHttp().newBuilder()
             .cache(null)
             .readTimeout(READ_TIMEOUT_S, TimeUnit.SECONDS)
             .build()
     }
 
     /** One random id per install: servers keep one session per device and user, Plex ties PINs to it. */
-    private val installId: String by lazy {
-        val prefs = graph.app.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        prefs.getString(KEY_INSTALL_ID, null)?.takeIf { it.isNotBlank() }
-            ?: UUID.randomUUID().toString().also { prefs.edit().putString(KEY_INSTALL_ID, it).apply() }
-    }
+    private val installId: String by lazy(readInstallId)
 
     private val deviceName: String
         get() = Build.MODEL?.trim()?.takeIf { it.isNotEmpty() } ?: "Android"
 
     val jellyfinDevice: JellyfinDevice by lazy {
-        JellyfinDevice(device = deviceName, deviceId = installId, version = BuildConfig.VERSION_NAME)
+        JellyfinDevice(device = deviceName, deviceId = installId, version = appVersion)
     }
 
     val plexClient: PlexClientInfo by lazy {
         PlexClientInfo(
             clientIdentifier = installId,
-            version = BuildConfig.VERSION_NAME,
+            version = appVersion,
             device = deviceName,
             deviceName = deviceName,
             platformVersion = Build.VERSION.RELEASE,
@@ -65,13 +73,21 @@ internal class MediaServerEnvironment(private val graph: AppGraph) {
     suspend fun storeAuth(source: SourceEntity, token: String?, userId: String?, serverId: String?) {
         if (source.id == 0L) return
         if (source.token == token && source.userId == userId && source.serverId == serverId) return
-        graph.library.updateSourceAuth(source.id, token, userId, serverId)
+        saveAuth(source.id, token, userId, serverId)
     }
 
     private companion object {
         const val PREFS = "media_servers"
         const val KEY_INSTALL_ID = "install_id"
         const val READ_TIMEOUT_S = 60L
+
+        /** Synchronized: two environments asking at first launch must not each make an id. */
+        @Synchronized
+        fun installIdOf(context: Context): String {
+            val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            return prefs.getString(KEY_INSTALL_ID, null)?.takeIf { it.isNotBlank() }
+                ?: UUID.randomUUID().toString().also { prefs.edit().putString(KEY_INSTALL_ID, it).apply() }
+        }
     }
 }
 
@@ -79,11 +95,15 @@ internal class MediaServerEnvironment(private val graph: AppGraph) {
 internal object MediaServerLog {
     private const val TAG = "MediaServers"
 
+    /** Logs [error]'s message (scrubbed), never its stack trace's messages or the URLs in them. */
     fun warn(message: String, error: Throwable) {
-        val detail = ServerSecrets.redact(error.message).ifEmpty { error.javaClass.simpleName }
-        Log.w(TAG, "$message: $detail")
-        CrashReporter.log("$message: ${error.javaClass.simpleName}: $detail")
+        val detail = scrub(error.message).ifEmpty { error.javaClass.simpleName }
+        Log.w(TAG, "${scrub(message)}: $detail")
+        CrashReporter.log("${scrub(message)}: ${error.javaClass.simpleName}: $detail")
     }
+
+    /** [text] without access tokens: api_key=, ApiKey=, X-Plex-Token=, X-Emby-Token= values and Token="…". */
+    fun scrub(text: String?): String = ServerSecrets.redact(text)
 }
 
 /** Names as media servers give them, made fit for ScannedVideo folders and file names. */

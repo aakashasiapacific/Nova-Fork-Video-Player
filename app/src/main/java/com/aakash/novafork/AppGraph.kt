@@ -116,7 +116,11 @@ class AppGraph(val app: Application) {
         if (repository.isInitialized()) repository.value.markLaunch()
     }
 
-    val imageLoader: ImageLoader by lazy { Network.createImageLoader(app, http, smb) }
+    val imageLoader: ImageLoader by lazy {
+        // Posters and fanart on a WebDAV server need that source's login.
+        val imageHttp = http.newBuilder().addInterceptor(FileServerSources.imageAuth(this)).build()
+        Network.createImageLoader(app, imageHttp, smb)
+    }
 
     private companion object {
         const val TAG = "AppGraph"

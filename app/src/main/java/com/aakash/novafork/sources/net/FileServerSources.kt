@@ -59,6 +59,17 @@ internal object FileServerSources {
      * OkHttp client the image loader is built with (`http.newBuilder().addInterceptor(…)`).
      */
     fun imageAuth(graph: AppGraph): Interceptor = WebDavAuthInterceptor(graph.appScope) { graph.library.observeSources() }
+
+    /**
+     * The UPnP/DLNA media servers that answer on the local network within [timeoutMs], for an
+     * "Add DLNA server" picker: each entry's name is the server's, its path the address to save
+     * (NetworkSourceInput(type = UPNP, address = path)), its imageUrl the server's icon. Empty
+     * when none answers; throws an IOException when discovery can't run. Main-safe, cancellable.
+     */
+    suspend fun discoverUpnpServers(graph: AppGraph, timeoutMs: Long = UpnpBrowser.DISCOVERY_MS): List<RemoteEntry> {
+        val upnp = graph.browsers[SourceType.UPNP] as? UpnpBrowser ?: return emptyList()
+        return upnp.discoverUpnpServers(timeoutMs)
+    }
 }
 
 /**

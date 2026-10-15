@@ -8,10 +8,12 @@ import com.aakash.novafork.data.db.VideoEntity
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withTimeout
 import kotlin.math.abs
 
 /** One media server's playback API, as [MediaServerReporter] drives it. Failures throw. */
@@ -32,9 +34,11 @@ internal interface MediaServerPlayback {
  * video starts it, later ones become progress reports (at most one per [progressIntervalMs]), and
  * the session stops when the video finishes, another video starts, or no save came for
  * [idleStopMs] (the player was paused or closed) — then with the last position, so the server
- * resumes where the person stopped. A save at 0 with no session running is the person marking
- * the video unwatched (savePlayback writes lastPlayedAt; setWatched doesn't). One player plays
- * at a time, so one session is tracked across [servers].
+ * resumes where the person stopped. A finished video is reported once (stopped, then watched),
+ * however many saves the end credits bring. A save at 0 with no session running is the person
+ * marking the video watched or unwatched (savePlayback writes lastPlayedAt; setWatched doesn't),
+ * which leaves a running session alone. One player plays at a time, so one session is tracked
+ * across [servers]. Every request is given [callTimeoutMs].
  */
 internal class MediaServerReporter(
     private val servers: Map<SourceType, MediaServerPlayback>,
@@ -44,6 +48,7 @@ internal class MediaServerReporter(
     private val wallClock: () -> Long = { System.currentTimeMillis() },
     private val progressIntervalMs: Long = PROGRESS_INTERVAL_MS,
     private val idleStopMs: Long = IDLE_STOP_MS,
+    private val callTimeoutMs: Long = CALL_TIMEOUT_MS,
 ) : RemoteProgressReporter {
 
     private class Session(
@@ -64,6 +69,9 @@ internal class MediaServerReporter(
     /** The video playing now; read and written with [mutex] held. */
     private var current: Session? = null
 
+    /** The video whose playback last ran to its end, already reported; read and written with [mutex] held. */
+    private var finishedVideoId: Long? = null
+
     override suspend fun report(
         source: SourceEntity,
         video: VideoEntity,
@@ -76,29 +84,32 @@ internal class MediaServerReporter(
             val position = positionMs.coerceAtLeast(0L)
             val running = current
             val active = running?.takeIf { it.videoId == video.id && it.server === server }
-            // Another video playing means the previous one stopped.
-            if (running != null && active == null) closeCurrent()
             when {
-                finished -> {
-                    if (active != null || position > 0L) {
-                        active?.idleStop?.cancel()
-                        current = null
-                        // Watched matters more than the session: a failed stop doesn't keep it from the server.
-                        try {
-                            server.stop(source, video, position, durationMs)
-                        } catch (e: CancellationException) {
-                            throw e
-                        } catch (e: Exception) {
-                            MediaServerLog.warn("Couldn't tell the server playback stopped", e)
-                        }
-                    }
-                    server.setWatched(source, video, watched = true)
+                // Marked watched (setWatched: position 0, no session).
+                finished && active == null && position == 0L -> {
+                    call { server.setWatched(source, video, watched = true) }
                 }
+                finished -> {
+                    // The player keeps saving through the end credits: the server heard it once.
+                    if (active == null && finishedVideoId == video.id) return@withLock
+                    if (running != null && active == null) closeCurrent()
+                    active?.idleStop?.cancel()
+                    current = null
+                    finishedVideoId = video.id
+                    // Watched matters more than the session: a failed stop doesn't keep it from the server.
+                    quietly("Couldn't tell the server playback stopped") { server.stop(source, video, position, durationMs) }
+                    call { server.setWatched(source, video, watched = true) }
+                }
+                // Marked unwatched: savePlayback writes lastPlayedAt, setWatched doesn't.
                 active == null && position == 0L && !justPlayed(video) -> {
-                    if (!video.watched) server.setWatched(source, video, watched = false)
+                    if (finishedVideoId == video.id) finishedVideoId = null
+                    if (!video.watched) call { server.setWatched(source, video, watched = false) }
                 }
                 active == null -> {
-                    server.start(source, video, position, durationMs)
+                    // Another video playing means the previous one stopped.
+                    if (running != null) closeCurrent()
+                    if (finishedVideoId == video.id) finishedVideoId = null
+                    call { server.start(source, video, position, durationMs) }
                     val session = Session(video.id, server, source, video, position, durationMs, sentAt = clock())
                     current = session
                     scheduleStop(session)
@@ -108,12 +119,13 @@ internal class MediaServerReporter(
                     active.video = video
                     active.positionMs = position
                     active.durationMs = durationMs ?: active.durationMs
+                    scheduleStop(active)
                     val now = clock()
                     if (now - active.sentAt >= progressIntervalMs - INTERVAL_SLACK_MS) {
-                        server.progress(source, video, position, active.durationMs)
+                        // Counted as sent even when it fails: an unreachable server is asked again in 10 s, not at every save.
                         active.sentAt = now
+                        call { server.progress(source, video, position, active.durationMs) }
                     }
-                    scheduleStop(active)
                 }
             }
         }
@@ -142,12 +154,26 @@ internal class MediaServerReporter(
         val session = current ?: return
         current = null
         session.idleStop?.cancel()
-        try {
+        quietly("Couldn't tell the server playback stopped") {
             session.server.stop(session.source, session.video, session.positionMs, session.durationMs)
+        }
+    }
+
+    /** One request to a server, given at most [callTimeoutMs]; failures go to the caller (the library logs them). */
+    private suspend fun call(request: suspend () -> Unit) {
+        withTimeout(callTimeoutMs) { request() }
+    }
+
+    /** Like [call], but a failure is only logged: what comes after it must still happen. */
+    private suspend fun quietly(what: String, request: suspend () -> Unit) {
+        try {
+            call(request)
+        } catch (e: TimeoutCancellationException) {
+            MediaServerLog.warn(what, e)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            MediaServerLog.warn("Couldn't tell the server playback stopped", e)
+            MediaServerLog.warn(what, e)
         }
     }
 
@@ -162,5 +188,8 @@ internal class MediaServerReporter(
         private const val INTERVAL_SLACK_MS = 1_000L
 
         private const val JUST_PLAYED_MS = 15_000L
+
+        /** A server that takes longer than this to answer one report is given up on for that report. */
+        const val CALL_TIMEOUT_MS = 30_000L
     }
 }
