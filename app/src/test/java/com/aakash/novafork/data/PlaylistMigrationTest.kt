@@ -39,7 +39,8 @@ class PlaylistMigrationTest {
             assertEquals(MOVIE_ID, movie.id)
             assertEquals(60_000L, movie.positionMs)
             assertEquals("Movies", database.sourceDao().byId(SOURCE_ID)?.name)
-            assertEquals(2, database.openHelper.writableDatabase.version)
+            // Through every later migration too, up to the current schema.
+            assertEquals(3, database.openHelper.writableDatabase.version)
 
             val playlists = database.playlistDao()
             val playlistId = playlists.insert(PlaylistEntity(name = "Mix", createdAt = 1L, updatedAt = 1L))

@@ -451,7 +451,9 @@ object UiMappers {
                 listOf(host, location.share, location.path).filter { it.isNotEmpty() }.joinToString("/")
             }
             ?: source.location
-        SourceType.STREAM -> source.location
+        SourceType.STREAM, SourceType.FTP, SourceType.SFTP, SourceType.NFS, SourceType.UPNP, SourceType.WEBDAV,
+        SourceType.JELLYFIN, SourceType.EMBY, SourceType.PLEX,
+        -> source.location
     }
 
     /**

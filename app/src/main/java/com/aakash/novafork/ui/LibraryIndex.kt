@@ -316,7 +316,9 @@ internal fun mediaKindOf(video: VideoEntity, source: SourceEntity?): MediaKind =
 
 internal fun sourceLabel(source: SourceEntity): String = when (source.type) {
     SourceType.DEVICE -> "Device"
-    SourceType.FOLDER, SourceType.SMB -> source.name
+    SourceType.FOLDER, SourceType.SMB, SourceType.FTP, SourceType.SFTP, SourceType.NFS, SourceType.UPNP,
+    SourceType.WEBDAV, SourceType.JELLYFIN, SourceType.EMBY, SourceType.PLEX,
+    -> source.name
     SourceType.STREAM -> "Stream"
 }
 
@@ -439,6 +441,10 @@ internal fun relativeFolder(type: SourceType, smbRoot: String, folder: String): 
             }
         }
         SourceType.STREAM -> ""
+        // Their scanners give folders below the source's location already.
+        SourceType.FTP, SourceType.SFTP, SourceType.NFS, SourceType.UPNP, SourceType.WEBDAV, SourceType.JELLYFIN,
+        SourceType.EMBY, SourceType.PLEX,
+        -> clean
     }
 }
 

@@ -74,7 +74,7 @@ class AppGraph(val app: Application) {
 
     /** A source type without a scanner is saved but not scanned. */
     val scanners: Map<SourceType, SourceScanner> by lazy {
-        mapOf(
+        mapOf<SourceType, SourceScanner>(
             SourceType.DEVICE to DeviceScanner(app),
             SourceType.FOLDER to FolderScanner(app),
             SourceType.SMB to SmbScanner(smb),

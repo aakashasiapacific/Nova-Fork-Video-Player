@@ -80,8 +80,8 @@ data class ServerMetadata(
     val genres: List<String> = emptyList(),
     val runtimeMin: Int? = null,
     /**
-     * Ids in other databases by lower-case provider name ("tmdb" → "603", "imdb" → "tt0133093",
-     * "tvdb" → "…"). The "tmdb" one is stored as [com.aakash.novafork.data.db.MetadataEntity.tmdbId].
+     * Ids in other databases by provider name ("tmdb" → "603", "imdb" → "tt0133093", "tvdb" → "…";
+     * names compare ignoring case). The TMDB one is stored as [com.aakash.novafork.data.db.MetadataEntity.tmdbId].
      */
     val providerIds: Map<String, String> = emptyMap(),
 
@@ -106,7 +106,7 @@ data class ServerMetadata(
         fun key(sourceId: Long, metadata: ServerMetadata): String =
             KEY_PREFIX + sourceId + (if (metadata.type == ServerItemType.MOVIE) ":movie:" else ":tv:") + metadata.id
 
-        /** True for a key [key] made, i.e. metadata a media server supplied rather than TMDB. */
+        /** True for a key made by [ServerMetadata.key]: metadata a media server supplied, not TMDB. */
         fun isServerKey(key: String?): Boolean = key != null && key.startsWith(KEY_PREFIX)
     }
 }
@@ -191,15 +191,17 @@ interface NetworkBrowser {
  */
 interface PlaybackOptions {
     /**
-     * libVLC media options for playing [uri] (a [VideoEntity.uri] of [source]), e.g.
-     * ":ftp-user=…", ":ftp-pwd=…", ":sftp-user=…", ":http-user=…", ":http-pwd=…",
-     * ":http-user-agent=…". Empty for none. Called off the main thread.
+     * libVLC media options for playing [uri] (a [VideoEntity.uri] of [source]), as libVLC 3.7.2
+     * knows them: ":ftp-user=…", ":ftp-pwd=…", ":ftp-account=…", ":sftp-user=…", ":sftp-pwd=…",
+     * ":sftp-port=…", ":http-user-agent=…", ":http-referrer=…". Empty for none. Called off the
+     * main thread.
      */
     suspend fun mediaOptions(source: SourceEntity, uri: String): List<String>
 
     /**
-     * The URI libVLC opens for [uri]: by default [uri] itself. Media servers add what must not be
-     * stored with the video here (the access token, a playback session).
+     * The URI libVLC opens for [uri]: by default [uri] itself. What must not be stored with the
+     * video goes in here: a media server's access token or playback session, and a WebDAV login
+     * as the URI's user info (libVLC's http access has no user or password option).
      */
     suspend fun playUri(source: SourceEntity, uri: String): String = uri
 }
@@ -209,9 +211,11 @@ interface RemoteProgressReporter {
     /**
      * Called after the library saved playback progress for [video] (savePlayback, about every ten
      * seconds while playing) or the user marked it watched or unwatched (setWatched). [video] is the
-     * row as saved, so [VideoEntity.watched] holds the outcome; [finished] is true when this save
-     * finished the video or marked it watched. Reports for one video arrive in order and may be
-     * coalesced (only the latest of several pending ones is sent). Failures are logged and dropped.
+     * row as saved, so [VideoEntity.watched] holds the outcome; [positionMs] is where playback is
+     * (0 from setWatched), [durationMs] the video's length when known; [finished] is true when this
+     * save finished the video or marked it watched. Reports for one video arrive in order and may
+     * be coalesced (only the latest of several pending ones is sent). Runs on a background
+     * dispatcher; failures are logged and dropped.
      */
     suspend fun report(source: SourceEntity, video: VideoEntity, positionMs: Long, durationMs: Long?, finished: Boolean)
 

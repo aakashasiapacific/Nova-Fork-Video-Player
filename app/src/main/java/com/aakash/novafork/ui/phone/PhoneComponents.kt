@@ -125,6 +125,10 @@ internal fun SourceType.iconRes(): Int = when (this) {
     SourceType.FOLDER -> R.drawable.ic_folder
     SourceType.SMB -> R.drawable.ic_lan
     SourceType.STREAM -> R.drawable.ic_live_tv
+    SourceType.FTP, SourceType.SFTP, SourceType.NFS -> R.drawable.ic_dns
+    SourceType.WEBDAV -> R.drawable.ic_cloud
+    SourceType.UPNP -> R.drawable.ic_wifi
+    SourceType.JELLYFIN, SourceType.EMBY, SourceType.PLEX -> R.drawable.ic_video_library
 }
 
 // ---------------------------------------------------------------------------------------------

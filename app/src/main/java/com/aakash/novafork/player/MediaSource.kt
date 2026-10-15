@@ -5,6 +5,7 @@ import android.net.Uri
 import android.os.ParcelFileDescriptor
 import android.os.SystemClock
 import android.util.Log
+import com.aakash.novafork.NovaApp
 import com.aakash.novafork.data.HwDecoding
 import com.aakash.novafork.data.Settings
 import com.aakash.novafork.data.SmbCredentials
@@ -12,6 +13,7 @@ import java.io.FileNotFoundException
 import java.io.IOException
 import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
+import kotlinx.coroutines.CancellationException
 import org.videolan.libvlc.LibVLC
 import org.videolan.libvlc.Media
 
@@ -64,6 +66,7 @@ internal fun ParcelFileDescriptor?.closeQuietly() {
 }
 
 internal object MediaSource {
+    private const val TAG = "MediaSource"
     private const val NETWORK_CACHING_MS = 1500
 
     /** Videos (by URI) whose hardware decoding failed in this process; they play in software now. */
@@ -83,10 +86,13 @@ internal object MediaSource {
 
     /**
      * Builds the libVLC media for [uri] with the playback settings and [decoding] applied;
-     * [forRenderer] = it will play on a cast device. Blocking: a content provider may fetch the
-     * whole file before it hands out a descriptor, so call this off the main thread.
+     * [forRenderer] = it will play on a cast device. A network video of a source type with
+     * [com.aakash.novafork.data.PlaybackOptions] (FTP, SFTP, WebDAV, media servers) is opened at
+     * the URI and with the media options its source adds (login, token). Blocking: a content
+     * provider may fetch the whole file before it hands out a descriptor, so call this off the
+     * main thread.
      */
-    fun open(
+    suspend fun open(
         context: Context,
         libVLC: LibVLC,
         uri: String,
@@ -104,8 +110,12 @@ internal object MediaSource {
                 smbCredentials?.domain?.takeIf { it.isNotBlank() }?.let { addOption(":smb-domain=$it") }
                 addOption(":network-caching=$NETWORK_CACHING_MS")
             }
-            UriKind.NETWORK -> Media(libVLC, Uri.parse(uri)).apply {
-                addOption(":network-caching=$NETWORK_CACHING_MS")
+            UriKind.NETWORK -> {
+                val network = networkPlayback(context, uri)
+                Media(libVLC, Uri.parse(network.uri)).apply {
+                    addOption(":network-caching=$NETWORK_CACHING_MS")
+                    for (option in network.options) addOption(option)
+                }
             }
         }
         applySettings(media, settings, decoding, forRenderer)
@@ -153,4 +163,31 @@ internal object MediaSource {
 
     private fun localPath(uri: String): String =
         if (uri.startsWith("/")) uri else Uri.parse(uri).path ?: uri.removePrefix("file://")
+
+    /** What libVLC opens for a network video: the URI and the media options its source adds. */
+    private class NetworkPlayback(val uri: String, val options: List<String>)
+
+    /**
+     * Asks the [com.aakash.novafork.data.PlaybackOptions] of the source [uri] belongs to (looked
+     * up by the library) for the URI to open and the options to add. A video of no such source,
+     * or a failed lookup, plays [uri] as it is.
+     */
+    private suspend fun networkPlayback(context: Context, uri: String): NetworkPlayback {
+        val plain = NetworkPlayback(uri, emptyList())
+        return try {
+            val graph = (context.applicationContext as? NovaApp)?.graph ?: return plain
+            val source = graph.library.sourceForUri(uri) ?: return plain
+            val hook = graph.playbackOptions[source.type] ?: return plain
+            val options = hook.mediaOptions(source, uri)
+            val playUri = hook.playUri(source, uri)
+            PlayerDiagnostics.record("open: ${source.type.name} source adds ${options.size} option(s)")
+            NetworkPlayback(playUri, options)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.w(TAG, "No playback options for a network video", e)
+            PlayerDiagnostics.record("open: the source's playback options failed: ${e.javaClass.simpleName}")
+            plain
+        }
+    }
 }

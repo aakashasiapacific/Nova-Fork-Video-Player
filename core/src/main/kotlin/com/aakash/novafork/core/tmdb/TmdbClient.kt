@@ -350,9 +350,15 @@ class TmdbClient(
             isLenient = true
         }
 
-        /** Full image URL or null. Sizes: posters w185/w342/w500/w780, backdrops w780/w1280/original, stills w300/w780. */
-        fun imageUrl(path: String?, size: String): String? =
-            if (path.isNullOrBlank()) null else IMAGE_BASE_URL + size + (if (path.startsWith("/")) path else "/$path")
+        /**
+         * Full image URL or null. Sizes: posters w185/w342/w500/w780, backdrops w780/w1280/original, stills w300/w780.
+         * A full http(s) URL (artwork a media server supplied) is returned as it is.
+         */
+        fun imageUrl(path: String?, size: String): String? = when {
+            path.isNullOrBlank() -> null
+            path.startsWith("http://", ignoreCase = true) || path.startsWith("https://", ignoreCase = true) -> path
+            else -> IMAGE_BASE_URL + size + (if (path.startsWith("/")) path else "/$path")
+        }
 
         fun posterUrl(path: String?, size: String = "w500"): String? = imageUrl(path, size)
         fun backdropUrl(path: String?, size: String = "w1280"): String? = imageUrl(path, size)
