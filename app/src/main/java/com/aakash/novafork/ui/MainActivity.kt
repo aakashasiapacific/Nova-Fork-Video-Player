@@ -67,6 +67,14 @@ class MainActivity : ComponentActivity() {
                 startActivity(PlayerIntents.forUri(this@MainActivity, link))
             }
 
+            override fun playRemote(uri: String, title: String) {
+                startActivity(PlayerIntents.forUri(this@MainActivity, uri, title.ifBlank { null }))
+            }
+
+            override fun openWebPage(url: String) {
+                if (!tryStart(Intent(Intent.ACTION_VIEW, Uri.parse(url)))) viewModel.showMessage("No browser to open $url")
+            }
+
             override fun requestPermission() = requestStoragePermission()
 
             override fun requestAllFilesAccess() = openAllFilesAccess()

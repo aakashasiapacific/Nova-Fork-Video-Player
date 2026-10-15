@@ -24,6 +24,7 @@ import com.aakash.novafork.FakeLibrary.SHOGUN_KEY
 import com.aakash.novafork.FakeLibrary.SHOGUN_S1E1
 import com.aakash.novafork.FakeLibrary.SPIRITED_AWAY
 import com.aakash.novafork.FakeLibrary.TEARS
+import com.aakash.novafork.data.RemoteEntry
 import com.aakash.novafork.data.ScanState
 import com.aakash.novafork.data.db.MetadataEntity
 import com.aakash.novafork.data.db.SourceEntity
@@ -32,10 +33,13 @@ import com.aakash.novafork.data.db.VideoEntity
 import com.aakash.novafork.data.db.VideoKind
 import com.aakash.novafork.data.db.VideoWithMeta
 import com.aakash.novafork.ui.LibraryIndex
+import com.aakash.novafork.ui.ListingKey
 import com.aakash.novafork.ui.NaturalOrder
+import com.aakash.novafork.ui.RemoteListing
 import com.aakash.novafork.ui.UiMappers
 import com.aakash.novafork.ui.frameSourceOf
 import com.aakash.novafork.ui.model.Crumb
+import com.aakash.novafork.ui.model.FolderUi
 import com.aakash.novafork.ui.model.HeroTarget
 import com.aakash.novafork.ui.model.LibraryFilter
 import com.aakash.novafork.ui.model.LibraryItemUi
@@ -372,18 +376,109 @@ class UiMappersTest {
     // Browse
 
     @Test
-    fun sourcesAreDeviceThenFoldersThenSharesWithoutStreams() {
+    fun sourcesAreDeviceThenFoldersThenNetworkSourcesWithoutStreams() {
         val browse = UiMappers.browse(index, idle)
-        assertEquals(listOf(SourceType.DEVICE, SourceType.FOLDER, SourceType.SMB), browse.sources.map { it.type })
         assertEquals(
-            listOf("Internal storage and SD cards", "Movies", "nas.local/Media"),
+            listOf(SourceType.DEVICE, SourceType.FOLDER, SourceType.SMB, SourceType.SFTP, SourceType.JELLYFIN),
+            browse.sources.map { it.type },
+        )
+        assertEquals(
+            listOf(
+                "Internal storage and SD cards",
+                "Movies",
+                "nas.local/Media",
+                "SFTP · seedbox.example.net/downloads",
+                "Jellyfin · 192.168.1.5:8096",
+            ),
             browse.sources.map { it.detail },
         )
-        assertEquals(listOf(7, 7, 16), browse.sources.map { it.videoCount })
+        assertEquals(listOf(7, 7, 16, 0, 0), browse.sources.map { it.videoCount })
         assertEquals(listOf(TEARS, BUNNY), browse.streams.map { it.id })
 
         val scanning = UiMappers.browse(index, ScanState(running = true, sourceName = "NAS · Media"))
-        assertEquals(listOf(false, false, true), scanning.sources.map { it.isScanning })
+        assertEquals(listOf(false, false, true, false, false), scanning.sources.map { it.isScanning })
+    }
+
+    @Test
+    fun networkSourceDetailsNameTheTypeAndWhere() {
+        fun detail(type: SourceType, location: String) =
+            UiMappers.sourceDetail(SourceEntity(type = type, name = "x", location = location))
+        assertEquals("FTPS · nas.local:2121/My Movies", detail(SourceType.FTP, "ftps://nas.local:2121/My%20Movies"))
+        assertEquals("NFS · nas/export/video", detail(SourceType.NFS, "nfs://nas/export/video"))
+        assertEquals("WebDAV · dav.example.com/remote.php/dav", detail(SourceType.WEBDAV, "https://dav.example.com/remote.php/dav"))
+        assertEquals("DLNA · 192.168.1.9", detail(SourceType.UPNP, "http://192.168.1.9:8200/rootDesc.xml"))
+        assertEquals("DLNA server", detail(SourceType.UPNP, "uuid:4d696e69-444c-164e-9d41-b827eb54e939"))
+        assertEquals("Plex · [fd00::5]:32400", detail(SourceType.PLEX, "http://[fd00::5]:32400"))
+    }
+
+    // Live listings of network sources
+
+    @Test
+    fun remoteDirListsFoldersThenFilesMatchingLibraryVideosByUri() {
+        val source = SourceEntity(id = 40, type = SourceType.FTP, name = "Basement", location = "ftp://nas/Videos")
+        val dune = requireNotNull(index.videosById[DUNE])
+        val listings = mapOf(
+            ListingKey(40, "Films") to RemoteListing(
+                entries = listOf(
+                    RemoteEntry(name = "Sci-Fi", path = "Films/Sci-Fi", isDirectory = true),
+                    RemoteEntry(name = "Sci-Fi", path = "Films/Sci-Fi", isDirectory = true),
+                    RemoteEntry(name = "dune.mkv", path = "Films/dune.mkv", isDirectory = false, playUri = dune.video.uri),
+                    RemoteEntry(name = "cover.jpg", path = "Films/cover.jpg", isDirectory = false),
+                    RemoteEntry(
+                        name = "Heat (1995).mkv",
+                        path = "Films/Heat (1995).mkv",
+                        isDirectory = false,
+                        sizeBytes = 3L shl 30,
+                        playUri = "ftp://nas/Videos/Films/Heat%20%281995%29.mkv",
+                    ),
+                ),
+            ),
+        )
+        val dir = UiMappers.remoteDir(index, source, "Films", listings)
+        assertEquals("Films", dir.title)
+        assertEquals(SourceType.FTP, dir.sourceType)
+        assertEquals(listOf(Crumb("Basement", ""), Crumb("Films", "Films")), dir.crumbs)
+        // Listed twice, shown once; nothing scanned below it yet.
+        assertEquals(listOf(FolderUi(40, "Films/Sci-Fi", "Sci-Fi", note = "Folder")), dir.folders)
+        assertEquals(listOf(dune.card), dir.videos)
+        assertEquals(listOf("Heat (1995).mkv"), dir.files.map { it.name })
+        assertEquals("ftp://nas/Videos/Films/Heat%20%281995%29.mkv", dir.files.single().uri)
+        assertEquals("3.0 GB", dir.files.single().subtitle)
+        assertFalse(dir.isLoading)
+        assertFalse(dir.isEmpty)
+
+        val notListedYet = UiMappers.remoteDir(index, source, "Films/Sci-Fi", listings)
+        assertTrue(notListedYet.isLoading)
+        assertTrue(notListedYet.isEmpty)
+        assertEquals(listOf("Basement", "Films", "Sci-Fi"), notListedYet.crumbs.map { it.label })
+    }
+
+    @Test
+    fun remoteDirOfAMediaServerFollowsItsListingsForTheTrail() {
+        val source = requireNotNull(index.sourcesById[FakeLibrary.DEN_JELLYFIN])
+        val listings = FakeLibrary.jellyfinListings + mapOf(
+            ListingKey(source.id, "col-1") to RemoteListing(loading = true),
+            ListingKey(source.id, "lost") to RemoteListing(error = "The server didn't answer"),
+        )
+        val root = UiMappers.remoteDir(index, source, "", listings)
+        assertEquals("Den Jellyfin", root.title)
+        assertEquals(listOf("Library", "Library"), root.folders.map { it.note })
+
+        val movies = UiMappers.remoteDir(index, source, "lib-movies", listings)
+        assertEquals(listOf(Crumb("Den Jellyfin", ""), Crumb("Movies", "lib-movies")), movies.crumbs)
+        assertEquals(listOf("Collections"), movies.folders.map { it.name })
+        assertEquals(5, movies.files.size)
+        assertEquals("http://192.168.1.5:8096/Items/a1/Images/Primary?maxWidth=342&tag=poster", movies.files.first().artwork.posterUrl)
+        assertTrue(movies.videos.isEmpty())
+
+        val collections = UiMappers.remoteDir(index, source, "col-1", listings)
+        assertEquals(listOf("Den Jellyfin", "Movies", "Collections"), collections.crumbs.map { it.label })
+        assertTrue(collections.isLoading)
+
+        val lost = UiMappers.remoteDir(index, source, "lost", listings)
+        assertEquals(listOf(Crumb("Den Jellyfin", ""), Crumb("Folder", "lost")), lost.crumbs)
+        assertEquals("The server didn't answer", lost.error)
+        assertFalse(lost.isLoading)
     }
 
     // Playlists

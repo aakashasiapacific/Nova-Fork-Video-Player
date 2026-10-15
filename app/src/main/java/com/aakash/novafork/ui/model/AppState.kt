@@ -2,6 +2,7 @@ package com.aakash.novafork.ui.model
 
 import androidx.compose.runtime.Immutable
 import com.aakash.novafork.data.Settings
+import com.aakash.novafork.data.db.SourceType
 
 /** Top-level tabs. Phone shows them in a bottom NavigationBar, tablet in a NavigationRail. */
 enum class TopDestination(val label: String) { HOME("Home"), LIBRARY("Library"), BROWSE("Browse"), SETTINGS("Settings") }
@@ -41,6 +42,69 @@ data class SmbForm(
     val domain: String = "",
 )
 
+/**
+ * What the add/edit dialog of an FTP, SFTP, NFS, WebDAV, DLNA/UPnP, Jellyfin, Emby or Plex source
+ * holds, as typed (ui NetworkForms turns it into a data NetworkSourceInput).
+ */
+@Immutable
+data class NetworkSourceForm(
+    /** The source being edited; null adds a new one. */
+    val id: Long? = null,
+    val type: SourceType,
+    val name: String = "",
+    /**
+     * Server name, address or URL: "nas.local", "ftps://nas.local", "https://dav.example.com/remote.php/dav",
+     * "http://192.168.1.5:8096"; for DLNA/UPnP the device's description URL or UDN.
+     */
+    val address: String = "",
+    val port: String = "",
+    /** Folder on the server (FTP, SFTP, NFS, WebDAV); "" = its root. */
+    val path: String = "",
+    val username: String = "",
+    val password: String = "",
+    /** Plex: a pasted X-Plex-Token. */
+    val token: String = "",
+    /** Jellyfin/Emby: ids of the libraries to scan; empty = all of them. */
+    val libraryIds: List<String> = emptyList(),
+)
+
+/** A Jellyfin or Emby library, offered in the server dialog once a connection test listed them. */
+@Immutable
+data class ServerLibraryUi(val id: String, val name: String)
+
+/** A Plex server the signed-in account can open. */
+@Immutable
+data class PlexServerUi(
+    /** Its machine identifier ([AppActions.pickPlexServer] takes it). */
+    val id: String,
+    val name: String,
+    /** "Your server · 192.168.1.5", "Shared with you · …". */
+    val detail: String,
+    /** False when plex.tv lists no address to reach it at. */
+    val reachable: Boolean = true,
+)
+
+/** Signing in to Plex with a code, inside [DialogUi.NetworkServer]. */
+@Immutable
+data class PlexSignInUi(
+    /** The code to enter at [linkUrl]; null while plex.tv is asked for one. */
+    val code: String? = null,
+    val linkUrl: String = "https://plex.tv/link",
+    /** The account's servers once the code was entered (null = still waiting). */
+    val servers: List<PlexServerUi>? = null,
+    /** Signing in failed (or the code expired); [AppActions.startPlexSignIn] tries again. */
+    val error: String? = null,
+)
+
+/** A DLNA/UPnP media server that answered on the local network. */
+@Immutable
+data class UpnpServerUi(
+    val name: String,
+    /** Its description URL or UDN: what the source is saved with. */
+    val address: String,
+    val iconUrl: String? = null,
+)
+
 @Immutable
 sealed interface DialogUi {
     /** Save a stream URL to the library. */
@@ -66,6 +130,29 @@ sealed interface DialogUi {
     ) : DialogUi
 
     data class ConfirmRemoveSource(val source: SourceUi) : DialogUi
+
+    /** "Add network source": picks the kind of server (SMB, FTP, SFTP, NFS, WebDAV, DLNA/UPnP, Jellyfin, Emby, Plex). */
+    data object AddSource : DialogUi
+
+    /** Add or edit an FTP, SFTP, NFS, WebDAV, DLNA/UPnP (by address), Jellyfin, Emby or Plex source. */
+    data class NetworkServer(
+        val form: NetworkSourceForm,
+        val testing: Boolean = false,
+        /** null = not tested, "" = OK, else the error (also a failed save). */
+        val testResult: String? = null,
+        /** Jellyfin/Emby: the server's libraries, listed by the last successful test; null = not listed yet. */
+        val libraries: List<ServerLibraryUi>? = null,
+        /** Plex: the sign-in with a code, once started; null = not started (or cancelled). */
+        val plexSignIn: PlexSignInUi? = null,
+    ) : DialogUi
+
+    /** DLNA/UPnP servers found on the local network; picking one adds it. */
+    data class UpnpServers(
+        val searching: Boolean = false,
+        val servers: List<UpnpServerUi> = emptyList(),
+        /** The search couldn't run. */
+        val error: String? = null,
+    ) : DialogUi
 
     /**
      * Picks the playlist [videoIds] go into, or starts a new one. [label] names what is added
@@ -201,6 +288,44 @@ interface AppActions {
 
     /** Moves the playlist's video at index [from] to index [to] (indices of [PlaylistDetailsUi.videos]). */
     fun movePlaylistItem(playlistId: Long, from: Int, to: Int) {}
+
+    // Network sources: FTP, SFTP, NFS, WebDAV, DLNA/UPnP, Jellyfin, Emby and Plex (SMB keeps saveSmb/testSmb).
+
+    /** Opens the "Add network source" type picker ([DialogUi.AddSource]). */
+    fun addNetworkSource() = showDialog(DialogUi.AddSource)
+
+    /**
+     * Goes on from the type picker: SMB opens [DialogUi.SmbServer], DLNA/UPnP searches the network
+     * ([discoverUpnpServers]), the other network types open [DialogUi.NetworkServer].
+     */
+    fun chooseSourceType(type: SourceType) {}
+
+    /** Connects with what [form] holds (Jellyfin and Emby also list their libraries); reported in [DialogUi.NetworkServer]. */
+    fun testNetworkSource(form: NetworkSourceForm) {}
+
+    /** Adds ([NetworkSourceForm.id] null) or updates the source [form] describes, then scans it. */
+    fun saveNetworkSource(form: NetworkSourceForm) {}
+
+    /** Searches the local network for DLNA/UPnP servers ([DialogUi.UpnpServers]). */
+    fun discoverUpnpServers() {}
+
+    /** Adds a DLNA/UPnP server [discoverUpnpServers] found, then scans it. */
+    fun addUpnpServer(server: UpnpServerUi) {}
+
+    /** Plex: asks plex.tv for a code to enter at plex.tv/link and waits until it is ([DialogUi.NetworkServer.plexSignIn]). */
+    fun startPlexSignIn() {}
+
+    /** Plex: stops waiting for the code and forgets the sign-in. */
+    fun cancelPlexSignIn() {}
+
+    /** Plex: adds (or, editing [form], updates) the signed-in account's server [serverId] ([PlexServerUi.id]). */
+    fun pickPlexServer(serverId: String, form: NetworkSourceForm) {}
+
+    /** Plays a video of a live folder listing that the library doesn't hold (yet): [uri] as the library would store it. */
+    fun playRemote(uri: String, title: String) {}
+
+    /** Opens [url] in the browser (plex.tv/link). */
+    fun openWebPage(url: String) {}
 }
 
 /** No-op actions for previews and screenshot tests. */

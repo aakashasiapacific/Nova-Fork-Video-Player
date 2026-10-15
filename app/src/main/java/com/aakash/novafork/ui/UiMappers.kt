@@ -7,6 +7,7 @@ import com.aakash.novafork.data.PlaylistWithCount
 import com.aakash.novafork.data.ScanState
 import com.aakash.novafork.data.db.SourceEntity
 import com.aakash.novafork.data.db.SourceType
+import com.aakash.novafork.ui.model.Artwork
 import com.aakash.novafork.ui.model.BrowseDirUi
 import com.aakash.novafork.ui.model.BrowseUi
 import com.aakash.novafork.ui.model.Crumb
@@ -22,6 +23,7 @@ import com.aakash.novafork.ui.model.LibraryUi
 import com.aakash.novafork.ui.model.MediaKind
 import com.aakash.novafork.ui.model.PlaylistDetailsUi
 import com.aakash.novafork.ui.model.PlaylistUi
+import com.aakash.novafork.ui.model.RemoteFileUi
 import com.aakash.novafork.ui.model.ScanUi
 import com.aakash.novafork.ui.model.SearchUi
 import com.aakash.novafork.ui.model.SeasonUi
@@ -41,6 +43,8 @@ object UiMappers {
     /** Newest movies and shows considered for the hero before the backdrop preference is applied. */
     private const val HERO_RECENT_CANDIDATES = 12
     private const val SEARCH_LIMIT = 60
+    /** Folders deep a media server's breadcrumb trail goes. */
+    private const val MAX_REMOTE_TRAIL = 12
 
     // Home
 
@@ -422,7 +426,7 @@ object UiMappers {
             videos = videoIds.distinct().mapNotNull { index.videosById[it]?.card },
         )
 
-    /** Device, then picked folders, then network shares; streams are listed as videos instead. */
+    /** Device, then picked folders, then network sources by type; streams are listed as videos instead. */
     fun sources(index: LibraryIndex, scan: ScanState): List<SourceUi> =
         index.sources
             .filter { it.type != SourceType.STREAM }
@@ -451,9 +455,10 @@ object UiMappers {
                 listOf(host, location.share, location.path).filter { it.isNotEmpty() }.joinToString("/")
             }
             ?: source.location
-        SourceType.STREAM, SourceType.FTP, SourceType.SFTP, SourceType.NFS, SourceType.UPNP, SourceType.WEBDAV,
-        SourceType.JELLYFIN, SourceType.EMBY, SourceType.PLEX,
-        -> source.location
+        SourceType.STREAM -> source.location
+        SourceType.FTP, SourceType.SFTP, SourceType.NFS, SourceType.UPNP, SourceType.WEBDAV, SourceType.JELLYFIN,
+        SourceType.EMBY, SourceType.PLEX,
+        -> NetworkForms.sourceDetail(source)
     }
 
     /**
@@ -496,6 +501,127 @@ object UiMappers {
             isLoading = isScanning(source, scan),
             error = source.lastError.nonBlank(),
         )
+    }
+
+    /**
+     * One folder of a network source as its NetworkBrowser listed it ([listings] by source and
+     * path): the folders, then the playable files, in the browser's order. A file the library
+     * holds (same URI) shows as its library card, one it doesn't (yet) as a [RemoteFileUi].
+     * File servers' folders are paths below the source's location; media servers and DLNA name
+     * theirs by id, so their trail is pieced together from the listings that showed each folder.
+     */
+    internal fun remoteDir(
+        index: LibraryIndex,
+        source: SourceEntity,
+        path: String,
+        listings: Map<ListingKey, RemoteListing>,
+    ): BrowseDirUi {
+        val listing = listings[ListingKey(source.id, path)]
+        val pathFolders = NetworkForms.takesPath(source.type)
+        val counts = if (pathFolders) remoteFolderCounts(index, source.id, path) else emptyMap()
+        val folders = ArrayList<FolderUi>()
+        val videos = ArrayList<VideoCardUi>()
+        val files = ArrayList<RemoteFileUi>()
+        // Lists key their rows by path, id and URI: a server listing something twice must not repeat a key.
+        val seenFolders = HashSet<String>()
+        val seenFiles = HashSet<String>()
+        val seenVideos = HashSet<Long>()
+        for (entry in listing?.entries.orEmpty()) {
+            if (entry.isDirectory) {
+                if (!seenFolders.add(entry.path)) continue
+                val count = if (pathFolders) counts[entry.path.trim('/').substringAfterLast('/')] ?: 0 else 0
+                folders += FolderUi(
+                    sourceId = source.id,
+                    path = entry.path,
+                    name = entry.name.ifBlank { entry.path },
+                    videoCount = count,
+                    note = when {
+                        count > 0 -> null
+                        path.isEmpty() && source.type.isMediaServer -> "Library"
+                        else -> "Folder"
+                    },
+                )
+                continue
+            }
+            val uri = entry.playUri ?: continue
+            if (!seenFiles.add(uri)) continue
+            val known = index.videosByUri[uri]
+            if (known != null) {
+                if (seenVideos.add(known.id)) videos += known.card
+                continue
+            }
+            val name = entry.name.ifBlank { uri.substringAfterLast('/') }
+            files += RemoteFileUi(
+                name = name,
+                uri = uri,
+                subtitle = entry.sizeBytes?.takeIf { it > 0 }?.let(Formats::size),
+                artwork = Artwork(posterUrl = entry.imageUrl, stillUrl = entry.imageUrl, seed = name),
+            )
+        }
+        val crumbs = remoteCrumbs(source, path, listings)
+        return BrowseDirUi(
+            sourceId = source.id,
+            sourceType = source.type,
+            path = path,
+            title = crumbs.last().label,
+            crumbs = crumbs,
+            folders = folders,
+            videos = videos,
+            isLoading = listing == null || listing.loading,
+            error = listing?.error,
+            files = files,
+        )
+    }
+
+    /** Library videos of the source below each subfolder of [path] (file servers), by subfolder name. */
+    private fun remoteFolderCounts(index: LibraryIndex, sourceId: Long, path: String): Map<String, Int> {
+        val dir = path.trim('/')
+        val prefix = if (dir.isEmpty()) "" else "$dir/"
+        val counts = HashMap<String, Int>()
+        for (video in index.videos) {
+            if (video.video.sourceId != sourceId) continue
+            val folder = video.relativeFolder
+            if (folder == dir || !folder.startsWith(prefix)) continue
+            val next = folder.substring(prefix.length).substringBefore('/')
+            if (next.isNotEmpty()) counts[next] = (counts[next] ?: 0) + 1
+        }
+        return counts
+    }
+
+    private fun remoteCrumbs(source: SourceEntity, path: String, listings: Map<ListingKey, RemoteListing>): List<Crumb> {
+        val root = Crumb(label = source.name, path = "")
+        if (path.isEmpty()) return listOf(root)
+        if (NetworkForms.takesPath(source.type)) {
+            val segments = path.split('/').filter { it.isNotEmpty() }
+            if (segments.isEmpty()) return listOf(root)
+            return listOf(root) + segments.mapIndexed { i, segment ->
+                Crumb(label = segment, path = segments.subList(0, i + 1).joinToString("/"))
+            }
+        }
+        val trail = ArrayList<Crumb>()
+        val seen = HashSet<String>()
+        var current = path
+        while (current.isNotEmpty() && seen.add(current) && trail.size < MAX_REMOTE_TRAIL) {
+            val parent = listedParent(source.id, current, listings)
+            if (parent == null) {
+                // Its parent's listing is gone (or never was): the trail starts here.
+                trail += Crumb(label = "Folder", path = current)
+                break
+            }
+            trail += Crumb(label = parent.second, path = current)
+            current = parent.first
+        }
+        return listOf(root) + trail.asReversed()
+    }
+
+    /** The path of the listing that showed folder [path], and the name it gave it. */
+    private fun listedParent(sourceId: Long, path: String, listings: Map<ListingKey, RemoteListing>): Pair<String, String>? {
+        for ((key, listing) in listings) {
+            if (key.sourceId != sourceId) continue
+            val entry = listing.entries?.firstOrNull { it.isDirectory && it.path == path } ?: continue
+            return key.path to entry.name.ifBlank { path }
+        }
+        return null
     }
 
     // Search

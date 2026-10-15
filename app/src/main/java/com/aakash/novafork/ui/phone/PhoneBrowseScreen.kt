@@ -61,7 +61,7 @@ fun PhoneBrowseScreen(
     val sources = browse.sources
     val device = remember(sources) { sources.filter { it.type == SourceType.DEVICE } }
     val folders = remember(sources) { sources.filter { it.type == SourceType.FOLDER } }
-    val shares = remember(sources) { sources.filter { it.type == SourceType.SMB } }
+    val network = remember(sources) { sources.filter { it.type.isNetworkShare || it.type.isMediaServer } }
 
     Column(modifier.fillMaxSize()) {
         PhoneTopBar(
@@ -93,10 +93,10 @@ fun PhoneBrowseScreen(
                 ActionRow(R.drawable.ic_create_new_folder, "Add folder", actions::addFolder)
             }
 
-            sectionHeader("shares", "Network shares")
-            items(shares, key = { "src:${it.id}" }) { source -> SourceRow(source, actions) }
-            item(key = "addShare") {
-                ActionRow(R.drawable.ic_add, "Add network share") { actions.showDialog(DialogUi.SmbServer()) }
+            sectionHeader("network", "Network")
+            items(network, key = { "src:${it.id}" }) { source -> SourceRow(source, actions) }
+            item(key = "addNetwork") {
+                ActionRow(R.drawable.ic_add, "Add network source", actions::addNetworkSource)
             }
 
             sectionHeader("streams", "Streams")
@@ -192,7 +192,7 @@ private fun SourceRow(source: SourceUi, actions: AppActions) {
                                 actions.rescanSource(source.id)
                             },
                         )
-                        if (source.type == SourceType.SMB) {
+                        if (source.type.isNetworkShare || source.type.isMediaServer) {
                             DropdownMenuItem(
                                 text = { Text("Edit") },
                                 leadingIcon = { NovaIcon(R.drawable.ic_edit, contentDescription = null) },

@@ -74,6 +74,9 @@ class PhoneScreensTest {
 
     @Test fun browseDir() = capture("browse_dir", FakeScreens.browseDir(MOVIES_FOLDER))
 
+    /** A Jellyfin library listed live by its NetworkBrowser, nothing scanned yet. */
+    @Test fun browseRemote() = capture("browse_remote", FakeScreens.remoteDir())
+
     @Test fun search() = capture("search", FakeScreens.search("pa"))
 
     @Test fun playlist() = capture("playlist", FakeScreens.playlist(SEVERANCE_REWATCH))
@@ -83,4 +86,8 @@ class PhoneScreensTest {
     @Test fun smbDialog() = capture("dialog_smb", FakeScreens.smbDialog(), wholeScreen = true)
 
     @Test fun identifyDialog() = capture("dialog_identify", FakeScreens.identifyDialog(), wholeScreen = true)
+
+    @Test fun addSourceDialog() = capture("dialog_add_source", FakeScreens.addSourceDialog(), wholeScreen = true)
+
+    @Test fun jellyfinDialog() = capture("dialog_jellyfin", FakeScreens.jellyfinDialog(), wholeScreen = true)
 }

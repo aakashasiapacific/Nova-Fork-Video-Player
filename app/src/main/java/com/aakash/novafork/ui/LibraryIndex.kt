@@ -75,6 +75,9 @@ class LibraryIndex(
     val sourcesById: Map<Long, SourceEntity> = sources.associateBy { it.id }
     val videoCountBySource: Map<Long, Int> = videos.groupingBy { it.video.sourceId }.eachCount()
 
+    /** By [com.aakash.novafork.data.db.VideoEntity.uri], for matching live network listings to the library. */
+    val videosByUri: Map<String, IndexedVideo> by lazy { videos.associateBy { it.video.uri } }
+
     /** Movies from device, folders and shares (matched movie streams stay with the streams). Newest first. */
     val movies: List<IndexedVideo> = videos.filter { it.kind == MediaKind.MOVIE }
 

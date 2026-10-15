@@ -45,6 +45,7 @@ import com.aakash.novafork.data.ThemeMode
 import com.aakash.novafork.data.TmdbHost
 import com.aakash.novafork.data.db.SourceType
 import com.aakash.novafork.ui.common.NovaIcon
+import com.aakash.novafork.ui.common.sourceTypeIcon
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.DialogUi
 import com.aakash.novafork.ui.model.KeyStatus
@@ -75,7 +76,7 @@ internal fun settingsGroups(section: SettingsSection, state: SettingsUi, actions
 private fun libraryGroups(state: SettingsUi, actions: AppActions): List<SettingsGroup> {
     val settings = state.settings
     val folders = state.sources.filter { it.type == SourceType.FOLDER }
-    val shares = state.sources.filter { it.type == SourceType.SMB }
+    val network = state.sources.filter { it.type.isNetworkShare || it.type.isMediaServer }
     return listOf(
         SettingsGroup(
             key = "library",
@@ -125,8 +126,8 @@ private fun libraryGroups(state: SettingsUi, actions: AppActions): List<Settings
         ),
         SettingsGroup(
             key = "shares",
-            title = "Network shares",
-            rows = shares.map { share ->
+            title = "Network",
+            rows = network.map { share ->
                 SettingsRow("share-${share.id}") { shape ->
                     SourceRow(
                         shape = shape,
@@ -139,9 +140,9 @@ private fun libraryGroups(state: SettingsUi, actions: AppActions): List<Settings
                 ActionRow(
                     shape = shape,
                     icon = R.drawable.ic_lan,
-                    title = "Add network share",
-                    summary = "SMB / Windows share on a NAS or a computer",
-                    onClick = { actions.showDialog(DialogUi.SmbServer()) },
+                    title = "Add network source",
+                    summary = "SMB, FTP, SFTP, NFS, WebDAV, DLNA, Jellyfin, Emby or Plex",
+                    onClick = actions::addNetworkSource,
                 )
             },
         ),
@@ -197,7 +198,7 @@ private fun AllFilesAccessRow(shape: Shape, granted: Boolean, canRequest: Boolea
 @Composable
 private fun SourceRow(shape: Shape, source: SourceUi, onEdit: (() -> Unit)?, onRemove: () -> Unit) {
     RowSurface(shape = shape, onClick = onEdit) {
-        RowIcon(if (source.type == SourceType.SMB) R.drawable.ic_dns else R.drawable.ic_folder)
+        RowIcon(sourceTypeIcon(source.type))
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(source.name, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
             // A folder picked at the top of a volume is usually named like its path.

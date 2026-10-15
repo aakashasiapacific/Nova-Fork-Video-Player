@@ -70,6 +70,7 @@ import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.ScanBanner
 import com.aakash.novafork.ui.common.VideoMenuBox
 import com.aakash.novafork.ui.common.metaLine
+import com.aakash.novafork.ui.common.sourceTypeIcon
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.AppUiState
 import com.aakash.novafork.ui.model.BrowseDirUi
@@ -79,6 +80,7 @@ import com.aakash.novafork.ui.model.FolderUi
 import com.aakash.novafork.ui.model.PermissionUi
 import com.aakash.novafork.ui.model.PlaylistDetailsUi
 import com.aakash.novafork.ui.model.PlaylistUi
+import com.aakash.novafork.ui.model.RemoteFileUi
 import com.aakash.novafork.ui.model.Route
 import com.aakash.novafork.ui.model.ScanUi
 import com.aakash.novafork.ui.model.SourceUi
@@ -171,7 +173,7 @@ private fun SourcesPane(
     val sources = browse.sources
     val device = remember(sources) { sources.filter { it.type == SourceType.DEVICE } }
     val folders = remember(sources) { sources.filter { it.type == SourceType.FOLDER } }
-    val shares = remember(sources) { sources.filter { it.type == SourceType.SMB } }
+    val network = remember(sources) { sources.filter { it.type.isNetworkShare || it.type.isMediaServer } }
     Surface(modifier = modifier, color = MaterialTheme.colorScheme.surfaceContainerLow) {
         LazyColumn(
             contentPadding = PaddingValues(
@@ -213,12 +215,12 @@ private fun SourcesPane(
                 ActionRow(R.drawable.ic_create_new_folder, "Add folder", actions::addFolder)
             }
 
-            sectionHeader("shares", "Network shares")
-            items(shares, key = { "src:${it.id}" }, contentType = { "source" }) { source ->
+            sectionHeader("network", "Network")
+            items(network, key = { "src:${it.id}" }, contentType = { "source" }) { source ->
                 SourceRow(source = source, selected = source.id == selectedSourceId, actions = actions)
             }
-            item(key = "addShare", contentType = "action") {
-                ActionRow(R.drawable.ic_add, "Add network share") { actions.showDialog(DialogUi.SmbServer()) }
+            item(key = "addNetwork", contentType = "action") {
+                ActionRow(R.drawable.ic_add, "Add network source", actions::addNetworkSource)
             }
 
             sectionHeader("streams", "Streams")
@@ -262,17 +264,6 @@ private fun LazyListScope.sectionHeader(key: String, title: String) {
     }
 }
 
-@DrawableRes
-private fun SourceType.iconRes(): Int = when (this) {
-    SourceType.DEVICE -> R.drawable.ic_storage
-    SourceType.FOLDER -> R.drawable.ic_folder
-    SourceType.SMB -> R.drawable.ic_lan
-    SourceType.STREAM -> R.drawable.ic_live_tv
-    SourceType.FTP, SourceType.SFTP, SourceType.NFS -> R.drawable.ic_dns
-    SourceType.WEBDAV -> R.drawable.ic_cloud
-    SourceType.UPNP -> R.drawable.ic_wifi
-    SourceType.JELLYFIN, SourceType.EMBY, SourceType.PLEX -> R.drawable.ic_video_library
-}
 
 @Composable
 private fun RowIcon(@DrawableRes icon: Int, tint: Color = MaterialTheme.colorScheme.primary) {
@@ -301,7 +292,7 @@ private fun SourceRow(source: SourceUi, selected: Boolean, actions: AppActions) 
             Modifier.padding(start = 12.dp, top = 10.dp, bottom = 10.dp, end = 0.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            RowIcon(source.type.iconRes())
+            RowIcon(sourceTypeIcon(source.type))
             Spacer(Modifier.width(14.dp))
             Column(Modifier.weight(1f)) {
                 Text(source.name, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -348,7 +339,7 @@ private fun SourceRow(source: SourceUi, selected: Boolean, actions: AppActions) 
                             actions.rescanSource(source.id)
                         },
                     )
-                    if (source.type == SourceType.SMB) {
+                    if (source.type.isNetworkShare || source.type.isMediaServer) {
                         DropdownMenuItem(
                             text = { Text("Edit") },
                             leadingIcon = { NovaIcon(R.drawable.ic_edit, contentDescription = null) },
@@ -496,9 +487,9 @@ private fun BrowseWelcome(actions: AppActions, modifier: Modifier = Modifier) {
                     )
                     ActionTile(
                         icon = R.drawable.ic_lan,
-                        title = "Add network share",
-                        body = "A Windows share or NAS on your network (SMB).",
-                        onClick = { actions.showDialog(DialogUi.SmbServer()) },
+                        title = "Add network source",
+                        body = "SMB, FTP, SFTP, NFS, WebDAV, DLNA, Jellyfin, Emby or Plex.",
+                        onClick = actions::addNetworkSource,
                         modifier = Modifier.weight(1f),
                     )
                 }
@@ -563,7 +554,7 @@ private fun ActionTile(
 
 @Composable
 private fun BrowseDirPane(dir: BrowseDirUi, cellMin: Dp, actions: AppActions, modifier: Modifier = Modifier) {
-    val isEmpty = dir.folders.isEmpty() && dir.videos.isEmpty()
+    val isEmpty = dir.isEmpty
     Column(modifier) {
         BrowseDirHeader(
             dir = dir,
@@ -660,7 +651,7 @@ private fun BrowseDirHeader(dir: BrowseDirUi, actions: AppActions, modifier: Mod
                             leadingIcon = if (index == 0) {
                                 {
                                     NovaIcon(
-                                        dir.sourceType.iconRes(),
+                                        sourceTypeIcon(dir.sourceType),
                                         contentDescription = null,
                                         modifier = Modifier.size(AssistChipDefaults.IconSize),
                                     )
@@ -705,7 +696,7 @@ private fun DirGrid(dir: BrowseDirUi, error: String?, cellMin: Dp, actions: AppA
                 FolderTile(folder = folder, onClick = { actions.openFolder(folder) })
             }
         }
-        if (dir.videos.isNotEmpty()) {
+        if (dir.videos.isNotEmpty() || dir.files.isNotEmpty()) {
             fullWidthItem("videosHeader") { GridHeader("Videos") }
             items(dir.videos, key = { "video:${it.id}" }, contentType = { "video" }) { video ->
                 VideoMenuBox(videoId = video.id, title = video.primaryLine(), actions = actions) { openMenu ->
@@ -721,8 +712,23 @@ private fun DirGrid(dir: BrowseDirUi, error: String?, cellMin: Dp, actions: AppA
                     )
                 }
             }
+            // Not scanned yet: played straight from the server.
+            items(dir.files, key = { "file:${it.uri}" }, contentType = { "file" }) { file ->
+                RemoteFileCard(file = file, onPlay = { actions.playRemote(file.uri, file.name) })
+            }
         }
     }
+}
+
+@Composable
+private fun RemoteFileCard(file: RemoteFileUi, onPlay: () -> Unit) {
+    TabletStillCard(
+        artwork = file.artwork,
+        title = file.name,
+        subtitle = file.subtitle,
+        onClick = onPlay,
+        onLongClick = onPlay,
+    )
 }
 
 private fun LazyGridScope.fullWidthItem(key: String, content: @Composable () -> Unit) {
@@ -761,7 +767,7 @@ private fun FolderTile(folder: FolderUi, onClick: () -> Unit) {
             Column(Modifier.weight(1f)) {
                 Text(folder.name, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(
-                    text = metaLine(countLabel(folder.videoCount, "video")),
+                    text = folder.note ?: metaLine(countLabel(folder.videoCount, "video")),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,

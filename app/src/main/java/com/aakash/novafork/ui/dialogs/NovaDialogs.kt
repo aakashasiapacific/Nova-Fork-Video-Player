@@ -53,6 +53,9 @@ fun NovaDialogs(dialog: DialogUi?, actions: AppActions, playlists: List<Playlist
             onDismiss = actions::dismissDialog,
         )
         is DialogUi.SmbServer -> SmbServerDialog(dialog = dialog, actions = actions)
+        DialogUi.AddSource -> AddSourceDialog(actions = actions)
+        is DialogUi.NetworkServer -> NetworkServerDialog(dialog = dialog, actions = actions)
+        is DialogUi.UpnpServers -> UpnpServersDialog(dialog = dialog, actions = actions)
         is DialogUi.Identify -> IdentifyDialog(dialog = dialog, actions = actions)
         is DialogUi.ConfirmRemoveSource -> ConfirmRemoveSourceDialog(
             source = dialog.source,

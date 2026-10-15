@@ -222,13 +222,18 @@ data class SourceUi(
     val error: String? = null,
 )
 
-/** A folder in Browse. [path] is relative to its source root ("" = root). */
+/**
+ * A folder in Browse. [path] is relative to its source root ("" = root); for a live listing of a
+ * network source it is what that source's NetworkBrowser gave (a media server's item id).
+ */
 @Immutable
 data class FolderUi(
     val sourceId: Long,
     val path: String,
     val name: String,
     val videoCount: Int = 0,
+    /** Shown instead of the video count when that isn't known (live listings): "Library", "Folder". */
+    val note: String? = null,
 )
 
 @Immutable
@@ -236,7 +241,7 @@ data class Crumb(val label: String, val path: String)
 
 @Immutable
 data class BrowseUi(
-    /** DEVICE first, then FOLDER, then SMB sources. */
+    /** DEVICE first, then FOLDER, then the network sources (SMB, FTP, …, Plex) by type. */
     val sources: List<SourceUi> = emptyList(),
     /** Saved network streams. */
     val streams: List<VideoCardUi> = emptyList(),
@@ -263,7 +268,11 @@ data class PlaylistDetailsUi(
     val videos: List<VideoCardUi> = emptyList(),
 )
 
-/** Contents of one folder of a source (device/folder sources come from the library, SMB is listed live). */
+/**
+ * Contents of one folder of a source. Device, folder and SMB sources come from the library; the
+ * other network sources are listed live by their NetworkBrowser, their videos matched to the
+ * library's ([videos]) or, not scanned yet, given as [files].
+ */
 @Immutable
 data class BrowseDirUi(
     val sourceId: Long,
@@ -275,6 +284,21 @@ data class BrowseDirUi(
     val videos: List<VideoCardUi> = emptyList(),
     val isLoading: Boolean = false,
     val error: String? = null,
+    /** Live listings only: playable files the library doesn't hold (yet); [AppActions.playRemote] plays them. */
+    val files: List<RemoteFileUi> = emptyList(),
+) {
+    val isEmpty: Boolean get() = folders.isEmpty() && videos.isEmpty() && files.isEmpty()
+}
+
+/** A video file of a live network listing that isn't in the library. */
+@Immutable
+data class RemoteFileUi(
+    val name: String,
+    /** The URI the player opens (and a scan would store it under). */
+    val uri: String,
+    /** "1.4 GB". */
+    val subtitle: String? = null,
+    val artwork: Artwork = Artwork(),
 )
 
 @Immutable

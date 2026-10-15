@@ -190,7 +190,7 @@ internal fun SmbServerDialog(dialog: DialogUi.SmbServer, actions: AppActions) {
 }
 
 @Composable
-private fun FormField(
+internal fun FormField(
     value: String,
     onValueChange: (String) -> Unit,
     label: String,
@@ -225,9 +225,9 @@ private fun FormField(
     )
 }
 
-/** "" means the share opened; anything else is the error to show. */
+/** "" means the connection worked; anything else is the error to show. */
 @Composable
-private fun TestResultLine(result: String) {
+internal fun TestResultLine(result: String) {
     val ok = result.isEmpty()
     val color = if (ok) NovaColors.Mint else MaterialTheme.colorScheme.error
     Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(8.dp)) {

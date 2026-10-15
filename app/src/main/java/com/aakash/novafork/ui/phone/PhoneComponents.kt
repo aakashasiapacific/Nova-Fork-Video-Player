@@ -68,6 +68,7 @@ import com.aakash.novafork.ui.common.RatingPill
 import com.aakash.novafork.ui.common.VideoMenuBox
 import com.aakash.novafork.ui.common.WatchedBadge
 import com.aakash.novafork.ui.common.metaLine
+import com.aakash.novafork.ui.common.sourceTypeIcon
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.Artwork
 import com.aakash.novafork.ui.model.EpisodeUi
@@ -122,13 +123,9 @@ internal fun remainingLabel(card: VideoCardUi): String? {
 @DrawableRes
 internal fun SourceType.iconRes(): Int = when (this) {
     SourceType.DEVICE -> R.drawable.ic_phone_android
-    SourceType.FOLDER -> R.drawable.ic_folder
-    SourceType.SMB -> R.drawable.ic_lan
-    SourceType.STREAM -> R.drawable.ic_live_tv
-    SourceType.FTP, SourceType.SFTP, SourceType.NFS -> R.drawable.ic_dns
-    SourceType.WEBDAV -> R.drawable.ic_cloud
-    SourceType.UPNP -> R.drawable.ic_wifi
-    SourceType.JELLYFIN, SourceType.EMBY, SourceType.PLEX -> R.drawable.ic_video_library
+    SourceType.FOLDER, SourceType.SMB, SourceType.STREAM, SourceType.FTP, SourceType.SFTP, SourceType.NFS,
+    SourceType.UPNP, SourceType.WEBDAV, SourceType.JELLYFIN, SourceType.EMBY, SourceType.PLEX,
+    -> sourceTypeIcon(this)
 }
 
 // ---------------------------------------------------------------------------------------------

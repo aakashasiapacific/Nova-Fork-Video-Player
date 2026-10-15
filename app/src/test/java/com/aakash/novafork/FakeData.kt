@@ -1,6 +1,7 @@
 package com.aakash.novafork
 
 import com.aakash.novafork.data.PlaylistWithCount
+import com.aakash.novafork.data.RemoteEntry
 import com.aakash.novafork.data.ScanState
 import com.aakash.novafork.data.Settings
 import com.aakash.novafork.data.TmdbHost
@@ -12,6 +13,8 @@ import com.aakash.novafork.data.db.VideoEntity
 import com.aakash.novafork.data.db.VideoKind
 import com.aakash.novafork.data.db.VideoWithMeta
 import com.aakash.novafork.ui.LibraryIndex
+import com.aakash.novafork.ui.ListingKey
+import com.aakash.novafork.ui.RemoteListing
 import com.aakash.novafork.ui.UiMappers
 import com.aakash.novafork.ui.model.AppUiState
 import com.aakash.novafork.ui.model.CastDeviceUi
@@ -21,11 +24,13 @@ import com.aakash.novafork.ui.model.IdentifyResultUi
 import com.aakash.novafork.ui.model.KeyStatus
 import com.aakash.novafork.ui.model.LibraryFilter
 import com.aakash.novafork.ui.model.LibrarySort
+import com.aakash.novafork.ui.model.NetworkSourceForm
 import com.aakash.novafork.ui.model.PermissionUi
 import com.aakash.novafork.ui.model.PlayerUiState
 import com.aakash.novafork.ui.model.QueueItemUi
 import com.aakash.novafork.ui.model.RepeatMode
 import com.aakash.novafork.ui.model.Route
+import com.aakash.novafork.ui.model.ServerLibraryUi
 import com.aakash.novafork.ui.model.SettingsUi
 import com.aakash.novafork.ui.model.SmbForm
 import com.aakash.novafork.ui.model.TrackUi
@@ -34,7 +39,8 @@ import com.aakash.novafork.ui.model.VideoDetailsUi
 
 /**
  * A believable library: TMDB-matched movies and shows on a picked folder, a NAS and the device,
- * a couple of home videos and two saved streams. Only entities live here; every screen model is
+ * a couple of home videos and two saved streams, plus an SFTP seedbox and a Jellyfin server that
+ * have nothing scanned yet. Only entities live here; every screen model is
  * derived from them by the real [UiMappers], the same way MainViewModel does it.
  */
 object FakeLibrary {
@@ -51,6 +57,8 @@ object FakeLibrary {
     const val NAS = 3L
     const val BUNNY_STREAM = 4L
     const val TEARS_STREAM = 5L
+    const val SEEDBOX = 6L
+    const val DEN_JELLYFIN = 7L
 
     // Movies (all in the picked "Movies" folder)
     const val DUNE = 101L
@@ -132,7 +140,56 @@ object FakeLibrary {
             location = "https://demo.unified-streaming.com/k8s/features/stable/video/tears-of-steel/tears-of-steel.ism/.m3u8",
             addedAt = NOW - 18 * DAY,
         ),
+        SourceEntity(
+            id = SEEDBOX,
+            type = SourceType.SFTP,
+            name = "Seedbox",
+            location = "sftp://seedbox.example.net/downloads",
+            username = "aakash",
+            password = "correct-horse",
+            addedAt = NOW - 3 * DAY,
+        ),
+        SourceEntity(
+            id = DEN_JELLYFIN,
+            type = SourceType.JELLYFIN,
+            name = "Den Jellyfin",
+            location = "http://192.168.1.5:8096",
+            port = 8096,
+            username = "aakash",
+            password = "correct-horse",
+            addedAt = NOW - 2 * DAY,
+        ),
     )
+
+    /** What the Jellyfin server's browser lists: its libraries, and the Movies library (nothing scanned yet). */
+    internal val jellyfinListings: Map<ListingKey, RemoteListing> by lazy {
+        fun movie(id: String, title: String, gigabytes: Double) = RemoteEntry(
+            name = title,
+            path = id,
+            isDirectory = false,
+            sizeBytes = (gigabytes * (1L shl 30)).toLong(),
+            playUri = "http://192.168.1.5:8096/Videos/$id/stream?static=true",
+            imageUrl = "http://192.168.1.5:8096/Items/$id/Images/Primary?maxWidth=342&tag=poster",
+        )
+        mapOf(
+            ListingKey(DEN_JELLYFIN, "") to RemoteListing(
+                entries = listOf(
+                    RemoteEntry(name = "Movies", path = "lib-movies", isDirectory = true),
+                    RemoteEntry(name = "Shows", path = "lib-shows", isDirectory = true),
+                ),
+            ),
+            ListingKey(DEN_JELLYFIN, "lib-movies") to RemoteListing(
+                entries = listOf(
+                    RemoteEntry(name = "Collections", path = "col-1", isDirectory = true),
+                    movie("a1", "Arrival", 7.8),
+                    movie("b2", "Blade Runner 2049", 21.4),
+                    movie("h3", "Heat", 14.2),
+                    movie("h4", "Her", 6.1),
+                    movie("m5", "Mad Max: Fury Road", 18.9),
+                ),
+            ),
+        )
+    }
 
     private val dune = movieMeta(
         tmdbId = 693134,
@@ -649,6 +706,14 @@ object FakeScreens {
         browseDir = requireNotNull(UiMappers.browseDir(index, sourceId, path, idle)) { "No source $sourceId in the fake library" },
     )
 
+    /** A Jellyfin library listed live: nothing scanned yet, so every movie plays straight from the server. */
+    fun remoteDir(): AppUiState {
+        val source = index.sourcesById.getValue(FakeLibrary.DEN_JELLYFIN)
+        return app(Route.BrowseDir(source.id, "lib-movies")).copy(
+            browseDir = UiMappers.remoteDir(index, source, "lib-movies", FakeLibrary.jellyfinListings),
+        )
+    }
+
     fun search(query: String): AppUiState = app(Route.Search).copy(search = UiMappers.search(index, query))
 
     fun playlist(playlistId: Long): AppUiState {
@@ -671,6 +736,30 @@ object FakeScreens {
                 path = "TV",
                 username = "aakash",
                 password = "correct-horse",
+            ),
+        ),
+    )
+
+    /** Browse › Add network source: the kinds of server. */
+    fun addSourceDialog(): AppUiState = browse().copy(dialog = DialogUi.AddSource)
+
+    /** Adding a Jellyfin server: the connection tested, its libraries listed and two of them chosen. */
+    fun jellyfinDialog(): AppUiState = browse().copy(
+        dialog = DialogUi.NetworkServer(
+            form = NetworkSourceForm(
+                type = SourceType.JELLYFIN,
+                name = "Den Jellyfin",
+                address = "http://192.168.1.5:8096",
+                username = "aakash",
+                password = "correct-horse",
+                libraryIds = listOf("lib-movies", "lib-shows"),
+            ),
+            testResult = "",
+            libraries = listOf(
+                ServerLibraryUi(id = "lib-movies", name = "Movies"),
+                ServerLibraryUi(id = "lib-shows", name = "Shows"),
+                ServerLibraryUi(id = "lib-anime", name = "Anime"),
+                ServerLibraryUi(id = "lib-home", name = "Home videos"),
             ),
         ),
     )

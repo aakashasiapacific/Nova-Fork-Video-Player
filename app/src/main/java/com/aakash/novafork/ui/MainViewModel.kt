@@ -7,20 +7,30 @@ import androidx.lifecycle.viewModelScope
 import com.aakash.novafork.BuildConfig
 import com.aakash.novafork.CrashReporter
 import com.aakash.novafork.NovaApp
+import com.aakash.novafork.core.jellyfin.ServerSecrets
+import com.aakash.novafork.core.plex.PlexResource
 import com.aakash.novafork.core.smb.SmbUris
 import com.aakash.novafork.core.tmdb.TmdbDisabledException
 import com.aakash.novafork.core.tmdb.TmdbException
 import com.aakash.novafork.data.IdentifyType
+import com.aakash.novafork.data.NetworkLocation
+import com.aakash.novafork.data.NetworkSourceInput
+import com.aakash.novafork.data.NetworkSources
 import com.aakash.novafork.data.PlaylistWithCount
 import com.aakash.novafork.data.ScanState
 import com.aakash.novafork.data.Settings
 import com.aakash.novafork.data.SmbCredentials
 import com.aakash.novafork.data.StoragePermissions
 import com.aakash.novafork.data.TmdbSearchResult
+import com.aakash.novafork.data.db.SourceEntity
 import com.aakash.novafork.data.db.SourceType
 import com.aakash.novafork.data.db.VideoKind
+import com.aakash.novafork.sources.media.MediaServerSources
+import com.aakash.novafork.sources.media.PlexSignIn
+import com.aakash.novafork.sources.net.FileServerSources
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.AppUiState
+import com.aakash.novafork.ui.model.BrowseDirUi
 import com.aakash.novafork.ui.model.DialogUi
 import com.aakash.novafork.ui.model.IdentifyResultUi
 import com.aakash.novafork.ui.model.KeyStatus
@@ -28,13 +38,18 @@ import com.aakash.novafork.ui.model.LibraryFilter
 import com.aakash.novafork.ui.model.LibraryItemUi
 import com.aakash.novafork.ui.model.LibrarySort
 import com.aakash.novafork.ui.model.LibraryUi
+import com.aakash.novafork.ui.model.NetworkSourceForm
 import com.aakash.novafork.ui.model.PermissionUi
+import com.aakash.novafork.ui.model.PlexServerUi
+import com.aakash.novafork.ui.model.PlexSignInUi
 import com.aakash.novafork.ui.model.Route
 import com.aakash.novafork.ui.model.SearchUi
+import com.aakash.novafork.ui.model.ServerLibraryUi
 import com.aakash.novafork.ui.model.SettingsUi
 import com.aakash.novafork.ui.model.SmbForm
 import com.aakash.novafork.ui.model.SourceUi
 import com.aakash.novafork.ui.model.TopDestination
+import com.aakash.novafork.ui.model.UpnpServerUi
 import java.io.IOException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -85,6 +100,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
         val permission: PermissionUi = PermissionUi(),
         val allFilesAccess: Boolean = false,
         val crashReport: String? = null,
+        /** Folders of network sources (other than SMB) listed live, most recently updated last. */
+        val listings: Map<ListingKey, RemoteListing> = emptyMap(),
     )
 
     private val local = MutableStateFlow(
@@ -108,6 +125,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
         UiMappers.library(index, filter, sort)
     }
     private val searchMemo = Memo<Pair<LibraryIndex, String>, SearchUi> { (index, query) -> UiMappers.search(index, query) }
+    private val remoteDirMemo = Memo<RemoteDirInput, BrowseDirUi> { (index, source, path, listings) ->
+        UiMappers.remoteDir(index, source, path, listings)
+    }
 
     /** The topmost playlist on the back stack, so it stays loaded under a details page opened from it. */
     private val openPlaylistId: Flow<Long?> = local
@@ -143,6 +163,14 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
     private var identifyJob: Job? = null
     private var keyCheckJob: Job? = null
     private var smbTestJob: Job? = null
+    private var networkTestJob: Job? = null
+    private var upnpJob: Job? = null
+    private var plexJob: Job? = null
+    private val listingJobs = HashMap<ListingKey, Job>()
+
+    /** The Plex account a code signed in, until one of its servers is picked or the dialog goes away. Memory only. */
+    private var plexAccount: PlexAccount? = null
+    private val plexSignIn: PlexSignIn by lazy { MediaServerSources.plexSignIn(graph) }
 
     init {
         launchSafely("Couldn't scan the library") { library.refreshAll() }
@@ -156,6 +184,13 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
                     keyCheckJob?.cancel()
                     local.update { state -> state.copy(keyStatus = KeyStatus.UNKNOWN) }
                 }
+        }
+        viewModelScope.launch {
+            // Network sources other than SMB are browsed live: a folder is listed when it is opened.
+            local
+                .map { it.backStack.lastOrNull() as? Route.BrowseDir }
+                .distinctUntilChanged()
+                .collect { route -> if (route != null) openListing(route.sourceId, route.path, refresh = false) }
         }
     }
 
@@ -181,7 +216,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
             home = index.home,
             library = libraryMemo[Triple(index, user.filter, user.sort)],
             browse = browse,
-            browseDir = (route as? Route.BrowseDir)?.let { UiMappers.browseDir(index, it.sourceId, it.path, scan) },
+            browseDir = (route as? Route.BrowseDir)?.let { browseDirFor(index, it, user.listings, scan) },
             videoDetails = videoId?.let { UiMappers.videoDetails(index, it) },
             showDetails = showKey?.let { UiMappers.showDetails(index, it) },
             previewKey = previewKey,
@@ -202,6 +237,21 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
             message = user.message,
             crashReport = user.crashReport,
         )
+    }
+
+    /** Library folders for device, picked folders and SMB; the other network sources as listed live. */
+    private fun browseDirFor(
+        index: LibraryIndex,
+        route: Route.BrowseDir,
+        listings: Map<ListingKey, RemoteListing>,
+        scan: ScanState,
+    ): BrowseDirUi? {
+        val source = index.sourcesById[route.sourceId]
+        return if (source != null && source.type in NetworkSources.TYPES) {
+            remoteDirMemo[RemoteDirInput(index, source, route.path, listings)]
+        } else {
+            UiMappers.browseDir(index, route.sourceId, route.path, scan)
+        }
     }
 
     // Navigation
@@ -246,6 +296,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
     }
 
     override fun rescanSource(sourceId: Long) {
+        // Refresh on a live folder lists it again as well.
+        val open = local.value.backStack.lastOrNull() as? Route.BrowseDir
+        if (open != null && open.sourceId == sourceId) openListing(open.sourceId, open.path, refresh = true)
         launchSafely("Couldn't scan this source") { library.scanSource(sourceId) }
     }
 
@@ -277,6 +330,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
         val name = (local.value.dialog as? DialogUi.ConfirmRemoveSource)?.source?.takeIf { it.id == sourceId }?.name
         launchSafely("Couldn't remove the source") {
             library.removeSource(sourceId)
+            forgetListings(sourceId, relist = false)
             local.update { state ->
                 // Folders of a removed source have nothing left to show.
                 val stack = state.backStack.filterNot { it is Route.BrowseDir && it.sourceId == sourceId }
@@ -294,6 +348,12 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
     override fun showDialog(dialog: DialogUi?) {
         if (dialog !is DialogUi.Identify) identifyJob?.cancel()
         if (dialog !is DialogUi.SmbServer) smbTestJob?.cancel()
+        if (dialog !is DialogUi.NetworkServer) {
+            networkTestJob?.cancel()
+            plexJob?.cancel()
+            plexAccount = null
+        }
+        if (dialog !is DialogUi.UpnpServers) upnpJob?.cancel()
         local.update { it.copy(dialog = dialog) }
     }
 
@@ -403,26 +463,30 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
     }
 
     override fun editSource(source: SourceUi) {
-        launchSafely("Couldn't open the share") {
+        launchSafely("Couldn't open the source") {
             val entity = library.source(source.id)
-            if (entity == null || entity.type != SourceType.SMB) {
-                showMessage("Only network shares can be edited")
-                return@launchSafely
+            when {
+                entity == null -> showMessage("This source is gone")
+                entity.type == SourceType.SMB -> showDialog(DialogUi.SmbServer(form = smbForm(entity)))
+                entity.type in NetworkSources.TYPES -> showDialog(DialogUi.NetworkServer(form = NetworkForms.formFor(entity)))
+                else -> showMessage("Only network sources can be edited")
             }
-            val location = SmbUris.parse(entity.location)
-            val form = SmbForm(
-                id = entity.id,
-                name = entity.name,
-                host = location?.host.orEmpty(),
-                port = location?.port?.toString().orEmpty(),
-                share = location?.share.orEmpty(),
-                path = location?.path.orEmpty(),
-                username = entity.username.orEmpty(),
-                password = entity.password.orEmpty(),
-                domain = entity.domain.orEmpty(),
-            )
-            showDialog(DialogUi.SmbServer(form = form))
         }
+    }
+
+    private fun smbForm(entity: SourceEntity): SmbForm {
+        val location = SmbUris.parse(entity.location)
+        return SmbForm(
+            id = entity.id,
+            name = entity.name,
+            host = location?.host.orEmpty(),
+            port = location?.port?.toString().orEmpty(),
+            share = location?.share.orEmpty(),
+            path = location?.path.orEmpty(),
+            username = entity.username.orEmpty(),
+            password = entity.password.orEmpty(),
+            domain = entity.domain.orEmpty(),
+        )
     }
 
     private fun updateSmbDialog(transform: (DialogUi.SmbServer) -> DialogUi.SmbServer) {
@@ -430,6 +494,301 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
             val dialog = state.dialog as? DialogUi.SmbServer ?: return@update state
             state.copy(dialog = transform(dialog))
         }
+    }
+
+    // Network sources other than SMB: FTP, SFTP, NFS, WebDAV, DLNA/UPnP, Jellyfin, Emby, Plex
+
+    override fun chooseSourceType(type: SourceType) {
+        when (type) {
+            SourceType.SMB -> showDialog(DialogUi.SmbServer())
+            SourceType.UPNP -> discoverUpnpServers()
+            SourceType.FTP, SourceType.SFTP, SourceType.NFS, SourceType.WEBDAV, SourceType.JELLYFIN, SourceType.EMBY,
+            SourceType.PLEX,
+            -> showDialog(DialogUi.NetworkServer(form = NetworkSourceForm(type = type)))
+            SourceType.STREAM -> showDialog(DialogUi.AddStream)
+            // Not network sources: the picker doesn't offer them.
+            SourceType.DEVICE, SourceType.FOLDER -> showDialog(null)
+        }
+    }
+
+    override fun testNetworkSource(form: NetworkSourceForm) {
+        val (_, source) = checkedNetworkSource(form) ?: return
+        val browser = graph.browsers[form.type]
+        if (browser == null) {
+            updateNetworkDialog { it.copy(testing = false, testResult = "${NetworkForms.typeLabel(form.type)} sources can't be checked") }
+            return
+        }
+        val listsLibraries = form.type == SourceType.JELLYFIN || form.type == SourceType.EMBY
+        networkTestJob?.cancel()
+        updateNetworkDialog { it.copy(testing = true, testResult = null) }
+        networkTestJob = viewModelScope.launch {
+            var libraries: List<ServerLibraryUi>? = null
+            val outcome = try {
+                val target = withStoredSignIn(source, form.id)
+                val failure = browser.test(target).exceptionOrNull()
+                if (failure == null && listsLibraries) {
+                    // libraryIds null: every library a scan could take, not just the ones chosen before.
+                    libraries = browser.list(target.copy(libraryIds = null), "")
+                        .filter { it.isDirectory }
+                        .map { ServerLibraryUi(id = it.path, name = it.name.ifBlank { it.path }) }
+                        .distinctBy { it.id }
+                }
+                if (failure == null) "" else userText(failure, "Couldn't connect")
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                logNetwork("Testing the server failed", e)
+                userText(e, "Couldn't connect")
+            }
+            updateNetworkDialog { it.copy(testing = false, testResult = outcome, libraries = libraries) }
+        }
+    }
+
+    override fun saveNetworkSource(form: NetworkSourceForm) {
+        val (input, source) = checkedNetworkSource(form) ?: return
+        networkTestJob?.cancel()
+        saveNetworkInput(form.id, input, source.name)
+    }
+
+    override fun discoverUpnpServers() {
+        upnpJob?.cancel()
+        showDialog(DialogUi.UpnpServers(searching = true))
+        upnpJob = viewModelScope.launch {
+            val outcome = try {
+                Result.success(FileServerSources.discoverUpnpServers(graph))
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                logNetwork("Looking for DLNA servers failed", e)
+                Result.failure(e)
+            }
+            updateUpnpDialog { dialog ->
+                outcome.fold(
+                    onSuccess = { found ->
+                        dialog.copy(
+                            searching = false,
+                            servers = found
+                                .distinctBy { it.path }
+                                .map { UpnpServerUi(name = it.name.ifBlank { "DLNA server" }, address = it.path, iconUrl = it.imageUrl) },
+                            error = null,
+                        )
+                    },
+                    onFailure = { dialog.copy(searching = false, error = userText(it, "Couldn't search this network")) },
+                )
+            }
+        }
+    }
+
+    override fun addUpnpServer(server: UpnpServerUi) {
+        val input = NetworkSourceInput(type = SourceType.UPNP, name = server.name, address = server.address)
+        val name = try {
+            NetworkSources.toSource(input).name
+        } catch (e: IllegalArgumentException) {
+            showMessage(userText(e, "Couldn't add ${server.name}"))
+            return
+        }
+        saveNetworkInput(null, input, name)
+    }
+
+    override fun startPlexSignIn() {
+        plexJob?.cancel()
+        plexAccount = null
+        updateNetworkDialog { it.copy(plexSignIn = PlexSignInUi(linkUrl = plexSignIn.linkUrl)) }
+        plexJob = viewModelScope.launch {
+            try {
+                val pin = plexSignIn.createCode()
+                updatePlexSignIn { it.copy(code = pin.code) }
+                val token = plexSignIn.awaitToken(pin)
+                val servers = plexSignIn.servers(token)
+                plexAccount = PlexAccount(token, servers)
+                updatePlexSignIn { it.copy(servers = servers.map(::plexServerUi)) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                logNetwork("Signing in to Plex failed", e)
+                updatePlexSignIn { it.copy(error = userText(e, "Couldn't sign in to Plex")) }
+            }
+        }
+    }
+
+    override fun cancelPlexSignIn() {
+        plexJob?.cancel()
+        plexAccount = null
+        updateNetworkDialog { it.copy(plexSignIn = null) }
+    }
+
+    override fun pickPlexServer(serverId: String, form: NetworkSourceForm) {
+        val account = plexAccount ?: return
+        val server = account.servers.firstOrNull { it.clientIdentifier == serverId } ?: return
+        val input = plexSignIn.sourceInput(server, account.token, form.name)
+        if (input == null) {
+            updatePlexSignIn { it.copy(error = "plex.tv lists no address for ${server.name.nonBlank() ?: "this server"}") }
+            return
+        }
+        val name = try {
+            NetworkSources.toSource(input).name
+        } catch (e: IllegalArgumentException) {
+            updatePlexSignIn { it.copy(error = userText(e, "Couldn't add this server")) }
+            return
+        }
+        saveNetworkInput(form.id, input, name)
+    }
+
+    /** [form] as a source, checked; null (the problem shown in the dialog) when it can't be one. */
+    private fun checkedNetworkSource(form: NetworkSourceForm): Pair<NetworkSourceInput, SourceEntity>? =
+        try {
+            val input = NetworkForms.toInput(form)
+            input to NetworkSources.toSource(input)
+        } catch (e: IllegalArgumentException) {
+            updateNetworkDialog { it.copy(testing = false, testResult = userText(e, "Check the server address")) }
+            null
+        }
+
+    /** An edit that keeps the server and the user keeps the stored sign-in too, so a test needn't sign in again. */
+    private suspend fun withStoredSignIn(source: SourceEntity, id: Long?): SourceEntity {
+        val stored = id?.let { library.source(it) } ?: return source
+        if (stored.type != source.type || stored.location != source.location || stored.username != source.username) return source
+        return source.copy(
+            token = source.token ?: stored.token,
+            userId = source.userId ?: stored.userId,
+            serverId = source.serverId ?: stored.serverId,
+        )
+    }
+
+    private fun saveNetworkInput(id: Long?, input: NetworkSourceInput, name: String) {
+        viewModelScope.launch {
+            try {
+                val savedId = library.saveNetworkSource(id, input)
+                forgetListings(savedId, relist = true)
+                plexJob?.cancel()
+                plexAccount = null
+                local.update { state ->
+                    state.copy(
+                        dialog = state.dialog.takeUnless { it is DialogUi.NetworkServer || it is DialogUi.UpnpServers },
+                        message = if (id == null) "Added $name — scanning" else "Saved $name — scanning",
+                    )
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                logNetwork("Saving the server failed", e)
+                val text = userText(e, "Couldn't save the server")
+                val dialog = local.value.dialog
+                when {
+                    dialog is DialogUi.NetworkServer && dialog.plexSignIn?.servers != null ->
+                        updatePlexSignIn { it.copy(error = text) }
+                    dialog is DialogUi.NetworkServer -> updateNetworkDialog { it.copy(testing = false, testResult = text) }
+                    dialog is DialogUi.UpnpServers -> updateUpnpDialog { it.copy(error = text) }
+                    else -> showMessage(text)
+                }
+            }
+        }
+    }
+
+    private fun plexServerUi(server: PlexResource): PlexServerUi {
+        val address = PlexSignIn.address(server)
+        val host = address?.let { NetworkLocation.parse(it)?.host }
+        return PlexServerUi(
+            id = server.clientIdentifier,
+            name = server.name.nonBlank() ?: "Plex server",
+            detail = joinMeta(if (server.owned) "Your server" else "Shared with you", host ?: "No address on plex.tv").orEmpty(),
+            reachable = address != null,
+        )
+    }
+
+    private fun updateNetworkDialog(transform: (DialogUi.NetworkServer) -> DialogUi.NetworkServer) {
+        local.update { state ->
+            val dialog = state.dialog as? DialogUi.NetworkServer ?: return@update state
+            state.copy(dialog = transform(dialog))
+        }
+    }
+
+    private fun updatePlexSignIn(transform: (PlexSignInUi) -> PlexSignInUi) {
+        updateNetworkDialog { dialog ->
+            val signIn = dialog.plexSignIn ?: return@updateNetworkDialog dialog
+            dialog.copy(plexSignIn = transform(signIn))
+        }
+    }
+
+    private fun updateUpnpDialog(transform: (DialogUi.UpnpServers) -> DialogUi.UpnpServers) {
+        local.update { state ->
+            val dialog = state.dialog as? DialogUi.UpnpServers ?: return@update state
+            state.copy(dialog = transform(dialog))
+        }
+    }
+
+    /** A server's error for people: its message without access tokens (servers may quote URLs). */
+    private fun userText(error: Throwable, fallback: String): String = ServerSecrets.redact(error.message).nonBlank() ?: fallback
+
+    /** Server errors may quote URLs with access tokens: logged scrubbed and without the stack trace. */
+    private fun logNetwork(what: String, error: Throwable) {
+        Log.w(TAG, "$what: ${error.javaClass.simpleName}: ${ServerSecrets.redact(error.message)}")
+    }
+
+    // Live folders of network sources (Browse)
+
+    /**
+     * Lists folder [path] of source [sourceId] with its NetworkBrowser, unless that listing is
+     * there already (or on its way) and no [refresh] is asked for. Sources browsed from the
+     * library (device, folders, SMB) are left alone.
+     */
+    private fun openListing(sourceId: Long, path: String, refresh: Boolean) {
+        val key = ListingKey(sourceId, path)
+        val known = local.value.listings[key]
+        if (!refresh && known != null && (known.loading || known.error == null)) return
+        listingJobs.remove(key)?.cancel()
+        val job = viewModelScope.launch {
+            val source = try {
+                library.source(sourceId)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.w(TAG, "Reading source $sourceId failed", e)
+                null
+            }
+            if (source == null || source.type !in NetworkSources.TYPES) return@launch
+            updateListing(key) { it.copy(loading = true, error = null) }
+            val outcome = try {
+                val browser = graph.browsers[source.type]
+                    ?: throw IOException("${NetworkForms.typeLabel(source.type)} sources can't be browsed")
+                Result.success(browser.list(source, path))
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                logNetwork("Listing a folder failed", e)
+                Result.failure(e)
+            }
+            updateListing(key) { listing ->
+                outcome.fold(
+                    onSuccess = { entries -> RemoteListing(entries = entries) },
+                    onFailure = { listing.copy(loading = false, error = userText(it, "Couldn't open this folder")) },
+                )
+            }
+        }
+        listingJobs[key] = job
+        // Runs on the main thread like everything touching listingJobs (or at once, when already done).
+        job.invokeOnCompletion { if (listingJobs[key] === job) listingJobs.remove(key) }
+    }
+
+    private fun updateListing(key: ListingKey, transform: (RemoteListing) -> RemoteListing) {
+        local.update { state ->
+            val listings = LinkedHashMap(state.listings)
+            // Taken out and put back: the most recently updated listing goes last, the oldest is dropped first.
+            listings[key] = transform(listings.remove(key) ?: RemoteListing())
+            while (listings.size > MAX_LISTINGS) listings.remove(listings.keys.first())
+            state.copy(listings = listings)
+        }
+    }
+
+    /**
+     * A removed or edited source's folders are listed afresh when opened again; with [relist], the
+     * one on screen right away.
+     */
+    private fun forgetListings(sourceId: Long, relist: Boolean) {
+        listingJobs.keys.filter { it.sourceId == sourceId }.forEach { key -> listingJobs.remove(key)?.cancel() }
+        local.update { state -> state.copy(listings = state.listings.filterKeys { it.sourceId != sourceId }) }
+        val open = local.value.backStack.lastOrNull() as? Route.BrowseDir
+        if (relist && open != null && open.sourceId == sourceId) openListing(open.sourceId, open.path, refresh = true)
     }
 
     // Identify
@@ -628,8 +987,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
     }
 
     override fun playFolder(sourceId: Long, path: String, shuffle: Boolean) {
+        // A live folder plays the library videos it lists, in its order (media servers' folders are no paths).
+        val live = ListingKey(sourceId, path) in local.value.listings
+        val listed = state.value.browseDir?.takeIf { it.sourceId == sourceId && it.path == path }?.videos?.map { it.id }
         playResolved("Couldn't play this folder", "No videos to play in this folder", shuffle) {
-            library.folderQueue(sourceId, path)
+            if (live) listed.orEmpty() else library.folderQueue(sourceId, path)
         }
     }
 
@@ -771,8 +1133,22 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
 
     private companion object {
         val TRAILING_YEAR = Regex("""\s*\(?(19|20)\d{2}\)?$""")
+
+        /** Live folder listings kept for going back without listing again. */
+        const val MAX_LISTINGS = 40
     }
 }
+
+/** What a live folder's screen model is built from (scan progress alone doesn't rebuild it). */
+private data class RemoteDirInput(
+    val index: LibraryIndex,
+    val source: SourceEntity,
+    val path: String,
+    val listings: Map<ListingKey, RemoteListing>,
+)
+
+/** A Plex account signed in with a code: its token and the servers it can open. */
+private class PlexAccount(val token: String, val servers: List<PlexResource>)
 
 /** Every playlist, and the videos of the one the back stack shows ([open] null = none). */
 private data class PlaylistsState(

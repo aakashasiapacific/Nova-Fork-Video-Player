@@ -521,10 +521,10 @@ private fun HomeOnboarding(scan: ScanUi, permission: PermissionUi, actions: AppA
                         ButtonContent(R.drawable.ic_create_new_folder, "Add a folder")
                     }
                     OutlinedButton(
-                        onClick = { actions.showDialog(DialogUi.SmbServer()) },
+                        onClick = actions::addNetworkSource,
                         modifier = Modifier.fillMaxWidth(),
                     ) {
-                        ButtonContent(R.drawable.ic_lan, "Add a network share")
+                        ButtonContent(R.drawable.ic_lan, "Add a network source")
                     }
                     OutlinedButton(
                         onClick = { actions.showDialog(DialogUi.OpenUrl) },

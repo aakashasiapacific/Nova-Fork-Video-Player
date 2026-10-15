@@ -581,10 +581,10 @@ private fun OnboardingText(scan: ScanUi, permission: PermissionUi, actions: AppA
                 ButtonLabel(R.drawable.ic_create_new_folder, "Add a folder")
             }
             FilledTonalButton(
-                onClick = { actions.showDialog(DialogUi.SmbServer()) },
+                onClick = actions::addNetworkSource,
                 modifier = Modifier.fillMaxWidth().height(48.dp),
             ) {
-                ButtonLabel(R.drawable.ic_lan, "Add a network share")
+                ButtonLabel(R.drawable.ic_lan, "Add a network source")
             }
             OutlinedButton(
                 onClick = { actions.showDialog(DialogUi.OpenUrl) },

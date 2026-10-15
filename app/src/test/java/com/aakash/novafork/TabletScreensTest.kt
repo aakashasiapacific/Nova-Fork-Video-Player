@@ -1,5 +1,8 @@
 package com.aakash.novafork
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.test.core.app.ApplicationProvider
 import com.aakash.novafork.FakeLibrary.DUNE
@@ -41,10 +44,18 @@ class TabletScreensTest {
         FakeImages.reset()
     }
 
-    private fun capture(name: String, state: AppUiState, expected: DeviceLayout = DeviceLayout.TABLET_EXPANDED) {
+    private fun capture(
+        name: String,
+        state: AppUiState,
+        expected: DeviceLayout = DeviceLayout.TABLET_EXPANDED,
+        wholeScreen: Boolean = false,
+    ) {
         var layout: DeviceLayout? = null
-        compose.captureScreen(name) {
-            AppUnderTest(state) { layout = it }
+        // Dialogs open on top of the settled screen (see captureScreen).
+        var shown by mutableStateOf(state.copy(dialog = null))
+        val reveal: (() -> Unit)? = if (state.dialog == null) null else fun() { shown = state }
+        compose.captureScreen(name, wholeScreen = wholeScreen, reveal = reveal) {
+            AppUnderTest(shown) { layout = it }
         }
         assertEquals(expected, layout)
     }
@@ -64,6 +75,10 @@ class TabletScreensTest {
     @Test fun playlist() = capture("tablet_playlist", FakeScreens.playlist(MOVIE_NIGHT))
 
     @Test fun settings() = capture("tablet_settings", FakeScreens.settingsPage())
+
+    @Test fun addSourceDialog() = capture("tablet_dialog_add_source", FakeScreens.addSourceDialog(), wholeScreen = true)
+
+    @Test fun jellyfinDialog() = capture("tablet_dialog_jellyfin", FakeScreens.jellyfinDialog(), wholeScreen = true)
 
     @Test
     @Config(qualifiers = PORTRAIT)

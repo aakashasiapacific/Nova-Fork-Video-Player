@@ -28,6 +28,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -42,7 +43,9 @@ import com.aakash.novafork.ui.common.VideoMenuBox
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.BrowseDirUi
 import com.aakash.novafork.ui.model.FolderUi
+import com.aakash.novafork.ui.model.RemoteFileUi
 import com.aakash.novafork.ui.model.Route
+import com.aakash.novafork.ui.model.VideoCardUi
 
 @Composable
 fun PhoneBrowseDirScreen(
@@ -73,7 +76,7 @@ fun PhoneBrowseDirScreen(
 @Composable
 private fun BrowseDirContent(dir: BrowseDirUi, actions: AppActions) {
     val dims = LocalNovaDimens.current
-    val isEmpty = dir.folders.isEmpty() && dir.videos.isEmpty()
+    val isEmpty = dir.isEmpty
     val error = dir.error
 
     if (dir.crumbs.size > 1) {
@@ -133,6 +136,10 @@ private fun BrowseDirContent(dir: BrowseDirUi, actions: AppActions) {
                         onLongClick = openMenu,
                     )
                 }
+            }
+            // Not scanned yet: played straight from the server.
+            items(dir.files, key = { "file:${it.uri}" }) { file ->
+                RemoteFileRow(file = file, onClick = { actions.playRemote(file.uri, file.name) })
             }
         }
     }
@@ -204,12 +211,19 @@ private fun FolderRow(folder: FolderUi, onClick: () -> Unit) {
             }
         },
         headlineContent = { Text(folder.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-        supportingContent = { Text(countLabel(folder.videoCount, "video")) },
+        supportingContent = { Text(folder.note ?: countLabel(folder.videoCount, "video")) },
         trailingContent = {
             NovaIcon(R.drawable.ic_chevron_right, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
         },
         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
     )
+}
+
+/** A file of a live listing the library doesn't hold yet, drawn like a library video's row. */
+@Composable
+private fun RemoteFileRow(file: RemoteFileUi, onClick: () -> Unit) {
+    val card = remember(file) { VideoCardUi(id = 0L, title = file.name, subtitle = file.subtitle, artwork = file.artwork) }
+    PhoneVideoRow(card = card, onClick = onClick)
 }
 
 @Composable
