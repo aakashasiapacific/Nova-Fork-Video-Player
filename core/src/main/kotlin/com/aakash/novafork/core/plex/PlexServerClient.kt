@@ -13,8 +13,9 @@ import okhttp3.Request
  * [token] (X-Plex-Token: the account's, or the server's own for a shared server; null for a server
  * that lets this network in without one). JSON answers (Accept: application/json). Main-safe and
  * cancellable; every failure is a [PlexException] with a message fit for the user. The token goes
- * in a header, never in the URLs of API calls; only [withToken] and [imageUrl] put it into a URL
- * (for the player and the image loader, which can't send headers).
+ * in a header ([TOKEN_HEADER]), never in the URLs this client hands out; only [withToken] puts it
+ * into one, for the player, which can't send headers. Image URLs go without: whoever loads them
+ * sends the token as a header, so stored artwork URLs never carry it.
  */
 class PlexServerClient(
     private val http: OkHttpClient,
@@ -76,8 +77,9 @@ class PlexServerClient(
 
     /**
      * A full image URL for a server path ([PlexMetadata.thumb], art…), scaled by the server's photo
-     * transcoder to [width]×[height], with the token so an image loader can fetch it as it is. A
-     * path that is already an http(s) URL (some agents link outside images) is returned unchanged.
+     * transcoder to [width]×[height]. It has no token, so it can be stored: the image loader sends
+     * the token as an [TOKEN_HEADER] header to this server. A path that is already an http(s) URL
+     * (some agents link outside images) is returned unchanged.
      */
     fun imageUrl(path: String?, width: Int, height: Int): String? {
         val source = path?.trim()?.takeIf { it.isNotEmpty() } ?: return null
@@ -88,7 +90,6 @@ class PlexServerClient(
             "minSize" to "1",
             "upscale" to "1",
             "url" to source,
-            TOKEN_PARAM to token,
         )
         return urlOrNull(listOf("photo", ":", "transcode"), query)?.toString()
     }
@@ -232,6 +233,9 @@ class PlexServerClient(
         const val DEFAULT_PAGE_SIZE = 300
         val DEFAULT_RETRY_DELAYS_MS: List<Long> = listOf(1_000L)
 
+        /** The header requests to a server (and plex.tv) carry the token in. */
+        const val TOKEN_HEADER = "X-Plex-Token"
+
         private const val TOKEN_PARAM = "X-Plex-Token"
         private const val CLIENT_PARAM = "X-Plex-Client-Identifier"
         private const val PRODUCT_PARAM = "X-Plex-Product"
@@ -253,6 +257,6 @@ internal fun plexHeaders(info: PlexClientInfo, token: String?): Headers {
         .add("X-Plex-Device", ServerHttp.headerValue(info.device))
         .add("X-Plex-Device-Name", ServerHttp.headerValue(info.deviceName))
     info.platformVersion?.let { builder.add("X-Plex-Platform-Version", ServerHttp.headerValue(it)) }
-    token?.let { builder.add("X-Plex-Token", ServerHttp.headerValue(it)) }
+    token?.let { builder.add(PlexServerClient.TOKEN_HEADER, ServerHttp.headerValue(it)) }
     return builder.build()
 }

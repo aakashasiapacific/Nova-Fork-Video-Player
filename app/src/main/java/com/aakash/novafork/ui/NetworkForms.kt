@@ -82,6 +82,17 @@ object NetworkForms {
         )
     }
 
+    /**
+     * The dialog's warning for [form]: its login or token would cross the internet unencrypted
+     * (see NetworkSources.cleartextWarning). Null when not, and while the form isn't a source yet.
+     */
+    fun cleartextWarning(form: NetworkSourceForm): String? =
+        try {
+            NetworkSources.cleartextWarning(NetworkSources.toSource(toInput(form)))
+        } catch (e: IllegalArgumentException) {
+            null
+        }
+
     /** A saved source as the dialog shows it for editing. */
     fun formFor(source: SourceEntity): NetworkSourceForm {
         val base = NetworkSourceForm(

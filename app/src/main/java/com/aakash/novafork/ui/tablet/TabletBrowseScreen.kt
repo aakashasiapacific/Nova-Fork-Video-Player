@@ -264,7 +264,6 @@ private fun LazyListScope.sectionHeader(key: String, title: String) {
     }
 }
 
-
 @Composable
 private fun RowIcon(@DrawableRes icon: Int, tint: Color = MaterialTheme.colorScheme.primary) {
     Box(

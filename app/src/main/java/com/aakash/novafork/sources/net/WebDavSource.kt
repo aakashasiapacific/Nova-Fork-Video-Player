@@ -25,7 +25,7 @@ import javax.net.ssl.SSLException
  * PROPFIND through core [WebDavClient] (HTTP Basic login), libVLC plays the files over http(s)
  * with the login as the URI's user info, added only at playback ([playUri]) so it is never stored.
  * Posters and fanart next to the videos are picked with core ArtworkRules; loading them needs the
- * login too (see [WebDavAuthInterceptor]).
+ * login too, which the image loader adds (see SourceImageAuth).
  */
 internal class WebDavSource(private val client: WebDavClient) : NetworkBrowser, SourceScanner, PlaybackOptions {
 

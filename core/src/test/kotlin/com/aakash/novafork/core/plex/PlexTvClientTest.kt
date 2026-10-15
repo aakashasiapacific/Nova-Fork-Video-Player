@@ -7,6 +7,7 @@ import okhttp3.mockwebserver.Dispatcher
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import okhttp3.mockwebserver.RecordedRequest
+import okhttp3.mockwebserver.SocketPolicy
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -103,6 +104,48 @@ class PlexTvClientTest {
         }
         val timedOut = expectFailure { plexTv.awaitToken(pinOf(pin(null)), pollIntervalMs = 5, timeoutMs = 50) }
         assertEquals("The code expired. Get a new one.", timedOut.message)
+    }
+
+    @Test
+    fun aCheckThatFailsOnTheWayKeepsTheWaitGoing() = runBlocking<Unit> {
+        // The phone loses the network while the person is at plex.tv/link, and plex.tv has a bad moment.
+        server.enqueue(MockResponse().setSocketPolicy(SocketPolicy.DISCONNECT_AT_START))
+        server.enqueue(json(pin(null)))
+        server.enqueue(MockResponse().setResponseCode(502))
+        server.enqueue(MockResponse().setResponseCode(429))
+        server.enqueue(json("<html>Wi-Fi login</html>"))
+        server.enqueue(json(pin("account-token")))
+        val failures = ArrayList<Int>()
+
+        val token = plexTv.awaitToken(pinOf(pin(null)), pollIntervalMs = 1) { failures += it.code }
+        assertEquals("account-token", token)
+        assertEquals(listOf(0, 502, 429, 0), failures)
+        assertEquals(6, server.requestCount)
+    }
+
+    @Test
+    fun onlyTheCodeItselfEndsTheWaitEarly() = runBlocking<Unit> {
+        server.enqueue(MockResponse().setResponseCode(503))
+        server.enqueue(MockResponse().setResponseCode(401))
+        val refused = expectFailure { plexTv.awaitToken(pinOf(pin(null)), pollIntervalMs = 1) }
+        assertEquals(401, refused.code)
+        assertEquals(2, server.requestCount)
+
+        server.enqueue(MockResponse().setResponseCode(500))
+        server.enqueue(MockResponse().setResponseCode(410))
+        assertEquals(410, expectFailure { plexTv.awaitToken(pinOf(pin(null)), pollIntervalMs = 1) }.code)
+    }
+
+    @Test
+    fun runningOutOfTimeWhilePlexTvIsDownSaysWhy() = runBlocking<Unit> {
+        server.dispatcher = object : Dispatcher() {
+            override fun dispatch(request: RecordedRequest): MockResponse = MockResponse().setResponseCode(503)
+        }
+        val down = expectFailure { plexTv.awaitToken(pinOf(pin(null)), pollIntervalMs = 1, timeoutMs = 40) }
+        assertEquals(503, down.code)
+        assertEquals("plex.tv had a problem (HTTP 503)", down.message)
+        // Backed off rather than asked every millisecond.
+        assertTrue(server.requestCount.toString(), server.requestCount in 2..10)
     }
 
     @Test

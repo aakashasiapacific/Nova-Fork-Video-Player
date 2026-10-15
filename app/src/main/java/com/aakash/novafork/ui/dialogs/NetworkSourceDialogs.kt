@@ -1,9 +1,11 @@
 package com.aakash.novafork.ui.dialogs
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -35,6 +37,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
@@ -266,6 +269,7 @@ internal fun NetworkServerDialog(dialog: DialogUi.NetworkServer, actions: AppAct
                         supporting = "Your X-Plex-Token",
                     )
                 }
+                NetworkForms.cleartextWarning(connection)?.let { CleartextWarning(it) }
                 Spacer(Modifier.height(2.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     OutlinedButton(
@@ -423,17 +427,23 @@ private fun LibraryChoice(
     }
 }
 
-/** Plex sign-in without a token: a code to enter at plex.tv/link, then the account's servers. */
+/**
+ * Plex sign-in without a token: a code to enter at plex.tv/link, then the account's servers. An
+ * error (an expired code, a server that couldn't be added) shows above whatever is still useful.
+ */
 @Composable
 private fun PlexSignInPanel(signIn: PlexSignInUi?, form: NetworkSourceForm, actions: AppActions) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        // The dialog itself is surfaceContainerHigh: an outline sets the panel apart.
+        color = Color.Transparent,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             val error = signIn?.error
             val servers = signIn?.servers
+            if (error != null) TestResultLine(error)
             when {
                 signIn == null -> {
                     Text("Sign in with plex.tv", style = MaterialTheme.typography.titleSmall)
@@ -443,13 +453,6 @@ private fun PlexSignInPanel(signIn: PlexSignInUi?, form: NetworkSourceForm, acti
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     FilledTonalButton(onClick = actions::startPlexSignIn) { Text("Sign in with a code") }
-                }
-                error != null -> {
-                    TestResultLine(error)
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        FilledTonalButton(onClick = actions::startPlexSignIn) { Text("Get a new code") }
-                        TextButton(onClick = actions::cancelPlexSignIn) { Text("Cancel") }
-                    }
                 }
                 servers != null -> {
                     Text("Pick a server", style = MaterialTheme.typography.titleSmall)
@@ -463,6 +466,10 @@ private fun PlexSignInPanel(signIn: PlexSignInUi?, form: NetworkSourceForm, acti
                     servers.forEach { server ->
                         PlexServerRow(server = server, onClick = { actions.pickPlexServer(server.id, form) })
                     }
+                    TextButton(onClick = actions::cancelPlexSignIn) { Text("Cancel") }
+                }
+                error != null -> PanelButtons {
+                    FilledTonalButton(onClick = actions::startPlexSignIn) { Text("Get a new code") }
                     TextButton(onClick = actions::cancelPlexSignIn) { Text("Cancel") }
                 }
                 else -> {
@@ -487,7 +494,7 @@ private fun PlexSignInPanel(signIn: PlexSignInUi?, form: NetworkSourceForm, acti
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    PanelButtons {
                         FilledTonalButton(onClick = { actions.openWebPage(signIn.linkUrl) }) { Text("Open $link") }
                         TextButton(onClick = actions::cancelPlexSignIn) { Text("Cancel") }
                     }
@@ -497,12 +504,26 @@ private fun PlexSignInPanel(signIn: PlexSignInUi?, form: NetworkSourceForm, acti
     }
 }
 
+/** Buttons side by side, wrapping to a second line in a narrow dialog. */
+@Composable
+private fun PanelButtons(content: @Composable () -> Unit) {
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        content()
+    }
+}
+
 @Composable
 private fun PlexServerRow(server: PlexServerUi, onClick: () -> Unit) {
     Surface(
         onClick = onClick,
         enabled = server.reachable,
-        modifier = Modifier.fillMaxWidth(),
+        // A server plex.tv lists no address for can't be added.
+        modifier = Modifier
+            .fillMaxWidth()
+            .alpha(if (server.reachable) 1f else DISABLED_ALPHA),
         shape = RoundedCornerShape(12.dp),
         color = MaterialTheme.colorScheme.surfaceContainerHighest,
     ) {
@@ -519,8 +540,26 @@ private fun PlexServerRow(server: PlexServerUi, onClick: () -> Unit) {
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            NovaIcon(R.drawable.ic_chevron_right, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (server.reachable) {
+                NovaIcon(R.drawable.ic_chevron_right, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
         }
+    }
+}
+
+private const val DISABLED_ALPHA = 0.5f
+
+/** The login or token would cross the internet unencrypted (NetworkForms.cleartextWarning). */
+@Composable
+private fun CleartextWarning(text: String) {
+    Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        NovaIcon(
+            R.drawable.ic_lock_open,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.error,
+            modifier = Modifier.size(20.dp),
+        )
+        Text(text = text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
     }
 }
 
@@ -584,20 +623,17 @@ internal fun UpnpServersDialog(dialog: DialogUi.UpnpServers, actions: AppActions
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
+                // Servers that don't answer the search (another subnet, multicast blocked) are added by address.
+                TextButton(onClick = { actions.showDialog(DialogUi.NetworkServer(NetworkSourceForm(type = SourceType.UPNP))) }) {
+                    Text("Enter an address instead")
+                }
             }
         },
         confirmButton = {
             TextButton(onClick = actions::discoverUpnpServers, enabled = !dialog.searching) { Text("Search again") }
         },
         dismissButton = {
-            Row {
-                TextButton(
-                    onClick = { actions.showDialog(DialogUi.NetworkServer(NetworkSourceForm(type = SourceType.UPNP))) },
-                ) {
-                    Text("Enter address")
-                }
-                TextButton(onClick = actions::dismissDialog) { Text("Cancel") }
-            }
+            TextButton(onClick = actions::dismissDialog) { Text("Cancel") }
         },
     )
 }

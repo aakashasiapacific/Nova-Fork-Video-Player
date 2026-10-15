@@ -6,6 +6,7 @@ import com.aakash.novafork.data.db.SourceType
 import com.aakash.novafork.ui.NetworkForms
 import com.aakash.novafork.ui.model.NetworkSourceForm
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
 import org.junit.Test
@@ -137,9 +138,40 @@ class NetworkFormsTest {
     }
 
     @Test
+    fun everyEditedTypeSavesTheLocationItCameFrom() {
+        val locations = listOf(
+            SourceType.FTP to "ftpes://nas.local/Media",
+            SourceType.SFTP to "sftp://seedbox.example.net:2222/downloads/tv",
+            SourceType.NFS to "nfs://nas/export/video",
+            SourceType.WEBDAV to "http://dav.local:8080/files/Movies",
+            SourceType.UPNP to "uuid:4d696e69-444c-164e-9d41-b827eb54e939",
+            SourceType.UPNP to "http://192.168.1.9:8200/rootDesc.xml",
+            SourceType.JELLYFIN to "https://jellyfin.example.com",
+            SourceType.EMBY to "http://192.168.1.5:8096",
+            SourceType.PLEX to "https://192-168-1-5.abc.plex.direct:32400",
+        )
+        for ((type, location) in locations) {
+            val saved = SourceEntity(type = type, name = "x", location = location, username = "ann", token = "tok")
+            val again = NetworkSources.toSource(NetworkForms.toInput(NetworkForms.formFor(saved)))
+            assertEquals("$type $location", location, again.location)
+        }
+    }
+
+    @Test
     fun typeLabels() {
         assertEquals("DLNA", NetworkForms.typeLabel(SourceType.UPNP))
         assertEquals("WebDAV", NetworkForms.typeLabel(SourceType.WEBDAV))
         assertEquals("Jellyfin", NetworkForms.typeLabel(SourceType.JELLYFIN))
+    }
+
+    @Test
+    fun theDialogWarnsWhileTheFormWouldSendALoginUnencrypted() {
+        val form = NetworkSourceForm(type = SourceType.WEBDAV, address = "http://cloud.example.com", path = "remote.php/dav", username = "ann", password = "pw")
+        assertNotNull(NetworkForms.cleartextWarning(form))
+        assertNull(NetworkForms.cleartextWarning(form.copy(address = "cloud.example.com")))
+        assertNull(NetworkForms.cleartextWarning(form.copy(username = "")))
+        // Not a source yet: nothing to say.
+        assertNull(NetworkForms.cleartextWarning(form.copy(address = "ftp://cloud.example.com")))
+        assertNull(NetworkForms.cleartextWarning(NetworkSourceForm(type = SourceType.PLEX, address = "", token = "tok")))
     }
 }

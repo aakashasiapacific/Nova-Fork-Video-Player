@@ -18,7 +18,10 @@ import java.io.InterruptedIOException
 import java.net.ConnectException
 import java.net.NoRouteToHostException
 import java.net.UnknownHostException
+import java.security.cert.CertPathValidatorException
+import java.security.cert.CertificateException
 import javax.net.ssl.SSLException
+import javax.net.ssl.SSLPeerUnverifiedException
 import kotlin.coroutines.resumeWithException
 
 /**
@@ -107,12 +110,18 @@ internal object ServerHttp {
         }
     }
 
-    /** Why [host] could not be reached, in words people can act on. */
+    /**
+     * Why [host] could not be reached, in words people can act on. A failed https connection is
+     * never answered with "use http": that would send the password or token unencrypted, to
+     * whoever stands in the middle when the certificate is what failed.
+     */
     fun unreachableMessage(e: IOException, host: String): String {
         val causes = generateSequence<Throwable>(e) { current -> current.cause?.takeIf { it !== current } }.take(10).toList()
         return when {
             causes.any { it is UnknownHostException } -> "Can't find $host on the network"
-            causes.any { it is SSLException } -> "Couldn't make a secure connection to $host. Try http:// instead of https://"
+            causes.any { it is CertificateException || it is CertPathValidatorException || it is SSLPeerUnverifiedException } ->
+                "$host's certificate isn't trusted (self-signed, expired or made out to another name), so Nova Fork won't connect"
+            causes.any { it is SSLException } -> "Couldn't make a secure connection to $host. Does it speak https on this port?"
             causes.any { it is ConnectException || it is NoRouteToHostException } -> "Can't connect to $host. Is the server running?"
             // SocketTimeoutException and OkHttp's call timeout are both InterruptedIOExceptions.
             causes.any { it is InterruptedIOException } -> "$host didn't answer"

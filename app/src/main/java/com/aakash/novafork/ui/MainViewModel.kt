@@ -52,6 +52,7 @@ import com.aakash.novafork.ui.model.TopDestination
 import com.aakash.novafork.ui.model.UpnpServerUi
 import java.io.IOException
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
@@ -620,6 +621,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
     override fun pickPlexServer(serverId: String, form: NetworkSourceForm) {
         val account = plexAccount ?: return
         val server = account.servers.firstOrNull { it.clientIdentifier == serverId } ?: return
+        // A failure with another server (or an earlier try) says nothing about this one.
+        updatePlexSignIn { it.copy(error = null) }
         val input = plexSignIn.sourceInput(server, account.token, form.name)
         if (input == null) {
             updatePlexSignIn { it.copy(error = "plex.tv lists no address for ${server.name.nonBlank() ?: "this server"}") }
@@ -737,37 +740,45 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
         val known = local.value.listings[key]
         if (!refresh && known != null && (known.loading || known.error == null)) return
         listingJobs.remove(key)?.cancel()
-        val job = viewModelScope.launch {
-            val source = try {
-                library.source(sourceId)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                Log.w(TAG, "Reading source $sourceId failed", e)
-                null
-            }
-            if (source == null || source.type !in NetworkSources.TYPES) return@launch
-            updateListing(key) { it.copy(loading = true, error = null) }
-            val outcome = try {
-                val browser = graph.browsers[source.type]
-                    ?: throw IOException("${NetworkForms.typeLabel(source.type)} sources can't be browsed")
-                Result.success(browser.list(source, path))
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                logNetwork("Listing a folder failed", e)
-                Result.failure(e)
-            }
-            updateListing(key) { listing ->
-                outcome.fold(
-                    onSuccess = { entries -> RemoteListing(entries = entries) },
-                    onFailure = { listing.copy(loading = false, error = userText(it, "Couldn't open this folder")) },
-                )
+        // Started lazily so it is in listingJobs before its body runs (and removes it) on the main thread.
+        val job = viewModelScope.launch(start = CoroutineStart.LAZY) {
+            try {
+                listFolder(key)
+            } finally {
+                if (listingJobs[key] === coroutineContext[Job]) listingJobs.remove(key)
             }
         }
         listingJobs[key] = job
-        // Runs on the main thread like everything touching listingJobs (or at once, when already done).
-        job.invokeOnCompletion { if (listingJobs[key] === job) listingJobs.remove(key) }
+        job.start()
+    }
+
+    private suspend fun listFolder(key: ListingKey) {
+        val source = try {
+            library.source(key.sourceId)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.w(TAG, "Reading source ${key.sourceId} failed", e)
+            null
+        }
+        if (source == null || source.type !in NetworkSources.TYPES) return
+        updateListing(key) { it.copy(loading = true, error = null) }
+        val outcome = try {
+            val browser = graph.browsers[source.type]
+                ?: throw IOException("${NetworkForms.typeLabel(source.type)} sources can't be browsed")
+            Result.success(browser.list(source, key.path))
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            logNetwork("Listing a folder failed", e)
+            Result.failure(e)
+        }
+        updateListing(key) { listing ->
+            outcome.fold(
+                onSuccess = { entries -> RemoteListing(entries = entries) },
+                onFailure = { listing.copy(loading = false, error = userText(it, "Couldn't open this folder")) },
+            )
+        }
     }
 
     private fun updateListing(key: ListingKey, transform: (RemoteListing) -> RemoteListing) {
@@ -775,7 +786,12 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
             val listings = LinkedHashMap(state.listings)
             // Taken out and put back: the most recently updated listing goes last, the oldest is dropped first.
             listings[key] = transform(listings.remove(key) ?: RemoteListing())
-            while (listings.size > MAX_LISTINGS) listings.remove(listings.keys.first())
+            // The folder on screen stays, however old: nothing would list it again while it is open.
+            val open = (state.backStack.lastOrNull() as? Route.BrowseDir)?.let { ListingKey(it.sourceId, it.path) }
+            while (listings.size > MAX_LISTINGS) {
+                val oldest = listings.keys.firstOrNull { it != open } ?: break
+                listings.remove(oldest)
+            }
             state.copy(listings = listings)
         }
     }

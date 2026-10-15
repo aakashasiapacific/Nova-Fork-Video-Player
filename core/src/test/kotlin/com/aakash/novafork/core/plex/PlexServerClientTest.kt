@@ -174,7 +174,10 @@ class PlexServerClientTest {
         assertEquals("/library/metadata/7/thumb/1700000000", image.queryParameter("url"))
         assertEquals("500", image.queryParameter("width"))
         assertEquals("750", image.queryParameter("height"))
-        assertEquals("tok-plex", image.queryParameter("X-Plex-Token"))
+        // Image URLs get stored: the image loader sends the token as a header instead.
+        assertNull(image.queryParameter("X-Plex-Token"))
+        assertFalse(image.toString(), "tok-plex" in image.toString())
+        assertEquals("X-Plex-Token", PlexServerClient.TOKEN_HEADER)
         assertEquals("https://image.tmdb.org/t/p/original/x.jpg", plex.imageUrl("https://image.tmdb.org/t/p/original/x.jpg", 500, 750))
         assertNull(plex.imageUrl(" ", 500, 750))
     }

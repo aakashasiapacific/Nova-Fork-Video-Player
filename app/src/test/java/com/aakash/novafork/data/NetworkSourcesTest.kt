@@ -78,6 +78,50 @@ class NetworkSourcesTest {
     }
 
     @Test
+    fun aMediaServerOnTheInternetTypedBareIsAskedOverHttps() {
+        source(SourceType.JELLYFIN, "jellyfin.example.com", username = "alice").let {
+            assertEquals("https://jellyfin.example.com", it.location)
+            assertNull(it.port)
+        }
+        assertEquals("https://emby.example.com:8920", source(SourceType.EMBY, "emby.example.com:8920", username = "bob").location)
+        // At home it stays on the server's own http port; a typed scheme is always kept.
+        assertEquals("http://192.168.1.5:8096", source(SourceType.JELLYFIN, "192.168.1.5", username = "alice").location)
+        assertEquals("http://jellyfin:8096", source(SourceType.JELLYFIN, "jellyfin", username = "alice").location)
+        assertEquals("http://100.101.102.103:8096", source(SourceType.JELLYFIN, "100.101.102.103", username = "alice").location)
+        assertEquals("http://jellyfin.example.com:8096", source(SourceType.JELLYFIN, "http://jellyfin.example.com:8096", username = "alice").location)
+        // Plex on 32400 has no certificate for a name of its own.
+        assertEquals("http://plex.example.com:32400", source(SourceType.PLEX, "plex.example.com").location)
+    }
+
+    @Test
+    fun loginsThatWouldCrossTheInternetUnencryptedAreWarnedAbout() {
+        fun warning(type: SourceType, address: String, username: String? = null, token: String? = null): String? =
+            NetworkSources.cleartextWarning(
+                NetworkSources.toSource(NetworkSourceInput(type = type, address = address, username = username, password = "pw", token = token)),
+            )
+
+        val webDav = warning(SourceType.WEBDAV, "http://cloud.example.com/remote.php/dav", username = "ann")
+        assertTrue(webDav.orEmpty(), webDav.orEmpty().startsWith("Not encrypted: your password would cross the internet to cloud.example.com"))
+        assertTrue(webDav.orEmpty(), webDav.orEmpty().contains("https://"))
+        assertTrue(warning(SourceType.JELLYFIN, "http://jellyfin.example.com:8096", username = "ann").orEmpty().contains("your password and sign-in"))
+        assertTrue(warning(SourceType.EMBY, "http://203.0.113.5:8096", username = "ann") != null)
+        assertTrue(warning(SourceType.PLEX, "plex.example.com", token = "tok").orEmpty().contains("your Plex token"))
+        assertTrue(warning(SourceType.FTP, "ftp.example.com/videos", username = "ann").orEmpty().contains("ftps:// or ftpes://"))
+
+        // Encrypted, at home, or nothing secret to send: no warning.
+        assertNull(warning(SourceType.WEBDAV, "cloud.example.com/remote.php/dav", username = "ann"))
+        assertNull(warning(SourceType.WEBDAV, "http://nas.local:5005/video", username = "ann"))
+        assertNull(warning(SourceType.WEBDAV, "http://cloud.example.com/public"))
+        assertNull(warning(SourceType.JELLYFIN, "jellyfin.example.com", username = "ann"))
+        assertNull(warning(SourceType.JELLYFIN, "http://192.168.1.5:8096", username = "ann"))
+        assertNull(warning(SourceType.PLEX, "plex.example.com"))
+        assertNull(warning(SourceType.PLEX, "https://1-2-3-4.abc.plex.direct:32400", token = "tok"))
+        assertNull(warning(SourceType.FTP, "ftpes://ftp.example.com", username = "ann"))
+        assertNull(warning(SourceType.FTP, "ftp.example.com"))
+        assertNull(warning(SourceType.SFTP, "sftp.example.com", username = "ann"))
+    }
+
+    @Test
     fun upnpTakesADescriptionUrlOrAUdn() {
         source(SourceType.UPNP, "uuid:4d696e69-444c-164e-9d41-001e0680ae1d").let {
             assertEquals("uuid:4d696e69-444c-164e-9d41-001e0680ae1d", it.location)

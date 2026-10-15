@@ -46,18 +46,55 @@ class PlexTvClient(
 
     /**
      * Polls [pin] every [pollIntervalMs] until someone links it, and returns the account's token.
-     * Gives up (PlexException "The code expired…") after [timeoutMs], by default when the PIN
-     * expires. Cancel the coroutine to stop waiting.
+     * The person is in a browser meanwhile, often with this app in the background, so a check that
+     * fails on the network or with 408, 429 or a 5xx only goes to [onCheckFailed]: polling goes
+     * on, further apart (up to 30 s) while plex.tv answers with errors. Only an expired or refused
+     * code ends the wait early. Gives up after [timeoutMs], by default when the PIN expires: with
+     * "The code expired…", or with the last check's failure when that one failed. Cancel the
+     * coroutine to stop waiting.
      */
-    suspend fun awaitToken(pin: PlexPin, pollIntervalMs: Long = DEFAULT_POLL_INTERVAL_MS, timeoutMs: Long? = null): String {
+    suspend fun awaitToken(
+        pin: PlexPin,
+        pollIntervalMs: Long = DEFAULT_POLL_INTERVAL_MS,
+        timeoutMs: Long? = null,
+        onCheckFailed: (PlexException) -> Unit = {},
+    ): String {
         val limit = timeoutMs ?: ((pin.expiresIn?.takeIf { it > 0 }?.toLong() ?: DEFAULT_PIN_LIFETIME_S) * 1000L)
         val deadline = System.nanoTime() + limit * 1_000_000L
+        val interval = pollIntervalMs.coerceAtLeast(1L)
+        var busyChecks = 0
         while (true) {
-            val token = checkPin(pin).authToken?.trim()
+            var failure: PlexException? = null
+            val token = try {
+                checkPin(pin).authToken?.trim()
+            } catch (e: PlexException) {
+                if (!isPassing(e)) throw e
+                onCheckFailed(e)
+                failure = e
+                null
+            }
             if (!token.isNullOrEmpty()) return token
-            if (System.nanoTime() - deadline >= 0) throw expired()
-            delay(pollIntervalMs.coerceAtLeast(1L))
+            val left = deadline - System.nanoTime()
+            if (left <= 0) throw failure ?: expired()
+            busyChecks = when {
+                failure == null -> 0
+                // No network says nothing about how busy plex.tv is.
+                failure.code == 0 -> busyChecks
+                else -> busyChecks + 1
+            }
+            // Never past the deadline: the last check comes right at it.
+            delay(pollWait(interval, busyChecks).coerceAtMost(left / 1_000_000L).coerceAtLeast(1L))
         }
+    }
+
+    /** A check that failed on the way (no network, plex.tv busy or down), not because of the code. */
+    private fun isPassing(e: PlexException): Boolean =
+        e.code == 0 || e.code == HTTP_REQUEST_TIMEOUT || e.code == HTTP_TOO_MANY_REQUESTS || e.code in 500..599
+
+    /** [interval], doubled for each check in a row that plex.tv answered with an error, up to [MAX_POLL_WAIT_MS]. */
+    private fun pollWait(interval: Long, busyChecks: Int): Long {
+        if (busyChecks == 0 || interval >= MAX_POLL_WAIT_MS) return interval
+        return (interval shl minOf(busyChecks, MAX_BACKOFF_DOUBLINGS)).coerceAtMost(MAX_POLL_WAIT_MS)
     }
 
     /** The page where a signed-in person approves [pin] (works for normal and strong PINs). */
@@ -146,6 +183,11 @@ class PlexTvClient(
 
         /** How long a PIN lives when plex.tv doesn't say: 15 minutes. */
         private const val DEFAULT_PIN_LIFETIME_S = 900L
+
+        private const val HTTP_REQUEST_TIMEOUT = 408
+        private const val HTTP_TOO_MANY_REQUESTS = 429
+        private const val MAX_POLL_WAIT_MS = 30_000L
+        private const val MAX_BACKOFF_DOUBLINGS = 4
 
         private const val HOST = "plex.tv"
     }

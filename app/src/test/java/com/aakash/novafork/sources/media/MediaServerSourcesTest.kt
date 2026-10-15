@@ -247,7 +247,6 @@ class MediaServerSourcesTest {
         assertEquals(listOf("Crime"), movieMeta.genres)
         val poster = movieMeta.posterUrl!!
         assertTrue(poster, poster.startsWith("http://plex:32400/photo/:/transcode?width=500&height=750"))
-        assertTrue(poster, poster.contains("X-Plex-Token=plex-tok"))
 
         val episode = videos[1]
         assertEquals("TV Shows/Severance/Season 1", episode.folder)
@@ -265,10 +264,15 @@ class MediaServerSourcesTest {
         assertEquals("Home Videos", videos[2].folder)
         assertNull(videos[2].serverMetadata)
 
-        // The token goes in a header (and into image URLs), never into a stored URI.
+        // The token goes in a header, never into a stored URI or artwork URL (the image loader sends it as a header too).
         assertTrue(requests.all { it.header("X-Plex-Token") == "plex-tok" })
         assertTrue(requests.all { it.header("X-Plex-Client-Identifier") == "install-1" })
         assertTrue(videos.none { "plex-tok" in it.uri })
+        val artwork = videos.mapNotNull { it.serverMetadata }.flatMap {
+            listOf(it.posterUrl, it.backdropUrl, it.episodeStillUrl, it.seasonPosterUrl)
+        }.filterNotNull()
+        assertEquals(5, artwork.size)
+        assertTrue(artwork.toString(), artwork.none { "plex-tok" in it || "X-Plex-Token" in it })
         assertTrue(requests.none { it.url.encodedPath == "/library/sections/4/all" })
         assertEquals(listOf("7 plex-tok null machine-1"), savedAuth)
     }
@@ -287,6 +291,8 @@ class MediaServerSourcesTest {
         val seasons = browser.list(source, "/library/metadata/500/children")
         assertEquals("/library/metadata/501/children", seasons.single().path)
         assertTrue(seasons.single().isDirectory)
+        assertTrue(movies.single().imageUrl.orEmpty().startsWith("http://plex:32400/photo/:/transcode?"))
+        assertFalse(movies.single().imageUrl.orEmpty().contains("plex-tok"))
 
         val playUri = PlexPlayback(connector).playUri(source, "http://plex:32400/library/parts/301/1700000000/file.mkv")
         assertTrue(playUri, playUri.startsWith("http://plex:32400/library/parts/301/1700000000/file.mkv?"))
@@ -307,6 +313,14 @@ class MediaServerSourcesTest {
             ),
         )
         assertEquals("https://192-168-1-5.abc.plex.direct:32400", PlexSignIn.address(server))
+        // Over the internet, https before http.
+        val remote = server.copy(
+            connections = listOf(
+                PlexConnection(uri = "http://5.6.7.8:32400", local = false),
+                PlexConnection(uri = "https://5-6-7-8.abc.plex.direct:32400", local = false),
+            ),
+        )
+        assertEquals("https://5-6-7-8.abc.plex.direct:32400", PlexSignIn.address(remote))
         val signIn = PlexSignIn(environment(server { 404 to "" }))
         val input = signIn.sourceInput(server, accountToken = "account-tok")!!
         assertEquals(SourceType.PLEX, input.type)

@@ -1,5 +1,6 @@
 package com.aakash.novafork.data
 
+import com.aakash.novafork.core.net.LocalAddresses
 import com.aakash.novafork.data.db.SourceEntity
 import com.aakash.novafork.data.db.SourceType
 import java.io.ByteArrayOutputStream
@@ -215,6 +216,7 @@ object NetworkSources {
         SourceType.PLEX,
     )
 
+    private const val HTTPS = "https"
     private const val JELLYFIN_PORT = 8096
     private const val PLEX_PORT = 32400
     private const val UDN_PREFIX = "uuid:"
@@ -222,7 +224,10 @@ object NetworkSources {
     /** Schemes typed for WebDAV that libVLC knows as plain http(s). */
     private val SCHEME_ALIASES = mapOf("dav" to "http", "webdav" to "http", "davs" to "https", "webdavs" to "https")
 
-    /** URI schemes a source of [type] may use; the first is the one an address without scheme gets. */
+    /**
+     * URI schemes a source of [type] may use; the first is the one an address without scheme gets
+     * (except a Jellyfin or Emby server on the internet: https, see [toSource]).
+     */
     fun schemes(type: SourceType): List<String> = when (type) {
         SourceType.FTP -> listOf("ftp", "ftps", "ftpes")
         SourceType.SFTP -> listOf("sftp")
@@ -301,8 +306,8 @@ object NetworkSources {
         val separator = address.indexOf("://")
         val typedScheme = if (separator > 0) address.substring(0, separator).lowercase(Locale.ROOT) else null
         val schemes = schemes(type)
-        val scheme = typedScheme?.let { SCHEME_ALIASES[it] ?: it } ?: schemes.first()
-        require(scheme in schemes) {
+        val namedScheme = typedScheme?.let { SCHEME_ALIASES[it] ?: it }
+        require(namedScheme == null || namedScheme in schemes) {
             "${label(type)} addresses start with " + schemes.joinToString(" or ") { "$it://" }
         }
         val rest = if (separator > 0) address.substring(separator + 3) else address
@@ -318,7 +323,12 @@ object NetworkSources {
         } else {
             body.substring(slash + 1).split('/').filter { it.isNotEmpty() }.joinToString("/") { NetworkLocation.decode(it) }
         }
-        val port = (input.port ?: addressPort ?: defaultServerPort(type)?.takeIf { typedScheme == null })
+        // A Jellyfin or Emby server on the internet typed bare is asked over https (behind a proxy,
+        // on 443): the password and token would cross the internet unencrypted on its own http port.
+        val internetServer = namedScheme == null && (type == SourceType.JELLYFIN || type == SourceType.EMBY) &&
+            !LocalAddresses.isLocal(host)
+        val scheme = namedScheme ?: if (internetServer) HTTPS else schemes.first()
+        val port = (input.port ?: addressPort ?: defaultServerPort(type)?.takeIf { typedScheme == null && !internetServer })
             ?.takeIf { it != NetworkLocation.defaultPort(scheme) }
         val location = NetworkLocation(scheme, host, port, path)
         // A description URL may need its query; the other types are base URIs without one.
@@ -341,6 +351,36 @@ object NetworkSources {
             username = user,
             password = password ?: infoPassword,
         )
+    }
+
+    /**
+     * A warning when [source] would send its login or token unencrypted over the internet: WebDAV,
+     * Jellyfin, Emby or Plex over http://, FTP over plain ftp://, to a host that isn't on the local
+     * network (see core LocalAddresses). Null when the connection is encrypted, the host is local,
+     * or there is nothing secret to send.
+     */
+    fun cleartextWarning(source: SourceEntity): String? {
+        val location = NetworkLocation.parse(source.location) ?: return null
+        val login = !source.username.isNullOrEmpty()
+        val token = !source.token.isNullOrEmpty()
+        val http = location.scheme == "http"
+        // What would go unencrypted, and the scheme that would encrypt it.
+        val (secret, secure) = when (source.type) {
+            SourceType.WEBDAV -> (if (http && login) "your password" else null) to "https://"
+            SourceType.JELLYFIN, SourceType.EMBY -> when {
+                http && login -> "your password and sign-in"
+                http && token -> "your sign-in"
+                else -> null
+            } to "https://"
+            SourceType.PLEX -> (if (http && token) "your Plex token" else null) to "https://"
+            SourceType.FTP -> (if (location.scheme == "ftp" && login) "your password" else null) to "ftps:// or ftpes://"
+            SourceType.DEVICE, SourceType.FOLDER, SourceType.SMB, SourceType.STREAM, SourceType.SFTP, SourceType.NFS,
+            SourceType.UPNP,
+            -> return null
+        }
+        if (secret == null || LocalAddresses.isLocal(location.host)) return null
+        return "Not encrypted: $secret would cross the internet to ${location.host} readable by anyone on the way. " +
+            "Use $secure if the server supports it."
     }
 
     /** [SourceEntity.libraryIds] as a list; empty = every library. */

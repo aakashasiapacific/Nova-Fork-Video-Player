@@ -31,8 +31,21 @@ internal class PlexSignIn(private val env: MediaServerEnvironment) {
     /** The page where a person already signed in to Plex in the browser approves [pin] with one tap. */
     suspend fun approvalUrl(pin: PlexPin): String = withContext(Dispatchers.IO) { plexTv.authUrl(pin) }
 
-    /** Waits (polling every 2 s) until someone entered [pin]'s code; returns the account's token. Cancel to stop. */
-    suspend fun awaitToken(pin: PlexPin): String = withContext(Dispatchers.IO) { plexTv.awaitToken(pin) }
+    /**
+     * Waits (polling every 2 s) until someone entered [pin]'s code; returns the account's token.
+     * Checks that fail on the way (no network while the person is in the browser, plex.tv busy)
+     * are logged and the wait goes on until the code expires. Cancel to stop.
+     */
+    suspend fun awaitToken(pin: PlexPin): String = withContext(Dispatchers.IO) {
+        var logged: String? = null
+        plexTv.awaitToken(pin) { failure ->
+            // Once per kind of trouble, not once per poll: the crash report's trail is short.
+            if (failure.message != logged) {
+                logged = failure.message
+                MediaServerLog.warn("Checking the Plex code failed; still waiting", failure)
+            }
+        }
+    }
 
     /** The account's token for a Plex user name (or email) and password. */
     suspend fun signIn(login: String, password: String): String = withContext(Dispatchers.IO) { plexTv.signIn(login, password) }
@@ -59,11 +72,14 @@ internal class PlexSignIn(private val env: MediaServerEnvironment) {
     }
 
     companion object {
-        /** The connection to use: on this network before the internet, direct before Plex's relay. */
+        /**
+         * The connection to use: on this network before the internet, direct before Plex's relay,
+         * and over the internet https before http (the token goes along with every request).
+         */
         fun address(server: PlexResource): String? =
             server.connections
                 .filter { it.uri.startsWith("http://") || it.uri.startsWith("https://") }
-                .sortedWith(compareBy<PlexConnection>({ it.relay }, { !it.local }))
+                .sortedWith(compareBy<PlexConnection>({ it.relay }, { !it.local }, { !it.local && !it.uri.startsWith("https://") }))
                 .firstOrNull()
                 ?.uri
     }

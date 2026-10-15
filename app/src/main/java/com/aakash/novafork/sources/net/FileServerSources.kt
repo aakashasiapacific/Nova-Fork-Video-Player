@@ -15,7 +15,6 @@ import com.aakash.novafork.sources.MAX_FOLDER_DEPTH
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
-import okhttp3.Interceptor
 
 /**
  * FTP, SFTP, NFS, UPnP and WebDAV: their scanners, browsers and playback options, as AppGraph
@@ -53,12 +52,6 @@ internal object FileServerSources {
             ),
         )
     }
-
-    /**
-     * The interceptor that gives image requests to a WebDAV server its source's login, for the
-     * OkHttp client the image loader is built with (`http.newBuilder().addInterceptor(…)`).
-     */
-    fun imageAuth(graph: AppGraph): Interceptor = WebDavAuthInterceptor(graph.appScope) { graph.library.observeSources() }
 
     /**
      * The UPnP/DLNA media servers that answer on the local network within [timeoutMs], for an

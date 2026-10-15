@@ -22,6 +22,7 @@ import com.aakash.novafork.sources.DeviceScanner
 import com.aakash.novafork.sources.FolderScanner
 import com.aakash.novafork.sources.SmbBrowserImpl
 import com.aakash.novafork.sources.SmbScanner
+import com.aakash.novafork.sources.SourceImageAuthInterceptor
 import com.aakash.novafork.sources.media.MediaServerSources
 import com.aakash.novafork.sources.net.FileServerSources
 import kotlinx.coroutines.CoroutineExceptionHandler
@@ -117,8 +118,9 @@ class AppGraph(val app: Application) {
     }
 
     val imageLoader: ImageLoader by lazy {
-        // Posters and fanart on a WebDAV server need that source's login.
-        val imageHttp = http.newBuilder().addInterceptor(FileServerSources.imageAuth(this)).build()
+        // Artwork on WebDAV and Plex servers needs that source's login or token, which stored URLs never carry.
+        val imageAuth = SourceImageAuthInterceptor(appScope) { library.observeSources() }
+        val imageHttp = http.newBuilder().addNetworkInterceptor(imageAuth).build()
         Network.createImageLoader(app, imageHttp, smb)
     }
 

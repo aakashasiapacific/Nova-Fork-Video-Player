@@ -71,6 +71,9 @@ class TabletScreensTest {
 
     @Test fun browseDir() = capture("tablet_browse_dir", FakeScreens.browseDir(MOVIES_FOLDER))
 
+    /** A Jellyfin library listed live by its NetworkBrowser, nothing scanned yet. */
+    @Test fun browseRemote() = capture("tablet_browse_remote", FakeScreens.remoteDir())
+
     /** Browse with a playlist open in the right pane. */
     @Test fun playlist() = capture("tablet_playlist", FakeScreens.playlist(MOVIE_NIGHT))
 
