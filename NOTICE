@@ -1,0 +1,7 @@
+Nova Fork uses:
+- libVLC (LGPL-2.1-or-later) — https://code.videolan.org/videolan/vlc-android
+- smbj (Apache-2.0) — https://github.com/hierynomus/smbj
+- Coil, OkHttp (Apache-2.0)
+- Material Icons (Apache-2.0) — https://github.com/google/material-design-icons
+- Inter typeface (SIL Open Font License 1.1) — https://rsms.me/inter
+- Metadata and images from TMDB. This product uses the TMDB API but is not endorsed or certified by TMDB.

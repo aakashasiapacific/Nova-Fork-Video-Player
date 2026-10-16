@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 9-11 (Android 12+ reads data_extraction_rules.xml): what Android's own backup copies.
+     Settings, the library database and what belongs to it go, like there, but only where nobody
+     else can read them: a cloud backup encrypted end to end (the device has a screen lock), or a
+     transfer to a new device. settings.xml holds API keys and the OpenSubtitles password, the
+     database share passwords and server sign-ins.
+     Only what is listed goes: the crash report, ui.xml ("asked for the storage permission
+     already"), media_servers.xml (the install id media servers know this device by) and
+     backup.xml (when a backup file was last saved here) stay with this install, and a new file
+     of the app's stays too until it is listed. The downloaded subtitles (filed under the
+     database's video ids) and a restore's waiting entries belong to the database and travel with
+     it. Android adds the database's -journal and -wal files to its entry itself.
+     Caches under cacheDir are never backed up by Android. -->
+<full-backup-content>
+    <include domain="sharedpref" path="settings.xml" requireFlags="clientSideEncryption" />
+    <include domain="sharedpref" path="library_state.xml" requireFlags="clientSideEncryption" />
+    <include domain="database" path="nova.db" requireFlags="clientSideEncryption" />
+    <include domain="file" path="subtitles" requireFlags="clientSideEncryption" />
+    <include domain="file" path="pending_restore.json" requireFlags="clientSideEncryption" />
+
+    <include domain="sharedpref" path="settings.xml" requireFlags="deviceToDeviceTransfer" />
+    <include domain="sharedpref" path="library_state.xml" requireFlags="deviceToDeviceTransfer" />
+    <include domain="database" path="nova.db" requireFlags="deviceToDeviceTransfer" />
+    <include domain="file" path="subtitles" requireFlags="deviceToDeviceTransfer" />
+    <include domain="file" path="pending_restore.json" requireFlags="deviceToDeviceTransfer" />
+</full-backup-content>
