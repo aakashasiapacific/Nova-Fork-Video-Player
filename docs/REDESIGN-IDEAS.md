@@ -65,6 +65,23 @@ What our current hero does differently:
 - an orange dot pill
 - a hero only about 45% of the screen
 
+### Dark Apple TV screenshot (owner, 2026-10-16): what it shows
+- **Colours:** a pure black background. Text is white for titles and light grey for secondary lines.
+- **Primary button:** a white pill with black text.
+- **Page dots:** white and grey, with the active one a stretched pill.
+- **Tab bar:** black, with a thin dark separator line above it. The selected tab has a dark-grey pill
+  behind its icon, a white label and white icon; the other tabs are grey.
+- **Video preview:** the hero plays a muted video preview after a moment; it shows black while loading.
+- **Mute button:** Apple TV puts it at the top right, as a dark round glass button next to the profile
+  button.
+
+### Owner's decisions on these
+- **Hero video preview:** after a short pause, the hero plays a muted preview of the video itself. For
+  our own files, that is a short clip from the middle of the video.
+- **Mute/unmute button at the bottom of the hero, not the top.** The top is out of thumb reach.
+  Proposed spot: the right end of the page-dot row, as a small dark round glass button. It sits level with
+  the dots, so the dots stay centred.
+
 ## 4. Rows under the hero
 
 - **Row headers:** large bold titles with a chevron, e.g. "Top 10 TV Shows ›". The whole header opens
