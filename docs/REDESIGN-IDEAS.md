@@ -167,3 +167,19 @@ UI, following Apple Music:
     DOWN / MUTE), changes STREAM_MUSIC with `adjustStreamVolume` without `FLAG_SHOW_UI`, so the
     system panel stays hidden, and shows its own pill. Outside the player (and in
     picture-in-picture) the system panel shows as usual.
+
+## 8. Build 36 list (owner, 2026-10-16; not built yet, more items coming)
+
+1. **Mute button:** match the owner's reference, Apple TV's button: a 44pt dark-grey (#2C2C2E-ish) solid circle
+   with a white speaker glyph (a slash across it when muted). It sits next to a same-style profile
+   button in Apple TV.
+2. **The Settings tab becomes "Preferences"** with a person icon.
+3. **Tab bar ("dock"):** it is too big and blocky, so make it slimmer. Swiping left or right on a
+   tab's page switches tabs.
+4. **The hero crops wide backdrops** (Ramaiya Vastavaiya lost most of its picture in the tall hero).
+   Decided fix: use TMDB's portrait poster *without text* (textless key art, `images` → `posters`
+   with no language) for the tall hero, as Apple TV does. Fall back to the backdrop when TMDB has
+   none.
+5. **Artwork and search:**
+   - On a movie or show page, pick another poster or backdrop from TMDB's alternatives.
+   - Search finds titles by cast and director (store the credits per title).
