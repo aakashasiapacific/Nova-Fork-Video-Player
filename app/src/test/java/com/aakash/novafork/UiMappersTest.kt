@@ -182,7 +182,9 @@ class UiMappersTest {
         val small = LibraryIndex.build(rows, listOf(device, nas), preferLocalArtwork = false)
         val hero = UiMappers.home(small).hero
         assertEquals(setOf(HeroTarget.Video(1), HeroTarget.Video(2)), hero.map { it.target }.toSet())
-        assertTrue(hero.all { it.artwork.frameSource != null && it.previewUri != null })
+        assertTrue(hero.all { it.artwork.frameSource != null })
+        // These run two minutes: longer than a hero clip, so they show a still frame and don't play.
+        assertTrue(hero.all { it.previewUri == null })
     }
 
     @Test
