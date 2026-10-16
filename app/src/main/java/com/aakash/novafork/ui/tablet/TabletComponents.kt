@@ -281,7 +281,7 @@ internal fun TabletLoading(modifier: Modifier = Modifier) {
     }
 }
 
-/** The brand mark: the launcher icon's look, a flat iOS-blue rounded square with the screen-and-play glyph. */
+/** The brand mark: the launcher icon on its iOS-blue rounded square. */
 @Composable
 internal fun BrandMark(modifier: Modifier = Modifier, size: Dp = 40.dp) {
     Box(

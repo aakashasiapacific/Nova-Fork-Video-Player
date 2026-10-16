@@ -1,19 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
     <!-- Themed icon (Android 13+): the same glyph in one colour. -->
-    <path android:fillType="evenOdd" android:fillColor="#FFFFFFFF" android:pathData="M38,33H70A11,11 0,0 1,81,44V58A11,11 0,0 1,70,69H38A11,11 0,0 1,27,58V44A11,11 0,0 1,38,33ZM38,39H70A5,5 0,0 1,75,44V58A5,5 0,0 1,70,63H38A5,5 0,0 1,33,58V44A5,5 0,0 1,38,39Z" />
-    <path android:fillColor="#FFFFFFFF" android:pathData="M45,72.5H63A3,3 0,0 1,66,75.5V75.5A3,3 0,0 1,63,78.5H45A3,3 0,0 1,42,75.5V75.5A3,3 0,0 1,45,72.5Z" />
+    <path android:fillType="evenOdd" android:fillColor="#FFFFFFFF" android:pathData="M36.72,37.44H71.28A4.32,4.32 0,0 1,75.6,41.76V61.2A4.32,4.32 0,0 1,71.28,65.52H36.72A4.32,4.32 0,0 1,32.4,61.2V41.76A4.32,4.32 0,0 1,36.72,37.44ZM36.94,40.68H71.06A1.3,1.3 0,0 1,72.36,41.98V60.98A1.3,1.3 0,0 1,71.06,62.28H36.94A1.3,1.3 0,0 1,35.64,60.98V41.98A1.3,1.3 0,0 1,36.94,40.68Z" />
+    <path android:fillColor="#FFFFFFFF" android:pathData="M46.62,69.84H61.38A1.26,1.26 0,0 1,62.64,71.1V71.1A1.26,1.26 0,0 1,61.38,72.36H46.62A1.26,1.26 0,0 1,45.36,71.1V71.1A1.26,1.26 0,0 1,46.62,69.84Z" />
     <group
-        android:pivotX="57"
+        android:pivotX="58.25"
         android:pivotY="52"
-        android:scaleX="0.40"
-        android:scaleY="0.40"
-        android:translateX="-2.2"
-        android:translateY="-1">
+        android:scaleX="0.3155"
+        android:scaleY="0.3155"
+        android:translateX="-3.37"
+        android:translateY="-0.52">
         <path android:fillColor="#FFFFFFFF" android:pathData="M42,36.5C42,33.4 45.4,31.5 48,33.1L72.6,48.6C75.1,50.2 75.1,53.8 72.6,55.4L48,70.9C45.4,72.5 42,70.6 42,67.5Z" />
     </group>
 </vector>
