@@ -145,7 +145,12 @@ UI, following Apple Music:
   the phone's: the system brightness and the volume buttons.
 - **Volume changes get an iOS-style indicator** instead of the player's current one: a slim
   vertical pill that fills as the volume changes and fades away after a moment, as on iPhone.
-- Still to settle with the owner: remove the vertical swipes altogether, or keep them but have them
-  change the phone's own brightness and volume? (Changing the system brightness needs the
-  "Modify system settings" permission.) And should the iOS-style indicator also replace Android's
-  volume panel when the hardware buttons are pressed in the player?
+- **Decided (owner, 2026-10-16):**
+  - **Remove the vertical swipes** for brightness and volume altogether. The player no longer
+    touches brightness; the phone's own brightness applies. (Horizontal scrubbing and the
+    double-tap seeks stay.)
+  - **The iOS-style indicator replaces Android's volume panel** while the player is on screen:
+    the player takes the volume keys itself (PlayerActivity's onKeyDown for KEYCODE_VOLUME_UP /
+    DOWN / MUTE), changes STREAM_MUSIC with `adjustStreamVolume` without `FLAG_SHOW_UI`, so the
+    system panel stays hidden, and shows its own pill. Outside the player (and in
+    picture-in-picture) the system panel shows as usual.
