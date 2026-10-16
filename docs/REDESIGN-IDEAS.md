@@ -5,8 +5,16 @@ screenshots show. They come before `docs/APPLE-TV-SPEC.md` wherever the two disa
 implemented yet.
 
 Reference screenshots were sent in chat; they are not in the repo:
-- Apple TV app, Home, phone, light mode
+- Apple TV app, Home, phone, light mode (layout reference only; the app will be dark only)
 - Nova Fork build 24, Home
+
+## 0. Theme: AMOLED black, dark only (decided)
+
+- **One theme only:** the Apple TV app's dark (night) look, on a pure black `#000000` background.
+- **No light theme and no system light/dark switch.** One theme keeps the work and the testing at half
+  the size.
+- Reference screenshots of the dark Apple TV app come from the owner. The light-mode screenshot in the
+  notes below was only used for layout and proportions.
 
 ## 1. Navigation: four tabs, in this order
 
@@ -97,7 +105,7 @@ UI, following Apple Music:
    categories and the sources list (folders, network shares, servers) go? Options:
    - inside the Video tab, behind row headers and a "Library" entry;
    - in Settings.
-2. **Theme:** light, dark, or follow the system? The Apple TV screenshot is in light mode.
+2. ~~Theme~~: decided. AMOLED black, dark only (section 0).
 3. **The hero's round "+" button:** add to a playlist, a new "Watchlist", or something else?
 4. **Music sources:** only files on the phone and in picked folders, or also network shares and
    Jellyfin/Plex music?
