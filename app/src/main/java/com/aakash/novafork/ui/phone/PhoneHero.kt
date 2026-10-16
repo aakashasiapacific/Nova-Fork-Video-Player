@@ -47,8 +47,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -285,19 +289,34 @@ private fun PhoneHeroPage(hero: HeroUi, preview: Boolean, muted: Boolean, action
 }
 
 /**
- * The hero's picture. A backdrop (or episode still) fills it. A video without one gets what it
- * has, its poster or a frame of the video, blurred to fill the hero with a sharp copy on top
- * (the poster in its own shape, the frame full width), so it never shows a bare placeholder.
+ * The hero's picture, never a bare crop of a wide image:
+ * - TMDB's portrait poster without text ([Artwork.tallUrl]) fills the tall hero, as Apple TV's
+ *   key art does;
+ * - else a backdrop (or still) fills the top 60% (far less cropped than filling the whole hero)
+ *   and fades into a blurred copy of itself;
+ * - else the poster or a frame of the video, sharp over a blurred copy.
  */
 @Composable
 private fun HeroArt(artwork: Artwork, modifier: Modifier = Modifier) {
-    val sharp = artwork.posterUrl ?: artwork.frameSource
-    if (artwork.backdropUrl != null || artwork.stillUrl != null || sharp == null) {
+    val tall = artwork.tallUrl
+    if (tall != null) {
+        ArtImage(
+            candidates = listOfNotNull(tall, artwork.backdropUrl, artwork.posterUrl),
+            contentDescription = null,
+            modifier = modifier,
+            alignment = Alignment.TopCenter,
+        ) {
+            ArtPlaceholder(seed = artwork.seed, title = null, modifier = Modifier.fillMaxSize())
+        }
+        return
+    }
+    val wide = artwork.backdropUrl ?: artwork.stillUrl
+    val sharp = wide ?: artwork.posterUrl ?: artwork.frameSource
+    if (sharp == null) {
         BackdropArt(artwork = artwork, modifier = modifier)
         return
     }
-    val candidates = listOfNotNull(artwork.posterUrl, artwork.frameSource)
-    val isPoster = artwork.posterUrl != null
+    val candidates = listOfNotNull(sharp, artwork.frameSource).distinct()
     BoxWithConstraints(modifier) {
         ArtImage(
             candidates = candidates,
@@ -314,14 +333,25 @@ private fun HeroArt(artwork: Artwork, modifier: Modifier = Modifier) {
                 .fillMaxSize()
                 .background(Color.Black.copy(alpha = 0.35f)),
         )
-        val sharpModifier = if (isPoster) {
-            Modifier
+        val sharpModifier = when {
+            wide != null -> Modifier
+                .fillMaxWidth()
+                .fillMaxHeight(0.6f)
+                .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+                .drawWithContent {
+                    drawContent()
+                    // Fades the picture's lower edge into the blur instead of a hard line.
+                    drawRect(
+                        Brush.verticalGradient(0.7f to Color.Black, 1f to Color.Transparent),
+                        blendMode = BlendMode.DstIn,
+                    )
+                }
+            artwork.posterUrl != null -> Modifier
                 .padding(top = maxHeight * 0.09f)
                 .fillMaxHeight(0.5f)
                 .aspectRatio(2f / 3f)
                 .clip(RoundedCornerShape(12.dp))
-        } else {
-            Modifier
+            else -> Modifier
                 .padding(top = maxHeight * 0.16f)
                 .fillMaxWidth()
                 .aspectRatio(16f / 9f)
@@ -378,21 +408,21 @@ private fun PagerDots(count: Int, current: Int, fill: Float, modifier: Modifier 
     }
 }
 
-/** A small dark round glass button, level with the dots. */
+/** Apple TV's mute button (owner's reference): a solid dark-grey circle with a white speaker, level with the dots. */
 @Composable
 private fun MuteButton(muted: Boolean, onClick: () -> Unit) {
     IconButton(
         onClick = onClick,
-        modifier = Modifier.size(36.dp),
+        modifier = Modifier.size(42.dp),
         colors = IconButtonDefaults.iconButtonColors(
-            containerColor = Color.Black.copy(alpha = 0.45f),
+            containerColor = Color(0xE62C2C2E),
             contentColor = Color.White,
         ),
     ) {
         NovaIcon(
             if (muted) R.drawable.ic_volume_off else R.drawable.ic_volume_up,
             contentDescription = if (muted) "Unmute preview" else "Mute preview",
-            modifier = Modifier.size(18.dp),
+            modifier = Modifier.size(22.dp),
         )
     }
 }

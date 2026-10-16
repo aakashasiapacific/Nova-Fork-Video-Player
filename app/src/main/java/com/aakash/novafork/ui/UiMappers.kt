@@ -5,6 +5,7 @@ import com.aakash.novafork.core.smb.SmbUris
 import com.aakash.novafork.core.tmdb.TmdbClient
 import com.aakash.novafork.data.PlaylistWithCount
 import com.aakash.novafork.data.ScanState
+import com.aakash.novafork.data.db.MetadataEntity
 import com.aakash.novafork.data.db.SourceEntity
 import com.aakash.novafork.data.db.SourceType
 import com.aakash.novafork.data.music.MusicLibrary
@@ -115,7 +116,7 @@ object UiMappers {
             .forEach { add(it.second) }
         // sortedByDescending is stable, so the order above survives within each group.
         val main = candidates.values
-            .sortedByDescending { it.artwork.backdropUrl != null }
+            .sortedByDescending { it.artwork.tallUrl != null || it.artwork.backdropUrl != null }
             .take(HERO_LIMIT)
         if (main.size >= HERO_LIMIT) return main
         // A library with few movies and shows fills the hero with its newest personal videos too,
@@ -660,13 +661,15 @@ object UiMappers {
         for (video in index.videos) {
             val matches = video.title.contains(needle, ignoreCase = true) ||
                 video.showTitle?.contains(needle, ignoreCase = true) == true ||
-                video.video.fileName.contains(needle, ignoreCase = true)
+                video.video.fileName.contains(needle, ignoreCase = true) ||
+                creditsMatch(video.meta, needle)
             if (!matches) continue
             val showKey = video.showKey
             if (showKey != null) showKeys += showKey else entries += videoEntry(video)
         }
         // A matched show's TMDB name can differ from what its files are called.
-        index.shows.filter { it.title.contains(needle, ignoreCase = true) }.forEach { showKeys += it.key }
+        index.shows.filter { it.title.contains(needle, ignoreCase = true) || creditsMatch(it.meta, needle) }
+            .forEach { showKeys += it.key }
         showKeys.mapNotNullTo(entries) { key -> index.showsByKey[key]?.let(::showEntry) }
         val ranked = entries.sortedWith(
             compareBy<Entry> { !it.item.title.startsWith(needle, ignoreCase = true) }.then(ENTRY_TITLE_ORDER),
@@ -705,6 +708,16 @@ object UiMappers {
             },
         )
     }
+
+    /** Cast or director (creator, for shows) names of a TMDB title contain [needle]. */
+    private fun creditsMatch(meta: MetadataEntity?, needle: String): Boolean {
+        if (meta == null || needle.length < MIN_CREDIT_QUERY) return false
+        return meta.castNames?.contains(needle, ignoreCase = true) == true ||
+            meta.directors?.contains(needle, ignoreCase = true) == true
+    }
+
+    /** Two letters would match half the cast lists; names need three. */
+    private const val MIN_CREDIT_QUERY = 3
 
     // Scan
 

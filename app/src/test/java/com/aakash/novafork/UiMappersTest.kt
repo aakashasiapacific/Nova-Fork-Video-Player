@@ -152,6 +152,26 @@ class UiMappersTest {
     }
 
     @Test
+    fun searchFindsTitlesByCastAndDirector() {
+        val meta = MetadataEntity(
+            key = "movie:603",
+            tmdbId = 603,
+            type = "movie",
+            title = "The Matrix",
+            castNames = "Keanu Reeves, Carrie-Anne Moss",
+            directors = "Lana Wachowski, Lilly Wachowski",
+        )
+        val rows = listOf(
+            VideoWithMeta(video(id = 1, sourceId = DEVICE, uri = "content://media/external/video/media/1", kind = VideoKind.MOVIE, metadataKey = meta.key), meta),
+        )
+        val small = LibraryIndex.build(rows, listOf(device), preferLocalArtwork = false)
+        assertEquals(1, UiMappers.search(small, "keanu").results.size)
+        assertEquals(1, UiMappers.search(small, "wachowski").results.size)
+        // Two letters are too few to search names by.
+        assertTrue(UiMappers.search(small, "ke").results.isEmpty())
+    }
+
+    @Test
     fun personalVideosFillAHeroThatHasRoom() {
         val rows = listOf(
             row(video(id = 1, sourceId = DEVICE, uri = "content://media/external/video/media/1", fileName = "Birthday.mp4")),

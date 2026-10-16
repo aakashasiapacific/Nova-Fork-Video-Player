@@ -2,31 +2,58 @@ package com.aakash.novafork.ui.phone
 
 import androidx.annotation.DrawableRes
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
@@ -39,6 +66,7 @@ import com.aakash.novafork.ui.model.Route
 import com.aakash.novafork.ui.model.TopDestination
 import com.aakash.novafork.ui.model.top
 import com.aakash.novafork.ui.settings.SettingsScreen
+import com.aakash.novafork.ui.theme.NovaColors
 
 /**
  * Phone UI: bottom navigation plus one full-screen page per route. Dialogs, snackbars and system
@@ -148,29 +176,124 @@ private fun PhonePage(state: AppUiState, actions: AppActions) {
     }
 }
 
+/**
+ * Apple TV's tab bar, slim (52dp, not Material's 80dp): black with a hairline above it; the
+ * selected tab has a dark-grey pill behind a white icon and a bold label, the others are grey.
+ * Like iOS 26's bar, a finger dragged along it moves the pill, and the tab under the finger is
+ * opened when it lifts.
+ */
 @Composable
 private fun PhoneNavigationBar(selected: TopDestination, onSelect: (TopDestination) -> Unit) {
-    // Apple TV's bar: black, a hairline above it; the selected tab has a dark-grey pill behind a
-    // white icon and a bold label, the others are grey.
-    Column {
-        HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
-        NavigationBar(containerColor = MaterialTheme.colorScheme.background, tonalElevation = 0.dp) {
-            TopDestination.entries.forEach { tab ->
-                val isSelected = tab == selected
-                NavigationBarItem(
-                    selected = isSelected,
-                    onClick = { onSelect(tab) },
-                    icon = { NovaIcon(tab.iconRes(), contentDescription = null) },
-                    label = { Text(tab.label, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium) },
-                    colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = MaterialTheme.colorScheme.onSurface,
-                        selectedTextColor = MaterialTheme.colorScheme.onSurface,
-                        indicatorColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                        unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                        unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    ),
-                )
+    val tabs = TopDestination.entries
+    val currentOnSelect by rememberUpdatedState(onSelect)
+    var dragX by remember { mutableStateOf<Float?>(null) }
+    val colors = MaterialTheme.colorScheme
+    Column(Modifier.background(colors.background)) {
+        HorizontalDivider(thickness = 0.5.dp, color = colors.outlineVariant)
+        BoxWithConstraints(
+            Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .height(TabBarHeight)
+                .pointerInput(tabs.size) {
+                    fun tabAt(x: Float): TopDestination = tabs[(x / size.width * tabs.size).toInt().coerceIn(0, tabs.lastIndex)]
+                    detectHorizontalDragGestures(
+                        onDragStart = { dragX = it.x },
+                        onDragEnd = {
+                            dragX?.let { currentOnSelect(tabAt(it)) }
+                            dragX = null
+                        },
+                        onDragCancel = { dragX = null },
+                    ) { change, amount ->
+                        change.consume()
+                        dragX = (dragX ?: change.position.x) + amount
+                    }
+                },
+        ) {
+            val slot = maxWidth / tabs.size
+            val widthPx = constraints.maxWidth.toFloat().coerceAtLeast(1f)
+            val active = dragX?.let { x -> (x / widthPx * tabs.size).toInt().coerceIn(0, tabs.lastIndex) } ?: tabs.indexOf(selected)
+            val pillWidth = slot - 10.dp
+            val pillX by animateDpAsState(slot * active + 5.dp, label = "tabPill")
+            // Apple TV's selected tab: a big dark-grey pill around icon and label.
+            Box(
+                Modifier
+                    .offset(x = pillX, y = 2.dp)
+                    .size(width = pillWidth, height = TabBarHeight - 4.dp)
+                    .clip(RoundedCornerShape(percent = 50))
+                    .background(colors.surfaceContainerHigh),
+            )
+            Row(Modifier.fillMaxSize()) {
+                tabs.forEachIndexed { index, tab ->
+                    val isActive = index == active
+                    val tint = when {
+                        !isActive -> colors.onSurfaceVariant
+                        // Apple Music's tab is red, like its app.
+                        tab == TopDestination.AUDIO -> NovaColors.AppleMusicRed
+                        else -> Color.White
+                    }
+                    Column(
+                        Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .selectable(
+                                selected = tab == selected,
+                                onClick = { onSelect(tab) },
+                                role = Role.Tab,
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null,
+                            ),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        TabIcon(tab = tab, active = isActive, tint = tint, modifier = Modifier.padding(top = 5.dp))
+                        Text(
+                            tab.label,
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = if (isActive) FontWeight.Bold else FontWeight.Medium,
+                            color = if (isActive) Color.White else tint,
+                            maxLines = 1,
+                            modifier = Modifier.padding(top = 3.dp),
+                        )
+                    }
+                }
             }
+        }
+    }
+}
+
+private val TabBarHeight = 54.dp
+
+/**
+ * A tab's icon. The selected one "lights up" as in Apple TV's bar: a filled white disc with the
+ * glyph cut out in black (Apple Music red for Audio), popping in with a short spring; the others
+ * are plain grey glyphs.
+ */
+@Composable
+private fun TabIcon(tab: TopDestination, active: Boolean, tint: Color, modifier: Modifier = Modifier) {
+    val scale by animateFloatAsState(
+        targetValue = if (active) 1f else 0.82f,
+        animationSpec = spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessMedium),
+        label = "tabIcon",
+    )
+    Box(
+        modifier
+            .size(26.dp)
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            },
+        contentAlignment = Alignment.Center,
+    ) {
+        if (active) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .clip(CircleShape)
+                    .background(tint),
+            )
+            NovaIcon(tab.iconRes(), contentDescription = null, tint = if (tab == TopDestination.AUDIO) Color.White else Color.Black, modifier = Modifier.size(16.dp))
+        } else {
+            NovaIcon(tab.iconRes(), contentDescription = null, tint = tint, modifier = Modifier.size(24.dp))
         }
     }
 }
@@ -178,7 +301,7 @@ private fun PhoneNavigationBar(selected: TopDestination, onSelect: (TopDestinati
 @DrawableRes
 private fun TopDestination.iconRes(): Int = when (this) {
     TopDestination.VIDEO -> R.drawable.ic_tv
-    TopDestination.AUDIO -> R.drawable.ic_audiotrack
-    TopDestination.SETTINGS -> R.drawable.ic_settings
+    TopDestination.AUDIO -> R.drawable.ic_music_notes
+    TopDestination.SETTINGS -> R.drawable.ic_person
     TopDestination.SEARCH -> R.drawable.ic_search
 }

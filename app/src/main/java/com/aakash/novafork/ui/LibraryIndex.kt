@@ -219,6 +219,7 @@ private fun buildShow(
         ),
         frameSource = first.card.artwork.frameSource,
         seed = title,
+        tallUrl = TmdbClient.posterUrl(meta?.textlessPosterPath, TALL_SIZE),
     )
     // Two copies of one episode (720p and 1080p) count once.
     val distinct = ordered.distinctBy { episodeIdentity(it) }
@@ -268,8 +269,12 @@ private fun movieArtwork(video: VideoEntity, meta: MetadataEntity?, seed: String
         stillUrl = video.localThumb.takeIf { backdrop == null },
         frameSource = frameSourceOf(video.uri),
         seed = seed,
+        tallUrl = TmdbClient.posterUrl(meta?.textlessPosterPath, TALL_SIZE),
     )
 }
+
+/** Textless posters fill most of a phone screen: a size sharper than the cards' w500. */
+private const val TALL_SIZE = "w780"
 
 private fun episodeArtwork(
     video: VideoEntity,

@@ -16,7 +16,8 @@ enum class TopDestination(val label: String) {
 
     /** Music (a temporary test screen until the Apple Music-style design). */
     AUDIO("Audio"),
-    SETTINGS("Settings"),
+    /** Settings, called "Preferences" with a person icon (owner's choice). */
+    SETTINGS("Preferences"),
     SEARCH("Search"),
 }
 
@@ -145,6 +146,23 @@ sealed interface DialogUi {
     ) : DialogUi
 
     data class ConfirmRemoveSource(val source: SourceUi) : DialogUi
+
+    /**
+     * "Change artwork": TMDB's posters and backdrops for a movie or show ([metadataKey]), as TMDB
+     * paths ("/abc.jpg"); [poster]/[backdrop] are the ones shown now. Picking one applies it.
+     */
+    data class ChangeArtwork(
+        val metadataKey: String,
+        val title: String,
+        val loading: Boolean = true,
+        val posters: List<String> = emptyList(),
+        val backdrops: List<String> = emptyList(),
+        val poster: String? = null,
+        val backdrop: String? = null,
+        /** The user picked artwork for it before: "Use TMDB's" undoes that. */
+        val customised: Boolean = false,
+        val error: String? = null,
+    ) : DialogUi
 
     /** "Add network source": picks the kind of server (SMB, FTP, SFTP, NFS, WebDAV, DLNA/UPnP, Jellyfin, Emby, Plex). */
     data object AddSource : DialogUi
@@ -282,6 +300,15 @@ interface AppActions {
         navigate(Route.Library)
         setLibraryFilter(filter)
     }
+
+    /** Opens "Change artwork" for the movie or show [videoId] belongs to. */
+    fun changeArtwork(videoId: Long) {}
+
+    /** Uses this poster and/or backdrop (TMDB paths) for [metadataKey]; null leaves that one as it is. */
+    fun chooseArtwork(metadataKey: String, posterPath: String?, backdropPath: String?) {}
+
+    /** Back to TMDB's own poster and backdrop for [metadataKey]. */
+    fun resetArtwork(metadataKey: String) {}
 
     /** The hero's "+": adds the item ([HeroUi.itemKey]) to the watchlist, or takes it off. */
     fun toggleWatchlist(itemKey: String) {}

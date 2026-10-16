@@ -17,6 +17,8 @@ data class Artwork(
     val stillUrl: String? = null,
     /** A local video URI (content:// or file://) to grab a frame from when nothing else exists. Null for network files. */
     val frameSource: String? = null,
+    /** Portrait key art without text (TMDB's textless poster), for the tall Home hero. */
+    val tallUrl: String? = null,
     /** Seed for the placeholder colours (usually the title). */
     val seed: String = "",
 )

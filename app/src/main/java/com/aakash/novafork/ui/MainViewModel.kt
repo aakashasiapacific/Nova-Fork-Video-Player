@@ -10,6 +10,7 @@ import com.aakash.novafork.BuildConfig
 import com.aakash.novafork.CrashReporter
 import com.aakash.novafork.NovaApp
 import com.aakash.novafork.core.jellyfin.ServerSecrets
+import com.aakash.novafork.core.library.LibraryKeys
 import com.aakash.novafork.core.plex.PlexResource
 import com.aakash.novafork.core.smb.SmbUris
 import com.aakash.novafork.core.tmdb.TmdbDisabledException
@@ -30,9 +31,11 @@ import com.aakash.novafork.data.backup.BackupManager
 import com.aakash.novafork.data.backup.BackupSummary
 import com.aakash.novafork.data.backup.NovaBackup
 import com.aakash.novafork.data.backup.RestoreReport
+import com.aakash.novafork.data.db.ArtworkChoiceEntity
 import com.aakash.novafork.data.db.SourceEntity
 import com.aakash.novafork.data.db.SourceType
 import com.aakash.novafork.data.db.VideoKind
+import com.aakash.novafork.data.db.VideoWithMeta
 import com.aakash.novafork.data.music.MusicLibraryData
 import com.aakash.novafork.sources.DeviceScanner
 import com.aakash.novafork.sources.media.MediaServerSources
@@ -134,8 +137,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
         library.observeVideos(),
         library.observeSources(),
         settingsStore.settings.map { it.preferLocalArtwork }.distinctUntilChanged(),
-    ) { videos, sources, preferLocal ->
-        LibraryIndex.build(videos, sources, preferLocal)
+        graph.database.metadataDao().observeArtworkChoices(),
+    ) { videos, sources, preferLocal, choices ->
+        LibraryIndex.build(withArtworkChoices(videos, choices), sources, preferLocal)
     }
 
     // Only touched from the state combine below, which never runs concurrently with itself.
@@ -383,6 +387,79 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
 
     override fun search(query: String) {
         local.update { it.copy(query = query) }
+    }
+
+    override fun changeArtwork(videoId: Long) {
+        launchSafely("Couldn't load artwork") {
+            val row = library.video(videoId) ?: return@launchSafely
+            val meta = row.meta
+            val tmdbId = meta?.key?.takeUnless { it.startsWith("server:") }?.let { LibraryKeys.tmdbId(it) }
+            if (meta == null || tmdbId == null) {
+                showMessage("Artwork can only be changed for titles matched with TMDB")
+                return@launchSafely
+            }
+            val key = meta.key
+            val type = if (key.startsWith("tv:")) "tv" else "movie"
+            val choice = graph.database.metadataDao().artworkChoices().firstOrNull { it.metadataKey == key }
+            val opened = DialogUi.ChangeArtwork(
+                metadataKey = key,
+                title = meta.title,
+                poster = choice?.posterPath ?: meta.posterPath,
+                backdrop = choice?.backdropPath ?: meta.backdropPath,
+                customised = choice != null,
+            )
+            showDialog(opened)
+            val loaded = try {
+                val images = graph.tmdb.images(type, tmdbId)
+                opened.copy(
+                    loading = false,
+                    posters = images.posters.sortedByDescending { it.voteAverage }.map { it.filePath }.filter { it.isNotBlank() }.distinct().take(ARTWORK_LIMIT),
+                    backdrops = images.backdrops.sortedByDescending { it.voteAverage }.map { it.filePath }.filter { it.isNotBlank() }.distinct().take(ARTWORK_LIMIT),
+                )
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.w(TAG, "TMDB images failed", e)
+                opened.copy(loading = false, error = "Couldn't reach TMDB. Check the connection and try again.")
+            }
+            local.update { state ->
+                val shown = state.dialog as? DialogUi.ChangeArtwork
+                if (shown != null && shown.metadataKey == key) state.copy(dialog = loaded.copy(poster = shown.poster, backdrop = shown.backdrop, customised = shown.customised)) else state
+            }
+        }
+    }
+
+    override fun chooseArtwork(metadataKey: String, posterPath: String?, backdropPath: String?) {
+        launchSafely("Couldn't change the artwork") {
+            val dao = graph.database.metadataDao()
+            val old = dao.artworkChoices().firstOrNull { it.metadataKey == metadataKey }
+            dao.setArtworkChoice(
+                ArtworkChoiceEntity(
+                    metadataKey = metadataKey,
+                    posterPath = posterPath ?: old?.posterPath,
+                    backdropPath = backdropPath ?: old?.backdropPath,
+                ),
+            )
+            local.update { state ->
+                val shown = state.dialog as? DialogUi.ChangeArtwork ?: return@update state
+                if (shown.metadataKey != metadataKey) return@update state
+                state.copy(
+                    dialog = shown.copy(
+                        poster = posterPath ?: shown.poster,
+                        backdrop = backdropPath ?: shown.backdrop,
+                        customised = true,
+                    ),
+                )
+            }
+        }
+    }
+
+    override fun resetArtwork(metadataKey: String) {
+        launchSafely("Couldn't change the artwork") {
+            graph.database.metadataDao().clearArtworkChoice(metadataKey)
+            dismissDialog()
+            showMessage("Back to TMDB's artwork")
+        }
     }
 
     override fun toggleWatchlist(itemKey: String) {
@@ -1430,6 +1507,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
         const val MAX_LISTINGS = 40
 
         const val BACKUP_BUSY = "Wait for the backup or restore that is running"
+
+        /** "Change artwork" shows TMDB's best-voted images, up to this many of each. */
+        const val ARTWORK_LIMIT = 30
     }
 }
 
@@ -1459,5 +1539,21 @@ private class Memo<K, V>(private val compute: (K) -> V) {
         val cached = last
         if (cached != null && cached.first == key) return cached.second
         return compute(key).also { last = key to it }
+    }
+}
+
+/** The posters and backdrops the user picked in "Change artwork", over TMDB's defaults. */
+private fun withArtworkChoices(rows: List<VideoWithMeta>, choices: List<ArtworkChoiceEntity>): List<VideoWithMeta> {
+    if (choices.isEmpty()) return rows
+    val byKey = choices.associateBy { it.metadataKey }
+    return rows.map { row ->
+        val meta = row.meta ?: return@map row
+        val choice = byKey[meta.key] ?: return@map row
+        row.copy(
+            meta = meta.copy(
+                posterPath = choice.posterPath ?: meta.posterPath,
+                backdropPath = choice.backdropPath ?: meta.backdropPath,
+            ),
+        )
     }
 }

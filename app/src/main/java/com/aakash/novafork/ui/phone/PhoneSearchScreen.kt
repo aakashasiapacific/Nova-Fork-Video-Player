@@ -78,7 +78,7 @@ fun PhoneSearchScreen(
                 modifier = Modifier
                     .weight(1f)
                     .focusRequester(focusRequester),
-                placeholder = { Text("Search videos and music") },
+                placeholder = { Text("Search videos, music and cast") },
                 leadingIcon = { NovaIcon(R.drawable.ic_search, contentDescription = null) },
                 trailingIcon = if (field.text.isNotEmpty()) {
                     {

@@ -209,6 +209,14 @@ fun PhoneShowDetailsScreen(
                             actions.identify(identifyVideoId)
                         },
                     )
+                    DropdownMenuItem(
+                        text = { Text("Change artwork…") },
+                        leadingIcon = { NovaIcon(R.drawable.ic_image, contentDescription = null) },
+                        onClick = {
+                            close()
+                            actions.changeArtwork(identifyVideoId)
+                        },
+                    )
                 }
             } else {
                 null

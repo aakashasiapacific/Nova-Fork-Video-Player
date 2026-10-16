@@ -52,7 +52,7 @@ separate phone and tablet UIs. This file is for a new Claude session picking the
   `tools/regex-check/`, which CI runs).
 - **App code must be compile-exact.** Use explicit imports and real signatures, and grep the repo for
   existing patterns. libVLC is pinned at 3.7.2, because 3.7.3+ needs Kotlin 2.2.
-- **Room.** The schema is exported to `app/schemas/`; the database is now at version 4, with manual
+- **Room.** The schema is exported to `app/schemas/`; the database is now at version 5, with manual
   migrations in `NovaDatabase.MIGRATIONS`. After a version bump, copy the new `N.json` from the `screens`
   branch into `app/schemas/`.
 - **Keys** (in `gradle.properties`, each overridable by an env var / repository secret of the same name):

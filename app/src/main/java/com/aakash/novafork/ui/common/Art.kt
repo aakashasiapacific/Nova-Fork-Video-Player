@@ -41,6 +41,7 @@ fun ArtImage(
     modifier: Modifier = Modifier,
     contentScale: ContentScale = ContentScale.Crop,
     frameSource: String? = null,
+    alignment: Alignment = Alignment.Center,
     placeholder: @Composable () -> Unit,
 ) {
     val context = LocalContext.current
@@ -61,6 +62,7 @@ fun ArtImage(
                 contentDescription = contentDescription,
                 modifier = Modifier.fillMaxSize(),
                 contentScale = contentScale,
+                alignment = alignment,
                 onError = { index += 1 },
             )
         }

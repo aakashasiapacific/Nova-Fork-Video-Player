@@ -69,6 +69,7 @@ import com.aakash.novafork.data.music.MusicScanState
 import com.aakash.novafork.music.MusicPlayerState
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.model.RepeatMode
+import com.aakash.novafork.ui.theme.AudioTheme
 
 /**
  * A plain, temporary Audio tab for testing the music engine on a phone: the library by songs,
@@ -85,17 +86,19 @@ fun AudioScreen(modifier: Modifier = Modifier, viewModel: MusicViewModel = viewM
     val openPlaylist by viewModel.openPlaylist.collectAsStateWithLifecycle()
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.onAccessChecked() }
     val access = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { viewModel.onAccessChecked() }
-    AudioContent(
-        library = library,
-        scan = scan,
-        playlists = playlists,
-        player = player,
-        hasAccess = hasAccess,
-        openPlaylist = openPlaylist,
-        actions = viewModel,
-        onRequestAccess = { access.launch(viewModel.permission) },
-        modifier = modifier,
-    )
+    AudioTheme {
+        AudioContent(
+            library = library,
+            scan = scan,
+            playlists = playlists,
+            player = player,
+            hasAccess = hasAccess,
+            openPlaylist = openPlaylist,
+            actions = viewModel,
+            onRequestAccess = { access.launch(viewModel.permission) },
+            modifier = modifier,
+        )
+    }
 }
 
 private enum class AudioTab(val label: String) {

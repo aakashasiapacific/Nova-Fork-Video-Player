@@ -17,6 +17,7 @@ import com.aakash.novafork.music.NowPlaying
 import com.aakash.novafork.ui.audio.AudioActions
 import com.aakash.novafork.ui.audio.AudioContent
 import com.aakash.novafork.ui.model.RepeatMode
+import com.aakash.novafork.ui.theme.AudioTheme
 import com.aakash.novafork.ui.theme.NovaTheme
 import org.junit.After
 import org.junit.Before
@@ -71,7 +72,7 @@ class AudioScreensTest {
             lyrics = LrcParser.parse("[01:10.00]Is this the real life?\n[01:14.00]Is this just fantasy?"),
         )
         compose.captureScreen("audio_songs") {
-            NovaTheme {
+            NovaTheme { AudioTheme {
                 Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                     AudioContent(
                         library = library,
@@ -84,14 +85,14 @@ class AudioScreensTest {
                         onRequestAccess = {},
                     )
                 }
-            }
+            } }
         }
     }
 
     @Test
     fun noAccessYet() {
         compose.captureScreen("audio_no_access") {
-            NovaTheme {
+            NovaTheme { AudioTheme {
                 Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                     AudioContent(
                         library = MusicLibrary.build(emptyList()),
@@ -104,7 +105,7 @@ class AudioScreensTest {
                         onRequestAccess = {},
                     )
                 }
-            }
+            } }
         }
     }
 

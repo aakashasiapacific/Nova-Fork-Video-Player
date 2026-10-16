@@ -16,6 +16,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
  * Version 3 adds what network and media-server sources need: sources.port, token, userId,
  * serverId and libraryIds, and videos.remoteId.
  * Version 4 adds music (songs, playlist_songs) and the watchlist.
+ * Version 5 adds metadata.textlessPosterPath, castNames and directors, and artwork_choices.
  */
 @Database(
     entities = [
@@ -28,8 +29,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         SongEntity::class,
         PlaylistSongEntity::class,
         WatchlistEntity::class,
+        ArtworkChoiceEntity::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = true,
 )
 abstract class NovaDatabase : RoomDatabase() {
@@ -123,11 +125,27 @@ abstract class NovaDatabase : RoomDatabase() {
         }
 
         /**
+         * Adds the metadata columns for the tall hero and search (nullable: old rows read null and
+         * are fetched again) and the table of artwork the user picked.
+         */
+        val MIGRATION_4_5: Migration = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `metadata` ADD COLUMN `textlessPosterPath` TEXT")
+                db.execSQL("ALTER TABLE `metadata` ADD COLUMN `castNames` TEXT")
+                db.execSQL("ALTER TABLE `metadata` ADD COLUMN `directors` TEXT")
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `artwork_choices` (`metadataKey` TEXT NOT NULL, `posterPath` TEXT, " +
+                        "`backdropPath` TEXT, PRIMARY KEY(`metadataKey`))",
+                )
+            }
+        }
+
+        /**
          * Upgrades between schema versions, oldest first (`Migration(1, 2)`, `Migration(2, 3)`, …).
          * Watch history, resume points and manual matches only survive an app update through these:
          * with a version missing here Room refuses to open the database rather than wipe it.
          */
-        val MIGRATIONS: Array<Migration> = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+        val MIGRATIONS: Array<Migration> = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
 
         fun create(context: Context): NovaDatabase =
             Room.databaseBuilder(context.applicationContext, NovaDatabase::class.java, "nova.db")

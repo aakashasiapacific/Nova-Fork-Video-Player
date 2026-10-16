@@ -168,7 +168,7 @@ UI, following Apple Music:
     system panel stays hidden, and shows its own pill. Outside the player (and in
     picture-in-picture) the system panel shows as usual.
 
-## 8. Build 36 list (owner, 2026-10-16; not built yet, more items coming)
+## 8. Build 36 list (owner, 2026-10-16; built)
 
 1. **Mute button:** match the owner's reference, Apple TV's button: a 44pt dark-grey (#2C2C2E-ish) solid circle
    with a white speaker glyph (a slash across it when muted). It sits next to a same-style profile
@@ -183,3 +183,16 @@ UI, following Apple Music:
 5. **Artwork and search:**
    - On a movie or show page, pick another poster or backdrop from TMDB's alternatives.
    - Search finds titles by cast and director (store the credits per title).
+6. **App icon:** keep D with the play button.
+7. **Audio tab:** a ♫ icon, and Apple Music red (#FA2D48) as the accent inside the tab and on its
+   selected tab icon. The rest of the app stays iOS blue.
+8. **Selected tab, like Apple TV:**
+   - a big dark-grey pill around the selected tab's icon and label;
+   - its icon "lights up" as a white disc with a black glyph (red for Audio), popping in with a
+     spring.
+
+Notes on how they were built:
+- The hero uses `Artwork.tallUrl`. A title without a text-free poster shows its backdrop over the
+  top 60%, fading into a blurred copy, which crops far less than filling the whole hero.
+- Dragging along the tab bar picks a tab. The pages themselves don't switch on a swipe, because
+  the hero and the rows already scroll sideways.

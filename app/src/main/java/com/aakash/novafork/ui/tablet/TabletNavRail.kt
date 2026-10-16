@@ -52,7 +52,7 @@ internal fun TabletNavRail(
 @DrawableRes
 private fun TopDestination.iconRes(): Int = when (this) {
     TopDestination.VIDEO -> R.drawable.ic_tv
-    TopDestination.AUDIO -> R.drawable.ic_audiotrack
-    TopDestination.SETTINGS -> R.drawable.ic_settings
+    TopDestination.AUDIO -> R.drawable.ic_music_notes
+    TopDestination.SETTINGS -> R.drawable.ic_person
     TopDestination.SEARCH -> R.drawable.ic_search
 }
