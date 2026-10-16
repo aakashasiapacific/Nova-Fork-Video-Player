@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.aakash.novafork.data.music.MusicRepositoryTest" tests="12" skipped="0" failures="0" errors="0" timestamp="2026-10-16T09:29:12.637Z" hostname="runnervm8k3b6" time="0.358">
+  <properties/>
+  <testcase name="aScanGroupsSongsIntoAlbumsAndArtists" classname="com.aakash.novafork.data.music.MusicRepositoryTest" time="0.035"/>
+  <testcase name="aSourceTurnedOffIsNotScannedAndHidden" classname="com.aakash.novafork.data.music.MusicRepositoryTest" time="0.035"/>
+  <testcase name="anUnchangedFileKeepsItsTags" classname="com.aakash.novafork.data.music.MusicRepositoryTest" time="0.029"/>
+  <testcase name="songsOfARemovedSourceGo" classname="com.aakash.novafork.data.music.MusicRepositoryTest" time="0.024"/>
+  <testcase name="lyricsComeFromTheLrcFile" classname="com.aakash.novafork.data.music.MusicRepositoryTest" time="0.031"/>
+  <testcase name="aFolderCopyOfADeviceSongIsKeptOnce" classname="com.aakash.novafork.data.music.MusicRepositoryTest" time="0.03"/>
+  <testcase name="aSourceThatFailsKeepsItsSongs" classname="com.aakash.novafork.data.music.MusicRepositoryTest" time="0.033"/>
+  <testcase name="playlistsKeepTheirOrderAndEachSongOnce" classname="com.aakash.novafork.data.music.MusicRepositoryTest" time="0.041"/>
+  <testcase name="aRescanKeepsPlayCountsAndHidesFilesThatAreGone" classname="com.aakash.novafork.data.music.MusicRepositoryTest" time="0.032"/>
+  <testcase name="theWatchlistKeepsTheFirstDate" classname="com.aakash.novafork.data.music.MusicRepositoryTest" time="0.024"/>
+  <testcase name="aRestoreIsAppliedAfterEachScan" classname="com.aakash.novafork.data.music.MusicRepositoryTest" time="0.019"/>
+  <testcase name="diagnosticsCountSongsPerSource" classname="com.aakash.novafork.data.music.MusicRepositoryTest" time="0.023"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

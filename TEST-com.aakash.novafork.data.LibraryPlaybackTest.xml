@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.aakash.novafork.data.LibraryPlaybackTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-10-16T09:29:09.206Z" hostname="runnervm8k3b6" time="0.24">
+  <properties/>
+  <testcase name="unknownDurationNeverMarksWatched" classname="com.aakash.novafork.data.LibraryPlaybackTest" time="0.035"/>
+  <testcase name="shortVideoIsWatchedWithinNinetySecondsOfTheEnd" classname="com.aakash.novafork.data.LibraryPlaybackTest" time="0.036"/>
+  <testcase name="longVideoIsWatchedWithinThreePercentOfTheEnd" classname="com.aakash.novafork.data.LibraryPlaybackTest" time="0.041"/>
+  <testcase name="nextEpisodeFollowsSeasonAndEpisodeOrder" classname="com.aakash.novafork.data.LibraryPlaybackTest" time="0.052"/>
+  <testcase name="setWatchedStartsOverEitherWay" classname="com.aakash.novafork.data.LibraryPlaybackTest" time="0.04"/>
+  <testcase name="clipShorterThanNinetySecondsNeedsHalfOfItPlayed" classname="com.aakash.novafork.data.LibraryPlaybackTest" time="0.035"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

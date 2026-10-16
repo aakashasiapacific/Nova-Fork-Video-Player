@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.aakash.novafork.UiMappersTest" tests="36" skipped="0" failures="0" errors="0" timestamp="2026-10-16T09:28:50.983Z" hostname="runnervm8k3b6" time="0.101">
+  <properties/>
+  <testcase name="homeVideoAndStreamDetails" classname="com.aakash.novafork.UiMappersTest" time="0.042"/>
+  <testcase name="twoCopiesOfAnEpisodeCountOnceAndSpecialsComeLast" classname="com.aakash.novafork.UiMappersTest" time="0.003"/>
+  <testcase name="librarySorts" classname="com.aakash.novafork.UiMappersTest" time="0.003"/>
+  <testcase name="remoteDirOfAMediaServerFollowsItsListingsForTheTrail" classname="com.aakash.novafork.UiMappersTest" time="0.003"/>
+  <testcase name="continueWatchingIsLastPlayedFirst" classname="com.aakash.novafork.UiMappersTest" time="0.004"/>
+  <testcase name="recentlyAddedCollapsesAShowIntoItsNewestEpisode" classname="com.aakash.novafork.UiMappersTest" time="0.002"/>
+  <testcase name="fakeLibraryArtworkFollowsThePriority" classname="com.aakash.novafork.UiMappersTest" time="0.002"/>
+  <testcase name="scanLabels" classname="com.aakash.novafork.UiMappersTest" time="0.001"/>
+  <testcase name="playlistsKeepTheirOrderAndTakeTheCoverVideosArt" classname="com.aakash.novafork.UiMappersTest" time="0.003"/>
+  <testcase name="searchRanksTitlesThatStartWithTheQueryFirst" classname="com.aakash.novafork.UiMappersTest" time="0.003"/>
+  <testcase name="progressNeedsADurationAndStaysInRange" classname="com.aakash.novafork.UiMappersTest" time="0.001"/>
+  <testcase name="browseDirListsSubfoldersWithRecursiveCountsAndTheVideosHere" classname="com.aakash.novafork.UiMappersTest" time="0.002"/>
+  <testcase name="browseDirOnTheNasAndTheDevice" classname="com.aakash.novafork.UiMappersTest" time="0.001"/>
+  <testcase name="pickedFolderLabels" classname="com.aakash.novafork.UiMappersTest" time="0.001"/>
+  <testcase name="deviceAccessNoticeSaysWhatKeepsDeviceVideosOut" classname="com.aakash.novafork.UiMappersTest" time="0.002"/>
+  <testcase name="homeRows" classname="com.aakash.novafork.UiMappersTest" time="0.002"/>
+  <testcase name="sourcesAreDeviceThenFoldersThenNetworkSourcesWithoutStreams" classname="com.aakash.novafork.UiMappersTest" time="0.001"/>
+  <testcase name="movieDetails" classname="com.aakash.novafork.UiMappersTest" time="0.001"/>
+  <testcase name="emptyLibraryAsksForOnboarding" classname="com.aakash.novafork.UiMappersTest" time="0.001"/>
+  <testcase name="naturalOrderComparesNumbersByValue" classname="com.aakash.novafork.UiMappersTest" time="0.001"/>
+  <testcase name="episodeDetails" classname="com.aakash.novafork.UiMappersTest" time="0.001"/>
+  <testcase name="heroStartsWithWhatIsInProgressThenTheNewest" classname="com.aakash.novafork.UiMappersTest" time="0.001"/>
+  <testcase name="heroPreviewsPlayOnlyShortLocalClipsFromTheStart" classname="com.aakash.novafork.UiMappersTest" time="0.003"/>
+  <testcase name="networkSourceDetailsNameTheTypeAndWhere" classname="com.aakash.novafork.UiMappersTest" time="0.001"/>
+  <testcase name="tmdbArtworkWinsUnlessLocalArtworkIsPreferred" classname="com.aakash.novafork.UiMappersTest" time="0.001"/>
+  <testcase name="personalVideosFillAHeroThatHasRoom" classname="com.aakash.novafork.UiMappersTest" time="0.001"/>
+  <testcase name="continueWatchingKeepsOneEpisodePerShow" classname="com.aakash.novafork.UiMappersTest" time="0.0"/>
+  <testcase name="remoteDirListsFoldersThenFilesMatchingLibraryVideosByUri" classname="com.aakash.novafork.UiMappersTest" time="0.001"/>
+  <testcase name="progressIsPositionOverDurationUntilWatched" classname="com.aakash.novafork.UiMappersTest" time="0.0"/>
+  <testcase name="searchFindsTitlesByCastAndDirector" classname="com.aakash.novafork.UiMappersTest" time="0.001"/>
+  <testcase name="frameSourceOnlyForLocalFiles" classname="com.aakash.novafork.UiMappersTest" time="0.001"/>
+  <testcase name="episodesGroupIntoShowsAndSeasons" classname="com.aakash.novafork.UiMappersTest" time="0.001"/>
+  <testcase name="libraryFiltersAndCounts" classname="com.aakash.novafork.UiMappersTest" time="0.001"/>
+  <testcase name="nextUpIsTheFirstUnwatchedEpisodeAfterTheLastWatchedOne" classname="com.aakash.novafork.UiMappersTest" time="0.001"/>
+  <testcase name="playlistDetailsListShownVideosInPlaylistOrderOnce" classname="com.aakash.novafork.UiMappersTest" time="0.001"/>
+  <testcase name="searchFindsEpisodesAsTheirShow" classname="com.aakash.novafork.UiMappersTest" time="0.003"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.aakash.novafork.PlayerScreensTest" tests="13" skipped="0" failures="0" errors="0" timestamp="2026-10-16T09:28:39.806Z" hostname="runnervm8k3b6" time="5.143">
+  <properties/>
+  <testcase name="tabletUpNext" classname="com.aakash.novafork.PlayerScreensTest" time="0.59"/>
+  <testcase name="phoneError" classname="com.aakash.novafork.PlayerScreensTest" time="0.339"/>
+  <testcase name="phoneQueue" classname="com.aakash.novafork.PlayerScreensTest" time="0.357"/>
+  <testcase name="tabletSeek" classname="com.aakash.novafork.PlayerScreensTest" time="0.413"/>
+  <testcase name="phonePaused" classname="com.aakash.novafork.PlayerScreensTest" time="0.324"/>
+  <testcase name="phoneResume" classname="com.aakash.novafork.PlayerScreensTest" time="0.365"/>
+  <testcase name="phoneSeek" classname="com.aakash.novafork.PlayerScreensTest" time="0.328"/>
+  <testcase name="phoneUpNext" classname="com.aakash.novafork.PlayerScreensTest" time="0.359"/>
+  <testcase name="phoneCasting" classname="com.aakash.novafork.PlayerScreensTest" time="0.27"/>
+  <testcase name="tabletError" classname="com.aakash.novafork.PlayerScreensTest" time="0.474"/>
+  <testcase name="tabletQueue" classname="com.aakash.novafork.PlayerScreensTest" time="0.474"/>
+  <testcase name="tabletPaused" classname="com.aakash.novafork.PlayerScreensTest" time="0.428"/>
+  <testcase name="tabletResume" classname="com.aakash.novafork.PlayerScreensTest" time="0.42"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.aakash.novafork.data.LibraryScanTest" tests="18" skipped="0" failures="0" errors="0" timestamp="2026-10-16T09:29:09.457Z" hostname="runnervm8k3b6" time="0.643">
+  <properties/>
+  <testcase name="launchRefreshSkipsFoldersScannedRecently" classname="com.aakash.novafork.data.LibraryScanTest" time="0.033"/>
+  <testcase name="smbServerNeedsHostAndShare" classname="com.aakash.novafork.data.LibraryScanTest" time="0.03"/>
+  <testcase name="removingAStreamDeletesItsVideo" classname="com.aakash.novafork.data.LibraryScanTest" time="0.042"/>
+  <testcase name="deviceStorageCannotBeRemoved" classname="com.aakash.novafork.data.LibraryScanTest" time="0.031"/>
+  <testcase name="fileItsShareNoLongerSeesMovesToTheShareThatDoes" classname="com.aakash.novafork.data.LibraryScanTest" time="0.035"/>
+  <testcase name="scanAddsNewFilesParsedFromTheirNames" classname="com.aakash.novafork.data.LibraryScanTest" time="0.03"/>
+  <testcase name="addingAFolderTwiceKeepsOneSource" classname="com.aakash.novafork.data.LibraryScanTest" time="0.025"/>
+  <testcase name="renamedFileIsParsedAgain" classname="com.aakash.novafork.data.LibraryScanTest" time="0.038"/>
+  <testcase name="deviceStorageFollowsTheSettingAndThePermission" classname="com.aakash.novafork.data.LibraryScanTest" time="0.051"/>
+  <testcase name="removingAFolderDeletesItsVideosAndTheirMetadata" classname="com.aakash.novafork.data.LibraryScanTest" time="0.043"/>
+  <testcase name="rescanKeepsPlaybackStateAndMatch" classname="com.aakash.novafork.data.LibraryScanTest" time="0.032"/>
+  <testcase name="refreshDuringALaunchRefreshJoinsItAndWalksWhatItSkipped" classname="com.aakash.novafork.data.LibraryScanTest" time="0.032"/>
+  <testcase name="missingFilesAreHiddenNotDeleted" classname="com.aakash.novafork.data.LibraryScanTest" time="0.046"/>
+  <testcase name="failedScanKeepsTheLibraryAndReportsTheError" classname="com.aakash.novafork.data.LibraryScanTest" time="0.029"/>
+  <testcase name="addStreamKeepsOneSourceAndVideoPerUrl" classname="com.aakash.novafork.data.LibraryScanTest" time="0.037"/>
+  <testcase name="removingAShareHandsCoveredVideosToTheOverlappingShare" classname="com.aakash.novafork.data.LibraryScanTest" time="0.043"/>
+  <testcase name="fileTwoSharesCoverStaysWithTheShareThatFoundItFirst" classname="com.aakash.novafork.data.LibraryScanTest" time="0.033"/>
+  <testcase name="editingAShareKeepsItsIdAndVideos" classname="com.aakash.novafork.data.LibraryScanTest" time="0.031"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

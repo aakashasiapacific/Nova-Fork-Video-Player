@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.aakash.novafork.player.DownloadedSubtitlesTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-10-16T09:29:13.074Z" hostname="runnervm8k3b6" time="0.008">
+  <properties/>
+  <testcase name="a library video is keyed by its id, a link by a hash of its address" classname="com.aakash.novafork.player.DownloadedSubtitlesTest" time="0.004"/>
+  <testcase name="lists subtitle files oldest first and leaves out the rest" classname="com.aakash.novafork.player.DownloadedSubtitlesTest" time="0.002"/>
+  <testcase name="the folder is under filesDir and its name stays a single safe segment" classname="com.aakash.novafork.player.DownloadedSubtitlesTest" time="0.001"/>
+  <testcase name="a missing folder lists nothing" classname="com.aakash.novafork.player.DownloadedSubtitlesTest" time="0.0"/>
+  <testcase name="keeps the newest when there are too many" classname="com.aakash.novafork.player.DownloadedSubtitlesTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

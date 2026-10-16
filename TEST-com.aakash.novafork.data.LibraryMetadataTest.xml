@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.aakash.novafork.data.LibraryMetadataTest" tests="9" skipped="0" failures="0" errors="0" timestamp="2026-10-16T09:29:08.868Z" hostname="runnervm8k3b6" time="0.336">
+  <properties/>
+  <testcase name="identifyingAnEpisodeMovesTheWholeShow" classname="com.aakash.novafork.data.LibraryMetadataTest" time="0.048"/>
+  <testcase name="identifyKeepsNumbersTmdbHasNoEpisodesFor" classname="com.aakash.novafork.data.LibraryMetadataTest" time="0.037"/>
+  <testcase name="searchRanksMoviesAndShowsTogether" classname="com.aakash.novafork.data.LibraryMetadataTest" time="0.031"/>
+  <testcase name="identifyingAHomeVideoAsAMovie" classname="com.aakash.novafork.data.LibraryMetadataTest" time="0.029"/>
+  <testcase name="retryMatchingRetriesMissesOnly" classname="com.aakash.novafork.data.LibraryMetadataTest" time="0.033"/>
+  <testcase name="identifyingAHomeVideoAsAShowMakesItTheFirstEpisode" classname="com.aakash.novafork.data.LibraryMetadataTest" time="0.037"/>
+  <testcase name="clearMetadataResetsEveryAutomaticMatch" classname="com.aakash.novafork.data.LibraryMetadataTest" time="0.044"/>
+  <testcase name="absoluteEpisodeNumbersArePlacedIntoTheShowsSeasons" classname="com.aakash.novafork.data.LibraryMetadataTest" time="0.038"/>
+  <testcase name="identifyingOneEpisodeAsAMovieTakesOnlyThatFile" classname="com.aakash.novafork.data.LibraryMetadataTest" time="0.039"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

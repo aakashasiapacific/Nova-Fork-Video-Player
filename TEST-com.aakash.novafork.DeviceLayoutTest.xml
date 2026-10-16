@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.aakash.novafork.DeviceLayoutTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-10-16T09:28:32.241Z" hostname="runnervm8k3b6" time="0.005">
+  <properties/>
+  <testcase name="tabletModeStillUsesWidthForCompactOrExpanded" classname="com.aakash.novafork.DeviceLayoutTest" time="0.003"/>
+  <testcase name="automaticLayoutFollowsSmallestWidthThenWidth" classname="com.aakash.novafork.DeviceLayoutTest" time="0.0"/>
+  <testcase name="eachFamilyGetsItsOwnDimens" classname="com.aakash.novafork.DeviceLayoutTest" time="0.0"/>
+  <testcase name="phoneModeForcesThePhoneUiOnTablets" classname="com.aakash.novafork.DeviceLayoutTest" time="0.0"/>
+  <testcase name="layoutFlags" classname="com.aakash.novafork.DeviceLayoutTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

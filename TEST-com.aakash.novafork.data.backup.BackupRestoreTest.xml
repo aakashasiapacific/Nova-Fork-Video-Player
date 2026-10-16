@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.aakash.novafork.data.backup.BackupRestoreTest" tests="12" skipped="0" failures="0" errors="0" timestamp="2026-10-16T09:29:11.809Z" hostname="runnervm8k3b6" time="0.606">
+  <properties/>
+  <testcase name="roundTripBringsBackSettingsSourcesHistoryMatchesAndPlaylists" classname="com.aakash.novafork.data.backup.BackupRestoreTest" time="0.146"/>
+  <testcase name="everySettingTypeSurvivesTheRoundTrip" classname="com.aakash.novafork.data.backup.BackupRestoreTest" time="0.025"/>
+  <testcase name="everyStoredSettingHasItsTypeListed" classname="com.aakash.novafork.data.backup.BackupRestoreTest" time="0.018"/>
+  <testcase name="newerAndForeignFilesAreRefused" classname="com.aakash.novafork.data.backup.BackupRestoreTest" time="0.025"/>
+  <testcase name="newerHistoryOnTheDeviceWins" classname="com.aakash.novafork.data.backup.BackupRestoreTest" time="0.019"/>
+  <testcase name="filesThatCantBeBackupsAreRefusedEarly" classname="com.aakash.novafork.data.backup.BackupRestoreTest" time="0.046"/>
+  <testcase name="videosAreFoundByFolderAndNameThenByNameAndSize" classname="com.aakash.novafork.data.backup.BackupRestoreTest" time="0.057"/>
+  <testcase name="settingsOfAnotherTypeAreNotRestored" classname="com.aakash.novafork.data.backup.BackupRestoreTest" time="0.037"/>
+  <testcase name="secretsStayOutUnlessAskedFor" classname="com.aakash.novafork.data.backup.BackupRestoreTest" time="0.062"/>
+  <testcase name="aMediaStoreIdOnAnotherDeviceIsAnotherFile" classname="com.aakash.novafork.data.backup.BackupRestoreTest" time="0.057"/>
+  <testcase name="waitingEntriesExpireAfterThirtyDays" classname="com.aakash.novafork.data.backup.BackupRestoreTest" time="0.035"/>
+  <testcase name="waitingEntriesAreAppliedWhenTheirSourceIsScanned" classname="com.aakash.novafork.data.backup.BackupRestoreTest" time="0.079"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

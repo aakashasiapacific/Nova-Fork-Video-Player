@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.aakash.novafork.data.QueueBuildersTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-10-16T09:29:10.932Z" hostname="runnervm8k3b6" time="0.204">
+  <properties/>
+  <testcase name="episodesWithoutASeasonAreListedInSeasonOne" classname="com.aakash.novafork.data.QueueBuildersTest" time="0.036"/>
+  <testcase name="nextUpQueuePlaysTheRestOfTheShow" classname="com.aakash.novafork.data.QueueBuildersTest" time="0.042"/>
+  <testcase name="folderQueueOnAShareStartsBelowTheSharesFolder" classname="com.aakash.novafork.data.QueueBuildersTest" time="0.03"/>
+  <testcase name="folderQueueListsOneFolderWithNumbersInOrder" classname="com.aakash.novafork.data.QueueBuildersTest" time="0.04"/>
+  <testcase name="seasonQueueFollowsSeasonsAndEpisodes" classname="com.aakash.novafork.data.QueueBuildersTest" time="0.037"/>
+  <testcase name="browseFoldersAreRelativeToTheSourceRoot" classname="com.aakash.novafork.data.QueueBuildersTest" time="0.019"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
