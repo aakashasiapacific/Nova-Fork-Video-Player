@@ -309,6 +309,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
             TopDestination.HOME -> Route.Home
             TopDestination.LIBRARY -> Route.Library
             TopDestination.BROWSE -> Route.Browse
+            TopDestination.AUDIO -> Route.Audio
             TopDestination.SETTINGS -> Route.Settings
         }
         // Other tabs sit on top of Home, so system back from a tab's root returns Home first.

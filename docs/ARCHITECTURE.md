@@ -143,11 +143,38 @@ Video view: `org.videolan.libvlc.util.VLCVideoLayout` inside `AndroidView`, atta
   current position, `stopCasting()` = `setRenderer(null)` and reopen locally. While casting the
   service stays in the foreground ("Casting to …"); the UI covers the surface with a placeholder.
 
-### Playlists (Room v2)
+### Playlists (Room v2; songs in v4, see Music)
 `playlists` and `playlist_items` (FK cascade to playlists and videos), added by the manual
 `NovaDatabase.MIGRATION_1_2`. Schemas are committed under `app/schemas/` (CI publishes the
 generated JSON to the `screens` branch; copy a new version's file from there). Every future
 version adds a migration to `NovaDatabase.MIGRATIONS`.
+
+### Music (Room v4)
+Local only: the DEVICE row (MediaStore's audio table, `IS_MUSIC` rows) and every FOLDER (SAF
+tree) — the same sources as videos, so turning one off or removing it does the same to its songs.
+- `core/audio`: `LrcParser` (synced .lrc lyrics, parsed by hand: no regexes), `AudioFiles`
+  (extensions, cover file and .lrc sidecar rules, tag clean-up, MediaStore's disc×1000+track),
+  `MusicKeys` (album = album artist + name, or folder + name without an album-artist tag;
+  artist = album artist, else artist; Apple-style sort keys ignoring "The").
+- `sources/music`: `DeviceMusicScanner` (tags from MediaStore; cover.jpg/folder.jpg and .lrc
+  only with All files access, read through the file's path), `FolderMusicScanner` (tags read with
+  `MediaMetadataRetriever`, skipped for files whose size and date are unchanged), `SongArtFetcher`
+  (Coil: `SongArt.embedded(uri)` = "novaart:<song uri>" loads the picture inside the file).
+- `data/music/MusicRepository` (`AppGraph.music`): scans whenever the local sources change and on
+  `rescan()`; songs missing from a scan stay with `present = false`; a folder copy of a device song
+  (same file name and size) is kept once. Playlists: `playlist_songs` beside `playlist_items`; a
+  playlist with only songs is left out of the Video side's list and one with only videos out of the
+  Audio tab's. Watchlist (`watchlist`, keyed by the UI item key "v:<id>" / "s:<showKey>") for the
+  hero's "+" button; no UI yet. `MusicLibrary.build` groups songs into albums, artists and genres.
+- `music/MusicPlayer` (`AppGraph.musicPlayer`, main thread): its own libVLC `MediaPlayer` (media
+  opened with `:no-video`), a `PlayQueue`, shuffle, repeat off/all/one, previous restarts after 3 s,
+  a failed song is skipped after 1.5 s, play counts on finish, lyrics loaded per song.
+  `music/MusicService` (foreground `mediaPlayback`, MediaStyle notification with previous/play/
+  next/close, a `PlaybackSession` without the ±10 s buttons). Video and music request audio focus
+  (movie vs music content), so starting one pauses the other.
+- `ui/audio`: a plain, temporary Audio tab (songs, albums, artists, genres, playlists, recently
+  added, a mini player with lyrics) to test the engine until the Apple Music-style screens.
+- Not yet: music in backup/restore, music in Library diagnostics, music search.
 
 ## Phone vs tablet UI
 

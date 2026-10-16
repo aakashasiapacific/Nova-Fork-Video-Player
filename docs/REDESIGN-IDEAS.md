@@ -95,8 +95,7 @@ What our current hero does differently:
 The app has no music/audio library today. This needs backend work as well as UI.
 
 Backend:
-- **Scanning:** audio files from MediaStore.Audio on the device, picked folders, and later network
-  sources.
+- **Scanning:** audio files from MediaStore.Audio on the device and picked folders (local only).
 - **Tags:** title, artist, album artist, album, track/disc number, year, genre and duration.
 - **Artwork:** embedded album art, or `cover.jpg` / `folder.jpg` next to the files.
 - **Storage:** new Room tables, so the database goes to v4 with a migration.
@@ -129,12 +128,8 @@ UI, following Apple Music:
    - The "+" turns into a check mark when the title is already on the list; tapping it again removes it.
    - Backend: a small Room addition (a table or a flag), done in the same v4 migration as the audio
      tables.
-4. **Music comes from every source in the first audio round:**
-   - the phone (MediaStore.Audio) and picked folders;
-   - network shares (SMB, FTP, SFTP, NFS, WebDAV, DLNA/UPnP);
-   - Jellyfin, Emby and Plex music libraries.
-   - This is a big round, so build and test the local scan first, then add the network and server
-     sources on top of it in the same round.
+4. **Music is local only** (changed by the owner, 2026-10-16): the phone (MediaStore.Audio) and the
+   picked folders. No network shares and no Jellyfin/Emby/Plex music, now or later.
 5. **Tablet: a floating tab bar at the top centre,** over the hero, as in the iPad Apple TV app. It
    keeps the same four tabs. Phone and tablet stay separate component families.
 6. **Search: one search over videos and music.**

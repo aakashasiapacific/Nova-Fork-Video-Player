@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -31,6 +32,7 @@ import com.aakash.novafork.ui.adaptive.DeviceLayout
 import com.aakash.novafork.ui.adaptive.LocalDeviceLayout
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
 import com.aakash.novafork.ui.adaptive.dimensFor
+import com.aakash.novafork.ui.audio.AudioScreen
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.AppUiState
 import com.aakash.novafork.ui.model.Route
@@ -137,6 +139,7 @@ private fun TabletPage(state: AppUiState, actions: AppActions, layout: DeviceLay
             actions = actions,
             modifier = pageModifier,
         )
+        Route.Audio -> AudioScreen(modifier = pageModifier.windowInsetsPadding(WindowInsets.navigationBars))
         Route.Settings -> SettingsScreen(
             state = state.settings,
             actions = actions,

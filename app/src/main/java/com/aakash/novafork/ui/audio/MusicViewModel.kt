@@ -26,7 +26,7 @@ data class OpenPlaylist(val id: Long, val name: String, val songs: List<SongEnti
  * The temporary Audio tab's state and actions: the music library, the scan, playlists and the
  * player. The Apple Music-style screens will replace the screen; this stays as their source.
  */
-class MusicViewModel(app: Application) : AndroidViewModel(app) {
+class MusicViewModel(app: Application) : AndroidViewModel(app), AudioActions {
     private val graph = NovaApp.graph(app)
     private val music = graph.music
     private val player = graph.musicPlayer
@@ -54,48 +54,48 @@ class MusicViewModel(app: Application) : AndroidViewModel(app) {
         if (gained) music.rescanInBackground()
     }
 
-    fun rescan() = music.rescanInBackground()
+    override fun rescan() = music.rescanInBackground()
 
-    fun play(songs: List<SongEntity>, index: Int, shuffle: Boolean = false) {
+    override fun play(songs: List<SongEntity>, index: Int, shuffle: Boolean) {
         player.playSongs(songs.map { it.id }, index, shuffle)
     }
 
-    fun togglePlay() = player.togglePlay()
+    override fun togglePlay() = player.togglePlay()
 
-    fun next() = player.next()
+    override fun next() = player.next()
 
-    fun previous() = player.previous()
+    override fun previous() = player.previous()
 
-    fun seekTo(positionMs: Long) = player.seekTo(positionMs)
+    override fun seekTo(positionMs: Long) = player.seekTo(positionMs)
 
-    fun toggleShuffle() = player.setShuffle(!player.state.value.shuffle)
+    override fun toggleShuffle() = player.setShuffle(!player.state.value.shuffle)
 
-    fun cycleRepeat() = player.cycleRepeat()
+    override fun cycleRepeat() = player.cycleRepeat()
 
-    fun closePlayer() = player.close()
+    override fun closePlayer() = player.close()
 
-    fun showPlaylist(row: MusicPlaylistRow) = launchSafely {
+    override fun showPlaylist(row: MusicPlaylistRow) = launchSafely {
         _openPlaylist.value = OpenPlaylist(row.id, row.name, music.playlistSongs(row.id))
     }
 
-    fun closePlaylist() {
+    override fun closePlaylist() {
         _openPlaylist.value = null
     }
 
     /** Adds [song] to the playlist, or to a new one named [newName] when [playlistId] is null. */
-    fun addToPlaylist(song: SongEntity, playlistId: Long?, newName: String) = launchSafely {
+    override fun addToPlaylist(song: SongEntity, playlistId: Long?, newName: String) = launchSafely {
         val id = playlistId ?: music.createPlaylist(newName)
         music.addToPlaylist(id, listOf(song.id))
         refreshOpenPlaylist()
     }
 
-    fun removeFromPlaylist(song: SongEntity) = launchSafely {
+    override fun removeFromPlaylist(song: SongEntity) = launchSafely {
         val open = _openPlaylist.value ?: return@launchSafely
         music.removeFromPlaylist(open.id, song.id)
         refreshOpenPlaylist()
     }
 
-    fun deletePlaylist(playlistId: Long) = launchSafely {
+    override fun deletePlaylist(playlistId: Long) = launchSafely {
         music.deletePlaylist(playlistId)
         if (_openPlaylist.value?.id == playlistId) _openPlaylist.value = null
     }

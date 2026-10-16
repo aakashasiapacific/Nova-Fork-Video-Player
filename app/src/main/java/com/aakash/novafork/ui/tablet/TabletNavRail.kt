@@ -68,5 +68,6 @@ private fun TopDestination.iconRes(): Int = when (this) {
     TopDestination.HOME -> R.drawable.ic_home
     TopDestination.LIBRARY -> R.drawable.ic_video_library
     TopDestination.BROWSE -> R.drawable.ic_folder
+    TopDestination.AUDIO -> R.drawable.ic_audiotrack
     TopDestination.SETTINGS -> R.drawable.ic_settings
 }

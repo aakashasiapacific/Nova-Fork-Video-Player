@@ -26,6 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
 import com.aakash.novafork.ui.adaptive.DeviceLayout
+import com.aakash.novafork.ui.audio.AudioScreen
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.AppUiState
@@ -129,6 +130,7 @@ private fun PhonePage(state: AppUiState, actions: AppActions) {
             actions = actions,
             modifier = pageModifier,
         )
+        Route.Audio -> AudioScreen(modifier = pageModifier)
         // statusBarsPadding (rather than contentPadding) consumes the inset, so it is not applied
         // twice whether Settings draws its own top app bar or a plain list.
         Route.Settings -> SettingsScreen(
@@ -160,5 +162,6 @@ private fun TopDestination.iconRes(): Int = when (this) {
     TopDestination.HOME -> R.drawable.ic_home
     TopDestination.LIBRARY -> R.drawable.ic_video_library
     TopDestination.BROWSE -> R.drawable.ic_folder
+    TopDestination.AUDIO -> R.drawable.ic_audiotrack
     TopDestination.SETTINGS -> R.drawable.ic_settings
 }

@@ -7,7 +7,15 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
 /** Top-level tabs. Phone shows them in a bottom NavigationBar, tablet in a NavigationRail. */
-enum class TopDestination(val label: String) { HOME("Home"), LIBRARY("Library"), BROWSE("Browse"), SETTINGS("Settings") }
+enum class TopDestination(val label: String) {
+    HOME("Home"),
+    LIBRARY("Library"),
+    BROWSE("Browse"),
+
+    /** Music (a temporary test screen until the Apple Music-style design). */
+    AUDIO("Audio"),
+    SETTINGS("Settings"),
+}
 
 @Immutable
 sealed interface Route {
@@ -15,6 +23,7 @@ sealed interface Route {
     data object Library : Route
     data object Browse : Route
     data object Settings : Route
+    data object Audio : Route
     data object Search : Route
     data class VideoDetails(val videoId: Long) : Route
     data class ShowDetails(val showKey: String) : Route
@@ -29,6 +38,7 @@ val Route.top: TopDestination
         Route.Library -> TopDestination.LIBRARY
         Route.Browse, is Route.BrowseDir, is Route.Playlist -> TopDestination.BROWSE
         Route.Settings -> TopDestination.SETTINGS
+        Route.Audio -> TopDestination.AUDIO
     }
 
 @Immutable

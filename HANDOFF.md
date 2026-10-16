@@ -44,7 +44,7 @@ separate phone and tablet UIs. This file is for a new Claude session picking the
   `tools/regex-check/`, which CI runs).
 - **App code must be compile-exact.** Use explicit imports and real signatures, and grep the repo for
   existing patterns. libVLC is pinned at 3.7.2, because 3.7.3+ needs Kotlin 2.2.
-- **Room.** The schema is exported to `app/schemas/`; the database is now at version 3, with manual
+- **Room.** The schema is exported to `app/schemas/`; the database is now at version 4, with manual
   migrations in `NovaDatabase.MIGRATIONS`. After a version bump, copy the new `N.json` from the `screens`
   branch into `app/schemas/`.
 - **Keys** (in `gradle.properties`, each overridable by an env var / repository secret of the same name):
@@ -60,6 +60,10 @@ separate phone and tablet UIs. This file is for a new Claude session picking the
 - **Background audio:** `PlaybackService` with a MediaSession notification.
 - **Chromecast:** through libVLC renderers.
 - **Network sources (Room v3):** SMB, FTP, SFTP, NFS, DLNA/UPnP, WebDAV, Jellyfin, Emby and Plex.
+- **Audio engine (Room v4), local only:** music from the phone and picked folders, tags, cover art
+  (cover.jpg or embedded), synced .lrc lyrics, songs in playlists, the watchlist table, a music
+  player with its own notification, and a plain temporary Audio tab to test it. See
+  `docs/ARCHITECTURE.md` › Music. Built on branch `ccr-987fc293-7gnds9` (PR #2, into this branch).
 - **OpenSubtitles downloads.**
 - **Backup and restore:** a JSON file through the file picker.
 - **Crash reporter:** an in-app Share dialog.
