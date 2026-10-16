@@ -27,6 +27,8 @@ object NovaColors {
     /** Brand gradient (launcher icon): amber → coral pink. */
     val Amber = Color(0xFFFFB347)
     val Coral = Color(0xFFFF5E7E)
+    /** iOS systemBlue in dark mode: the app's accent. */
+    val IosBlue = Color(0xFF0A84FF)
     /** Rating star. */
     val Gold = Color(0xFFFFC24B)
     /** Watched check / success. */
@@ -37,15 +39,16 @@ object NovaColors {
 }
 
 /**
- * The one theme (decided by the owner): the Apple TV app's dark look on pure black. White is the
- * accent (the Play pill, the selected tab, page dots); greys are iOS's dark system greys. The
- * amber/coral brand gradient stays for the launcher icon only.
+ * The one theme (decided by the owner): the Apple TV app's dark look on pure black, with iOS
+ * blue (dark-mode systemBlue, #0A84FF) as the accent: links, switches, buttons, progress. The
+ * hero keeps Apple's white Play pill and white/grey dots, and the tab bar its white selected tab;
+ * greys are iOS's dark system greys.
  */
 private val DarkScheme: ColorScheme = darkColorScheme(
-    primary = Color(0xFFFFFFFF),
-    onPrimary = Color(0xFF000000),
-    primaryContainer = Color(0xFF2C2C2E),
-    onPrimaryContainer = Color(0xFFFFFFFF),
+    primary = NovaColors.IosBlue,
+    onPrimary = Color(0xFFFFFFFF),
+    primaryContainer = Color(0xFF0B3A6E),
+    onPrimaryContainer = Color(0xFFD6E8FF),
     secondary = Color(0xFFAEAEB2),
     onSecondary = Color(0xFF000000),
     secondaryContainer = Color(0xFF2C2C2E),
@@ -63,7 +66,7 @@ private val DarkScheme: ColorScheme = darkColorScheme(
     surfaceTint = Color(0xFF000000),
     inverseSurface = Color(0xFFFFFFFF),
     inverseOnSurface = Color(0xFF000000),
-    inversePrimary = Color(0xFF000000),
+    inversePrimary = Color(0xFF007AFF),
     error = Color(0xFFFF6961),
     onError = Color(0xFF000000),
     errorContainer = Color(0xFF5C1A16),
