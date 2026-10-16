@@ -9,8 +9,13 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
@@ -36,11 +41,11 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -50,6 +55,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
@@ -77,10 +91,34 @@ fun PhoneApp(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
     // Pages leave the composition when navigated away from; this keeps their scroll positions
     // (and other saveable state) for when the user comes back.
     val pageStates = rememberSaveableStateHolder()
+    val top = state.route.top
+    // The tab bar shrinks while a page scrolls down and comes back when it scrolls up; a tab
+    // change always shows it in full.
+    var barCollapsed by remember { mutableStateOf(false) }
+    LaunchedEffect(top) { barCollapsed = false }
+    val collapseThreshold = with(LocalDensity.current) { BarCollapseScroll.toPx() }
+    val barScroll = remember {
+        object : NestedScrollConnection {
+            var travel = 0f
+            override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
+                val dy = consumed.y
+                if (dy == 0f) return Offset.Zero
+                travel = if (travel * dy < 0) dy else travel + dy
+                if (travel < -collapseThreshold) barCollapsed = true
+                if (travel > collapseThreshold) barCollapsed = false
+                return Offset.Zero
+            }
+        }
+    }
     Scaffold(
         modifier = modifier,
         bottomBar = {
-            PhoneNavigationBar(selected = state.route.top, onSelect = actions::selectTab)
+            PhoneNavigationBar(
+                selected = top,
+                collapsed = barCollapsed,
+                onExpand = { barCollapsed = false },
+                onSelect = actions::selectTab,
+            )
         },
         // Only the bottom bar is reserved here: pages handle the status bar themselves so that
         // Home and details artwork can run behind it.
@@ -92,6 +130,7 @@ fun PhoneApp(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
             targetState = state,
             modifier = Modifier
                 .fillMaxSize()
+                .nestedScroll(barScroll)
                 .padding(innerPadding)
                 .consumeWindowInsets(innerPadding)
                 .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)),
@@ -177,90 +216,146 @@ private fun PhonePage(state: AppUiState, actions: AppActions) {
 }
 
 /**
- * Apple TV's tab bar, slim (52dp, not Material's 80dp): black with a hairline above it; the
- * selected tab has a dark-grey pill behind a white icon and a bold label, the others are grey.
- * Like iOS 26's bar, a finger dragged along it moves the pill, and the tab under the finger is
- * opened when it lifts.
+ * iOS 26's floating tab bar, as in the owner's recording: a dark-grey glass capsule held off the
+ * screen edges, with a lighter grey pill behind the selected tab, whose icon and label take the
+ * tab's colour. A finger dragged along it moves the pill, and the tab under the finger opens when
+ * it lifts. While a page scrolls down it shrinks to two circles, the current tab on the left and
+ * Search on the right; scrolling back up, or tapping the left circle, brings back the full bar.
  */
 @Composable
-private fun PhoneNavigationBar(selected: TopDestination, onSelect: (TopDestination) -> Unit) {
+private fun PhoneNavigationBar(selected: TopDestination, collapsed: Boolean, onExpand: () -> Unit, onSelect: (TopDestination) -> Unit) {
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .navigationBarsPadding()
+            .padding(start = BarSideMargin, end = BarSideMargin, top = 6.dp, bottom = 10.dp)
+            .height(TabBarHeight),
+    ) {
+        AnimatedContent(
+            targetState = collapsed,
+            transitionSpec = {
+                (fadeIn(tween(200)) + scaleIn(tween(240), initialScale = 0.9f)) togetherWith
+                    (fadeOut(tween(120)) + scaleOut(tween(160), targetScale = 0.9f))
+            },
+            label = "tabBarCollapse",
+        ) { small ->
+            if (small) {
+                Box(Modifier.fillMaxSize()) {
+                    GlassCircle(onClick = onExpand, description = "Show tabs", modifier = Modifier.align(Alignment.CenterStart)) {
+                        NovaIcon(selected.iconRes(), contentDescription = null, tint = selected.activeColor(), modifier = Modifier.size(24.dp))
+                    }
+                    if (selected != TopDestination.SEARCH) {
+                        GlassCircle(onClick = { onSelect(TopDestination.SEARCH) }, description = TopDestination.SEARCH.label, modifier = Modifier.align(Alignment.CenterEnd)) {
+                            NovaIcon(TopDestination.SEARCH.iconRes(), contentDescription = null, tint = Color.White, modifier = Modifier.size(24.dp))
+                        }
+                    }
+                }
+            } else {
+                TabCapsule(selected = selected, onSelect = onSelect)
+            }
+        }
+    }
+}
+
+@Composable
+private fun TabCapsule(selected: TopDestination, onSelect: (TopDestination) -> Unit) {
     val tabs = TopDestination.entries
     val currentOnSelect by rememberUpdatedState(onSelect)
     var dragX by remember { mutableStateOf<Float?>(null) }
-    val colors = MaterialTheme.colorScheme
-    Column(Modifier.background(colors.background)) {
-        HorizontalDivider(thickness = 0.5.dp, color = colors.outlineVariant)
-        BoxWithConstraints(
+    BoxWithConstraints(
+        Modifier
+            .fillMaxSize()
+            .glass(RoundedCornerShape(percent = 50))
+            .padding(PillInset)
+            .pointerInput(tabs.size) {
+                fun tabAt(x: Float): TopDestination = tabs[(x / size.width * tabs.size).toInt().coerceIn(0, tabs.lastIndex)]
+                detectHorizontalDragGestures(
+                    onDragStart = { dragX = it.x },
+                    onDragEnd = {
+                        dragX?.let { currentOnSelect(tabAt(it)) }
+                        dragX = null
+                    },
+                    onDragCancel = { dragX = null },
+                ) { change, amount ->
+                    change.consume()
+                    dragX = (dragX ?: change.position.x) + amount
+                }
+            },
+    ) {
+        val slot = maxWidth / tabs.size
+        val widthPx = constraints.maxWidth.toFloat().coerceAtLeast(1f)
+        val active = dragX?.let { x -> (x / widthPx * tabs.size).toInt().coerceIn(0, tabs.lastIndex) } ?: tabs.indexOf(selected)
+        val pillX by animateDpAsState(slot * active, animationSpec = spring(dampingRatio = 0.75f, stiffness = Spring.StiffnessMediumLow), label = "tabPill")
+        Box(
             Modifier
-                .fillMaxWidth()
-                .navigationBarsPadding()
-                .height(TabBarHeight)
-                .pointerInput(tabs.size) {
-                    fun tabAt(x: Float): TopDestination = tabs[(x / size.width * tabs.size).toInt().coerceIn(0, tabs.lastIndex)]
-                    detectHorizontalDragGestures(
-                        onDragStart = { dragX = it.x },
-                        onDragEnd = {
-                            dragX?.let { currentOnSelect(tabAt(it)) }
-                            dragX = null
-                        },
-                        onDragCancel = { dragX = null },
-                    ) { change, amount ->
-                        change.consume()
-                        dragX = (dragX ?: change.position.x) + amount
-                    }
-                },
-        ) {
-            val slot = maxWidth / tabs.size
-            val widthPx = constraints.maxWidth.toFloat().coerceAtLeast(1f)
-            val active = dragX?.let { x -> (x / widthPx * tabs.size).toInt().coerceIn(0, tabs.lastIndex) } ?: tabs.indexOf(selected)
-            val pillWidth = slot - 10.dp
-            val pillX by animateDpAsState(slot * active + 5.dp, label = "tabPill")
-            // Apple TV's selected tab: a big dark-grey pill around icon and label.
-            Box(
-                Modifier
-                    .offset(x = pillX, y = 2.dp)
-                    .size(width = pillWidth, height = TabBarHeight - 4.dp)
-                    .clip(RoundedCornerShape(percent = 50))
-                    .background(colors.surfaceContainerHigh),
-            )
-            Row(Modifier.fillMaxSize()) {
-                tabs.forEachIndexed { index, tab ->
-                    val isActive = index == active
-                    val tint = if (isActive) tab.activeColor() else colors.onSurfaceVariant
-                    Column(
-                        Modifier
-                            .weight(1f)
-                            .fillMaxHeight()
-                            .selectable(
-                                selected = tab == selected,
-                                onClick = { onSelect(tab) },
-                                role = Role.Tab,
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null,
-                            ),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                    ) {
-                        TabIcon(tab = tab, active = isActive, tint = tint, modifier = Modifier.padding(top = 5.dp))
-                        Text(
-                            tab.label,
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = if (isActive) FontWeight.Bold else FontWeight.Medium,
-                            color = if (isActive) Color.White else tint,
-                            maxLines = 1,
-                            modifier = Modifier.padding(top = 3.dp),
-                        )
-                    }
+                .offset(x = pillX)
+                .size(width = slot, height = maxHeight)
+                .clip(RoundedCornerShape(percent = 50))
+                .background(SelectedPillColor),
+        )
+        Row(Modifier.fillMaxSize()) {
+            tabs.forEachIndexed { index, tab ->
+                val isActive = index == active
+                val tint = if (isActive) tab.activeColor() else Color.White
+                Column(
+                    Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .selectable(
+                            selected = tab == selected,
+                            onClick = { onSelect(tab) },
+                            role = Role.Tab,
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                        ),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                ) {
+                    TabIcon(tab = tab, active = isActive, tint = tint)
+                    Text(
+                        tab.label,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = tint,
+                        maxLines = 1,
+                        modifier = Modifier.padding(top = 2.dp),
+                    )
                 }
             }
         }
     }
 }
 
-private val TabBarHeight = 54.dp
+/** One of the shrunken bar's round glass buttons. */
+@Composable
+private fun GlassCircle(onClick: () -> Unit, description: String, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+    Box(
+        modifier
+            .size(TabBarHeight)
+            .glass(CircleShape)
+            .clickable(onClickLabel = description, role = Role.Button, onClick = onClick)
+            .semantics { contentDescription = description },
+        contentAlignment = Alignment.Center,
+    ) { content() }
+}
+
+/** iOS's dark glass: a translucent dark-grey fill, a hairline light edge and a soft shadow. */
+private fun Modifier.glass(shape: Shape): Modifier = this
+    .shadow(elevation = 12.dp, shape = shape, ambientColor = Color.Black, spotColor = Color.Black)
+    .clip(shape)
+    .background(GlassColor)
+    .border(0.5.dp, Color.White.copy(alpha = 0.10f), shape)
+
+private val TabBarHeight = 64.dp
+private val BarCollapseScroll = 32.dp
+private val BarSideMargin = 20.dp
+private val PillInset = 5.dp
+private val GlassColor = Color(0xF21C1C1E)
+private val SelectedPillColor = Color(0xFF3A3A3C)
 
 /**
- * The selected tab's disc colour, as the owner chose: Video and Preferences iOS blue, Audio
- * Apple Music red, Search white.
+ * The selected tab's colour, as the owner chose: Video and Preferences iOS blue, Audio Apple
+ * Music red, Search white.
  */
 private fun TopDestination.activeColor(): Color = when (this) {
     TopDestination.VIDEO, TopDestination.SETTINGS -> NovaColors.IosBlue
@@ -268,39 +363,25 @@ private fun TopDestination.activeColor(): Color = when (this) {
     TopDestination.SEARCH -> Color.White
 }
 
-/**
- * A tab's icon. The selected one "lights up" as in Apple TV's bar: a filled disc in the tab's
- * colour with the glyph on it (white, or black on Search's white disc), popping in with a short
- * spring; the others are plain grey glyphs.
- */
+/** A tab's icon; the selected one pops in with a short spring. */
 @Composable
-private fun TabIcon(tab: TopDestination, active: Boolean, tint: Color, modifier: Modifier = Modifier) {
+private fun TabIcon(tab: TopDestination, active: Boolean, tint: Color) {
     val scale by animateFloatAsState(
-        targetValue = if (active) 1f else 0.82f,
+        targetValue = if (active) 1f else 0.9f,
         animationSpec = spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessMedium),
         label = "tabIcon",
     )
-    Box(
-        modifier
-            .size(26.dp)
+    NovaIcon(
+        tab.iconRes(),
+        contentDescription = null,
+        tint = tint,
+        modifier = Modifier
+            .size(24.dp)
             .graphicsLayer {
                 scaleX = scale
                 scaleY = scale
             },
-        contentAlignment = Alignment.Center,
-    ) {
-        if (active) {
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .clip(CircleShape)
-                    .background(tint),
-            )
-            NovaIcon(tab.iconRes(), contentDescription = null, tint = if (tab == TopDestination.SEARCH) Color.Black else Color.White, modifier = Modifier.size(16.dp))
-        } else {
-            NovaIcon(tab.iconRes(), contentDescription = null, tint = tint, modifier = Modifier.size(24.dp))
-        }
-    }
+    )
 }
 
 @DrawableRes

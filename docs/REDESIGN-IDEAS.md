@@ -189,9 +189,13 @@ UI, following Apple Music:
    selected tab icon. The rest of the app stays iOS blue.
 8. **Selected tab, like Apple TV:**
    - a big dark-grey pill around the selected tab's icon and label;
-   - its icon "lights up" as a disc, popping in with a spring. *Changed after build 36:* the disc
-     is coloured per tab: Video and Preferences iOS blue, Audio red, Search white.
-9. **Dock size:** the owner will send a new idea (build 36's 54dp bar looked cramped).
+   - its icon "lights up" as a disc, popping in with a spring. *Changed after build 36:* the
+     selected tab is coloured: Video and Preferences iOS blue, Audio red, Search white.
+9. **Dock, iOS 26 style (from the owner's screen recording; replaces build 36's cramped 54dp bar):**
+   - a floating dark-grey glass capsule (64dp), 20dp off the screen sides, with a lighter grey pill
+     behind the selected tab; that tab's icon and label take its colour (no disc), others are white;
+   - scrolling a page down shrinks it to two circles, the current tab on the left and Search on the
+     right; scrolling up, tapping the left circle or changing tab brings it back.
 
 Notes on how they were built:
 - The hero uses `Artwork.tallUrl`. A title without a text-free poster shows its backdrop over the
