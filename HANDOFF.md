@@ -6,13 +6,13 @@ separate phone and tablet UIs. This file is for a new Claude session picking the
 ## Where things are
 
 - **Repo:** `aakashasiapacific/Nova-Fork-Video-Player`
-- **Branch:** `ccr-d205f787-t31r46`
+- **Branch:** `ccr-d205f787-t31r46` (PR #1); the audio engine and player volume work is on `ccr-987fc293-7gnds9` (PR #2, into PR #1's branch)
 - **PR:** #1 (draft): https://github.com/aakashasiapacific/Nova-Fork-Video-Player/pull/1
 - **Latest APK** (always the newest CI build, arm64 for the owner's Galaxy S21 FE):
   https://github.com/aakashasiapacific/Nova-Fork-Video-Player/raw/apk/NovaFork-latest-arm64-v8a.apk
 - **Docs:** `docs/ARCHITECTURE.md` (modules, contracts, toolchain: read it before coding) and
   `docs/APPLE-TV-SPEC.md` (target UI spec).
-- **Last green build:** CI run 23 at `098898d`. 291 app tests and 371 core tests pass.
+- **Last green build:** CI run 28 at `afa0c35` (branch `ccr-987fc293-7gnds9`, PR #2). 308 app tests and 394 core tests pass.
 
 ## Building and testing
 
@@ -68,6 +68,8 @@ separate phone and tablet UIs. This file is for a new Claude session picking the
 - **Backup and restore:** a JSON file through the file picker.
 - **Crash reporter:** an in-app Share dialog.
 - **Library diagnostics:** Settings › About.
+- **Player:** no brightness/volume swipes (the phone's own apply); the volume keys show an
+  iOS-style pill instead of the system panel (`docs/REDESIGN-IDEAS.md` §7).
 
 Each feature round had independent reviews and a fix pass.
 
