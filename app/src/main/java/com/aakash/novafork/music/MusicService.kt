@@ -115,6 +115,17 @@ class MusicService : Service() {
         return START_NOT_STICKY
     }
 
+    /** Music plays on in the background, until the app is cleared from recents (owner's choice). */
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        super.onTaskRemoved(rootIntent)
+        player.close()
+        if (foreground) stopForeground(STOP_FOREGROUND_REMOVE)
+        foreground = false
+        notificationManager.cancel(NOTIFICATION_ID)
+        posted = null
+        stopSelf()
+    }
+
     override fun onDestroy() {
         destroyed = true
         artworkJob?.cancel()

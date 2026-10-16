@@ -51,10 +51,11 @@ data class Settings(
     /** Play the next episode automatically when one ends. */
     val autoPlayNext: Boolean = true,
     /**
-     * Leaving the player while a video plays (Home, screen off, another app) keeps its sound
-     * playing, with controls in a notification. Off: it pauses, or goes picture-in-picture.
+     * Background play for videos: leaving the player while a video plays (Home, screen off,
+     * another app) keeps its sound playing, with controls in a notification. Off (the default,
+     * owner's choice): leaving the player pauses the video. Music always plays in the background.
      */
-    val backgroundAudio: Boolean = true,
+    val backgroundAudio: Boolean = false,
     /** OpenSubtitles.com API key pasted by the user. Empty = the built-in BuildConfig.OPENSUBTITLES_API_KEY, if any. */
     val opensubtitlesApiKey: String = "",
     /** Optional OpenSubtitles.com account; logged in, the daily download quota is bigger. */

@@ -8,7 +8,6 @@ import android.content.ServiceConnection
 import android.content.pm.ActivityInfo
 import android.content.res.Configuration
 import android.media.AudioManager
-import android.os.Build
 import android.os.Bundle
 import android.os.IBinder
 import android.os.PowerManager
@@ -335,18 +334,6 @@ class PlayerActivity : ComponentActivity(), PlayerController.Host {
         keyCode == KeyEvent.KEYCODE_VOLUME_UP || keyCode == KeyEvent.KEYCODE_VOLUME_DOWN ||
             keyCode == KeyEvent.KEYCODE_VOLUME_MUTE
 
-    override fun onUserLeaveHint() {
-        super.onUserLeaveHint()
-        val current = controller ?: return
-        // Android 12+ enters PiP by itself (auto-enter is on while playing without background audio).
-        if (
-            Build.VERSION.SDK_INT < Build.VERSION_CODES.S && !pickingSubtitle &&
-            current.state.value.isPlaying && !current.continuesInBackground && !current.isCasting
-        ) {
-            pip.enter()
-        }
-    }
-
     override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: Configuration) {
         super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
         controller?.onPictureInPictureModeChanged(isInPictureInPictureMode)
@@ -427,7 +414,9 @@ class PlayerActivity : ComponentActivity(), PlayerController.Host {
         pip.update(
             playing = playing,
             videoSize = current.videoSize.value,
-            autoEnter = playing && !current.continuesInBackground && !current.isCasting,
+            // Leaving the player pauses (or plays on in the background when that is wanted); it
+            // never turns into a picture-in-picture window by itself: the PiP button does that.
+            autoEnter = false,
         )
     }
 

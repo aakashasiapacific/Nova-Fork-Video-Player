@@ -126,6 +126,14 @@ Video view: `org.videolan.libvlc.util.VLCVideoLayout` inside `AndroidView`, atta
 `mediaPlayer.attachViews(layout, null, true /*subtitles*/, false /*textureView*/)`.
 
 ### Playback service, queue and casting
+- **Leaving the player** (owner's rules, round 1):
+  - It pauses the video. With `Settings.backgroundAudio` ("Background play for videos", off by
+    default, stored under the new key `background_play_video`), the sound plays on instead.
+  - It never enters picture-in-picture by itself: auto-enter is off, and only the PiP button
+    starts it.
+  - Music always plays in the background.
+  - Clearing the app from recents stops both video and music (`onTaskRemoved` in
+    `PlaybackService` and `MusicService`).
 - `PlaybackService` (foreground type `mediaPlayback`, not exported) owns the `PlayerController`
   (libVLC player, media, queue). `PlayerActivity` binds to it with a local Binder, lends it the
   video surface while visible and implements `PlayerController.Host` (PiP, brightness,

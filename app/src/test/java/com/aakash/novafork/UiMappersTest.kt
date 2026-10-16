@@ -152,6 +152,20 @@ class UiMappersTest {
     }
 
     @Test
+    fun personalVideosFillAHeroThatHasRoom() {
+        val rows = listOf(
+            row(video(id = 1, sourceId = DEVICE, uri = "content://media/external/video/media/1", fileName = "Birthday.mp4")),
+            row(video(id = 2, sourceId = DEVICE, uri = "content://media/external/video/media/2", fileName = "Trip.mp4")),
+            // A network file has no frame to show: it stays out.
+            row(video(id = 3, sourceId = NAS, uri = "smb://nas.local/Media/Clip.mkv")),
+        )
+        val small = LibraryIndex.build(rows, listOf(device, nas), preferLocalArtwork = false)
+        val hero = UiMappers.home(small).hero
+        assertEquals(setOf(HeroTarget.Video(1), HeroTarget.Video(2)), hero.map { it.target }.toSet())
+        assertTrue(hero.all { it.artwork.frameSource != null && it.previewUri != null })
+    }
+
+    @Test
     fun heroPreviewsPlayLocalFilesFromTheMiddle() {
         val dune = index.home.hero.first { it.target == HeroTarget.Video(DUNE) }
         val video = index.videos.first { it.id == DUNE }.video

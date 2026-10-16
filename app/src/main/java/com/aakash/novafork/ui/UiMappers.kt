@@ -114,9 +114,19 @@ object UiMappers {
             .sortedByDescending { it.first }
             .forEach { add(it.second) }
         // sortedByDescending is stable, so the order above survives within each group.
-        return candidates.values
+        val main = candidates.values
             .sortedByDescending { it.artwork.backdropUrl != null }
             .take(HERO_LIMIT)
+        if (main.size >= HERO_LIMIT) return main
+        // A library with few movies and shows fills the hero with its newest personal videos too,
+        // shown with a frame of the video (or their own picture) instead of a backdrop.
+        val taken = main.mapTo(HashSet()) { it.target }
+        val personal = index.otherVideos
+            .filter { video -> video.card.artwork.let { it.frameSource != null || it.posterUrl != null || it.backdropUrl != null } }
+            .sortedByDescending { it.video.dateAdded }
+            .map(::heroForVideo)
+            .filter { it.target !in taken }
+        return (main + personal).take(HERO_LIMIT)
     }
 
     private fun heroForInProgress(index: LibraryIndex, video: IndexedVideo): HeroUi {

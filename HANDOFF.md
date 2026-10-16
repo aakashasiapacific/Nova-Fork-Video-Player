@@ -76,6 +76,9 @@ separate phone and tablet UIs. This file is for a new Claude session picking the
 - **Backup and restore:** a JSON file through the file picker.
 - **Crash reporter:** an in-app Share dialog.
 - **Library diagnostics:** Settings › About.
+- **Leaving the player** pauses the video, unless "Background play for videos" is on (off by
+  default). Picture-in-picture only starts from its button. Music always plays in the background.
+  Clearing the app from recents stops both.
 - **Player:** no brightness/volume swipes (the phone's own apply); the volume keys show an
   iOS-style pill instead of the system panel (`docs/REDESIGN-IDEAS.md` §7).
 

@@ -12,10 +12,12 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -28,6 +30,7 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.IconButton
@@ -42,6 +45,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -51,11 +55,14 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
+import com.aakash.novafork.ui.common.ArtImage
+import com.aakash.novafork.ui.common.ArtPlaceholder
 import com.aakash.novafork.ui.common.BackdropArt
 import com.aakash.novafork.ui.common.HeroVideoPreview
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.RatingPill
 import com.aakash.novafork.ui.model.AppActions
+import com.aakash.novafork.ui.model.Artwork
 import com.aakash.novafork.ui.model.HeroTarget
 import com.aakash.novafork.ui.model.HeroUi
 import kotlinx.coroutines.delay
@@ -169,7 +176,7 @@ private fun PhoneHeroPage(hero: HeroUi, preview: Boolean, muted: Boolean, action
                 .fillMaxSize()
                 .clickable(onClickLabel = "Details", onClick = openTarget),
         ) {
-            BackdropArt(artwork = hero.artwork, modifier = Modifier.fillMaxSize())
+            HeroArt(artwork = hero.artwork, modifier = Modifier.fillMaxSize())
             val uri = hero.previewUri
             if (preview && uri != null) {
                 var started by remember(uri) { mutableStateOf(false) }
@@ -274,6 +281,59 @@ private fun PhoneHeroPage(hero: HeroUi, preview: Boolean, muted: Boolean, action
                 }
             }
         }
+    }
+}
+
+/**
+ * The hero's picture. A backdrop (or episode still) fills it. A video without one gets what it
+ * has, its poster or a frame of the video, blurred to fill the hero with a sharp copy on top
+ * (the poster in its own shape, the frame full width), so it never shows a bare placeholder.
+ */
+@Composable
+private fun HeroArt(artwork: Artwork, modifier: Modifier = Modifier) {
+    val sharp = artwork.posterUrl ?: artwork.frameSource
+    if (artwork.backdropUrl != null || artwork.stillUrl != null || sharp == null) {
+        BackdropArt(artwork = artwork, modifier = modifier)
+        return
+    }
+    val candidates = listOfNotNull(artwork.posterUrl, artwork.frameSource)
+    val isPoster = artwork.posterUrl != null
+    BoxWithConstraints(modifier) {
+        ArtImage(
+            candidates = candidates,
+            contentDescription = null,
+            modifier = Modifier
+                .fillMaxSize()
+                .blur(48.dp),
+            frameSource = artwork.frameSource,
+        ) {
+            ArtPlaceholder(seed = artwork.seed, title = null, modifier = Modifier.fillMaxSize())
+        }
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.35f)),
+        )
+        val sharpModifier = if (isPoster) {
+            Modifier
+                .padding(top = maxHeight * 0.09f)
+                .fillMaxHeight(0.5f)
+                .aspectRatio(2f / 3f)
+                .clip(RoundedCornerShape(12.dp))
+        } else {
+            Modifier
+                .padding(top = maxHeight * 0.16f)
+                .fillMaxWidth()
+                .aspectRatio(16f / 9f)
+        }
+        ArtImage(
+            candidates = candidates,
+            contentDescription = null,
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .then(sharpModifier),
+            frameSource = artwork.frameSource,
+        ) {}
     }
 }
 

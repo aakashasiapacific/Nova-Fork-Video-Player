@@ -555,8 +555,9 @@ private fun playerGroups(settings: Settings, actions: AppActions): List<Settings
                 SwitchRow(
                     shape = shape,
                     icon = R.drawable.ic_volume_up,
-                    title = "Background audio",
-                    summary = "Keep the sound playing after leaving the player, with controls in a notification",
+                    title = "Background play for videos",
+                    summary = "Keep a video's sound playing after leaving the player, with controls in a notification. " +
+                        "Off: leaving the player pauses it",
                     checked = settings.backgroundAudio,
                     onCheckedChange = { on -> actions.updateSettings { it.copy(backgroundAudio = on) } },
                 )
