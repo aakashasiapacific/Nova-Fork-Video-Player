@@ -1,11 +1,18 @@
 package com.aakash.novafork.data.music
 
+import android.app.Application
 import com.aakash.novafork.core.audio.MusicKeys
 import com.aakash.novafork.data.db.SongEntity
 import com.aakash.novafork.sources.music.SongArt
 import org.junit.Assert.assertEquals
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 
+/** Robolectric for android.net.Uri, which album art addresses are built with. */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [34], application = Application::class)
 class MusicLibraryTest {
     private var nextId = 1L
 
