@@ -13,6 +13,7 @@ import android.os.Bundle
 import android.os.IBinder
 import android.os.PowerManager
 import android.util.Log
+import android.view.KeyEvent
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
@@ -49,6 +50,9 @@ import org.videolan.libvlc.util.VLCVideoLayout
 class PlayerActivity : ComponentActivity(), PlayerController.Host {
 
     private var service: PlaybackService? = null
+
+    /** The last volume key down went to the player's indicator; its key up is swallowed too. */
+    private var volumeKeyHandled = false
     private val connected = MutableStateFlow<PlayerController?>(null)
     private val controller: PlayerController? get() = connected.value
     private var bound = false
@@ -304,6 +308,32 @@ class PlayerActivity : ComponentActivity(), PlayerController.Host {
         super.onWindowFocusChanged(hasFocus)
         if (hasFocus) hideSystemBars()
     }
+
+    /**
+     * The volume keys change the media volume with the player's own iOS-style indicator instead
+     * of the system's panel; in picture-in-picture (or before the player is connected) the
+     * system handles them as usual.
+     */
+    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
+        if (isVolumeKey(keyCode) && !isInPictureInPictureMode && controller?.onVolumeKey(keyCode) == true) {
+            volumeKeyHandled = true
+            return true
+        }
+        return super.onKeyDown(keyCode, event)
+    }
+
+    override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {
+        // The release of a key the player took, so the system doesn't act on it (a click sound, its panel).
+        if (isVolumeKey(keyCode) && volumeKeyHandled) {
+            volumeKeyHandled = false
+            return true
+        }
+        return super.onKeyUp(keyCode, event)
+    }
+
+    private fun isVolumeKey(keyCode: Int): Boolean =
+        keyCode == KeyEvent.KEYCODE_VOLUME_UP || keyCode == KeyEvent.KEYCODE_VOLUME_DOWN ||
+            keyCode == KeyEvent.KEYCODE_VOLUME_MUTE
 
     override fun onUserLeaveHint() {
         super.onUserLeaveHint()

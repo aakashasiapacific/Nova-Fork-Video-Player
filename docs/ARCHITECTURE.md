@@ -206,7 +206,9 @@ times and an icon row (lock, aspect, subtitles, audio, speed, rotate, PiP) — t
 `ModalBottomSheet`. Tablet controls = larger targets, seek bar with title above, labelled
 buttons in one bottom row, tracks/speed/subtitle delay in a right-side panel (no bottom sheet).
 Both: tap toggles controls (auto-hide after 3.5 s while playing), double-tap left/right seeks by
-`seekStepMs`, horizontal drag scrubs, vertical drag left = brightness / right = volume, lock mode,
+`seekStepMs`, horizontal drag scrubs (vertical drags do nothing: brightness and volume are the
+phone's own; the volume keys show an iOS-style pill, `VolumeHud`, instead of the system panel,
+except in picture-in-picture), lock mode,
 resume banner, up-next card, buffering spinner, error card.
 
 ## Icons (res/drawable, Material Icons Round, white fill — tint with `Icon`)

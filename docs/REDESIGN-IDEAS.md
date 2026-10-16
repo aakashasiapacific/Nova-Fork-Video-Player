@@ -137,7 +137,7 @@ UI, following Apple Music:
    - Filter chips (All / Video / Music) sit at the top.
    - The Audio tab has no search of its own.
 
-## 7. Video player: system brightness and volume (owner, 2026-10-16; not built yet)
+## 7. Video player: system brightness and volume (owner, 2026-10-16; built)
 
 - **No brightness or volume of the player's own.** Today a vertical swipe on the left half sets
   the window's brightness (only while the player is open) and on the right half the media volume,
