@@ -7,6 +7,9 @@ import com.aakash.novafork.data.PlaylistWithCount
 import com.aakash.novafork.data.ScanState
 import com.aakash.novafork.data.db.SourceEntity
 import com.aakash.novafork.data.db.SourceType
+import com.aakash.novafork.data.music.MusicLibrary
+import com.aakash.novafork.data.music.MusicLibraryData
+import com.aakash.novafork.data.music.MusicSearch
 import com.aakash.novafork.ui.model.Artwork
 import com.aakash.novafork.ui.model.BrowseDirUi
 import com.aakash.novafork.ui.model.BrowseUi
@@ -21,6 +24,7 @@ import com.aakash.novafork.ui.model.LibraryItemUi
 import com.aakash.novafork.ui.model.LibrarySort
 import com.aakash.novafork.ui.model.LibraryUi
 import com.aakash.novafork.ui.model.MediaKind
+import com.aakash.novafork.ui.model.MusicResultUi
 import com.aakash.novafork.ui.model.PlaylistDetailsUi
 import com.aakash.novafork.ui.model.PlaylistUi
 import com.aakash.novafork.ui.model.RemoteFileUi
@@ -627,9 +631,11 @@ object UiMappers {
     // Search
 
     /** Title, show title and file name, case-insensitive; episodes show up as their show. */
-    fun search(index: LibraryIndex, query: String): SearchUi {
+    fun search(index: LibraryIndex, query: String, music: MusicLibraryData = MusicLibraryData()): SearchUi {
         val needle = query.trim()
         if (needle.isEmpty()) return SearchUi(query = query)
+        val found = MusicSearch.search(music, needle)
+        val songIds = found.songs.map { it.id }
         val entries = ArrayList<Entry>()
         val showKeys = LinkedHashSet<String>()
         for (video in index.videos) {
@@ -646,7 +652,39 @@ object UiMappers {
         val ranked = entries.sortedWith(
             compareBy<Entry> { !it.item.title.startsWith(needle, ignoreCase = true) }.then(ENTRY_TITLE_ORDER),
         )
-        return SearchUi(query = query, results = ranked.take(SEARCH_LIMIT).map { it.item })
+        return SearchUi(
+            query = query,
+            results = ranked.take(SEARCH_LIMIT).map { it.item },
+            songs = found.songs.mapIndexed { i, song ->
+                MusicResultUi(
+                    key = "song:${song.id}",
+                    title = song.title,
+                    subtitle = listOfNotNull("Song", song.artist ?: song.albumArtist).joinToString(" · "),
+                    artUri = MusicLibrary.artUri(song),
+                    songIds = songIds,
+                    startIndex = i,
+                )
+            },
+            albums = found.albums.map { album ->
+                MusicResultUi(
+                    key = "album:${album.key}",
+                    title = album.title,
+                    subtitle = "Album · ${album.artist}",
+                    artUri = album.artUri,
+                    songIds = album.songs.map { it.id },
+                )
+            },
+            artists = found.artists.map { artist ->
+                MusicResultUi(
+                    key = "artist:${artist.key}",
+                    title = artist.name,
+                    subtitle = "Artist",
+                    artUri = artist.albums.firstOrNull()?.artUri,
+                    songIds = artist.songs.map { it.id },
+                    round = true,
+                )
+            },
+        )
     }
 
     // Scan

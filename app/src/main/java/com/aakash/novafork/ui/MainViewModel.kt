@@ -33,6 +33,7 @@ import com.aakash.novafork.data.backup.RestoreReport
 import com.aakash.novafork.data.db.SourceEntity
 import com.aakash.novafork.data.db.SourceType
 import com.aakash.novafork.data.db.VideoKind
+import com.aakash.novafork.data.music.MusicLibraryData
 import com.aakash.novafork.sources.DeviceScanner
 import com.aakash.novafork.sources.media.MediaServerSources
 import com.aakash.novafork.sources.media.PlexSignIn
@@ -82,6 +83,7 @@ import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapLatest
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -140,7 +142,12 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
     private val libraryMemo = Memo<Triple<LibraryIndex, LibraryFilter, LibrarySort>, LibraryUi> { (index, filter, sort) ->
         UiMappers.library(index, filter, sort)
     }
-    private val searchMemo = Memo<Pair<LibraryIndex, String>, SearchUi> { (index, query) -> UiMappers.search(index, query) }
+    private val searchMemo = Memo<Triple<LibraryIndex, String, MusicLibraryData>, SearchUi> { (index, query, music) ->
+        UiMappers.search(index, query, music)
+    }
+
+    /** The music library, for search (one search over videos and music). */
+    private val musicLibrary: Flow<MusicLibraryData> = graph.music.observeLibrary().onStart { emit(MusicLibraryData()) }
     private val remoteDirMemo = Memo<RemoteDirInput, BrowseDirUi> { (index, source, path, listings) ->
         UiMappers.remoteDir(index, source, path, listings)
     }
@@ -163,9 +170,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
         library.scanState,
         settingsStore.settings,
         local,
-        playlists,
-    ) { index, scan, settings, user, lists ->
-        assemble(index, scan, settings, user, lists)
+        combine(playlists, musicLibrary) { lists, music -> lists to music },
+    ) { index, scan, settings, user, (lists, music) ->
+        assemble(index, scan, settings, user, lists, music)
     }
         .flowOn(Dispatchers.Default)
         // Seeded with the real settings so the first frame already has the right theme and layout.
@@ -236,6 +243,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
         settings: Settings,
         user: LocalState,
         lists: PlaylistsState,
+        music: MusicLibraryData,
     ): AppUiState {
         val route = user.backStack.lastOrNull() ?: Route.Home
         val previewKey = user.previewKey
@@ -257,7 +265,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
             showDetails = showKey?.let { UiMappers.showDetails(index, it) },
             previewKey = previewKey,
             playlist = openPlaylist?.let { UiMappers.playlistDetails(index, it.id, it.name, lists.openVideoIds) },
-            search = searchMemo[index to user.query],
+            search = searchMemo[Triple(index, user.query, music)],
             settings = SettingsUi(
                 settings = settings,
                 hasBuiltInKey = settingsStore.hasBuiltInTmdbKey,
@@ -358,6 +366,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
 
     override fun search(query: String) {
         local.update { it.copy(query = query) }
+    }
+
+    override fun playMusic(songIds: List<Long>, startIndex: Int) {
+        if (songIds.isNotEmpty()) graph.musicPlayer.playSongs(songIds, startIndex)
     }
 
     override fun setWatched(videoId: Long, watched: Boolean) {
@@ -1049,6 +1061,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
                     settings = settingsStore.settings.value,
                     appVersion = BuildConfig.VERSION_NAME,
                     census = { DeviceScanner(app).census() },
+                    music = { graph.music.diagnostics() },
                 )
             } catch (e: CancellationException) {
                 throw e
@@ -1301,9 +1314,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
     }
 
     private fun backupMessage(summary: BackupSummary): String {
-        val what = listOf(
+        val what = listOfNotNull(
             plural(summary.sources, "source", "sources"),
             plural(summary.videos, "video with history", "videos with history"),
+            summary.songs.takeIf { it > 0 }?.let { plural(it, "song with plays", "songs with plays") },
             plural(summary.playlists, "playlist", "playlists"),
         ).joinToString(", ")
         return if (summary.includesSecrets) {
@@ -1319,13 +1333,14 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
             if (report.sourcesAdded > 0) add(plural(report.sourcesAdded, "source", "sources"))
             if (report.applied.videos > 0) add("history of ${plural(report.applied.videos, "video", "videos")}")
             if (report.applied.matches > 0) add(plural(report.applied.matches, "match", "matches"))
+            if (report.applied.songs > 0) add("plays of ${plural(report.applied.songs, "song", "songs")}")
             if (report.playlistsCreated > 0 || report.applied.playlistItems > 0) add("playlists")
         }
         val sentences = ArrayList<String>()
         sentences += if (restored.isEmpty()) "Nothing new to restore" else "Restored ${restored.joinToString(", ")}"
         val waiting = report.waiting.total
-        if (waiting == 1) sentences += "1 item waits for its video to be scanned"
-        if (waiting > 1) sentences += "$waiting items wait for their videos to be scanned"
+        if (waiting == 1) sentences += "1 item waits for its video or song to be scanned"
+        if (waiting > 1) sentences += "$waiting items wait for their videos and songs to be scanned"
         if (report.foldersToPick.isNotEmpty()) {
             sentences += "Add ${report.foldersToPick.joinToString(", ")} again under Folders"
         }
@@ -1346,6 +1361,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
         videos = videos,
         matches = matches,
         playlists = playlists,
+        songs = songs,
     )
 
     /** "wt" truncates what a provider hands back; not every provider knows it, "w" is the fallback. */

@@ -5,6 +5,7 @@ import android.content.Context
 import android.net.Uri
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
+import com.aakash.novafork.data.MusicSourceCount
 import com.aakash.novafork.data.db.NovaDatabase
 import com.aakash.novafork.data.db.SourceEntity
 import com.aakash.novafork.data.db.SourceType
@@ -217,6 +218,28 @@ class MusicRepositoryTest {
         assertEquals(listOf("Hello", "World"), lyrics?.lines?.map { it.text })
         assertEquals(true, lyrics?.synced)
         assertNull(repository.lyrics(songs.getValue("B")))
+    }
+
+    @Test
+    fun diagnosticsCountSongsPerSource() = runTest {
+        val deviceId = addSource(SourceType.DEVICE)
+        device.songs[deviceId] = listOf(song("a.mp3", title = "A"), song("b.mp3", title = "B"))
+        repository.rescan()
+        device.songs[deviceId] = listOf(song("a.mp3", title = "A"))
+        repository.rescan()
+
+        val report = repository.diagnostics()
+        assertEquals(listOf(MusicSourceCount(name = "DEVICE", type = "DEVICE", shown = 1, hidden = 1)), report.sources)
+        assertEquals(time, report.lastScanAt)
+    }
+
+    @Test
+    fun aRestoreIsAppliedAfterEachScan() = runTest {
+        var calls = 0
+        val withHook = MusicRepository(context, database, mapOf(SourceType.DEVICE to device), CoroutineScope(Job()), { time }, afterScan = { calls++ })
+        withHook.rescan()
+        withHook.rescan()
+        assertEquals(2, calls)
     }
 
     private suspend fun addSource(type: SourceType): Long =

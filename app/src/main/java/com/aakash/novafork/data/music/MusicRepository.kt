@@ -8,6 +8,9 @@ import com.aakash.novafork.core.audio.AudioFiles
 import com.aakash.novafork.core.audio.LrcParser
 import com.aakash.novafork.core.audio.Lyrics
 import com.aakash.novafork.core.audio.MusicKeys
+import com.aakash.novafork.data.MusicDiagnostics
+import com.aakash.novafork.data.MusicSourceCount
+import com.aakash.novafork.data.StoragePermissions
 import com.aakash.novafork.data.db.MusicPlaylistRow
 import com.aakash.novafork.data.db.NovaDatabase
 import com.aakash.novafork.data.db.PlaylistEntity
@@ -57,6 +60,8 @@ class MusicRepository(
     private val scanners: Map<SourceType, MusicScanner>,
     private val scope: CoroutineScope,
     private val now: () -> Long = System::currentTimeMillis,
+    /** Runs after every scan: a restored backup's song entries are applied then (see AppGraph). */
+    private val afterScan: suspend () -> Unit = {},
 ) {
     private val songDao = database.songDao()
     private val playlistSongDao = database.playlistSongDao()
@@ -123,6 +128,13 @@ class MusicRepository(
             } finally {
                 _scanState.value = MusicScanState(scanning = false, lastScanAt = now(), error = errors.firstOrNull())
             }
+        }
+        try {
+            afterScan()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.w(TAG, "After a music scan", e)
         }
     }
 
@@ -219,6 +231,28 @@ class MusicRepository(
     }
 
     private fun sameFileKey(fileName: String, sizeBytes: Long?): String = "${fileName.lowercase()}|${sizeBytes ?: -1}"
+
+    /** Songs per source for Library diagnostics: names and counts, never file names. */
+    suspend fun diagnostics(): MusicDiagnostics {
+        val sources = sourceDao.all().associateBy { it.id }
+        val counts = songDao.countsBySource().groupBy { it.sourceId }
+        val state = _scanState.value
+        return MusicDiagnostics(
+            hasAccess = StoragePermissions.hasAudioAccess(context),
+            sources = counts.mapNotNull { (sourceId, rows) ->
+                val source = sources[sourceId] ?: return@mapNotNull null
+                MusicSourceCount(
+                    name = source.name,
+                    type = source.type.name,
+                    shown = rows.filter { it.present }.sumOf { it.count },
+                    hidden = rows.filterNot { it.present }.sumOf { it.count },
+                )
+            }.sortedBy { it.name },
+            lastScanAt = state.lastScanAt,
+            scanning = state.scanning,
+            error = state.error,
+        )
+    }
 
     // Songs
 

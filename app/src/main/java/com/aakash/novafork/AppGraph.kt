@@ -16,6 +16,7 @@ import com.aakash.novafork.data.SettingsStore
 import com.aakash.novafork.data.SmbBrowser
 import com.aakash.novafork.data.SourceModule
 import com.aakash.novafork.data.SourceScanner
+import com.aakash.novafork.data.backup.PendingRestore
 import com.aakash.novafork.data.db.NovaDatabase
 import com.aakash.novafork.data.db.SourceType
 import com.aakash.novafork.data.music.MusicRepository
@@ -131,6 +132,11 @@ class AppGraph(val app: Application) {
                 SourceType.FOLDER to FolderMusicScanner(app),
             ),
             scope = appScope,
+            // A restored backup's song plays and playlist songs wait for the songs to be scanned.
+            afterScan = {
+                val pending = PendingRestore(app, database)
+                if (pending.exists()) pending.apply(library, identify = false)
+            },
         ).also { it.watchSources() }
     }
 

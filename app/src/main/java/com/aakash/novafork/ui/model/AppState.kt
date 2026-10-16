@@ -213,6 +213,8 @@ data class RestorePreviewUi(
     val videos: Int,
     val matches: Int,
     val playlists: Int,
+    /** Songs with plays. */
+    val songs: Int = 0,
 )
 
 private val IdleBackupState: StateFlow<BackupUi> = MutableStateFlow(BackupUi())
@@ -271,6 +273,9 @@ interface AppActions {
     fun setLibraryFilter(filter: LibraryFilter)
     fun setLibrarySort(sort: LibrarySort)
     fun search(query: String)
+
+    /** Plays songs from search results (see [MusicResultUi]). */
+    fun playMusic(songIds: List<Long>, startIndex: Int) {}
 
     fun openSource(sourceId: Long) = navigate(Route.BrowseDir(sourceId, ""))
     fun openFolder(folder: FolderUi) = navigate(Route.BrowseDir(folder.sourceId, folder.path))

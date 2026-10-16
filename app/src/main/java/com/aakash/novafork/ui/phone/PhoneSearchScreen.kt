@@ -33,6 +33,7 @@ import com.aakash.novafork.R
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
 import com.aakash.novafork.ui.common.EmptyState
 import com.aakash.novafork.ui.common.NovaIcon
+import com.aakash.novafork.ui.common.musicSearchResults
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.SearchUi
 
@@ -77,7 +78,7 @@ fun PhoneSearchScreen(
                 modifier = Modifier
                     .weight(1f)
                     .focusRequester(focusRequester),
-                placeholder = { Text("Search movies, shows, videos") },
+                placeholder = { Text("Search videos and music") },
                 leadingIcon = { NovaIcon(R.drawable.ic_search, contentDescription = null) },
                 trailingIcon = if (field.text.isNotEmpty()) {
                     {
@@ -108,10 +109,10 @@ fun PhoneSearchScreen(
                 EmptyState(
                     icon = R.drawable.ic_search,
                     title = "Search your library",
-                    body = "Find movies, shows and videos by title.",
+                    body = "Find movies, shows, videos, songs, albums and artists.",
                 )
             }
-            search.results.isEmpty() && query.isNotEmpty() -> CenteredScrollable(Modifier.imePadding()) {
+            search.isEmpty && query.isNotEmpty() -> CenteredScrollable(Modifier.imePadding()) {
                 EmptyState(
                     icon = R.drawable.ic_search,
                     title = "No results",
@@ -122,6 +123,7 @@ fun PhoneSearchScreen(
                 items = search.results,
                 actions = actions,
                 modifier = Modifier.imePadding(),
+                footer = { musicSearchResults(search) { actions.playMusic(it.songIds, it.startIndex) } },
             )
         }
     }

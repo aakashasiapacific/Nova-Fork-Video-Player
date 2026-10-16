@@ -119,8 +119,8 @@ volume indicator.
    - the Audio tab (music scan, album art, lyrics), music in the background, and the music
      notification;
    - the player's iOS-style volume indicator and its volume-key handling.
-4. **Music not yet included in:** backup/restore (song-only playlists are left out of backups for
-   now), Library diagnostics, or search.
+4. **Music in backup/restore, Library diagnostics and search:** built on `ccr-987fc293-7gnds9` after
+   build 28 (see `docs/ARCHITECTURE.md` › Music). Check the latest CI run before relying on it.
 5. **Ideas noted, not built:** see `docs/REDESIGN-IDEAS.md` for the full list. Sections 0–6 cover the
    redesign; section 7 (the player's brightness and volume) is done.
 

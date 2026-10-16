@@ -41,6 +41,7 @@ import com.aakash.novafork.R
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
 import com.aakash.novafork.ui.common.EmptyState
 import com.aakash.novafork.ui.common.NovaIcon
+import com.aakash.novafork.ui.common.musicSearchResults
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.LibraryItemUi
 import com.aakash.novafork.ui.model.SearchUi
@@ -86,7 +87,7 @@ internal fun TabletSearchScreen(
                     .fillMaxWidth()
                     .focusRequester(focusRequester),
                 textStyle = MaterialTheme.typography.titleLarge,
-                placeholder = { Text("Search movies, shows and videos", style = MaterialTheme.typography.titleLarge) },
+                placeholder = { Text("Search videos and music", style = MaterialTheme.typography.titleLarge) },
                 leadingIcon = { NovaIcon(R.drawable.ic_search, contentDescription = null) },
                 trailingIcon = if (query.isNotEmpty()) {
                     {
@@ -119,10 +120,10 @@ internal fun TabletSearchScreen(
                 EmptyState(
                     icon = R.drawable.ic_search,
                     title = "Search your library",
-                    body = "Find movies, shows, episodes and videos by title.",
+                    body = "Find movies, shows, episodes, videos, songs, albums and artists.",
                 )
             }
-            results.isNotEmpty() -> LazyVerticalGrid(
+            !search.isEmpty -> LazyVerticalGrid(
                 columns = GridCells.Adaptive(dims.gridMinCell),
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(
@@ -147,6 +148,7 @@ internal fun TabletSearchScreen(
                         )
                     }
                 }
+                musicSearchResults(search) { actions.playMusic(it.songIds, it.startIndex) }
             }
             // Only claim "no matches" once the results belong to what is typed.
             search.query.trim() == query.trim() -> SearchMessage {

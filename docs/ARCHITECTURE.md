@@ -174,7 +174,13 @@ tree) — the same sources as videos, so turning one off or removing it does the
   (movie vs music content), so starting one pauses the other.
 - `ui/audio`: a plain, temporary Audio tab (songs, albums, artists, genres, playlists, recently
   added, a mini player with lyrics) to test the engine until the Apple Music-style screens.
-- Not yet: music in backup/restore, music in Library diagnostics, music search.
+- Backups carry song plays (`NovaBackup.songs`) and each playlist's songs (`BackupPlaylist.songs`),
+  matched on restore by `SongMatcher` (URI + name, place in source, name + size); entries wait in
+  `PendingRestore` and are applied after each music scan (`MusicRepository.afterScan`).
+- Library diagnostics has a Music section (access, songs per source, last music scan).
+- Search covers music: `MusicSearch` (accent- and case-insensitive; prefix matches first) feeds
+  `SearchUi.songs/albums/artists`, shown after the videos by `ui/common/musicSearchResults`;
+  tapping one plays it (`AppActions.playMusic`).
 
 ## Phone vs tablet UI
 

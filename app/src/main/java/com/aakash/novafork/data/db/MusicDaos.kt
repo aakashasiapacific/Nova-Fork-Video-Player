@@ -40,6 +40,18 @@ interface SongDao {
     @Query("DELETE FROM songs WHERE sourceId NOT IN (SELECT id FROM sources)")
     suspend fun deleteOrphans(): Int
 
+    /** Songs with plays, for backups. */
+    @Query("SELECT * FROM songs WHERE playCount > 0 OR lastPlayedAt IS NOT NULL")
+    suspend fun withPlays(): List<SongEntity>
+
+    /** Every song, present or not, as a restored backup's entries are matched against it. */
+    @Query("SELECT id, sourceId, uri, folder, fileName, sizeBytes FROM songs")
+    suspend fun identities(): List<SongIdentity>
+
+    /** Puts back a song's plays from a backup. */
+    @Query("UPDATE songs SET playCount = :playCount, lastPlayedAt = :lastPlayedAt WHERE id = :id")
+    suspend fun restorePlays(id: Long, playCount: Int, lastPlayedAt: Long?)
+
     @Query("UPDATE songs SET playCount = playCount + 1, lastPlayedAt = :playedAt WHERE id = :id")
     suspend fun markPlayed(id: Long, playedAt: Long)
 
@@ -50,6 +62,16 @@ interface SongDao {
     @Query("SELECT sourceId, present, COUNT(*) AS count FROM songs GROUP BY sourceId, present")
     suspend fun countsBySource(): List<SourceVideoCount>
 }
+
+/** What identifies a song when a restored backup's entries are matched to the library. */
+data class SongIdentity(
+    val id: Long,
+    val sourceId: Long,
+    val uri: String,
+    val folder: String,
+    val fileName: String,
+    val sizeBytes: Long?,
+)
 
 /** A playlist as the Audio tab lists it, with the number of songs it shows. */
 data class MusicPlaylistRow(

@@ -305,6 +305,28 @@ data class RemoteFileUi(
 data class SearchUi(
     val query: String = "",
     val results: List<LibraryItemUi> = emptyList(),
+    /** Music that matches, one section each, best first (one search over videos and music). */
+    val songs: List<MusicResultUi> = emptyList(),
+    val albums: List<MusicResultUi> = emptyList(),
+    val artists: List<MusicResultUi> = emptyList(),
+) {
+    val hasMusic: Boolean get() = songs.isNotEmpty() || albums.isNotEmpty() || artists.isNotEmpty()
+    val isEmpty: Boolean get() = results.isEmpty() && !hasMusic
+}
+
+/** A song, album or artist in search results; tapping it plays [songIds] from [startIndex]. */
+@Immutable
+data class MusicResultUi(
+    val key: String,
+    val title: String,
+    /** "Song · Queen", "Album · Queen", "Artist". */
+    val subtitle: String,
+    /** Cover file or embedded picture; null for none. */
+    val artUri: String?,
+    val songIds: List<Long>,
+    val startIndex: Int = 0,
+    /** Artists show round art, like Apple Music. */
+    val round: Boolean = false,
 )
 
 @Immutable
