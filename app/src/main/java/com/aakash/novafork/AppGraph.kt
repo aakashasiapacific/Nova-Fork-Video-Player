@@ -18,12 +18,16 @@ import com.aakash.novafork.data.SourceModule
 import com.aakash.novafork.data.SourceScanner
 import com.aakash.novafork.data.db.NovaDatabase
 import com.aakash.novafork.data.db.SourceType
+import com.aakash.novafork.data.music.MusicRepository
+import com.aakash.novafork.music.MusicPlayer
 import com.aakash.novafork.sources.DeviceScanner
 import com.aakash.novafork.sources.FolderScanner
 import com.aakash.novafork.sources.SmbBrowserImpl
 import com.aakash.novafork.sources.SmbScanner
 import com.aakash.novafork.sources.SourceImageAuthInterceptor
 import com.aakash.novafork.sources.media.MediaServerSources
+import com.aakash.novafork.sources.music.DeviceMusicScanner
+import com.aakash.novafork.sources.music.FolderMusicScanner
 import com.aakash.novafork.sources.net.FileServerSources
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
@@ -115,6 +119,24 @@ class AppGraph(val app: Application) {
      */
     internal fun onMainScreenCreated() {
         if (repository.isInitialized()) repository.value.markLaunch()
+    }
+
+    /** Music of the local sources (the device and picked folders); scans follow those sources. */
+    val music: MusicRepository by lazy {
+        MusicRepository(
+            context = app,
+            database = database,
+            scanners = mapOf(
+                SourceType.DEVICE to DeviceMusicScanner(app),
+                SourceType.FOLDER to FolderMusicScanner(app),
+            ),
+            scope = appScope,
+        ).also { it.watchSources() }
+    }
+
+    /** The music player; main thread only, so first used from there (it creates libVLC's player lazily). */
+    val musicPlayer: MusicPlayer by lazy {
+        MusicPlayer(app, music, CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate))
     }
 
     val imageLoader: ImageLoader by lazy {
