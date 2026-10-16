@@ -51,6 +51,9 @@ class MusicService : Service() {
     private lateinit var artworkLoader: PlaybackArtwork
 
     private var foreground = false
+
+    /** A start was handled (startForeground called): only then may sync() stop the service. */
+    private var started = false
     private var posted: NotificationContent? = null
     private var destroyed = false
     private var artUri: String? = null
@@ -86,8 +89,6 @@ class MusicService : Service() {
         artworkLoader = PlaybackArtwork(this, graph.imageLoader)
         createChannel()
         session = PlaybackSession(this, openAppIntent, controls, seekButtons = false)
-        // Plain Main: a state change inside a player call is handled after that call.
-        scope.launch(Dispatchers.Main) { player.state.collect { sync() } }
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -96,6 +97,13 @@ class MusicService : Service() {
         // Every start comes through startForegroundService(): startForeground() is owed now,
         // and sync() below leaves the foreground again when nothing plays.
         goForeground(content(ongoing = true))
+        if (!started) {
+            started = true
+            // Only now: a sync before the first start could stop the service while Android still
+            // waits for startForeground(), which it punishes with a crash.
+            // Plain Main: a state change inside a player call is handled after that call.
+            scope.launch(Dispatchers.Main) { player.state.collect { sync() } }
+        }
         when (intent?.action) {
             ACTION_PLAY -> player.play()
             ACTION_PAUSE -> player.pause()
@@ -128,7 +136,7 @@ class MusicService : Service() {
             state = sessionState(state),
             title = now?.title ?: DEFAULT_TITLE,
             hasContent = now != null,
-            playRequested = state.isPlaying,
+            playRequested = state.playRequested,
             active = state.active,
             artwork = artwork,
         )
@@ -140,7 +148,9 @@ class MusicService : Service() {
                 posted = null
                 stopSelf()
             }
-            state.isPlaying || state.isBuffering -> {
+            // Between songs and while a failed one is skipped too, not only while sound plays:
+            // a service that left the foreground can't come back to it from the background.
+            state.playRequested -> {
                 if (!foreground) goForeground(content(ongoing = true)) else post(content(ongoing = true))
             }
             else -> {
@@ -172,7 +182,7 @@ class MusicService : Service() {
         return NotificationContent(
             title = state.nowPlaying?.title ?: DEFAULT_TITLE,
             text = state.error ?: state.nowPlaying?.artist,
-            playing = state.isPlaying || state.isBuffering,
+            playing = state.playRequested,
             ongoing = ongoing,
             hasPrevious = state.nowPlaying != null,
             hasNext = state.hasNext,

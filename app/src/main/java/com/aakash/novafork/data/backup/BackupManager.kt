@@ -52,6 +52,7 @@ class BackupManager(
     private val sourceDao = database.sourceDao()
     private val videoDao = database.videoDao()
     private val playlistDao = database.playlistDao()
+    private val playlistSongDao = database.playlistSongDao()
 
     private val settingsPrefs: SharedPreferences
         get() = appContext.getSharedPreferences(SettingsBackup.PREFS_NAME, Context.MODE_PRIVATE)
@@ -89,8 +90,10 @@ class BackupManager(
                     )
                 },
                 matches = withState.mapNotNull { video -> video.manualMatch(sourcesById[video.sourceId], includeSecrets) },
-                playlists = playlistDao.all().map { playlist ->
+                playlists = playlistDao.all().mapNotNull { playlist ->
                     val items = playlistDao.items(playlist.id)
+                    // A playlist of songs only is the Audio tab's; music isn't in backups yet.
+                    if (items.isEmpty() && playlistSongDao.items(playlist.id).isNotEmpty()) return@mapNotNull null
                     val videos = items.map { it.videoId }.distinct().chunked(SQL_CHUNK)
                         .flatMap { videoDao.byIds(it) }
                         .associateBy { it.id }

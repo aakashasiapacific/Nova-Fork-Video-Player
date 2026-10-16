@@ -48,6 +48,12 @@ data class MusicPlayerState(
     /** Null while nothing is queued, and while the first song loads. */
     val nowPlaying: NowPlaying? = null,
     val isPlaying: Boolean = false,
+    /**
+     * The user wants sound: set by play, cleared only by pause, close, a permanent loss of audio
+     * focus and the end of the queue. Unlike [isPlaying] it stays on between songs and while a
+     * failed song is skipped, so the service keeps its foreground through them.
+     */
+    val playRequested: Boolean = false,
     val isBuffering: Boolean = false,
     val positionMs: Long = 0,
     val durationMs: Long = 0,
@@ -102,6 +108,7 @@ class MusicPlayer(
                 val player = mediaPlayer ?: return
                 if (!player.isPlaying) return
                 pausedByFocusLoss = transient
+                if (!transient) _state.update { it.copy(playRequested = false) }
                 player.pause()
             }
 
@@ -129,13 +136,17 @@ class MusicPlayer(
     fun playSongs(songIds: List<Long>, startIndex: Int = 0, shuffle: Boolean = false) {
         if (songIds.isEmpty()) return
         queue.set(songIds, startIndex, shuffle)
-        _state.update { it.copy(active = true, isBuffering = true, shuffle = shuffle) }
+        _state.update { it.copy(active = true, isBuffering = true, playRequested = true, shuffle = shuffle) }
         MusicService.start(appContext)
         startCurrent()
     }
 
     fun play() {
         if (!hasContent || _state.value.nowPlaying == null) return
+        _state.update { it.copy(playRequested = true) }
+        // The service may have stopped while paused (Android ends idle ones); this brings back
+        // its notification and media session.
+        MusicService.start(appContext)
         val player = mediaPlayer
         if (ended || player == null || !player.hasMedia() || _state.value.error != null) {
             startCurrent()
@@ -149,6 +160,7 @@ class MusicPlayer(
 
     fun pause() {
         pausedByFocusLoss = false
+        _state.update { it.copy(playRequested = false) }
         mediaPlayer?.pause()
     }
 
@@ -249,6 +261,8 @@ class MusicPlayer(
                 it.copy(
                     nowPlaying = nowPlaying(song),
                     isPlaying = false,
+                    // A new song always starts playing (next/previous while paused too).
+                    playRequested = true,
                     isBuffering = true,
                     positionMs = 0,
                     durationMs = song.durationMs ?: 0,
@@ -265,11 +279,17 @@ class MusicPlayer(
                 onFailed(song, "Can't open this song")
                 return@launch
             }
-            val player = mediaPlayer ?: VlcEngine.newMediaPlayer(appContext).also {
-                it.setEventListener(eventListener)
-                mediaPlayer = it
+            val player = try {
+                (mediaPlayer ?: VlcEngine.newMediaPlayer(appContext).also {
+                    it.setEventListener(eventListener)
+                    mediaPlayer = it
+                }).also { it.setMedia(opened.media) }
+            } catch (e: RuntimeException) {
+                Log.w(TAG, "libVLC refused a song", e)
+                opened.discard()
+                onFailed(song, "Can't play this song")
+                return@launch
             }
-            player.setMedia(opened.media)
             // The player keeps its own reference.
             opened.media.release()
             descriptor.closeQuietly()
@@ -361,7 +381,7 @@ class MusicPlayer(
         // The end of the queue: the last song stays, ready to play again.
         ended = true
         audio.release()
-        _state.update { it.copy(isPlaying = false, isBuffering = false, positionMs = 0) }
+        _state.update { it.copy(isPlaying = false, isBuffering = false, playRequested = false, positionMs = 0) }
     }
 
     /**
@@ -377,7 +397,11 @@ class MusicPlayer(
                 error = message,
             ).withQueue()
         }
-        val next = queue.nextPosition(wrap = _state.value.repeat == RepeatMode.ALL) ?: return
+        val next = queue.nextPosition(wrap = _state.value.repeat == RepeatMode.ALL)
+        if (next == null) {
+            _state.update { it.copy(playRequested = false) }
+            return
+        }
         skipJob?.cancel()
         skipJob = scope.launch {
             delay(SKIP_AFTER_ERROR_MS)
