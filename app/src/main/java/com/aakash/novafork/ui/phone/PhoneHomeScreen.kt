@@ -131,7 +131,8 @@ private fun HomeFeed(home: HomeUi, scan: ScanUi, permission: PermissionUi, actio
     val listState = rememberLazyListState()
     val hasHero = home.hero.isNotEmpty()
     val pagerState = rememberPagerState { home.hero.size }
-    var muted by rememberSaveable { mutableStateOf(true) }
+    // Short clips play with sound; the hero's mute button silences them.
+    var muted by rememberSaveable { mutableStateOf(false) }
     val previewEnabled = LocalHeroPreviewEnabled.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val lifecycleState by lifecycle.currentStateAsState()

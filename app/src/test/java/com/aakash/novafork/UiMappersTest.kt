@@ -186,11 +186,17 @@ class UiMappersTest {
     }
 
     @Test
-    fun heroPreviewsPlayLocalFilesFromTheMiddle() {
-        val dune = index.home.hero.first { it.target == HeroTarget.Video(DUNE) }
-        val video = index.videos.first { it.id == DUNE }.video
-        assertEquals(video.uri, dune.previewUri)
-        assertEquals((video.durationMs ?: 0L) / 2, dune.previewStartMs)
+    fun heroPreviewsPlayOnlyShortLocalClipsFromTheStart() {
+        // A full-length film doesn't play in the hero.
+        assertNull(index.home.hero.first { it.target == HeroTarget.Video(DUNE) }.previewUri)
+        // A clip of a minute or less does, from 0:00.
+        val clipRows = FakeLibrary.rows.map { row ->
+            if (row.video.id == DUNE) row.copy(video = row.video.copy(durationMs = 45_000)) else row
+        }
+        val clipIndex = LibraryIndex.build(clipRows, FakeLibrary.sources, preferLocalArtwork = false)
+        val dune = UiMappers.home(clipIndex).hero.first { it.target == HeroTarget.Video(DUNE) }
+        assertEquals(clipRows.first { it.video.id == DUNE }.video.uri, dune.previewUri)
+        assertEquals(0L, dune.previewStartMs)
         assertEquals("v:$DUNE", dune.itemKey)
         assertEquals("s:$SEVERANCE_KEY", index.home.hero.first { it.target == HeroTarget.Show(SEVERANCE_KEY) }.itemKey)
         // Files on a network share would be streamed for a preview: they get none.

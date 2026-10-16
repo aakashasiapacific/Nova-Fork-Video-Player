@@ -45,6 +45,7 @@ object UiMappers {
     private const val CONTINUE_WATCHING_LIMIT = 20
     private const val RECENTLY_ADDED_LIMIT = 30
     private const val HERO_LIMIT = 6
+    private const val HERO_CLIP_MAX_MS = 60_000L
     /** Newest movies and shows considered for the hero before the backdrop preference is applied. */
     private const val HERO_RECENT_CANDIDATES = 12
     private const val SEARCH_LIMIT = 60
@@ -144,8 +145,7 @@ object UiMappers {
             progress = video.card.progress,
             playVideoId = video.id,
             playLabel = playLabel(resume = true, code = code),
-            previewUri = video.card.artwork.frameSource,
-            previewStartMs = previewStart(video),
+            previewUri = shortClip(video),
         )
     }
 
@@ -167,8 +167,7 @@ object UiMappers {
             progress = video.card.progress,
             playVideoId = video.id,
             playLabel = if (video.inProgress) "Resume" else "Play",
-            previewUri = video.card.artwork.frameSource,
-            previewStartMs = previewStart(video),
+            previewUri = shortClip(video),
         )
     }
 
@@ -189,13 +188,19 @@ object UiMappers {
             genres = genres,
             playVideoId = next.id,
             playLabel = showPlayLabel(next),
-            previewUri = next.card.artwork.frameSource,
-            previewStartMs = previewStart(next),
+            previewUri = shortClip(next),
         )
     }
 
-    /** The hero's preview starts in the middle of the video, as the owner asked (0 when its length isn't known). */
-    private fun previewStart(video: IndexedVideo): Long = (video.video.durationMs ?: 0L).coerceAtLeast(0L) / 2
+    /**
+     * The hero plays only short clips (a minute or less, like a trailer), from the start: a long
+     * film playing in the poster isn't a preview. Null for longer videos, ones whose length isn't
+     * known yet and network files.
+     */
+    private fun shortClip(video: IndexedVideo): String? {
+        val duration = video.video.durationMs ?: return null
+        return video.card.artwork.frameSource.takeIf { duration in 1..HERO_CLIP_MAX_MS }
+    }
 
     // Library
 

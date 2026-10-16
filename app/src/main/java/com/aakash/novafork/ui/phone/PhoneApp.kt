@@ -226,12 +226,7 @@ private fun PhoneNavigationBar(selected: TopDestination, onSelect: (TopDestinati
             Row(Modifier.fillMaxSize()) {
                 tabs.forEachIndexed { index, tab ->
                     val isActive = index == active
-                    val tint = when {
-                        !isActive -> colors.onSurfaceVariant
-                        // Apple Music's tab is red, like its app.
-                        tab == TopDestination.AUDIO -> NovaColors.AppleMusicRed
-                        else -> Color.White
-                    }
+                    val tint = if (isActive) tab.activeColor() else colors.onSurfaceVariant
                     Column(
                         Modifier
                             .weight(1f)
@@ -264,9 +259,19 @@ private fun PhoneNavigationBar(selected: TopDestination, onSelect: (TopDestinati
 private val TabBarHeight = 54.dp
 
 /**
- * A tab's icon. The selected one "lights up" as in Apple TV's bar: a filled white disc with the
- * glyph cut out in black (Apple Music red for Audio), popping in with a short spring; the others
- * are plain grey glyphs.
+ * The selected tab's disc colour, as the owner chose: Video and Preferences iOS blue, Audio
+ * Apple Music red, Search white.
+ */
+private fun TopDestination.activeColor(): Color = when (this) {
+    TopDestination.VIDEO, TopDestination.SETTINGS -> NovaColors.IosBlue
+    TopDestination.AUDIO -> NovaColors.AppleMusicRed
+    TopDestination.SEARCH -> Color.White
+}
+
+/**
+ * A tab's icon. The selected one "lights up" as in Apple TV's bar: a filled disc in the tab's
+ * colour with the glyph on it (white, or black on Search's white disc), popping in with a short
+ * spring; the others are plain grey glyphs.
  */
 @Composable
 private fun TabIcon(tab: TopDestination, active: Boolean, tint: Color, modifier: Modifier = Modifier) {
@@ -291,7 +296,7 @@ private fun TabIcon(tab: TopDestination, active: Boolean, tint: Color, modifier:
                     .clip(CircleShape)
                     .background(tint),
             )
-            NovaIcon(tab.iconRes(), contentDescription = null, tint = if (tab == TopDestination.AUDIO) Color.White else Color.Black, modifier = Modifier.size(16.dp))
+            NovaIcon(tab.iconRes(), contentDescription = null, tint = if (tab == TopDestination.SEARCH) Color.Black else Color.White, modifier = Modifier.size(16.dp))
         } else {
             NovaIcon(tab.iconRes(), contentDescription = null, tint = tint, modifier = Modifier.size(24.dp))
         }

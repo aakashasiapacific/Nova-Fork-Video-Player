@@ -103,8 +103,8 @@ data class HeroUi(
     /** "Play", "Resume", "Play S2 · E4". */
     val playLabel: String = "Play",
     /**
-     * The local file (content:// or file://) the hero's muted preview plays, from [previewStartMs]:
-     * the video Play plays. Null for network files, which would be streamed for a preview.
+     * The local file (content:// or file://) the hero plays as a preview, from [previewStartMs]:
+     * the video Play plays, when it is a short clip (a minute or less). Null otherwise.
      */
     val previewUri: String? = null,
     val previewStartMs: Long = 0,

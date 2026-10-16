@@ -90,7 +90,8 @@ What our current hero does differently:
 
 ### Owner's decisions on these
 - **Hero video preview:** after a short pause, the hero plays a muted preview of the video itself. For
-  our own files, that is a short clip from the middle of the video.
+  our own files, that is a short clip from the middle of the video. *Changed after build 36:* only
+  videos of a minute or less play, from the start and with sound; longer ones show their art.
 - **Mute/unmute button at the bottom of the hero, not the top.** The top is out of thumb reach.
   Proposed spot: the right end of the page-dot row, as a small dark round glass button. It sits level with
   the dots, so the dots stay centred.
@@ -188,8 +189,9 @@ UI, following Apple Music:
    selected tab icon. The rest of the app stays iOS blue.
 8. **Selected tab, like Apple TV:**
    - a big dark-grey pill around the selected tab's icon and label;
-   - its icon "lights up" as a white disc with a black glyph (red for Audio), popping in with a
-     spring.
+   - its icon "lights up" as a disc, popping in with a spring. *Changed after build 36:* the disc
+     is coloured per tab: Video and Preferences iOS blue, Audio red, Search white.
+9. **Dock size:** the owner will send a new idea (build 36's 54dp bar looked cramped).
 
 Notes on how they were built:
 - The hero uses `Artwork.tallUrl`. A title without a text-free poster shows its backdrop over the

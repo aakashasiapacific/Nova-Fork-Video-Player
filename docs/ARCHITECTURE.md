@@ -206,8 +206,8 @@ only `ui/common`, `ui/settings`, `ui/dialogs`, and `ui/model`.
   - It shows a centred title, a white Play pill and a round "+", which calls
     `AppActions.toggleWatchlist` with `HeroUi.itemKey`.
   - The page dots are white and grey and fill as the timer runs.
-  - After 2.5 s still, a muted libVLC preview of the local video plays from its middle
-    (`HeroUi.previewUri` / `previewStartMs`, `ui/common/HeroPreview.kt`), only where MainActivity
+  - After 2.5 s still, a local clip of a minute or less plays from the start, with sound
+    (libVLC; longer videos show only their art; `HeroUi.previewUri` / `previewStartMs`, `ui/common/HeroPreview.kt`), only where MainActivity
     sets `LocalHeroPreviewEnabled`.
   - The mute button sits at the end of the dots row.
 
