@@ -136,3 +136,16 @@ UI, following Apple Music:
    - The results are grouped into sections: Movies, TV Shows, Videos, Songs, Albums and Artists.
    - Filter chips (All / Video / Music) sit at the top.
    - The Audio tab has no search of its own.
+
+## 7. Video player: system brightness and volume (owner, 2026-10-16; not built yet)
+
+- **No brightness or volume of the player's own.** Today a vertical swipe on the left half sets
+  the window's brightness (only while the player is open) and on the right half the media volume,
+  with the player's own on-screen level. The owner doesn't want either. Brightness and volume are
+  the phone's: the system brightness and the volume buttons.
+- **Volume changes get an iOS-style indicator** instead of the player's current one: a slim
+  vertical pill that fills as the volume changes and fades away after a moment, as on iPhone.
+- Still to settle with the owner: remove the vertical swipes altogether, or keep them but have them
+  change the phone's own brightness and volume? (Changing the system brightness needs the
+  "Modify system settings" permission.) And should the iOS-style indicator also replace Android's
+  volume panel when the hardware buttons are pressed in the player?
