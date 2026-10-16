@@ -188,6 +188,24 @@ Decided once per composition with `rememberDeviceLayout(settings.layoutMode)`; p
 `LocalDeviceLayout` and `LocalNovaDimens`. Phone and tablet have **their own components** — share
 only `ui/common`, `ui/settings`, `ui/dialogs`, and `ui/model`.
 
+**Apple TV look (round 1, phone):**
+- **Theme:** one black theme (`NovaTheme` ignores `themeMode`), white accent and iOS greys.
+- **Tabs:** `TopDestination` is VIDEO (Home, with Library behind the row headers and the
+  "Library" entry at the end of the feed), AUDIO, SETTINGS (Settings › Sources › "Browse sources and
+  playlists" opens Route.Browse) and SEARCH.
+- **Hero:** `ui/phone/PhoneHero.kt`, about 80% of the screen tall under a clear status bar
+  (`LocalStatusBarIcons`, dark icons over a bright top, measured by `rememberTopBrightness`).
+  - It shows a centred title, a white Play pill and a round "+", which calls
+    `AppActions.toggleWatchlist` with `HeroUi.itemKey`.
+  - The page dots are white and grey and fill as the timer runs.
+  - After 2.5 s still, a muted libVLC preview of the local video plays from its middle
+    (`HeroUi.previewUri` / `previewStartMs`, `ui/common/HeroPreview.kt`), only where MainActivity
+    sets `LocalHeroPreviewEnabled`.
+  - The mute button sits at the end of the dots row.
+
+The rest of this section is the earlier Material design, still used where the redesign hasn't
+reached yet.
+
 **Phone (`ui/phone`, entry `PhoneApp(state: AppUiState, actions: AppActions)`):**
 bottom `NavigationBar` (Home, Library, Browse, Settings); Home = full-bleed backdrop hero pager
 (≈ 62% of width in height, 16:10-ish) with title, meta line, Play + Info, then rows (Continue

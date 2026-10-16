@@ -62,6 +62,7 @@ fun PhoneLibraryScreen(
     Column(modifier.fillMaxSize()) {
         PhoneTopBar(
             title = "Library",
+            onBack = actions::back,
             actions = {
                 IconButton(onClick = { actions.navigate(Route.Search) }) {
                     NovaIcon(R.drawable.ic_search, contentDescription = "Search")

@@ -1,4 +1,17 @@
-# Redesign ideas: owner's notes (not built yet)
+# Redesign ideas: owner's notes
+
+**Built on the phone (round 1, branch `ccr-987fc293-7gnds9`):**
+- the black theme (section 0);
+- the four tabs (section 1);
+- no title and a clear status bar (section 2);
+- the hero, its dots, the muted preview and the mute button (section 3);
+- the watchlist "+" and its row (section 6.3).
+
+The tablet got the four tabs and the colours in its old side rail; its floating top bar (6.5) and
+hero come later. Still to do on the phone:
+- title logos from TMDB;
+- 16:9 landscape cards in the rows (section 4);
+- personal videos' frame-based hero art.
 
 These are the owner's decisions and requests for the Apple TV-style redesign, plus what their
 screenshots show. They come before `docs/APPLE-TV-SPEC.md` wherever the two disagree. Nothing here is

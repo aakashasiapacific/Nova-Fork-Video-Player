@@ -57,9 +57,7 @@ fun TabletApp(state: AppUiState, actions: AppActions, layout: DeviceLayout, modi
             Row(Modifier.fillMaxSize()) {
                 TabletNavRail(
                     selected = state.route.top,
-                    searchSelected = state.route == Route.Search,
                     onSelect = actions::selectTab,
-                    onSearch = { if (state.route != Route.Search) actions.navigate(Route.Search) },
                     modifier = Modifier.fillMaxHeight(),
                 )
                 // Keyed by page, so updates within a page recompose it in place while a page change

@@ -6,15 +6,18 @@ import com.aakash.novafork.data.db.SourceType
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
-/** Top-level tabs. Phone shows them in a bottom NavigationBar, tablet in a NavigationRail. */
+/**
+ * The four tabs, in the Apple TV app's order (owner's decision): Video (the Home feed, with the
+ * library behind its row headers and "Library" entry), Audio, Settings (with the sources) and
+ * Search. Phone shows them in a bottom bar, tablet in a rail.
+ */
 enum class TopDestination(val label: String) {
-    HOME("Home"),
-    LIBRARY("Library"),
-    BROWSE("Browse"),
+    VIDEO("Video"),
 
     /** Music (a temporary test screen until the Apple Music-style design). */
     AUDIO("Audio"),
     SETTINGS("Settings"),
+    SEARCH("Search"),
 }
 
 @Immutable
@@ -34,11 +37,11 @@ sealed interface Route {
 /** The tab a route belongs to (for highlighting the nav bar / rail). */
 val Route.top: TopDestination
     get() = when (this) {
-        Route.Home, is Route.VideoDetails, is Route.ShowDetails, Route.Search -> TopDestination.HOME
-        Route.Library -> TopDestination.LIBRARY
-        Route.Browse, is Route.BrowseDir, is Route.Playlist -> TopDestination.BROWSE
-        Route.Settings -> TopDestination.SETTINGS
+        Route.Home, Route.Library, is Route.VideoDetails, is Route.ShowDetails, is Route.Playlist -> TopDestination.VIDEO
+        // Sources are under Settings.
+        Route.Browse, is Route.BrowseDir, Route.Settings -> TopDestination.SETTINGS
         Route.Audio -> TopDestination.AUDIO
+        Route.Search -> TopDestination.SEARCH
     }
 
 @Immutable
@@ -223,7 +226,7 @@ private val IdleBackupState: StateFlow<BackupUi> = MutableStateFlow(BackupUi())
 data class AppUiState(
     val route: Route = Route.Home,
     /** The tab the current page was opened from (details opened from Library keep Library highlighted). */
-    val tab: TopDestination = TopDestination.HOME,
+    val tab: TopDestination = TopDestination.VIDEO,
     val canGoBack: Boolean = false,
     val home: HomeUi = HomeUi(),
     val library: LibraryUi = LibraryUi(),
@@ -273,6 +276,15 @@ interface AppActions {
     fun setLibraryFilter(filter: LibraryFilter)
     fun setLibrarySort(sort: LibrarySort)
     fun search(query: String)
+
+    /** Opens the library (under the Video tab) showing [filter]. */
+    fun openLibrary(filter: LibraryFilter) {
+        navigate(Route.Library)
+        setLibraryFilter(filter)
+    }
+
+    /** The hero's "+": adds the item ([HeroUi.itemKey]) to the watchlist, or takes it off. */
+    fun toggleWatchlist(itemKey: String) {}
 
     /** Plays songs from search results (see [MusicResultUi]). */
     fun playMusic(songIds: List<Long>, startIndex: Int) {}

@@ -68,7 +68,6 @@ import com.aakash.novafork.ui.model.LibraryFilter
 import com.aakash.novafork.ui.model.PermissionUi
 import com.aakash.novafork.ui.model.ScanUi
 import com.aakash.novafork.ui.model.ShowCardUi
-import com.aakash.novafork.ui.model.TopDestination
 import com.aakash.novafork.ui.model.VideoCardUi
 import kotlinx.coroutines.delay
 
@@ -180,10 +179,7 @@ private fun HomeFeed(home: HomeUi, scan: ScanUi, permission: PermissionUi, layou
     }
 }
 
-private fun AppActions.seeAll(filter: LibraryFilter) {
-    selectTab(TopDestination.LIBRARY)
-    setLibraryFilter(filter)
-}
+private fun AppActions.seeAll(filter: LibraryFilter) = openLibrary(filter)
 
 private fun AppActions.openHero(target: HeroTarget) {
     when (target) {

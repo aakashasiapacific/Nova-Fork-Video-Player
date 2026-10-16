@@ -133,6 +133,8 @@ object UiMappers {
             progress = video.card.progress,
             playVideoId = video.id,
             playLabel = playLabel(resume = true, code = code),
+            previewUri = video.card.artwork.frameSource,
+            previewStartMs = previewStart(video),
         )
     }
 
@@ -154,6 +156,8 @@ object UiMappers {
             progress = video.card.progress,
             playVideoId = video.id,
             playLabel = if (video.inProgress) "Resume" else "Play",
+            previewUri = video.card.artwork.frameSource,
+            previewStartMs = previewStart(video),
         )
     }
 
@@ -174,8 +178,13 @@ object UiMappers {
             genres = genres,
             playVideoId = next.id,
             playLabel = showPlayLabel(next),
+            previewUri = next.card.artwork.frameSource,
+            previewStartMs = previewStart(next),
         )
     }
+
+    /** The hero's preview starts in the middle of the video, as the owner asked (0 when its length isn't known). */
+    private fun previewStart(video: IndexedVideo): Long = (video.video.durationMs ?: 0L).coerceAtLeast(0L) / 2
 
     // Library
 

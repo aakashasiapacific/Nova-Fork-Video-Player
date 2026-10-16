@@ -69,7 +69,8 @@ fun PhoneBrowseScreen(
 
     Column(modifier.fillMaxSize()) {
         PhoneTopBar(
-            title = "Browse",
+            title = "Sources",
+            onBack = actions::back,
             actions = {
                 IconButton(onClick = actions::refresh, enabled = !scan.running) {
                     NovaIcon(R.drawable.ic_refresh, contentDescription = "Rescan all")

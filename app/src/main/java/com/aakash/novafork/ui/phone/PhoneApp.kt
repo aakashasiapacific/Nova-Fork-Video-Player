@@ -6,6 +6,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
@@ -16,13 +17,17 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
 import com.aakash.novafork.ui.adaptive.DeviceLayout
@@ -145,23 +150,35 @@ private fun PhonePage(state: AppUiState, actions: AppActions) {
 
 @Composable
 private fun PhoneNavigationBar(selected: TopDestination, onSelect: (TopDestination) -> Unit) {
-    NavigationBar {
-        TopDestination.entries.forEach { tab ->
-            NavigationBarItem(
-                selected = tab == selected,
-                onClick = { onSelect(tab) },
-                icon = { NovaIcon(tab.iconRes(), contentDescription = null) },
-                label = { Text(tab.label) },
-            )
+    // Apple TV's bar: black, a hairline above it; the selected tab has a dark-grey pill behind a
+    // white icon and a bold label, the others are grey.
+    Column {
+        HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
+        NavigationBar(containerColor = MaterialTheme.colorScheme.background, tonalElevation = 0.dp) {
+            TopDestination.entries.forEach { tab ->
+                val isSelected = tab == selected
+                NavigationBarItem(
+                    selected = isSelected,
+                    onClick = { onSelect(tab) },
+                    icon = { NovaIcon(tab.iconRes(), contentDescription = null) },
+                    label = { Text(tab.label, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium) },
+                    colors = NavigationBarItemDefaults.colors(
+                        selectedIconColor = MaterialTheme.colorScheme.onSurface,
+                        selectedTextColor = MaterialTheme.colorScheme.onSurface,
+                        indicatorColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    ),
+                )
+            }
         }
     }
 }
 
 @DrawableRes
 private fun TopDestination.iconRes(): Int = when (this) {
-    TopDestination.HOME -> R.drawable.ic_home
-    TopDestination.LIBRARY -> R.drawable.ic_video_library
-    TopDestination.BROWSE -> R.drawable.ic_folder
+    TopDestination.VIDEO -> R.drawable.ic_tv
     TopDestination.AUDIO -> R.drawable.ic_audiotrack
     TopDestination.SETTINGS -> R.drawable.ic_settings
+    TopDestination.SEARCH -> R.drawable.ic_search
 }

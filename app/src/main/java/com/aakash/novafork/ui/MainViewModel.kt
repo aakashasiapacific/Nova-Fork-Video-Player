@@ -146,6 +146,20 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
         UiMappers.search(index, query, music)
     }
 
+    /** Watchlist keys, most recently added first. */
+    private val watchlist: StateFlow<List<String>> =
+        graph.music.observeWatchlist().stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    /** The watchlist row's items, rebuilt when the library or the list changes. */
+    private val watchlistMemo = Memo<Pair<LibraryIndex, List<String>>, List<LibraryItemUi>> { (index, keys) ->
+        if (keys.isEmpty()) {
+            emptyList()
+        } else {
+            val byKey = UiMappers.library(index, LibraryFilter.ALL, LibrarySort.RECENT).items.associateBy { it.key }
+            keys.mapNotNull { byKey[it] }
+        }
+    }
+
     /** The music library, for search (one search over videos and music). */
     private val musicLibrary: Flow<MusicLibraryData> = graph.music.observeLibrary().onStart { emit(MusicLibraryData()) }
     private val remoteDirMemo = Memo<RemoteDirInput, BrowseDirUi> { (index, source, path, listings) ->
@@ -170,9 +184,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
         library.scanState,
         settingsStore.settings,
         local,
-        combine(playlists, musicLibrary) { lists, music -> lists to music },
-    ) { index, scan, settings, user, (lists, music) ->
-        assemble(index, scan, settings, user, lists, music)
+        combine(playlists, musicLibrary, watchlist) { lists, music, saved -> Triple(lists, music, saved) },
+    ) { index, scan, settings, user, (lists, music, saved) ->
+        assemble(index, scan, settings, user, lists, music, saved)
     }
         .flowOn(Dispatchers.Default)
         // Seeded with the real settings so the first frame already has the right theme and layout.
@@ -244,6 +258,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
         user: LocalState,
         lists: PlaylistsState,
         music: MusicLibraryData,
+        saved: List<String>,
     ): AppUiState {
         val route = user.backStack.lastOrNull() ?: Route.Home
         val previewKey = user.previewKey
@@ -257,7 +272,15 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
         return AppUiState(
             route = route,
             canGoBack = user.backStack.size > 1,
-            home = index.home,
+            home = if (saved.isEmpty()) {
+                index.home
+            } else {
+                val keys = saved.toHashSet()
+                index.home.copy(
+                    hero = index.home.hero.map { hero -> if (hero.itemKey in keys) hero.copy(onWatchlist = true) else hero },
+                    watchlist = watchlistMemo[index to saved],
+                )
+            },
             library = libraryMemo[Triple(index, user.filter, user.sort)],
             browse = browse,
             browseDir = (route as? Route.BrowseDir)?.let { browseDirFor(index, it, user.listings, scan) },
@@ -314,20 +337,14 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
 
     override fun selectTab(tab: TopDestination) {
         val root = when (tab) {
-            TopDestination.HOME -> Route.Home
-            TopDestination.LIBRARY -> Route.Library
-            TopDestination.BROWSE -> Route.Browse
+            TopDestination.VIDEO -> Route.Home
             TopDestination.AUDIO -> Route.Audio
             TopDestination.SETTINGS -> Route.Settings
+            TopDestination.SEARCH -> Route.Search
         }
         // Other tabs sit on top of Home, so system back from a tab's root returns Home first.
         val stack = if (root == Route.Home) listOf(Route.Home) else listOf(Route.Home, root)
-        local.update {
-            // Coming to Library from another tab shows everything again: a "See all" from Home
-            // used to leave it stuck on Movies, which hid home videos. (See all sets its filter after this.)
-            val freshLibrary = root == Route.Library && it.backStack.lastOrNull() != Route.Library
-            it.copy(backStack = stack, filter = if (freshLibrary) LibraryFilter.ALL else it.filter)
-        }
+        local.update { it.copy(backStack = stack) }
     }
 
     override fun preview(item: LibraryItemUi) {
@@ -366,6 +383,13 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
 
     override fun search(query: String) {
         local.update { it.copy(query = query) }
+    }
+
+    override fun toggleWatchlist(itemKey: String) {
+        val on = itemKey in watchlist.value
+        launchSafely("Couldn't change the watchlist") {
+            if (on) graph.music.removeFromWatchlist(itemKey) else graph.music.addToWatchlist(itemKey)
+        }
     }
 
     override fun playMusic(songIds: List<Long>, startIndex: Int) {

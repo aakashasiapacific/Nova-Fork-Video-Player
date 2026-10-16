@@ -152,6 +152,21 @@ class UiMappersTest {
     }
 
     @Test
+    fun heroPreviewsPlayLocalFilesFromTheMiddle() {
+        val dune = index.home.hero.first { it.target == HeroTarget.Video(DUNE) }
+        val video = index.videos.first { it.id == DUNE }.video
+        assertEquals(video.uri, dune.previewUri)
+        assertEquals((video.durationMs ?: 0L) / 2, dune.previewStartMs)
+        assertEquals("v:$DUNE", dune.itemKey)
+        assertEquals("s:$SEVERANCE_KEY", index.home.hero.first { it.target == HeroTarget.Show(SEVERANCE_KEY) }.itemKey)
+        // Files on a network share would be streamed for a preview: they get none.
+        index.home.hero.filter { hero ->
+            val id = hero.playVideoId
+            id != null && index.videos.first { it.id == id }.video.uri.startsWith("smb://")
+        }.forEach { assertEquals(null, it.previewUri) }
+    }
+
+    @Test
     fun emptyLibraryAsksForOnboarding() {
         val home = UiMappers.home(LibraryIndex.build(emptyList(), emptyList(), preferLocalArtwork = false))
         assertTrue(home.isEmpty)
