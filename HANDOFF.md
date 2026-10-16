@@ -80,7 +80,7 @@ files access counts as full access.
 
 1. **Apple TV-style UI redesign.** Read `docs/REDESIGN-IDEAS.md` first: it holds the owner's decisions, which come
    before the spec. These include a new nav (Video / Audio / Settings / Search), no app title, a clear status bar, a big hero,
-   and a new Apple Music-style Audio tab. Don't build until the owner says to.
+   and a new Apple Music-style Audio tab. All the open questions are now settled (section 6 of that file). Don't build until the owner says to.
    - The owner wants a "complete ditto" of the Apple TV app (Android/iOS). Their brother will send iPhone
      screenshots and recordings. Update `docs/APPLE-TV-SPEC.md` from them.
    - Earlier redesign work, paused before the backend rounds, is in commit `f41c97d` (later commits went

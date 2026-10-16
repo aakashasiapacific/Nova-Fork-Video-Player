@@ -116,15 +116,28 @@ UI, following Apple Music:
   - a scrubber, previous / play-pause / next, and volume;
   - buttons for lyrics, the queue and AirPlay-style casting.
 
-## 6. Open questions, to settle before building
+## 6. Decisions on the former open questions (owner, 2026-10-16)
 
-1. **Library and Browse:** with the tabs now Video / Audio / Settings / Search, where do the library
-   categories and the sources list (folders, network shares, servers) go? Options:
-   - inside the Video tab, behind row headers and a "Library" entry;
-   - in Settings.
-2. ~~Theme~~: decided. AMOLED black, dark only (section 0).
-3. **The hero's round "+" button:** add to a playlist, a new "Watchlist", or something else?
-4. **Music sources:** only files on the phone and in picked folders, or also network shares and
-   Jellyfin/Plex music?
-5. **Tablet:** the same four tabs as a floating bar at the top, as on iPad?
-6. **Search:** one search across videos and music, or separate?
+1. **Library and sources are split:**
+   - The library categories (Movies, TV Shows, Videos, Folders) live in the **Video tab**: the row
+     headers open them, and a "Library" entry at the end of the feed lists them all.
+   - Adding and managing sources (picked folders, network shares, Jellyfin/Emby/Plex servers) moves to
+     **Settings › Sources**.
+2. **Theme:** AMOLED black, dark only (section 0).
+3. **The hero's round "+" button adds the title to a new Watchlist.**
+   - The Watchlist is also a row on the Video tab, like Apple TV's "Up Next".
+   - The "+" turns into a check mark when the title is already on the list; tapping it again removes it.
+   - Backend: a small Room addition (a table or a flag), done in the same v4 migration as the audio
+     tables.
+4. **Music comes from every source in the first audio round:**
+   - the phone (MediaStore.Audio) and picked folders;
+   - network shares (SMB, FTP, SFTP, NFS, WebDAV, DLNA/UPnP);
+   - Jellyfin, Emby and Plex music libraries.
+   - This is a big round, so build and test the local scan first, then add the network and server
+     sources on top of it in the same round.
+5. **Tablet: a floating tab bar at the top centre,** over the hero, as in the iPad Apple TV app. It
+   keeps the same four tabs. Phone and tablet stay separate component families.
+6. **Search: one search over videos and music.**
+   - The results are grouped into sections: Movies, TV Shows, Videos, Songs, Albums and Artists.
+   - Filter chips (All / Video / Music) sit at the top.
+   - The Audio tab has no search of its own.
