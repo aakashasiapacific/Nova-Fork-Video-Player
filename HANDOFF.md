@@ -67,36 +67,26 @@ separate phone and tablet UIs. This file is for a new Claude session picking the
 
 Each feature round had independent reviews and a fix pass.
 
+**Fixed and confirmed by the owner on build 24: no videos appeared on the phone.** The file-name
+parser's `BRACKETS` regex in `core/parse/ReleaseTokens.kt` had an unescaped `}`. The JVM accepts that,
+so every test passed, but Android's regex engine (ICU) rejects it. As a result, every scan on a phone
+failed after 0.1 s, from the first version until this fix. It was found through the owner's Library
+diagnostics report (Settings › About), which is the first thing to ask for when the library looks wrong
+on a device. `tools/regex-check/run.sh` now compiles every regex with ICU in CI, so this can't happen
+again unnoticed. The owner's phone has All files access but not READ_MEDIA_VIDEO; since build 23, All
+files access counts as full access.
+
 ## Open items, most urgent first
 
-1. **Bug: videos without posters never appear. Root cause found and fixed; waiting for the owner's
-   confirmation.**
-   - **What the owner's Library diagnostics report showed** (Android 16, API 36):
-     - Every scan failed after 0.1 s with `ExceptionInInitializerError` in
-       `core.parse.ReleaseTokens`.
-     - Its `BRACKETS` regex had an unescaped `}`. The JVM's regex engine accepts that; Android's engine
-       (ICU) rejects it with `U_REGEX_RULE_SYNTAX`.
-     - So on phones the file-name parser never loaded and no scan ever finished, since the first version.
-   - **The fix:** escape every literal bracket and brace.
-   - **Proof:** all 64 patterns in the app now compile with ICU 74.
-   - **Guard against a repeat:** `tools/regex-check/run.sh` compiles every static Pattern/Regex with ICU,
-     and CI now fails if Android would reject one.
-   - **Report details:**
-     - READ_MEDIA_VIDEO is *denied* and All files access is *allowed* (the owner was looking at the wrong
-       setting).
-     - Since build 23 the app counts All files access as full access.
-     - MediaStore lists only 2 videos on the phone: one in WhatsApp Video and one in
-       `snaptube/download/SnapTube Video`.
-   - **If anything is still wrong,** ask for a new Library diagnostics report (Settings › About).
-2. **Apple TV-style UI redesign.**
+1. **Apple TV-style UI redesign.**
    - The owner wants a "complete ditto" of the Apple TV app (Android/iOS). Their brother will send iPhone
      screenshots and recordings. Update `docs/APPLE-TV-SPEC.md` from them.
    - Earlier redesign work, paused before the backend rounds, is in commit `f41c97d` (later commits went
      back to the Material UI). Reuse it where it still fits the current contracts.
    - Keep the phone and tablet component families separate.
-3. **OpenSubtitles API key:** put it in `gradle.properties` (`OPENSUBTITLES_API_KEY=`) once the owner
+2. **OpenSubtitles API key:** put it in `gradle.properties` (`OPENSUBTITLES_API_KEY=`) once the owner
    sends it.
-4. **Not yet tested on a real device:**
+3. **Not yet tested on a real device:**
    - background audio and lock-screen controls;
    - Chromecast;
    - network and media servers;
