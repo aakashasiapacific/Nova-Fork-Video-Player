@@ -1,14 +1,21 @@
 package com.aakash.novafork.ui.player
 
+import android.content.res.Configuration
 import androidx.annotation.DrawableRes
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -37,13 +44,16 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.AbsoluteAlignment
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.BiasAlignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
@@ -55,11 +65,10 @@ import com.aakash.novafork.ui.common.LandscapeArt
 import com.aakash.novafork.ui.model.GestureFeedback
 import com.aakash.novafork.ui.model.UpNextUi
 import com.aakash.novafork.ui.theme.NovaColors
-import kotlin.math.roundToInt
 
 private val TabularNumbers = TextStyle(fontFeatureSettings = "tnum")
 
-/** Centred pill for seek / volume / brightness / label feedback; fades out after the state clears it. */
+/** Centred pill for seek / label feedback; fades out after the state clears it. */
 @Composable
 internal fun FeedbackOverlay(feedback: GestureFeedback?, modifier: Modifier = Modifier) {
     val shown = rememberLatestNonNull(feedback)
@@ -78,16 +87,6 @@ private fun FeedbackPill(feedback: GestureFeedback) {
     Surface(shape = RoundedCornerShape(28.dp), color = NovaColors.PlayerSurface, contentColor = Color.White) {
         when (feedback) {
             is GestureFeedback.Seek -> SeekFeedback(feedback)
-            is GestureFeedback.Volume -> LevelFeedback(
-                icon = if (feedback.level <= 0f) R.drawable.ic_volume_off else R.drawable.ic_volume_up,
-                description = "Volume",
-                level = feedback.level,
-            )
-            is GestureFeedback.Brightness -> LevelFeedback(
-                icon = R.drawable.ic_brightness_6,
-                description = "Brightness",
-                level = feedback.level,
-            )
             is GestureFeedback.Label -> Text(
                 text = feedback.text,
                 style = MaterialTheme.typography.titleMedium,
@@ -120,35 +119,65 @@ private fun SeekFeedback(seek: GestureFeedback.Seek) {
     }
 }
 
+/**
+ * The player's volume indicator after a volume key, in the style of iOS: a slim frosted pill that
+ * fills with the level, on the end edge where the phone's volume keys are (portrait) or along the
+ * top (landscape), with the speaker icon. It replaces the system's volume panel in the player and
+ * fades a moment after the last press (see PlayerController.onVolumeKey). [modifier] should fill
+ * the screen: the pill places itself.
+ */
 @Composable
-private fun LevelFeedback(@DrawableRes icon: Int, description: String, level: Float) {
-    val clamped = level.coerceIn(0f, 1f)
-    Row(
-        modifier = Modifier.padding(horizontal = 20.dp, vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(14.dp),
-    ) {
-        Icon(painterResource(icon), contentDescription = description, modifier = Modifier.size(24.dp))
-        Box(
-            Modifier
-                .width(140.dp)
-                .height(4.dp)
-                .clip(CircleShape)
-                .background(Color.White.copy(alpha = 0.25f)),
+internal fun VolumeHud(level: Float?, modifier: Modifier = Modifier) {
+    val shown = (rememberLatestNonNull(level) ?: 0f).coerceIn(0f, 1f)
+    val fill by animateFloatAsState(
+        targetValue = shown,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow),
+        label = "volumeHud",
+    )
+    val landscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
+    Box(modifier, contentAlignment = if (landscape) Alignment.TopCenter else BiasAlignment(horizontalBias = 1f, verticalBias = -0.35f)) {
+        AnimatedVisibility(
+            visible = level != null,
+            enter = fadeIn(tween(140)) + scaleIn(tween(180), initialScale = 0.85f),
+            exit = fadeOut(tween(320)) + scaleOut(tween(320), targetScale = 0.85f),
         ) {
-            Box(
-                Modifier
-                    .fillMaxHeight()
-                    .fillMaxWidth(clamped)
-                    .background(Color.White),
-            )
+            val icon = if (shown <= 0f) R.drawable.ic_volume_off else R.drawable.ic_volume_up
+            if (landscape) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    VolumeIcon(icon)
+                    VolumeTrack(fill, vertical = false)
+                }
+            } else {
+                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    VolumeTrack(fill, vertical = true)
+                    VolumeIcon(icon)
+                }
+            }
         }
-        Text(
-            text = "${(clamped * 100).roundToInt()}%",
-            style = MaterialTheme.typography.labelLarge.merge(TabularNumbers),
-            textAlign = TextAlign.End,
-            modifier = Modifier.widthIn(min = 40.dp),
-        )
+    }
+}
+
+@Composable
+private fun VolumeIcon(@DrawableRes icon: Int) {
+    Icon(painterResource(icon), contentDescription = "Volume", tint = Color.White, modifier = Modifier.size(18.dp))
+}
+
+@Composable
+private fun VolumeTrack(fill: Float, vertical: Boolean) {
+    val shape = RoundedCornerShape(percent = 50)
+    val size = if (vertical) Modifier.size(width = 14.dp, height = 156.dp) else Modifier.size(width = 196.dp, height = 14.dp)
+    Box(
+        size
+            .clip(shape)
+            .background(Color.Black.copy(alpha = 0.55f))
+            .border(0.5.dp, Color.White.copy(alpha = 0.2f), shape),
+    ) {
+        val level = if (vertical) {
+            Modifier.align(Alignment.BottomCenter).fillMaxWidth().fillMaxHeight(fill)
+        } else {
+            Modifier.align(Alignment.CenterStart).fillMaxHeight().fillMaxWidth(fill)
+        }
+        Box(level.background(Color.White))
     }
 }
 

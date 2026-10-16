@@ -199,6 +199,13 @@ private fun PlayerChrome(state: PlayerUiState, actions: PlayerActions, layout: D
                     .align(BiasAlignment(horizontalBias = 0f, verticalBias = feedbackBias))
                     .padding(horizontal = 24.dp),
             )
+            VolumeHud(
+                level = state.volumeHud,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .safeDrawingPadding()
+                    .padding(12.dp),
+            )
             AnimatedVisibility(
                 visible = controlsVisible,
                 modifier = Modifier.fillMaxSize(),

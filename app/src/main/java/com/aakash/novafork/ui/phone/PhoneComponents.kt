@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyGridScope
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -432,6 +433,8 @@ internal fun PhoneLibraryGrid(
     actions: AppActions,
     modifier: Modifier = Modifier,
     state: LazyGridState = rememberLazyGridState(),
+    /** More full-width content after the cards (search's music results). */
+    footer: LazyGridScope.() -> Unit = {},
 ) {
     val dims = LocalNovaDimens.current
     LazyVerticalGrid(
@@ -455,6 +458,7 @@ internal fun PhoneLibraryGrid(
                 is LibraryItemUi.Show -> PhoneShowCard(item.card, onClick = { actions.openShow(item.card.key) })
             }
         }
+        footer()
     }
 }
 

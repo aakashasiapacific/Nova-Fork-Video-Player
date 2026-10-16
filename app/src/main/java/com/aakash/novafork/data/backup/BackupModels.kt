@@ -14,7 +14,8 @@ const val BACKUP_FORMAT = "nova-fork-backup"
 const val BACKUP_FORMAT_VERSION = 1
 
 /**
- * A backup file: settings, sources, the user's state per video, manual matches and playlists.
+ * A backup file: settings, sources, the user's state per video and per song, manual matches and
+ * playlists (videos and songs).
  * Videos are referred to by [BackupVideoRef], which a restore matches against the library.
  */
 @Serializable
@@ -32,6 +33,8 @@ data class NovaBackup(
     val videos: List<BackupVideoState> = emptyList(),
     val matches: List<BackupMatch> = emptyList(),
     val playlists: List<BackupPlaylist> = emptyList(),
+    /** Songs with plays. Older apps ignore this field. */
+    val songs: List<BackupSongState> = emptyList(),
 ) {
     fun summary(): BackupSummary = BackupSummary(
         createdAt = createdAt,
@@ -42,7 +45,8 @@ data class NovaBackup(
         videos = videos.size,
         matches = matches.size,
         playlists = playlists.size,
-        playlistItems = playlists.sumOf { it.items.size },
+        playlistItems = playlists.sumOf { it.items.size + it.songs.size },
+        songs = songs.size,
     )
 }
 
@@ -131,12 +135,38 @@ data class BackupMatch(
     val episode: Int? = null,
 )
 
-/** A playlist and its videos in playlist order (hidden ones included). */
+/** A playlist and its videos and songs, each in playlist order (hidden ones included). */
 @Serializable
 data class BackupPlaylist(
     val name: String,
     val createdAt: Long = 0,
     val items: List<BackupVideoRef> = emptyList(),
+    /** Older apps ignore this field. */
+    val songs: List<BackupSongRef> = emptyList(),
+)
+
+/**
+ * Which song an entry is about. A restore looks for it like for a video ([SongMatcher]): by [uri]
+ * (same [fileName]), then by its place in its source, then by [fileName] + [sizeBytes].
+ */
+@Serializable
+data class BackupSongRef(
+    val uri: String,
+    /** DEVICE or FOLDER. */
+    val sourceType: String? = null,
+    val sourceLocation: String? = null,
+    /** SongEntity.folder: root → leaf, '/'-separated. */
+    val folder: String = "",
+    val fileName: String,
+    val sizeBytes: Long? = null,
+)
+
+/** A song's plays. */
+@Serializable
+data class BackupSongState(
+    val song: BackupSongRef,
+    val playCount: Int = 0,
+    val lastPlayedAt: Long? = null,
 )
 
 /** What a backup holds, as counts: shown before a restore and after a backup. */
@@ -150,14 +180,21 @@ data class BackupSummary(
     val matches: Int,
     val playlists: Int,
     val playlistItems: Int,
+    /** Songs with plays. */
+    val songs: Int = 0,
 )
 
-/** Entries of a restore: video states, manual matches and playlist items. */
-data class RestoreCounts(val videos: Int = 0, val matches: Int = 0, val playlistItems: Int = 0) {
-    val total: Int get() = videos + matches + playlistItems
+/** Entries of a restore: video states, manual matches, playlist items (videos and songs) and song plays. */
+data class RestoreCounts(
+    val videos: Int = 0,
+    val matches: Int = 0,
+    val playlistItems: Int = 0,
+    val songs: Int = 0,
+) {
+    val total: Int get() = videos + matches + playlistItems + songs
 
     operator fun plus(other: RestoreCounts): RestoreCounts =
-        RestoreCounts(videos + other.videos, matches + other.matches, playlistItems + other.playlistItems)
+        RestoreCounts(videos + other.videos, matches + other.matches, playlistItems + other.playlistItems, songs + other.songs)
 }
 
 /** One pass over the waiting entries of a restore ([PendingRestore.apply]). */

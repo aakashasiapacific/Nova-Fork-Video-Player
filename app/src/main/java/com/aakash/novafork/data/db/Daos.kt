@@ -368,7 +368,10 @@ data class FolderEntry(
  */
 @Dao
 interface PlaylistDao {
-    /** Most recently changed first; the cover is the first shown video. */
+    /**
+     * Most recently changed first; the cover is the first shown video. A playlist that only holds
+     * songs is the Audio tab's and left out.
+     */
     @Query(
         "SELECT p.id AS id, p.name AS name, p.updatedAt AS updatedAt, " +
             "(SELECT COUNT(*) FROM playlist_items i JOIN videos v ON v.id = i.videoId " +
@@ -378,7 +381,9 @@ interface PlaylistDao {
             "WHERE i.playlistId = p.id AND v.present = 1 " +
             "AND v.sourceId IN (SELECT s.id FROM sources s WHERE s.enabled = 1) " +
             "ORDER BY i.`position`, i.id LIMIT 1) AS coverVideoId " +
-            "FROM playlists p ORDER BY p.updatedAt DESC, p.id DESC",
+            "FROM playlists p WHERE EXISTS (SELECT 1 FROM playlist_items i WHERE i.playlistId = p.id) " +
+            "OR NOT EXISTS (SELECT 1 FROM playlist_songs ps WHERE ps.playlistId = p.id) " +
+            "ORDER BY p.updatedAt DESC, p.id DESC",
     )
     fun observeWithCounts(): Flow<List<PlaylistWithCount>>
 
@@ -451,6 +456,26 @@ interface MetadataDao {
 
     @Query("DELETE FROM metadata WHERE `key` NOT IN (SELECT metadataKey FROM videos WHERE metadataKey IS NOT NULL)")
     suspend fun deleteUnreferenced()
+
+    /** TMDB rows saved before version 5, without textless poster and credits yet. */
+    @Query("SELECT `key` FROM metadata WHERE castNames IS NULL AND `key` NOT LIKE 'server:%'")
+    suspend fun keysWithoutDetails(): List<String>
+
+    /** TMDB no longer has the title: don't ask again for its details. */
+    @Query("UPDATE metadata SET castNames = '' WHERE `key` = :key AND castNames IS NULL")
+    suspend fun markDetailsChecked(key: String)
+
+    @Query("SELECT * FROM artwork_choices")
+    fun observeArtworkChoices(): Flow<List<ArtworkChoiceEntity>>
+
+    @Query("SELECT * FROM artwork_choices")
+    suspend fun artworkChoices(): List<ArtworkChoiceEntity>
+
+    @Upsert
+    suspend fun setArtworkChoice(choice: ArtworkChoiceEntity)
+
+    @Query("DELETE FROM artwork_choices WHERE metadataKey = :metadataKey")
+    suspend fun clearArtworkChoice(metadataKey: String)
 }
 
 @Dao

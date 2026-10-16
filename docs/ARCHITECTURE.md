@@ -126,6 +126,14 @@ Video view: `org.videolan.libvlc.util.VLCVideoLayout` inside `AndroidView`, atta
 `mediaPlayer.attachViews(layout, null, true /*subtitles*/, false /*textureView*/)`.
 
 ### Playback service, queue and casting
+- **Leaving the player** (owner's rules, round 1):
+  - It pauses the video. With `Settings.backgroundAudio` ("Background play for videos", off by
+    default, stored under the new key `background_play_video`), the sound plays on instead.
+  - It never enters picture-in-picture by itself: auto-enter is off, and only the PiP button
+    starts it.
+  - Music always plays in the background.
+  - Clearing the app from recents stops both video and music (`onTaskRemoved` in
+    `PlaybackService` and `MusicService`).
 - `PlaybackService` (foreground type `mediaPlayback`, not exported) owns the `PlayerController`
   (libVLC player, media, queue). `PlayerActivity` binds to it with a local Binder, lends it the
   video surface while visible and implements `PlayerController.Host` (PiP, brightness,
@@ -143,17 +151,68 @@ Video view: `org.videolan.libvlc.util.VLCVideoLayout` inside `AndroidView`, atta
   current position, `stopCasting()` = `setRenderer(null)` and reopen locally. While casting the
   service stays in the foreground ("Casting to …"); the UI covers the surface with a placeholder.
 
-### Playlists (Room v2)
+### Playlists (Room v2; songs in v4, see Music)
 `playlists` and `playlist_items` (FK cascade to playlists and videos), added by the manual
 `NovaDatabase.MIGRATION_1_2`. Schemas are committed under `app/schemas/` (CI publishes the
 generated JSON to the `screens` branch; copy a new version's file from there). Every future
 version adds a migration to `NovaDatabase.MIGRATIONS`.
+
+### Music (Room v4)
+Local only: the DEVICE row (MediaStore's audio table, `IS_MUSIC` rows) and every FOLDER (SAF
+tree) — the same sources as videos, so turning one off or removing it does the same to its songs.
+- `core/audio`: `LrcParser` (synced .lrc lyrics, parsed by hand: no regexes), `AudioFiles`
+  (extensions, cover file and .lrc sidecar rules, tag clean-up, MediaStore's disc×1000+track),
+  `MusicKeys` (album = album artist + name, or folder + name without an album-artist tag;
+  artist = album artist, else artist; Apple-style sort keys ignoring "The").
+- `sources/music`: `DeviceMusicScanner` (tags from MediaStore; cover.jpg/folder.jpg and .lrc
+  only with All files access, read through the file's path), `FolderMusicScanner` (tags read with
+  `MediaMetadataRetriever`, skipped for files whose size and date are unchanged), `SongArtFetcher`
+  (Coil: `SongArt.embedded(uri)` = "novaart:<song uri>" loads the picture inside the file).
+- `data/music/MusicRepository` (`AppGraph.music`): scans whenever the local sources change and on
+  `rescan()`; songs missing from a scan stay with `present = false`; a folder copy of a device song
+  (same file name and size) is kept once. Playlists: `playlist_songs` beside `playlist_items`; a
+  playlist with only songs is left out of the Video side's list and one with only videos out of the
+  Audio tab's. Watchlist (`watchlist`, keyed by the UI item key "v:<id>" / "s:<showKey>") for the
+  hero's "+" button; no UI yet. `MusicLibrary.build` groups songs into albums, artists and genres.
+- `music/MusicPlayer` (`AppGraph.musicPlayer`, main thread): its own libVLC `MediaPlayer` (media
+  opened with `:no-video`), a `PlayQueue`, shuffle, repeat off/all/one, previous restarts after 3 s,
+  a failed song is skipped after 1.5 s, play counts on finish, lyrics loaded per song.
+  `music/MusicService` (foreground `mediaPlayback`, MediaStyle notification with previous/play/
+  next/close, a `PlaybackSession` without the ±10 s buttons). Video and music request audio focus
+  (movie vs music content), so starting one pauses the other.
+- `ui/audio`: a plain, temporary Audio tab (songs, albums, artists, genres, playlists, recently
+  added, a mini player with lyrics) to test the engine until the Apple Music-style screens.
+- Backups carry song plays (`NovaBackup.songs`) and each playlist's songs (`BackupPlaylist.songs`),
+  matched on restore by `SongMatcher` (URI + name, place in source, name + size); entries wait in
+  `PendingRestore` and are applied after each music scan (`MusicRepository.afterScan`).
+- Library diagnostics has a Music section (access, songs per source, last music scan).
+- Search covers music: `MusicSearch` (accent- and case-insensitive; prefix matches first) feeds
+  `SearchUi.songs/albums/artists`, shown after the videos by `ui/common/musicSearchResults`;
+  tapping one plays it (`AppActions.playMusic`).
 
 ## Phone vs tablet UI
 
 Decided once per composition with `rememberDeviceLayout(settings.layoutMode)`; provided through
 `LocalDeviceLayout` and `LocalNovaDimens`. Phone and tablet have **their own components** — share
 only `ui/common`, `ui/settings`, `ui/dialogs`, and `ui/model`.
+
+**Apple TV look (round 1, phone):**
+- **Theme:** one black theme (`NovaTheme` ignores `themeMode`), white accent and iOS greys.
+- **Tabs:** `TopDestination` is VIDEO (Home, with Library behind the row headers and the
+  "Library" entry at the end of the feed), AUDIO, SETTINGS (Settings › Sources › "Browse sources and
+  playlists" opens Route.Browse) and SEARCH.
+- **Hero:** `ui/phone/PhoneHero.kt`, about 80% of the screen tall under a clear status bar
+  (`LocalStatusBarIcons`, dark icons over a bright top, measured by `rememberTopBrightness`).
+  - It shows a centred title, a white Play pill and a round "+", which calls
+    `AppActions.toggleWatchlist` with `HeroUi.itemKey`.
+  - The page dots are white and grey and fill as the timer runs.
+  - After 2.5 s still, a local clip of a minute or less plays from the start, with sound
+    (libVLC; longer videos show only their art; `HeroUi.previewUri` / `previewStartMs`, `ui/common/HeroPreview.kt`), only where MainActivity
+    sets `LocalHeroPreviewEnabled`.
+  - The mute button sits at the end of the dots row.
+
+The rest of this section is the earlier Material design, still used where the redesign hasn't
+reached yet.
 
 **Phone (`ui/phone`, entry `PhoneApp(state: AppUiState, actions: AppActions)`):**
 bottom `NavigationBar` (Home, Library, Browse, Settings); Home = full-bleed backdrop hero pager
@@ -179,7 +238,9 @@ times and an icon row (lock, aspect, subtitles, audio, speed, rotate, PiP) — t
 `ModalBottomSheet`. Tablet controls = larger targets, seek bar with title above, labelled
 buttons in one bottom row, tracks/speed/subtitle delay in a right-side panel (no bottom sheet).
 Both: tap toggles controls (auto-hide after 3.5 s while playing), double-tap left/right seeks by
-`seekStepMs`, horizontal drag scrubs, vertical drag left = brightness / right = volume, lock mode,
+`seekStepMs`, horizontal drag scrubs (vertical drags do nothing: brightness and volume are the
+phone's own; the volume keys show an iOS-style pill, `VolumeHud`, instead of the system panel,
+except in picture-in-picture), lock mode,
 resume banner, up-next card, buffering spinner, error card.
 
 ## Icons (res/drawable, Material Icons Round, white fill — tint with `Icon`)

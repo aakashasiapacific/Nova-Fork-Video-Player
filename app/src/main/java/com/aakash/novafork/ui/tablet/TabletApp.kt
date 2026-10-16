@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -31,6 +32,7 @@ import com.aakash.novafork.ui.adaptive.DeviceLayout
 import com.aakash.novafork.ui.adaptive.LocalDeviceLayout
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
 import com.aakash.novafork.ui.adaptive.dimensFor
+import com.aakash.novafork.ui.audio.AudioScreen
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.AppUiState
 import com.aakash.novafork.ui.model.Route
@@ -55,9 +57,7 @@ fun TabletApp(state: AppUiState, actions: AppActions, layout: DeviceLayout, modi
             Row(Modifier.fillMaxSize()) {
                 TabletNavRail(
                     selected = state.route.top,
-                    searchSelected = state.route == Route.Search,
                     onSelect = actions::selectTab,
-                    onSearch = { if (state.route != Route.Search) actions.navigate(Route.Search) },
                     modifier = Modifier.fillMaxHeight(),
                 )
                 // Keyed by page, so updates within a page recompose it in place while a page change
@@ -137,6 +137,7 @@ private fun TabletPage(state: AppUiState, actions: AppActions, layout: DeviceLay
             actions = actions,
             modifier = pageModifier,
         )
+        Route.Audio -> AudioScreen(modifier = pageModifier.windowInsetsPadding(WindowInsets.navigationBars))
         Route.Settings -> SettingsScreen(
             state = state.settings,
             actions = actions,

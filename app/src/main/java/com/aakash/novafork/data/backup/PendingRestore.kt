@@ -10,6 +10,7 @@ import com.aakash.novafork.data.LibraryRepository
 import com.aakash.novafork.data.TmdbSearchResult
 import com.aakash.novafork.data.db.MatchState
 import com.aakash.novafork.data.db.NovaDatabase
+import com.aakash.novafork.data.db.PlaylistSongEntity
 import com.aakash.novafork.data.db.SQL_CHUNK
 import com.aakash.novafork.data.db.VideoEntity
 import kotlinx.coroutines.Dispatchers
@@ -34,6 +35,10 @@ private const val MAX_AGE_MS = 30L * 24 * 60 * 60 * 1000
 @Serializable
 internal data class PendingPlaylistItem(val playlist: String, val video: BackupVideoRef)
 
+/** A playlist's song of a restore, waiting for its song to be scanned. */
+@Serializable
+internal data class PendingSongPlaylistItem(val playlist: String, val song: BackupSongRef)
+
 @Serializable
 internal data class PendingRestoreData(
     /** The latest restore that added entries (epoch ms); everything left goes [MAX_AGE_MS] after it. */
@@ -41,10 +46,14 @@ internal data class PendingRestoreData(
     val videos: List<BackupVideoState> = emptyList(),
     val matches: List<BackupMatch> = emptyList(),
     val playlistItems: List<PendingPlaylistItem> = emptyList(),
+    val songs: List<BackupSongState> = emptyList(),
+    val songPlaylistItems: List<PendingSongPlaylistItem> = emptyList(),
 ) {
-    fun isEmpty(): Boolean = videos.isEmpty() && matches.isEmpty() && playlistItems.isEmpty()
+    fun isEmpty(): Boolean =
+        videos.isEmpty() && matches.isEmpty() && playlistItems.isEmpty() && songs.isEmpty() && songPlaylistItems.isEmpty()
 
-    fun counts(): RestoreCounts = RestoreCounts(videos.size, matches.size, playlistItems.size)
+    fun counts(): RestoreCounts =
+        RestoreCounts(videos.size, matches.size, playlistItems.size + songPlaylistItems.size, songs.size)
 }
 
 /**
@@ -64,6 +73,8 @@ internal class PendingRestore(
     private val sourceDao = database.sourceDao()
     private val videoDao = database.videoDao()
     private val playlistDao = database.playlistDao()
+    private val songDao = database.songDao()
+    private val playlistSongDao = database.playlistSongDao()
 
     /** Cheap check before a pass: false when nothing waits. Call off the main thread. */
     fun exists(): Boolean = file.exists()
@@ -72,19 +83,28 @@ internal class PendingRestore(
         fileLock.withLock { load()?.counts() ?: RestoreCounts() }
     }
 
-    /** Adds a restore's entries; one for a video that already waits replaces the older one. */
-    suspend fun add(videos: List<BackupVideoState>, matches: List<BackupMatch>, playlistItems: List<PendingPlaylistItem>) {
+    /** Adds a restore's entries; one for a video or song that already waits replaces the older one. */
+    suspend fun add(
+        videos: List<BackupVideoState>,
+        matches: List<BackupMatch>,
+        playlistItems: List<PendingPlaylistItem>,
+        songs: List<BackupSongState> = emptyList(),
+        songPlaylistItems: List<PendingSongPlaylistItem> = emptyList(),
+    ) {
         withContext(Dispatchers.IO) {
             fileLock.withLock {
                 val old = load()
                 val newVideos = videos.mapTo(HashSet()) { it.video }
                 val newMatches = matches.mapTo(HashSet()) { it.video }
+                val newSongs = songs.mapTo(HashSet()) { it.song }
                 save(
                     PendingRestoreData(
                         restoredAt = clock(),
                         videos = old?.videos.orEmpty().filter { it.video !in newVideos } + videos,
                         matches = old?.matches.orEmpty().filter { it.video !in newMatches } + matches,
                         playlistItems = (old?.playlistItems.orEmpty() + playlistItems).distinct(),
+                        songs = old?.songs.orEmpty().filter { it.song !in newSongs } + songs,
+                        songPlaylistItems = (old?.songPlaylistItems.orEmpty() + songPlaylistItems).distinct(),
                     ),
                 )
             }
@@ -154,17 +174,94 @@ internal class PendingRestore(
             }
         }
 
+        val songPass = applySongs(data)
+
         val ready = data.matches.mapNotNull { match -> matcher.match(match.video)?.let { match to it } }
-        val left = data.copy(videos = missing, playlistItems = itemsLeft)
+        val left = data.copy(
+            videos = missing,
+            playlistItems = itemsLeft,
+            songs = songPass.songsLeft,
+            songPlaylistItems = songPass.itemsLeft,
+        )
         save(left)
         return LocalPass(
             result = PendingApplyResult(
-                applied = RestoreCounts(videos = found.size, playlistItems = itemsApplied),
+                applied = RestoreCounts(
+                    videos = found.size,
+                    playlistItems = itemsApplied + songPass.itemsApplied,
+                    songs = songPass.songsApplied,
+                ),
                 waiting = left.counts(),
                 matchesReady = ready.size,
             ),
             ready = ready,
         )
+    }
+
+    private class SongPass(
+        val songsApplied: Int,
+        val songsLeft: List<BackupSongState>,
+        val itemsApplied: Int,
+        val itemsLeft: List<PendingSongPlaylistItem>,
+    )
+
+    /** Song plays and the songs of playlists; called with [fileLock] held. */
+    private suspend fun applySongs(data: PendingRestoreData): SongPass {
+        if (data.songs.isEmpty() && data.songPlaylistItems.isEmpty()) return SongPass(0, emptyList(), 0, emptyList())
+        val matcher = SongMatcher(songDao.identities(), sourceDao.all())
+        val found = ArrayList<Pair<BackupSongState, Long>>()
+        val missing = ArrayList<BackupSongState>()
+        for (state in data.songs) {
+            val id = matcher.match(state.song)
+            if (id != null) found += state to id else missing += state
+        }
+        var itemsApplied = 0
+        val itemsLeft = ArrayList<PendingSongPlaylistItem>()
+        database.withTransaction {
+            if (found.isNotEmpty()) {
+                val current = found.map { it.second }.distinct().chunked(SQL_CHUNK)
+                    .flatMap { songDao.byIds(it) }
+                    .associateBy { it.id }
+                for ((state, id) in found) {
+                    val song = current[id] ?: continue
+                    val playCount = max(song.playCount, state.playCount.coerceAtLeast(0))
+                    val lastPlayedAt = listOfNotNull(song.lastPlayedAt, state.lastPlayedAt).maxOrNull()
+                    if (playCount != song.playCount || lastPlayedAt != song.lastPlayedAt) {
+                        songDao.restorePlays(id, playCount, lastPlayedAt)
+                    }
+                }
+            }
+            if (data.songPlaylistItems.isNotEmpty()) {
+                val playlists = playlistDao.all()
+                for ((name, items) in data.songPlaylistItems.groupBy { it.playlist }) {
+                    // A playlist deleted since the restore takes its waiting songs with it.
+                    val playlist = playlists.firstOrNull { it.name == name } ?: continue
+                    val existing = playlistSongDao.items(playlist.id)
+                    val already = existing.mapTo(HashSet()) { it.songId }
+                    var position = (existing.maxOfOrNull { it.position } ?: -1) + 1
+                    val added = ArrayList<PlaylistSongEntity>()
+                    var waiting = 0
+                    for (item in items) {
+                        val id = matcher.match(item.song)
+                        when {
+                            id == null -> {
+                                itemsLeft += item
+                                waiting++
+                            }
+                            already.add(id) -> added += PlaylistSongEntity(playlistId = playlist.id, songId = id, position = position++)
+                            // Already in the playlist: nothing to add, nothing left to wait for.
+                            else -> Unit
+                        }
+                    }
+                    if (added.isNotEmpty()) {
+                        playlistSongDao.insertItems(added)
+                        playlistDao.touch(playlist.id, clock())
+                    }
+                    itemsApplied += items.size - waiting
+                }
+            }
+        }
+        return SongPass(found.size, missing, itemsApplied, itemsLeft)
     }
 
     private suspend fun applyStates(found: List<Pair<BackupVideoState, Long>>) {

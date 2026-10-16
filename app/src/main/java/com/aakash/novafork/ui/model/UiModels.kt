@@ -17,6 +17,8 @@ data class Artwork(
     val stillUrl: String? = null,
     /** A local video URI (content:// or file://) to grab a frame from when nothing else exists. Null for network files. */
     val frameSource: String? = null,
+    /** Portrait key art without text (TMDB's textless poster), for the tall Home hero. */
+    val tallUrl: String? = null,
     /** Seed for the placeholder colours (usually the title). */
     val seed: String = "",
 )
@@ -100,12 +102,29 @@ data class HeroUi(
     val playVideoId: Long? = null,
     /** "Play", "Resume", "Play S2 · E4". */
     val playLabel: String = "Play",
-)
+    /**
+     * The local file (content:// or file://) the hero plays as a preview, from [previewStartMs]:
+     * the video Play plays, when it is a short clip (a minute or less). Null otherwise.
+     */
+    val previewUri: String? = null,
+    val previewStartMs: Long = 0,
+    /** On the watchlist (the "+" button shows a check). */
+    val onWatchlist: Boolean = false,
+) {
+    /** The library item key ("v:<id>" / "s:<showKey>"), which the watchlist stores. */
+    val itemKey: String
+        get() = when (val t = target) {
+            is HeroTarget.Video -> "v:${t.id}"
+            is HeroTarget.Show -> "s:${t.key}"
+        }
+}
 
 @Immutable
 data class HomeUi(
     val hero: List<HeroUi> = emptyList(),
     val continueWatching: List<VideoCardUi> = emptyList(),
+    /** Movies, shows and videos saved with the hero's "+", most recently added first. */
+    val watchlist: List<LibraryItemUi> = emptyList(),
     val recentlyAdded: List<VideoCardUi> = emptyList(),
     val movies: List<VideoCardUi> = emptyList(),
     val shows: List<ShowCardUi> = emptyList(),
@@ -305,6 +324,28 @@ data class RemoteFileUi(
 data class SearchUi(
     val query: String = "",
     val results: List<LibraryItemUi> = emptyList(),
+    /** Music that matches, one section each, best first (one search over videos and music). */
+    val songs: List<MusicResultUi> = emptyList(),
+    val albums: List<MusicResultUi> = emptyList(),
+    val artists: List<MusicResultUi> = emptyList(),
+) {
+    val hasMusic: Boolean get() = songs.isNotEmpty() || albums.isNotEmpty() || artists.isNotEmpty()
+    val isEmpty: Boolean get() = results.isEmpty() && !hasMusic
+}
+
+/** A song, album or artist in search results; tapping it plays [songIds] from [startIndex]. */
+@Immutable
+data class MusicResultUi(
+    val key: String,
+    val title: String,
+    /** "Song · Queen", "Album · Queen", "Artist". */
+    val subtitle: String,
+    /** Cover file or embedded picture; null for none. */
+    val artUri: String?,
+    val songIds: List<Long>,
+    val startIndex: Int = 0,
+    /** Artists show round art, like Apple Music. */
+    val round: Boolean = false,
 )
 
 @Immutable

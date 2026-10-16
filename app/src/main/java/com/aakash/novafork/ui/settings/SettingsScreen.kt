@@ -79,7 +79,7 @@ private fun PhoneSettings(state: SettingsUi, actions: AppActions, modifier: Modi
     ) {
         item(key = "title") {
             Text(
-                text = "Settings",
+                text = "Preferences",
                 style = MaterialTheme.typography.headlineLarge,
                 modifier = Modifier.padding(start = 4.dp, top = 16.dp, bottom = 4.dp),
             )
@@ -113,7 +113,7 @@ private fun TabletSettings(state: SettingsUi, actions: AppActions, modifier: Mod
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             Text(
-                text = "Settings",
+                text = "Preferences",
                 style = MaterialTheme.typography.headlineMedium,
                 modifier = Modifier.padding(start = 12.dp, bottom = 16.dp),
             )

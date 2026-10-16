@@ -134,6 +134,14 @@ fun PhoneVideoDetailsScreen(
                     },
                 )
                 DropdownMenuItem(
+                    text = { Text("Change artwork…") },
+                    leadingIcon = { NovaIcon(R.drawable.ic_image, contentDescription = null) },
+                    onClick = {
+                        close()
+                        actions.changeArtwork(details.id)
+                    },
+                )
+                DropdownMenuItem(
                     text = { Text(if (details.watched) "Mark as unwatched" else "Mark as watched") },
                     leadingIcon = {
                         NovaIcon(

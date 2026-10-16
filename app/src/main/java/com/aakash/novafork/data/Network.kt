@@ -8,6 +8,7 @@ import coil.disk.DiskCache
 import coil.memory.MemoryCache
 import com.aakash.novafork.BuildConfig
 import com.aakash.novafork.sources.SmbFetcher
+import com.aakash.novafork.sources.music.SongArtFetcher
 import okhttp3.Cache
 import okhttp3.Dns
 import okhttp3.HttpUrl.Companion.toHttpUrl
@@ -49,6 +50,7 @@ object Network {
             .components {
                 add(VideoFrameDecoder.Factory())
                 add(SmbFetcher.Factory(smb))
+                add(SongArtFetcher.Factory())
             }
             .memoryCache { MemoryCache.Builder(appContext).maxSizePercent(0.20).build() }
             .diskCache {

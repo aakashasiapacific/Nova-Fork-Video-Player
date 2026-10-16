@@ -41,7 +41,6 @@ import com.aakash.novafork.data.AspectMode
 import com.aakash.novafork.data.HwDecoding
 import com.aakash.novafork.data.LayoutMode
 import com.aakash.novafork.data.Settings
-import com.aakash.novafork.data.ThemeMode
 import com.aakash.novafork.data.TmdbHost
 import com.aakash.novafork.data.db.SourceType
 import com.aakash.novafork.ui.common.NovaIcon
@@ -49,15 +48,16 @@ import com.aakash.novafork.ui.common.sourceTypeIcon
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.DialogUi
 import com.aakash.novafork.ui.model.KeyStatus
+import com.aakash.novafork.ui.model.Route
 import com.aakash.novafork.ui.model.SettingsUi
 import com.aakash.novafork.ui.model.SourceUi
 import com.aakash.novafork.ui.theme.NovaColors
 
 internal enum class SettingsSection(val title: String, val summary: String, @DrawableRes val icon: Int) {
-    LIBRARY("Library", "Device storage, folders and network shares", R.drawable.ic_video_library),
+    LIBRARY("Sources", "Device storage, folders, network shares and playlists", R.drawable.ic_video_library),
     ARTWORK("Artwork & metadata", "TMDB key, language and server", R.drawable.ic_image),
     PLAYER("Player", "Decoding, subtitles and audio", R.drawable.ic_smart_display),
-    APPEARANCE("Appearance", "Theme and layout", R.drawable.ic_dark_mode),
+    APPEARANCE("Appearance", "Phone or tablet layout", R.drawable.ic_dark_mode),
     ABOUT("About", "Version, library diagnostics and credits", R.drawable.ic_info),
 }
 
@@ -90,6 +90,15 @@ private fun libraryGroups(state: SettingsUi, actions: AppActions): List<Settings
                         summary = "Find the videos in internal storage and on SD cards",
                         checked = settings.scanDeviceStorage,
                         onCheckedChange = { on -> actions.updateSettings { it.copy(scanDeviceStorage = on) } },
+                    )
+                },
+                SettingsRow("browse") { shape ->
+                    ActionRow(
+                        shape = shape,
+                        icon = R.drawable.ic_folder_open,
+                        title = "Browse sources and playlists",
+                        summary = "Folders, shares, servers, streams and playlists, file by file",
+                        onClick = { actions.navigate(Route.Browse) },
                     )
                 },
                 SettingsRow("all-files") { shape ->
@@ -546,8 +555,9 @@ private fun playerGroups(settings: Settings, actions: AppActions): List<Settings
                 SwitchRow(
                     shape = shape,
                     icon = R.drawable.ic_volume_up,
-                    title = "Background audio",
-                    summary = "Keep the sound playing after leaving the player, with controls in a notification",
+                    title = "Background play for videos",
+                    summary = "Keep a video's sound playing after leaving the player, with controls in a notification. " +
+                        "Off: leaving the player pauses it",
                     checked = settings.backgroundAudio,
                     onCheckedChange = { on -> actions.updateSettings { it.copy(backgroundAudio = on) } },
                 )
@@ -611,16 +621,6 @@ private fun appearanceGroups(settings: Settings, actions: AppActions): List<Sett
         key = "appearance",
         title = null,
         rows = listOf(
-            SettingsRow("theme") { shape ->
-                ChoiceRow(
-                    shape = shape,
-                    icon = R.drawable.ic_dark_mode,
-                    title = "Theme",
-                    options = ThemeMode.entries.map { Option(it, it.label) },
-                    selected = settings.themeMode,
-                    onSelect = { mode -> actions.updateSettings { it.copy(themeMode = mode) } },
-                )
-            },
             SettingsRow("layout") { shape ->
                 ChoiceRow(
                     shape = shape,

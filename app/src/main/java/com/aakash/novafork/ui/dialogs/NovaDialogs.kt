@@ -57,6 +57,7 @@ fun NovaDialogs(dialog: DialogUi?, actions: AppActions, playlists: List<Playlist
         is DialogUi.NetworkServer -> NetworkServerDialog(dialog = dialog, actions = actions)
         is DialogUi.UpnpServers -> UpnpServersDialog(dialog = dialog, actions = actions)
         is DialogUi.Identify -> IdentifyDialog(dialog = dialog, actions = actions)
+        is DialogUi.ChangeArtwork -> ChangeArtworkDialog(dialog = dialog, actions = actions)
         is DialogUi.ConfirmRemoveSource -> ConfirmRemoveSourceDialog(
             source = dialog.source,
             onConfirm = { actions.removeSource(dialog.source.id) },

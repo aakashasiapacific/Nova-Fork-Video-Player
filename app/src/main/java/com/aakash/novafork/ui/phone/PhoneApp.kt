@@ -2,30 +2,77 @@ package com.aakash.novafork.ui.phone
 
 import androidx.annotation.DrawableRes
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
 import com.aakash.novafork.ui.adaptive.DeviceLayout
+import com.aakash.novafork.ui.audio.AudioScreen
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.AppUiState
@@ -33,6 +80,7 @@ import com.aakash.novafork.ui.model.Route
 import com.aakash.novafork.ui.model.TopDestination
 import com.aakash.novafork.ui.model.top
 import com.aakash.novafork.ui.settings.SettingsScreen
+import com.aakash.novafork.ui.theme.NovaColors
 
 /**
  * Phone UI: bottom navigation plus one full-screen page per route. Dialogs, snackbars and system
@@ -43,10 +91,34 @@ fun PhoneApp(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
     // Pages leave the composition when navigated away from; this keeps their scroll positions
     // (and other saveable state) for when the user comes back.
     val pageStates = rememberSaveableStateHolder()
+    val top = state.route.top
+    // The tab bar shrinks while a page scrolls down and comes back when it scrolls up; a tab
+    // change always shows it in full.
+    var barCollapsed by remember { mutableStateOf(false) }
+    LaunchedEffect(top) { barCollapsed = false }
+    val collapseThreshold = with(LocalDensity.current) { BarCollapseScroll.toPx() }
+    val barScroll = remember {
+        object : NestedScrollConnection {
+            var travel = 0f
+            override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
+                val dy = consumed.y
+                if (dy == 0f) return Offset.Zero
+                travel = if (travel * dy < 0) dy else travel + dy
+                if (travel < -collapseThreshold) barCollapsed = true
+                if (travel > collapseThreshold) barCollapsed = false
+                return Offset.Zero
+            }
+        }
+    }
     Scaffold(
         modifier = modifier,
         bottomBar = {
-            PhoneNavigationBar(selected = state.route.top, onSelect = actions::selectTab)
+            PhoneNavigationBar(
+                selected = top,
+                collapsed = barCollapsed,
+                onExpand = { barCollapsed = false },
+                onSelect = actions::selectTab,
+            )
         },
         // Only the bottom bar is reserved here: pages handle the status bar themselves so that
         // Home and details artwork can run behind it.
@@ -58,6 +130,7 @@ fun PhoneApp(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
             targetState = state,
             modifier = Modifier
                 .fillMaxSize()
+                .nestedScroll(barScroll)
                 .padding(innerPadding)
                 .consumeWindowInsets(innerPadding)
                 .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)),
@@ -129,6 +202,7 @@ private fun PhonePage(state: AppUiState, actions: AppActions) {
             actions = actions,
             modifier = pageModifier,
         )
+        Route.Audio -> AudioScreen(modifier = pageModifier)
         // statusBarsPadding (rather than contentPadding) consumes the inset, so it is not applied
         // twice whether Settings draws its own top app bar or a plain list.
         Route.Settings -> SettingsScreen(
@@ -141,24 +215,179 @@ private fun PhonePage(state: AppUiState, actions: AppActions) {
     }
 }
 
+/**
+ * iOS 26's floating tab bar, as in the owner's recording: a dark-grey glass capsule held off the
+ * screen edges, with a lighter grey pill behind the selected tab, whose icon and label take the
+ * tab's colour. A finger dragged along it moves the pill, and the tab under the finger opens when
+ * it lifts. While a page scrolls down it shrinks to two circles, the current tab on the left and
+ * Search on the right; scrolling back up, or tapping the left circle, brings back the full bar.
+ */
 @Composable
-private fun PhoneNavigationBar(selected: TopDestination, onSelect: (TopDestination) -> Unit) {
-    NavigationBar {
-        TopDestination.entries.forEach { tab ->
-            NavigationBarItem(
-                selected = tab == selected,
-                onClick = { onSelect(tab) },
-                icon = { NovaIcon(tab.iconRes(), contentDescription = null) },
-                label = { Text(tab.label) },
-            )
+private fun PhoneNavigationBar(selected: TopDestination, collapsed: Boolean, onExpand: () -> Unit, onSelect: (TopDestination) -> Unit) {
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .navigationBarsPadding()
+            .padding(start = BarSideMargin, end = BarSideMargin, top = 6.dp, bottom = 10.dp)
+            .height(TabBarHeight),
+    ) {
+        AnimatedContent(
+            targetState = collapsed,
+            transitionSpec = {
+                (fadeIn(tween(200)) + scaleIn(tween(240), initialScale = 0.9f)) togetherWith
+                    (fadeOut(tween(120)) + scaleOut(tween(160), targetScale = 0.9f))
+            },
+            label = "tabBarCollapse",
+        ) { small ->
+            if (small) {
+                Box(Modifier.fillMaxSize()) {
+                    GlassCircle(onClick = onExpand, description = "Show tabs", modifier = Modifier.align(Alignment.CenterStart)) {
+                        NovaIcon(selected.iconRes(), contentDescription = null, tint = selected.activeColor(), modifier = Modifier.size(24.dp))
+                    }
+                    if (selected != TopDestination.SEARCH) {
+                        GlassCircle(onClick = { onSelect(TopDestination.SEARCH) }, description = TopDestination.SEARCH.label, modifier = Modifier.align(Alignment.CenterEnd)) {
+                            NovaIcon(TopDestination.SEARCH.iconRes(), contentDescription = null, tint = Color.White, modifier = Modifier.size(24.dp))
+                        }
+                    }
+                }
+            } else {
+                TabCapsule(selected = selected, onSelect = onSelect)
+            }
         }
     }
 }
 
+@Composable
+private fun TabCapsule(selected: TopDestination, onSelect: (TopDestination) -> Unit) {
+    val tabs = TopDestination.entries
+    val currentOnSelect by rememberUpdatedState(onSelect)
+    var dragX by remember { mutableStateOf<Float?>(null) }
+    BoxWithConstraints(
+        Modifier
+            .fillMaxSize()
+            .glass(RoundedCornerShape(percent = 50))
+            .padding(PillInset)
+            .pointerInput(tabs.size) {
+                fun tabAt(x: Float): TopDestination = tabs[(x / size.width * tabs.size).toInt().coerceIn(0, tabs.lastIndex)]
+                detectHorizontalDragGestures(
+                    onDragStart = { dragX = it.x },
+                    onDragEnd = {
+                        dragX?.let { currentOnSelect(tabAt(it)) }
+                        dragX = null
+                    },
+                    onDragCancel = { dragX = null },
+                ) { change, amount ->
+                    change.consume()
+                    dragX = (dragX ?: change.position.x) + amount
+                }
+            },
+    ) {
+        val slot = maxWidth / tabs.size
+        val widthPx = constraints.maxWidth.toFloat().coerceAtLeast(1f)
+        val active = dragX?.let { x -> (x / widthPx * tabs.size).toInt().coerceIn(0, tabs.lastIndex) } ?: tabs.indexOf(selected)
+        val pillX by animateDpAsState(slot * active, animationSpec = spring(dampingRatio = 0.75f, stiffness = Spring.StiffnessMediumLow), label = "tabPill")
+        Box(
+            Modifier
+                .offset(x = pillX)
+                .size(width = slot, height = maxHeight)
+                .clip(RoundedCornerShape(percent = 50))
+                .background(SelectedPillColor),
+        )
+        Row(Modifier.fillMaxSize()) {
+            tabs.forEachIndexed { index, tab ->
+                val isActive = index == active
+                val tint = if (isActive) tab.activeColor() else Color.White
+                Column(
+                    Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .selectable(
+                            selected = tab == selected,
+                            onClick = { onSelect(tab) },
+                            role = Role.Tab,
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                        ),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                ) {
+                    TabIcon(tab = tab, active = isActive, tint = tint)
+                    Text(
+                        tab.label,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = tint,
+                        maxLines = 1,
+                        modifier = Modifier.padding(top = 2.dp),
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** One of the shrunken bar's round glass buttons. */
+@Composable
+private fun GlassCircle(onClick: () -> Unit, description: String, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+    Box(
+        modifier
+            .size(TabBarHeight)
+            .glass(CircleShape)
+            .clickable(onClickLabel = description, role = Role.Button, onClick = onClick)
+            .semantics { contentDescription = description },
+        contentAlignment = Alignment.Center,
+    ) { content() }
+}
+
+/** iOS's dark glass: a translucent dark-grey fill, a hairline light edge and a soft shadow. */
+private fun Modifier.glass(shape: Shape): Modifier = this
+    .shadow(elevation = 12.dp, shape = shape, ambientColor = Color.Black, spotColor = Color.Black)
+    .clip(shape)
+    .background(GlassColor)
+    .border(0.5.dp, Color.White.copy(alpha = 0.10f), shape)
+
+private val TabBarHeight = 64.dp
+private val BarCollapseScroll = 32.dp
+private val BarSideMargin = 20.dp
+private val PillInset = 5.dp
+private val GlassColor = Color(0xF21C1C1E)
+private val SelectedPillColor = Color(0xFF3A3A3C)
+
+/**
+ * The selected tab's colour, as the owner chose: Video and Preferences iOS blue, Audio Apple
+ * Music red, Search white.
+ */
+private fun TopDestination.activeColor(): Color = when (this) {
+    TopDestination.VIDEO, TopDestination.SETTINGS -> NovaColors.IosBlue
+    TopDestination.AUDIO -> NovaColors.AppleMusicRed
+    TopDestination.SEARCH -> Color.White
+}
+
+/** A tab's icon; the selected one pops in with a short spring. */
+@Composable
+private fun TabIcon(tab: TopDestination, active: Boolean, tint: Color) {
+    val scale by animateFloatAsState(
+        targetValue = if (active) 1f else 0.9f,
+        animationSpec = spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessMedium),
+        label = "tabIcon",
+    )
+    NovaIcon(
+        tab.iconRes(),
+        contentDescription = null,
+        tint = tint,
+        modifier = Modifier
+            .size(24.dp)
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            },
+    )
+}
+
 @DrawableRes
 private fun TopDestination.iconRes(): Int = when (this) {
-    TopDestination.HOME -> R.drawable.ic_home
-    TopDestination.LIBRARY -> R.drawable.ic_video_library
-    TopDestination.BROWSE -> R.drawable.ic_folder
-    TopDestination.SETTINGS -> R.drawable.ic_settings
+    TopDestination.VIDEO -> R.drawable.ic_tv
+    TopDestination.AUDIO -> R.drawable.ic_music_notes
+    TopDestination.SETTINGS -> R.drawable.ic_person
+    TopDestination.SEARCH -> R.drawable.ic_search
 }

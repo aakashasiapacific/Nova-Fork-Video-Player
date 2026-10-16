@@ -5,8 +5,12 @@ import com.aakash.novafork.core.smb.SmbUris
 import com.aakash.novafork.core.tmdb.TmdbClient
 import com.aakash.novafork.data.PlaylistWithCount
 import com.aakash.novafork.data.ScanState
+import com.aakash.novafork.data.db.MetadataEntity
 import com.aakash.novafork.data.db.SourceEntity
 import com.aakash.novafork.data.db.SourceType
+import com.aakash.novafork.data.music.MusicLibrary
+import com.aakash.novafork.data.music.MusicLibraryData
+import com.aakash.novafork.data.music.MusicSearch
 import com.aakash.novafork.ui.model.Artwork
 import com.aakash.novafork.ui.model.BrowseDirUi
 import com.aakash.novafork.ui.model.BrowseUi
@@ -21,6 +25,7 @@ import com.aakash.novafork.ui.model.LibraryItemUi
 import com.aakash.novafork.ui.model.LibrarySort
 import com.aakash.novafork.ui.model.LibraryUi
 import com.aakash.novafork.ui.model.MediaKind
+import com.aakash.novafork.ui.model.MusicResultUi
 import com.aakash.novafork.ui.model.PlaylistDetailsUi
 import com.aakash.novafork.ui.model.PlaylistUi
 import com.aakash.novafork.ui.model.RemoteFileUi
@@ -40,6 +45,7 @@ object UiMappers {
     private const val CONTINUE_WATCHING_LIMIT = 20
     private const val RECENTLY_ADDED_LIMIT = 30
     private const val HERO_LIMIT = 6
+    private const val HERO_CLIP_MAX_MS = 60_000L
     /** Newest movies and shows considered for the hero before the backdrop preference is applied. */
     private const val HERO_RECENT_CANDIDATES = 12
     private const val SEARCH_LIMIT = 60
@@ -110,9 +116,19 @@ object UiMappers {
             .sortedByDescending { it.first }
             .forEach { add(it.second) }
         // sortedByDescending is stable, so the order above survives within each group.
-        return candidates.values
-            .sortedByDescending { it.artwork.backdropUrl != null }
+        val main = candidates.values
+            .sortedByDescending { it.artwork.tallUrl != null || it.artwork.backdropUrl != null }
             .take(HERO_LIMIT)
+        if (main.size >= HERO_LIMIT) return main
+        // A library with few movies and shows fills the hero with its newest personal videos too,
+        // shown with a frame of the video (or their own picture) instead of a backdrop.
+        val taken = main.mapTo(HashSet()) { it.target }
+        val personal = index.otherVideos
+            .filter { video -> video.card.artwork.let { it.frameSource != null || it.posterUrl != null || it.backdropUrl != null } }
+            .sortedByDescending { it.video.dateAdded }
+            .map(::heroForVideo)
+            .filter { it.target !in taken }
+        return (main + personal).take(HERO_LIMIT)
     }
 
     private fun heroForInProgress(index: LibraryIndex, video: IndexedVideo): HeroUi {
@@ -129,6 +145,7 @@ object UiMappers {
             progress = video.card.progress,
             playVideoId = video.id,
             playLabel = playLabel(resume = true, code = code),
+            previewUri = shortClip(video),
         )
     }
 
@@ -150,6 +167,7 @@ object UiMappers {
             progress = video.card.progress,
             playVideoId = video.id,
             playLabel = if (video.inProgress) "Resume" else "Play",
+            previewUri = shortClip(video),
         )
     }
 
@@ -170,7 +188,18 @@ object UiMappers {
             genres = genres,
             playVideoId = next.id,
             playLabel = showPlayLabel(next),
+            previewUri = shortClip(next),
         )
+    }
+
+    /**
+     * The hero plays only short clips (a minute or less, like a trailer), from the start: a long
+     * film playing in the poster isn't a preview. Null for longer videos, ones whose length isn't
+     * known yet and network files.
+     */
+    private fun shortClip(video: IndexedVideo): String? {
+        val duration = video.video.durationMs ?: return null
+        return video.card.artwork.frameSource.takeIf { duration in 1..HERO_CLIP_MAX_MS }
     }
 
     // Library
@@ -627,27 +656,73 @@ object UiMappers {
     // Search
 
     /** Title, show title and file name, case-insensitive; episodes show up as their show. */
-    fun search(index: LibraryIndex, query: String): SearchUi {
+    fun search(index: LibraryIndex, query: String, music: MusicLibraryData = MusicLibraryData()): SearchUi {
         val needle = query.trim()
         if (needle.isEmpty()) return SearchUi(query = query)
+        val found = MusicSearch.search(music, needle)
+        val songIds = found.songs.map { it.id }
         val entries = ArrayList<Entry>()
         val showKeys = LinkedHashSet<String>()
         for (video in index.videos) {
             val matches = video.title.contains(needle, ignoreCase = true) ||
                 video.showTitle?.contains(needle, ignoreCase = true) == true ||
-                video.video.fileName.contains(needle, ignoreCase = true)
+                video.video.fileName.contains(needle, ignoreCase = true) ||
+                creditsMatch(video.meta, needle)
             if (!matches) continue
             val showKey = video.showKey
             if (showKey != null) showKeys += showKey else entries += videoEntry(video)
         }
         // A matched show's TMDB name can differ from what its files are called.
-        index.shows.filter { it.title.contains(needle, ignoreCase = true) }.forEach { showKeys += it.key }
+        index.shows.filter { it.title.contains(needle, ignoreCase = true) || creditsMatch(it.meta, needle) }
+            .forEach { showKeys += it.key }
         showKeys.mapNotNullTo(entries) { key -> index.showsByKey[key]?.let(::showEntry) }
         val ranked = entries.sortedWith(
             compareBy<Entry> { !it.item.title.startsWith(needle, ignoreCase = true) }.then(ENTRY_TITLE_ORDER),
         )
-        return SearchUi(query = query, results = ranked.take(SEARCH_LIMIT).map { it.item })
+        return SearchUi(
+            query = query,
+            results = ranked.take(SEARCH_LIMIT).map { it.item },
+            songs = found.songs.mapIndexed { i, song ->
+                MusicResultUi(
+                    key = "song:${song.id}",
+                    title = song.title,
+                    subtitle = listOfNotNull("Song", song.artist ?: song.albumArtist).joinToString(" · "),
+                    artUri = MusicLibrary.artUri(song),
+                    songIds = songIds,
+                    startIndex = i,
+                )
+            },
+            albums = found.albums.map { album ->
+                MusicResultUi(
+                    key = "album:${album.key}",
+                    title = album.title,
+                    subtitle = "Album · ${album.artist}",
+                    artUri = album.artUri,
+                    songIds = album.songs.map { it.id },
+                )
+            },
+            artists = found.artists.map { artist ->
+                MusicResultUi(
+                    key = "artist:${artist.key}",
+                    title = artist.name,
+                    subtitle = "Artist",
+                    artUri = artist.albums.firstOrNull()?.artUri,
+                    songIds = artist.songs.map { it.id },
+                    round = true,
+                )
+            },
+        )
     }
+
+    /** Cast or director (creator, for shows) names of a TMDB title contain [needle]. */
+    private fun creditsMatch(meta: MetadataEntity?, needle: String): Boolean {
+        if (meta == null || needle.length < MIN_CREDIT_QUERY) return false
+        return meta.castNames?.contains(needle, ignoreCase = true) == true ||
+            meta.directors?.contains(needle, ignoreCase = true) == true
+    }
+
+    /** Two letters would match half the cast lists; names need three. */
+    private const val MIN_CREDIT_QUERY = 3
 
     // Scan
 

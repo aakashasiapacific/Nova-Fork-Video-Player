@@ -12,10 +12,6 @@ data class TrackUi(val id: Int, val name: String, val selected: Boolean)
 sealed interface GestureFeedback {
     /** Horizontal drag / double tap: where playback will land and how far that is. */
     data class Seek(val targetMs: Long, val deltaMs: Long, val durationMs: Long) : GestureFeedback
-    /** Right-side vertical drag. 0–1. */
-    data class Volume(val level: Float) : GestureFeedback
-    /** Left-side vertical drag. 0–1. */
-    data class Brightness(val level: Float) : GestureFeedback
     /** Short label after a button press: "Fit screen", "1.5×", "Subtitles off". */
     data class Label(val text: String) : GestureFeedback
 }
@@ -118,6 +114,11 @@ data class PlayerUiState(
     /** False where the system ignores orientation requests (Android 16+ on screens ≥ 600dp). */
     val canRotate: Boolean = true,
     val feedback: GestureFeedback? = null,
+    /**
+     * The media volume 0–1 while the player's own (iOS-style) volume indicator shows, after a
+     * volume key; null while it is hidden. The system's volume panel stays away in the player.
+     */
+    val volumeHud: Float? = null,
     /** Shown for a few seconds after auto-resume: "Resumed at 12:34" with a Start over button. */
     val resumedFromMs: Long? = null,
     val upNext: UpNextUi? = null,
@@ -164,13 +165,7 @@ interface PlayerActions {
     /** Live preview during a horizontal drag; [commit] = finger lifted. */
     fun scrub(targetMs: Long, commit: Boolean)
 
-    /** Vertical drag on the right half; [delta] is a fraction of full scale (+ = up). */
-    fun adjustVolume(delta: Float)
-
-    /** Vertical drag on the left half; [delta] is a fraction of full scale (+ = up). */
-    fun adjustBrightness(delta: Float)
-
-    /** Ends a volume/brightness/scrub gesture: lets the overlay fade. */
+    /** Ends a scrub gesture: lets the overlay fade. */
     fun endGesture()
 
     fun selectAudioTrack(id: Int)
@@ -242,8 +237,6 @@ open class NoOpPlayerActions : PlayerActions {
     override fun seekTo(positionMs: Long) {}
     override fun seekBy(deltaMs: Long) {}
     override fun scrub(targetMs: Long, commit: Boolean) {}
-    override fun adjustVolume(delta: Float) {}
-    override fun adjustBrightness(delta: Float) {}
     override fun endGesture() {}
     override fun selectAudioTrack(id: Int) {}
     override fun selectSubtitleTrack(id: Int) {}

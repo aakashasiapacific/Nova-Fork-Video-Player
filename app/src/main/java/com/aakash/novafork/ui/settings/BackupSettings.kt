@@ -166,6 +166,7 @@ private fun RestoreDialog(preview: RestorePreviewUi, onRestore: () -> Unit, onCa
                     SummaryLine(count(preview.sources, "source", "sources"))
                     SummaryLine(count(preview.videos, "video with watch history", "videos with watch history"))
                     SummaryLine(count(preview.matches, "manual match", "manual matches"))
+                    if (preview.songs > 0) SummaryLine(count(preview.songs, "song with plays", "songs with plays"))
                     SummaryLine(count(preview.playlists, "playlist", "playlists"))
                 }
                 Text(

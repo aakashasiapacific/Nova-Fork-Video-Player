@@ -28,7 +28,8 @@ private const val TAG = "BackupManager"
 
 /**
  * Backs up and restores what the user put into the app: settings (the whole settings file),
- * sources, each video's playback state, Identify's manual matches and playlists.
+ * sources, each video's playback state, each song's plays, Identify's manual matches and
+ * playlists of videos and songs.
  *
  * A restore replaces the settings, adds the sources this device doesn't have and applies the
  * rest to the videos it finds (see [VideoMatcher]); entries whose videos are not in the library
@@ -52,6 +53,8 @@ class BackupManager(
     private val sourceDao = database.sourceDao()
     private val videoDao = database.videoDao()
     private val playlistDao = database.playlistDao()
+    private val playlistSongDao = database.playlistSongDao()
+    private val songDao = database.songDao()
 
     private val settingsPrefs: SharedPreferences
         get() = appContext.getSharedPreferences(SettingsBackup.PREFS_NAME, Context.MODE_PRIVATE)
@@ -94,12 +97,26 @@ class BackupManager(
                     val videos = items.map { it.videoId }.distinct().chunked(SQL_CHUNK)
                         .flatMap { videoDao.byIds(it) }
                         .associateBy { it.id }
+                    val songItems = playlistSongDao.items(playlist.id)
+                    val songs = songItems.map { it.songId }.distinct().chunked(SQL_CHUNK)
+                        .flatMap { songDao.byIds(it) }
+                        .associateBy { it.id }
                     BackupPlaylist(
                         name = playlist.name,
                         createdAt = playlist.createdAt,
                         items = items.mapNotNull { item ->
                             videos[item.videoId]?.let { VideoMatcher.refOf(it, sourcesById[it.sourceId], includeSecrets) }
                         },
+                        songs = songItems.mapNotNull { item ->
+                            songs[item.songId]?.let { SongMatcher.refOf(it, sourcesById[it.sourceId]) }
+                        },
+                    )
+                },
+                songs = songDao.withPlays().map { song ->
+                    BackupSongState(
+                        song = SongMatcher.refOf(song, sourcesById[song.sourceId]),
+                        playCount = song.playCount,
+                        lastPlayedAt = song.lastPlayedAt,
                     )
                 },
             )
@@ -240,6 +257,11 @@ class BackupManager(
             playlistItems = backup.playlists.flatMap { playlist ->
                 val name = playlist.name.trim()
                 if (name.isEmpty()) emptyList() else playlist.items.map { PendingPlaylistItem(name, it) }
+            },
+            songs = backup.songs,
+            songPlaylistItems = backup.playlists.flatMap { playlist ->
+                val name = playlist.name.trim()
+                if (name.isEmpty()) emptyList() else playlist.songs.map { PendingSongPlaylistItem(name, it) }
             },
         )
         val result = pending.apply(library, identify = true)

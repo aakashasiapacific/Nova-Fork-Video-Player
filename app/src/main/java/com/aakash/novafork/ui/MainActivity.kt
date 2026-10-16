@@ -7,7 +7,6 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.DocumentsContract
-import android.provider.Settings as AndroidSettings
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
@@ -15,22 +14,25 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
-import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.core.view.WindowCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import com.aakash.novafork.data.StoragePermissions
-import com.aakash.novafork.data.ThemeMode
 import com.aakash.novafork.data.backup.BackupManager
 import com.aakash.novafork.player.PlayerIntents
+import com.aakash.novafork.ui.common.LocalHeroPreviewEnabled
+import com.aakash.novafork.ui.common.LocalStatusBarIcons
 import com.aakash.novafork.ui.model.AppActions
 import java.time.LocalDate
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import android.provider.Settings as AndroidSettings
 
 /**
  * The library. Hosts [NovaRoot] and adds the actions that need an Activity on top of
@@ -140,14 +142,15 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             val state by viewModel.state.collectAsStateWithLifecycle()
-            val dark = when (state.settings.settings.themeMode) {
-                ThemeMode.DARK -> true
-                ThemeMode.LIGHT -> false
-                ThemeMode.SYSTEM -> isSystemInDarkTheme()
+            // One dark theme: light (white) system bar icons on clear bars, except where a page
+            // asks for dark ones over a bright picture (the Home hero, see LocalStatusBarIcons).
+            LaunchedEffect(Unit) { applySystemBarStyle(dark = true) }
+            CompositionLocalProvider(
+                LocalStatusBarIcons provides { darkIcons -> setDarkStatusBarIcons(darkIcons) },
+                LocalHeroPreviewEnabled provides true,
+            ) {
+                NovaRoot(state = state, actions = actions)
             }
-            // System bar icons follow the app's theme, which need not match the system's.
-            LaunchedEffect(dark) { applySystemBarStyle(dark) }
-            NovaRoot(state = state, actions = actions)
         }
         lifecycleScope.launch {
             // Queues resolve in the background (folder, season, playlist); play each one once.
@@ -169,6 +172,10 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         // Access can change in system settings while the app is in the background.
         viewModel.onPermissionsChanged()
+    }
+
+    private fun setDarkStatusBarIcons(dark: Boolean) {
+        WindowCompat.getInsetsController(window, window.decorView).isAppearanceLightStatusBars = dark
     }
 
     private fun applySystemBarStyle(dark: Boolean) {

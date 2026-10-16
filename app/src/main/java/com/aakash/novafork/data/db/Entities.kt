@@ -196,6 +196,28 @@ data class MetadataEntity(
     /** Shows only: JSON object season number → poster path (or URL), e.g. {"1":"/a.jpg","2":"/b.jpg"}. */
     val seasonPostersJson: String? = null,
     val updatedAt: Long = 0,
+    /** TMDB's best poster without text (schema version 5), for the tall Home hero; null = none. */
+    val textlessPosterPath: String? = null,
+    /**
+     * Top-billed cast, comma-separated (version 5), for search. Null = not fetched yet (rows from
+     * before version 5 are fetched again); "" = TMDB lists none.
+     */
+    val castNames: String? = null,
+    /** Directors (movies) or creators (shows), comma-separated (version 5), for search. */
+    val directors: String? = null,
+)
+
+/**
+ * A poster or backdrop the user picked for a movie or show in "Change artwork" (schema version 5).
+ * Kept apart from [MetadataEntity] so refreshing the metadata never undoes the choice. Paths are
+ * TMDB paths ("/abc.jpg"); null = TMDB's default.
+ */
+@Entity(tableName = "artwork_choices")
+data class ArtworkChoiceEntity(
+    /** [MetadataEntity.key]. */
+    @PrimaryKey val metadataKey: String,
+    val posterPath: String? = null,
+    val backdropPath: String? = null,
 )
 
 /** Remembers TMDB lookups by normalised query so every episode of a show costs one search. */

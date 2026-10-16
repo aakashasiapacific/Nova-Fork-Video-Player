@@ -49,7 +49,7 @@ import com.aakash.novafork.ui.model.LibraryFilter
 import com.aakash.novafork.ui.model.LibraryItemUi
 import com.aakash.novafork.ui.model.LibrarySort
 import com.aakash.novafork.ui.model.LibraryUi
-import com.aakash.novafork.ui.model.TopDestination
+import com.aakash.novafork.ui.model.Route
 
 /**
  * Library. Landscape: list-detail (poster grid + preview pane driven by [AppActions.preview]).
@@ -314,7 +314,7 @@ private fun LibraryEmpty(filter: LibraryFilter, actions: AppActions, modifier: M
                 actionLabel = "Add a folder",
                 onAction = actions::addFolder,
                 secondaryLabel = "Browse sources",
-                onSecondary = { actions.selectTab(TopDestination.BROWSE) },
+                onSecondary = { actions.navigate(Route.Browse) },
             )
         } else {
             val title = when (filter) {

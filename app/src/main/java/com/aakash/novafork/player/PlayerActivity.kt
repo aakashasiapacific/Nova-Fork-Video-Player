@@ -8,11 +8,11 @@ import android.content.ServiceConnection
 import android.content.pm.ActivityInfo
 import android.content.res.Configuration
 import android.media.AudioManager
-import android.os.Build
 import android.os.Bundle
 import android.os.IBinder
 import android.os.PowerManager
 import android.util.Log
+import android.view.KeyEvent
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
@@ -49,6 +49,9 @@ import org.videolan.libvlc.util.VLCVideoLayout
 class PlayerActivity : ComponentActivity(), PlayerController.Host {
 
     private var service: PlaybackService? = null
+
+    /** The last volume key down went to the player's indicator; its key up is swallowed too. */
+    private var volumeKeyHandled = false
     private val connected = MutableStateFlow<PlayerController?>(null)
     private val controller: PlayerController? get() = connected.value
     private var bound = false
@@ -305,17 +308,31 @@ class PlayerActivity : ComponentActivity(), PlayerController.Host {
         if (hasFocus) hideSystemBars()
     }
 
-    override fun onUserLeaveHint() {
-        super.onUserLeaveHint()
-        val current = controller ?: return
-        // Android 12+ enters PiP by itself (auto-enter is on while playing without background audio).
-        if (
-            Build.VERSION.SDK_INT < Build.VERSION_CODES.S && !pickingSubtitle &&
-            current.state.value.isPlaying && !current.continuesInBackground && !current.isCasting
-        ) {
-            pip.enter()
+    /**
+     * The volume keys change the media volume with the player's own iOS-style indicator instead
+     * of the system's panel; in picture-in-picture (or before the player is connected) the
+     * system handles them as usual.
+     */
+    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
+        if (isVolumeKey(keyCode) && !isInPictureInPictureMode && controller?.onVolumeKey(keyCode) == true) {
+            volumeKeyHandled = true
+            return true
         }
+        return super.onKeyDown(keyCode, event)
     }
+
+    override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {
+        // The release of a key the player took, so the system doesn't act on it (a click sound, its panel).
+        if (isVolumeKey(keyCode) && volumeKeyHandled) {
+            volumeKeyHandled = false
+            return true
+        }
+        return super.onKeyUp(keyCode, event)
+    }
+
+    private fun isVolumeKey(keyCode: Int): Boolean =
+        keyCode == KeyEvent.KEYCODE_VOLUME_UP || keyCode == KeyEvent.KEYCODE_VOLUME_DOWN ||
+            keyCode == KeyEvent.KEYCODE_VOLUME_MUTE
 
     override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: Configuration) {
         super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
@@ -397,7 +414,9 @@ class PlayerActivity : ComponentActivity(), PlayerController.Host {
         pip.update(
             playing = playing,
             videoSize = current.videoSize.value,
-            autoEnter = playing && !current.continuesInBackground && !current.isCasting,
+            // Leaving the player pauses (or plays on in the background when that is wanted); it
+            // never turns into a picture-in-picture window by itself: the PiP button does that.
+            autoEnter = false,
         )
     }
 

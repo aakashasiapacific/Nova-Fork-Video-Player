@@ -1,5 +1,6 @@
 package com.aakash.novafork.ui.phone
 
+import androidx.annotation.DrawableRes
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
@@ -35,10 +36,14 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -51,11 +56,16 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.coerceAtMost
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.currentStateAsState
 import com.aakash.novafork.R
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
 import com.aakash.novafork.ui.common.BackdropArt
 import com.aakash.novafork.ui.common.DeviceAccessCard
 import com.aakash.novafork.ui.common.EmptyState
+import com.aakash.novafork.ui.common.LocalHeroPreviewEnabled
+import com.aakash.novafork.ui.common.LocalStatusBarIcons
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.RatingPill
 import com.aakash.novafork.ui.common.ScanBanner
@@ -64,27 +74,30 @@ import com.aakash.novafork.ui.common.VideoMenuBox
 import com.aakash.novafork.ui.common.bottomScrim
 import com.aakash.novafork.ui.common.deviceAccessNotice
 import com.aakash.novafork.ui.common.metaLine
+import com.aakash.novafork.ui.common.rememberTopBrightness
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.DialogUi
 import com.aakash.novafork.ui.model.HeroTarget
 import com.aakash.novafork.ui.model.HeroUi
 import com.aakash.novafork.ui.model.HomeUi
 import com.aakash.novafork.ui.model.LibraryFilter
+import com.aakash.novafork.ui.model.LibraryItemUi
 import com.aakash.novafork.ui.model.PermissionUi
 import com.aakash.novafork.ui.model.Route
 import com.aakash.novafork.ui.model.ScanUi
 import com.aakash.novafork.ui.model.ShowCardUi
-import com.aakash.novafork.ui.model.TopDestination
 import com.aakash.novafork.ui.model.VideoCardUi
 import com.aakash.novafork.ui.theme.NovaColors
 import kotlinx.coroutines.delay
 
-private val HomeTopBarHeight = 56.dp
+/** The hero's share of the screen height in portrait (Apple TV: about 80–82%). */
+private const val HERO_HEIGHT_FRACTION = 0.8f
 
-/** Space below the hero art taken by the title block (it overlaps the art's faded bottom). */
-private val HeroTextOverhang = 72.dp
+/** Scrolled less than this, the hero counts as on screen. */
+private const val HERO_VISIBLE_SCROLL_PX = 600
 
-private const val HERO_AUTO_ADVANCE_MS = 7_000L
+/** A top of the hero brighter than this gets dark status bar icons. */
+private const val BRIGHT_TOP = 0.62f
 
 @Composable
 fun PhoneHomeScreen(
@@ -94,14 +107,11 @@ fun PhoneHomeScreen(
     actions: AppActions,
     modifier: Modifier = Modifier,
 ) {
-    val indicatorTop = if (home.isEmpty) 0.dp else HomeTopBarHeight
     PhonePullToRefresh(
         scanning = scan.running,
         onRefresh = actions::refresh,
         modifier = modifier.fillMaxSize(),
-        indicatorModifier = Modifier
-            .statusBarsPadding()
-            .padding(top = indicatorTop),
+        indicatorModifier = Modifier.statusBarsPadding(),
     ) {
         if (home.isEmpty) {
             HomeOnboarding(scan = scan, permission = permission, actions = actions)
@@ -120,9 +130,24 @@ private fun HomeFeed(home: HomeUi, scan: ScanUi, permission: PermissionUi, actio
     val dims = LocalNovaDimens.current
     val listState = rememberLazyListState()
     val hasHero = home.hero.isNotEmpty()
+    val pagerState = rememberPagerState { home.hero.size }
+    // Short clips play with sound; the hero's mute button silences them.
+    var muted by rememberSaveable { mutableStateOf(false) }
+    val previewEnabled = LocalHeroPreviewEnabled.current
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    val lifecycleState by lifecycle.currentStateAsState()
+    // The hero is (mostly) on screen: previews play and the status bar follows its picture.
+    val heroOnScreen by remember(listState) {
+        derivedStateOf { listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset < HERO_VISIBLE_SCROLL_PX }
+    }
+    val resumed = lifecycleState.isAtLeast(Lifecycle.State.RESUMED)
+    HeroStatusBar(
+        hero = home.hero.getOrNull(pagerState.settledPage),
+        active = hasHero && heroOnScreen,
+    )
     BoxWithConstraints(Modifier.fillMaxSize()) {
-        // Keeps the hero from swallowing the whole screen on a phone in landscape.
-        val maxHeroArtHeight = if (constraints.hasBoundedHeight) maxHeight * 0.7f else Dp.Infinity
+        // Apple TV's hero is about 80% of the screen; in landscape it leaves room to see a row.
+        val heroHeight = if (maxWidth > maxHeight) maxHeight * 0.85f else maxHeight * HERO_HEIGHT_FRACTION
         LazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize(),
@@ -130,14 +155,20 @@ private fun HomeFeed(home: HomeUi, scan: ScanUi, permission: PermissionUi, actio
         ) {
             if (hasHero) {
                 item(key = "hero", contentType = "hero") {
-                    HeroPager(heroes = home.hero, maxArtHeight = maxHeroArtHeight, actions = actions)
+                    PhoneHeroPager(
+                        heroes = home.hero,
+                        height = heroHeight,
+                        pagerState = pagerState,
+                        previewEnabled = previewEnabled,
+                        previewAllowed = heroOnScreen && resumed,
+                        muted = muted,
+                        onToggleMute = { muted = !muted },
+                        actions = actions,
+                    )
                 }
             } else {
                 item(key = "top", contentType = "top") {
-                    Column(Modifier.statusBarsPadding()) {
-                        Spacer(Modifier.height(HomeTopBarHeight))
-                        ScanBanner(scan)
-                    }
+                    Spacer(Modifier.statusBarsPadding().height(16.dp))
                 }
             }
             val deviceNotice = deviceAccessNotice(permission)
@@ -159,6 +190,13 @@ private fun HomeFeed(home: HomeUi, scan: ScanUi, permission: PermissionUi, actio
                     }
                 }
             }
+            if (home.watchlist.isNotEmpty()) {
+                item(key = "watchlist", contentType = "posterRow") {
+                    HomeSection(title = "Watchlist") {
+                        ItemPosterRow(home.watchlist, actions)
+                    }
+                }
+            }
             if (home.recentlyAdded.isNotEmpty()) {
                 item(key = "recent", contentType = "posterRow") {
                     HomeSection(title = "Recently added") {
@@ -168,246 +206,93 @@ private fun HomeFeed(home: HomeUi, scan: ScanUi, permission: PermissionUi, actio
             }
             if (home.movies.isNotEmpty()) {
                 item(key = "movies", contentType = "posterRow") {
-                    HomeSection(
-                        title = "Movies",
-                        onSeeAll = { actions.seeAll(LibraryFilter.MOVIES) },
-                    ) {
+                    HomeSection(title = "Movies", onSeeAll = { actions.seeAll(LibraryFilter.MOVIES) }) {
                         VideoPosterRow(home.movies, actions)
                     }
                 }
             }
             if (home.shows.isNotEmpty()) {
                 item(key = "shows", contentType = "posterRow") {
-                    HomeSection(
-                        title = "TV shows",
-                        onSeeAll = { actions.seeAll(LibraryFilter.SHOWS) },
-                    ) {
+                    HomeSection(title = "TV shows", onSeeAll = { actions.seeAll(LibraryFilter.SHOWS) }) {
                         ShowPosterRow(home.shows, actions)
                     }
                 }
             }
             if (home.videos.isNotEmpty()) {
                 item(key = "videos", contentType = "posterRow") {
-                    HomeSection(
-                        title = "Videos",
-                        onSeeAll = { actions.seeAll(LibraryFilter.VIDEOS) },
-                    ) {
+                    HomeSection(title = "Videos", onSeeAll = { actions.seeAll(LibraryFilter.VIDEOS) }) {
                         VideoPosterRow(home.videos, actions)
                     }
                 }
             }
+            item(key = "library", contentType = "library") {
+                LibraryEntry(actions)
+            }
         }
-        HomeTopBar(
-            listState = listState,
-            overHero = hasHero,
+        ScanBanner(
             scan = scan,
-            onSearch = { actions.navigate(Route.Search) },
-            modifier = Modifier.align(Alignment.TopCenter),
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .statusBarsPadding(),
         )
     }
-}
-
-private fun AppActions.seeAll(filter: LibraryFilter) {
-    selectTab(TopDestination.LIBRARY)
-    setLibraryFilter(filter)
 }
 
 /**
- * Wordmark and search floating over the hero. It starts transparent (with a soft shade for the
- * status bar) and turns into a solid bar once the hero scrolls away.
+ * Dark status bar icons over a bright top of the hero picture, light ones everywhere else (the
+ * page is black). Light again when the hero scrolls away or Home is left.
  */
 @Composable
-private fun HomeTopBar(
-    listState: LazyListState,
-    overHero: Boolean,
-    scan: ScanUi,
-    onSearch: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val dims = LocalNovaDimens.current
-    val solidAfterPx = with(LocalDensity.current) { 160.dp.toPx() }
-    val scrolled by remember(listState, solidAfterPx) {
-        derivedStateOf {
-            listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > solidAfterPx
-        }
-    }
-    val solid = !overHero || scrolled
-    val solidness by animateFloatAsState(if (solid) 1f else 0f, label = "homeTopBar")
-    val background = MaterialTheme.colorScheme.background
-    val iconTint = if (solid) MaterialTheme.colorScheme.onBackground else Color.White
-    Column(
-        modifier
-            .fillMaxWidth()
-            .drawBehind {
-                drawRect(
-                    Brush.verticalGradient(
-                        listOf(Color.Black.copy(alpha = 0.55f * (1f - solidness)), Color.Transparent),
-                    ),
-                )
-                drawRect(background.copy(alpha = 0.96f * solidness))
-            },
-    ) {
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .statusBarsPadding()
-                .height(HomeTopBarHeight)
-                .padding(start = dims.gutter, end = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = "Nova Fork",
-                style = MaterialTheme.typography.titleLarge.copy(
-                    fontWeight = FontWeight.ExtraBold,
-                    brush = Brush.horizontalGradient(listOf(NovaColors.Amber, NovaColors.Coral)),
-                ),
-                modifier = Modifier.weight(1f),
-            )
-            IconButton(onClick = onSearch) {
-                NovaIcon(R.drawable.ic_search, contentDescription = "Search", tint = iconTint)
-            }
-        }
-        // Without a hero the banner lives in the list, so it never covers the first row.
-        if (overHero) ScanBanner(scan, Modifier.background(background.copy(alpha = 0.85f)))
-    }
+private fun HeroStatusBar(hero: HeroUi?, active: Boolean) {
+    val setDarkIcons = LocalStatusBarIcons.current
+    val brightness = rememberTopBrightness(
+        hero?.artwork?.let { it.backdropUrl ?: it.stillUrl ?: it.posterUrl }.takeIf { active },
+    )
+    val dark = active && (brightness ?: 0f) > BRIGHT_TOP
+    LaunchedEffect(dark) { setDarkIcons(dark) }
+    DisposableEffect(Unit) { onDispose { setDarkIcons(false) } }
 }
 
-// ---------------------------------------------------------------------------------------------
-// Hero
-// ---------------------------------------------------------------------------------------------
-
+/** The way into the whole library, at the end of the feed (Library left the tab bar). */
 @Composable
-private fun HeroPager(heroes: List<HeroUi>, maxArtHeight: Dp, actions: AppActions) {
-    val pagerState = rememberPagerState { heroes.size }
-    val dragged by pagerState.interactionSource.collectIsDraggedAsState()
-    // Restarts on every settle, so a manual swipe also resets the 7 s timer.
-    LaunchedEffect(pagerState, dragged, pagerState.settledPage, heroes.size) {
-        if (dragged || heroes.size < 2) return@LaunchedEffect
-        delay(HERO_AUTO_ADVANCE_MS)
-        pagerState.animateScrollToPage((pagerState.currentPage + 1) % heroes.size)
-    }
-    Column(Modifier.fillMaxWidth()) {
-        BoxWithConstraints(Modifier.fillMaxWidth()) {
-            val artHeight = (maxWidth * 0.62f + 80.dp).coerceAtMost(maxArtHeight)
-            HorizontalPager(state = pagerState, modifier = Modifier.fillMaxWidth()) { page ->
-                val hero = heroes.getOrNull(page)
-                if (hero != null) HeroPage(hero = hero, artHeight = artHeight, actions = actions)
-            }
-        }
-        if (heroes.size > 1) {
-            PagerDots(
-                count = heroes.size,
-                current = pagerState.currentPage,
-                modifier = Modifier
-                    .align(Alignment.CenterHorizontally)
-                    .padding(top = 14.dp),
-            )
-        }
+private fun LibraryEntry(actions: AppActions) {
+    val dims = LocalNovaDimens.current
+    Column(Modifier.fillMaxWidth().padding(top = dims.sectionSpacing)) {
+        SectionHeader(
+            title = "Library",
+            modifier = Modifier.padding(start = dims.gutter, end = 4.dp, bottom = 4.dp),
+        )
+        LibraryLink(R.drawable.ic_video_library, "All videos") { actions.openLibrary(LibraryFilter.ALL) }
+        LibraryLink(R.drawable.ic_movie, "Movies") { actions.openLibrary(LibraryFilter.MOVIES) }
+        LibraryLink(R.drawable.ic_tv, "TV shows") { actions.openLibrary(LibraryFilter.SHOWS) }
+        LibraryLink(R.drawable.ic_video_file, "Videos") { actions.openLibrary(LibraryFilter.VIDEOS) }
+        LibraryLink(R.drawable.ic_folder, "Folders, sources and playlists") { actions.navigate(Route.Browse) }
     }
 }
 
 @Composable
-private fun HeroPage(hero: HeroUi, artHeight: Dp, actions: AppActions) {
+private fun LibraryLink(@DrawableRes icon: Int, label: String, onClick: () -> Unit) {
     val dims = LocalNovaDimens.current
-    val openTarget: () -> Unit = {
-        when (val target = hero.target) {
-            is HeroTarget.Video -> actions.openVideo(target.id)
-            is HeroTarget.Show -> actions.openShow(target.key)
-        }
-    }
-    val play: () -> Unit = {
-        val videoId = hero.playVideoId
-        if (videoId != null) actions.play(videoId) else openTarget()
-    }
-    Box(
+    Row(
         Modifier
             .fillMaxWidth()
-            .height(artHeight + HeroTextOverhang),
+            .clickable(onClick = onClick)
+            .padding(horizontal = dims.gutter, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        BackdropArt(
-            artwork = hero.artwork,
+        NovaIcon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(
+            label,
+            style = MaterialTheme.typography.titleMedium,
             modifier = Modifier
-                .fillMaxWidth()
-                .height(artHeight)
-                .bottomScrim(MaterialTheme.colorScheme.background, startFraction = 0.4f)
-                .clickable(onClickLabel = "Details", onClick = openTarget),
+                .padding(start = 16.dp)
+                .weight(1f),
         )
-        Column(
-            Modifier
-                .align(Alignment.BottomStart)
-                .fillMaxWidth()
-                .padding(horizontal = dims.gutter),
-        ) {
-            Text(
-                text = hero.title,
-                style = MaterialTheme.typography.headlineMedium,
-                color = MaterialTheme.colorScheme.onBackground,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-            val rating = hero.rating
-            val meta = hero.metaLine
-            val hasRating = rating != null && rating > 0f
-            if (hasRating || !meta.isNullOrBlank()) {
-                Row(
-                    Modifier.padding(top = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    RatingPill(rating)
-                    if (!meta.isNullOrBlank()) {
-                        Text(
-                            text = meta,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                }
-            }
-            Spacer(Modifier.height(16.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Button(
-                    onClick = play,
-                    modifier = Modifier.widthIn(max = 240.dp),
-                    contentPadding = ButtonDefaults.ButtonWithIconContentPadding,
-                ) {
-                    ButtonContent(R.drawable.ic_play_arrow, hero.playLabel)
-                }
-                FilledTonalButton(
-                    onClick = openTarget,
-                    contentPadding = ButtonDefaults.ButtonWithIconContentPadding,
-                ) {
-                    ButtonContent(R.drawable.ic_info, "Info")
-                }
-            }
-        }
+        NovaIcon(R.drawable.ic_chevron_right, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
-@Composable
-private fun PagerDots(count: Int, current: Int, modifier: Modifier = Modifier) {
-    Row(
-        modifier,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        repeat(count) { index ->
-            val selected = index == current
-            val width by animateDpAsState(if (selected) 18.dp else 6.dp, label = "pagerDot")
-            Box(
-                Modifier
-                    .height(6.dp)
-                    .width(width)
-                    .clip(CircleShape)
-                    .background(
-                        if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.28f),
-                    ),
-            )
-        }
-    }
-}
+private fun AppActions.seeAll(filter: LibraryFilter) = openLibrary(filter)
 
 // ---------------------------------------------------------------------------------------------
 // Rows
@@ -467,6 +352,31 @@ private fun VideoPosterRow(cards: List<VideoCardUi>, actions: AppActions) {
                     onClick = { actions.openVideo(card.id) },
                     modifier = Modifier.width(dims.posterWidth),
                     onLongClick = openMenu,
+                )
+            }
+        }
+    }
+}
+
+/** Movies, shows and videos mixed (the watchlist). */
+@Composable
+private fun ItemPosterRow(items: List<LibraryItemUi>, actions: AppActions) {
+    val dims = LocalNovaDimens.current
+    LazyRow(
+        contentPadding = PaddingValues(horizontal = dims.gutter),
+        horizontalArrangement = Arrangement.spacedBy(dims.rowSpacing),
+    ) {
+        items(items, key = { it.key }) { item ->
+            when (item) {
+                is LibraryItemUi.Video -> PhonePosterCard(
+                    card = item.card,
+                    onClick = { actions.openVideo(item.card.id) },
+                    modifier = Modifier.width(dims.posterWidth),
+                )
+                is LibraryItemUi.Show -> PhoneShowCard(
+                    show = item.card,
+                    onClick = { actions.openShow(item.card.key) },
+                    modifier = Modifier.width(dims.posterWidth),
                 )
             }
         }
