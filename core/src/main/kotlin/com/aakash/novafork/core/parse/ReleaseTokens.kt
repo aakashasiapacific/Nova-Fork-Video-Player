@@ -98,7 +98,9 @@ internal object ReleaseTokens {
     private val YEAR: Pattern = Pattern.compile("\\d{4}$END")
     private val PAREN_YEAR: Pattern = Pattern.compile("\\(\\d{4}\\)")
 
-    private val BRACKETS = Regex("\\[([^\\[\\]]*)]|\\{([^{}]*)}|【([^【】]*)】")
+    // Every literal bracket and brace is escaped: Android's regex engine (ICU) rejects a bare "}" or
+    // "{" that the JVM accepts, and a pattern that fails to compile breaks every scan on the phone.
+    private val BRACKETS = Regex("\\[([^\\[\\]]*)\\]|\\{([^\\{\\}]*)\\}|【([^【】]*)】")
     private val PARENS = Regex("\\(([^()]*)\\)")
     private val SPACES = Regex("\\s+")
     private val GROUP_SUFFIX = Regex("^(.{2,}?)-([A-Z0-9]{2,})$")

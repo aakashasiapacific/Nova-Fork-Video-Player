@@ -40,6 +40,8 @@ separate phone and tablet UIs. This file is for a new Claude session picking the
   }
   ```
   Then run `/opt/gradle/bin/gradle :core:test --no-daemon -q`.
+- **Regexes:** escape every literal `[ ] { }`. Android uses ICU, which is stricter than the JVM (see
+  `tools/regex-check/`, which CI runs).
 - **App code must be compile-exact.** Use explicit imports and real signatures, and grep the repo for
   existing patterns. libVLC is pinned at 3.7.2, because 3.7.3+ needs Kotlin 2.2.
 - **Room.** The schema is exported to `app/schemas/`; the database is now at version 3, with manual
@@ -67,35 +69,25 @@ Each feature round had independent reviews and a fix pass.
 
 ## Open items, most urgent first
 
-1. **Bug: videos without posters never appear** (owner's Galaxy S21 FE, Android 14/15).
-   - **What the owner reports:**
-     - Photos and videos permission = **"Allow all"**.
-     - Browse › Device storage shows **0 videos**.
-     - Only picked folders worked; their movies have TMDB posters.
-     - Force stop doesn't help.
-   - **What the newest screenshots show** (build 23):
-     - Home shows the **empty onboarding** ("Your videos, with posters" / Scan again), so the app thinks the
-       whole library is empty.
-     - No "can't see your videos" card, so the app believes it has full access.
-     - The owner then added the picked folder `snaptube/download/SnapTube Video`, which holds a 173 MB
-       "How GDP is …" video. The screenshot was taken right after the "scanning" snackbar, so the result
-       is unknown.
-   - **Already shipped, but unproven on the device:**
-     - Android/media is no longer skipped.
-     - The Library filter resets.
-     - All files access counts as video access.
-     - Scans have time limits.
-     - Phone Browse has pull-to-refresh.
-     - Access cards are shown.
-   - **Next step:** the owner should paste the **Library diagnostics** report (Settings › About › Library
-     diagnostics › Copy). It shows:
-     - the MediaStore census (total, kept, dropped by reason, top folders);
-     - per-source counts, last scan and last error.
-     Fix the exact failing step that report shows, and prove the fix with a test. Don't guess again.
-   - **Also ask the owner** whether they uninstalled or cleared data. Earlier poster videos vanished from
-     Home, which would happen on a fresh install. Otherwise the UI state pipeline is suspect:
-     `MainViewModel.state` is a `combine(...)` seeded with an empty `AppUiState` whose `isEmpty`
-     defaults to true.
+1. **Bug: videos without posters never appear. Root cause found and fixed; waiting for the owner's
+   confirmation.**
+   - **What the owner's Library diagnostics report showed** (Android 16, API 36):
+     - Every scan failed after 0.1 s with `ExceptionInInitializerError` in
+       `core.parse.ReleaseTokens`.
+     - Its `BRACKETS` regex had an unescaped `}`. The JVM's regex engine accepts that; Android's engine
+       (ICU) rejects it with `U_REGEX_RULE_SYNTAX`.
+     - So on phones the file-name parser never loaded and no scan ever finished, since the first version.
+   - **The fix:** escape every literal bracket and brace.
+   - **Proof:** all 64 patterns in the app now compile with ICU 74.
+   - **Guard against a repeat:** `tools/regex-check/run.sh` compiles every static Pattern/Regex with ICU,
+     and CI now fails if Android would reject one.
+   - **Report details:**
+     - READ_MEDIA_VIDEO is *denied* and All files access is *allowed* (the owner was looking at the wrong
+       setting).
+     - Since build 23 the app counts All files access as full access.
+     - MediaStore lists only 2 videos on the phone: one in WhatsApp Video and one in
+       `snaptube/download/SnapTube Video`.
+   - **If anything is still wrong,** ask for a new Library diagnostics report (Settings › About).
 2. **Apple TV-style UI redesign.**
    - The owner wants a "complete ditto" of the Apple TV app (Android/iOS). Their brother will send iPhone
      screenshots and recordings. Update `docs/APPLE-TV-SPEC.md` from them.

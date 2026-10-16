@@ -31,6 +31,13 @@ jobs:
           set -o pipefail
           gradle :core:test assembleRelease --no-daemon --stacktrace 2>&1 | tee build.log
 
+      # The JVM's regex engine accepts patterns that Android's (ICU) rejects; one such pattern broke
+      # every library scan on phones while all tests passed. This compiles every pattern with ICU.
+      - name: Check regexes with Android's regex engine
+        run: |
+          set -o pipefail
+          bash tools/regex-check/run.sh 2>&1 | tee -a build.log
+
       - name: Publish failure log
         if: failure()
         run: |
