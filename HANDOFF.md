@@ -6,12 +6,19 @@ separate phone and tablet UIs. This file is for a new Claude session picking the
 ## Where things are
 
 - **Repo:** `aakashasiapacific/Nova-Fork-Video-Player`
-- **Branch:** `ccr-d205f787-t31r46` (PR #1); the audio engine and player volume work is on `ccr-987fc293-7gnds9` (PR #2, into PR #1's branch)
-- **PR:** #1 (draft): https://github.com/aakashasiapacific/Nova-Fork-Video-Player/pull/1
+- **Branches and PRs:**
+  - `ccr-987fc293-7gnds9` is the newest work: the audio engine, the player volume change and these
+    docs. Its PR is #2 (draft), which merges into `ccr-d205f787-t31r46`:
+    https://github.com/aakashasiapacific/Nova-Fork-Video-Player/pull/2
+  - `ccr-d205f787-t31r46` holds everything before that. Its PR is #1 (draft), into the default branch:
+    https://github.com/aakashasiapacific/Nova-Fork-Video-Player/pull/1
+  - A new session builds on `ccr-987fc293-7gnds9` (or on its own branch started from it) and watches
+    PR #2. The previous session stopped watching both PRs.
 - **Latest APK** (always the newest CI build, arm64 for the owner's Galaxy S21 FE):
   https://github.com/aakashasiapacific/Nova-Fork-Video-Player/raw/apk/NovaFork-latest-arm64-v8a.apk
 - **Docs:** `docs/ARCHITECTURE.md` (modules, contracts, toolchain: read it before coding) and
-  `docs/APPLE-TV-SPEC.md` (target UI spec).
+  `docs/APPLE-TV-SPEC.md` (target UI spec), and `docs/REDESIGN-IDEAS.md` (the owner's decisions,
+  which come before the spec).
 - **Last green build:** CI run 28 at `afa0c35` (branch `ccr-987fc293-7gnds9`, PR #2). 308 app tests and 394 core tests pass.
 
 ## Building and testing
@@ -26,8 +33,8 @@ separate phone and tablet UIs. This file is for a new Claude session picking the
 - **The `core` module (pure Kotlin/JVM) can be tested locally.** Make a small Gradle project anywhere
   (outside the repo), with this `settings.gradle.kts`:
   ```kotlin
-  pluginManagement { repositories { gradlePluginPortal(); mavenCentral() } }
-  dependencyResolutionManagement { repositories { mavenCentral() } }
+  pluginManagement { repositories { maven("https://maven-central.storage-download.googleapis.com/maven2/"); gradlePluginPortal() } }
+  dependencyResolutionManagement { repositories { maven("https://maven-central.storage-download.googleapis.com/maven2/") } }
   rootProject.name = "core-harness"
   include(":core")
   project(":core").projectDir = file("/home/user/nova-fork-video-player/core")
@@ -39,7 +46,8 @@ separate phone and tablet UIs. This file is for a new Claude session picking the
       id("org.jetbrains.kotlin.plugin.serialization") version "2.0.21" apply false
   }
   ```
-  Then run `/opt/gradle/bin/gradle :core:test --no-daemon -q`.
+  Then run `/opt/gradle/bin/gradle :core:test --no-daemon -q`. Use Google's mirror of Maven Central,
+  as above: Maven Central itself answers the container with "429 Too Many Requests".
 - **Regexes:** escape every literal `[ ] { }`. Android uses ICU, which is stricter than the JVM (see
   `tools/regex-check/`, which CI runs).
 - **App code must be compile-exact.** Use explicit imports and real signatures, and grep the repo for
@@ -82,6 +90,15 @@ on a device. `tools/regex-check/run.sh` now compiles every regex with ICU in CI,
 again unnoticed. The owner's phone has All files access but not READ_MEDIA_VIDEO; since build 23, All
 files access counts as full access.
 
+**Confirmed by the owner on build 28 (screenshot of Home):**
+- Live TMDB lookups work on the phone: posters, backdrops and ratings.
+- The library scan works.
+- Watched marks show.
+- The Audio tab is in the bottom bar.
+
+The owner hasn't yet reported on music playback, lyrics, the lock-screen controls or the new
+volume indicator.
+
 ## Open items, most urgent first
 
 1. **Apple TV-style UI redesign.** Read `docs/REDESIGN-IDEAS.md` first: it holds the owner's decisions, which come
@@ -99,17 +116,24 @@ files access counts as full access.
    - Chromecast;
    - network and media servers;
    - subtitle downloads;
-   - live TMDB lookups (TMDB is blocked from the container).
+   - the Audio tab (music scan, album art, lyrics), music in the background, and the music
+     notification;
+   - the player's iOS-style volume indicator and its volume-key handling.
+4. **Music not yet included in:** backup/restore (song-only playlists are left out of backups for
+   now), Library diagnostics, or search.
+5. **Ideas noted, not built:** see `docs/REDESIGN-IDEAS.md` for the full list. Sections 0–6 cover the
+   redesign; section 7 (the player's brightness and volume) is done.
 
 ## Working with the owner
 
 - **Usage limits.** The owner is on limited usage and doesn't want sessions burned:
   - Work only for the time they give, then stop: commit (`[skip ci]` if it's WIP), push, report, and wait.
-  - Prefer working solo. Multi-agent workflows used about 1–2.4M tokens per feature round, so run one
+  - Prefer working solo. For a big round, one independent review agent before or alongside CI
+    is fine; the owner agreed to that for the audio engine. Multi-agent workflows used about 1–2.4M tokens per feature round, so run one
     only when the owner agrees.
 - **Communication:**
   - Ask clarifying questions before long answers (the owner's stated preference).
   - Write in plain language and give the APK link after each green build.
   - Don't claim a fix works on their phone until the owner confirms it. Say what is proven (tests, CI)
     and what isn't.
-- After pushing, CI results arrive as PR #1 events. Check `apk` / `ci-logs` / `screens` to see the outcome.
+- After pushing, CI results arrive as events on the PR the session watches (PR #2 now). Check `apk` / `ci-logs` / `screens` to see the outcome.
