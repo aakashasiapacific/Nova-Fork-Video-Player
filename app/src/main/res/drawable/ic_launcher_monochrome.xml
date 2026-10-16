@@ -4,10 +4,16 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <path
-        android:fillColor="#FFFFFFFF"
-        android:pathData="M42,36.5C42,33.4 45.4,31.5 48,33.1L72.6,48.6C75.1,50.2 75.1,53.8 72.6,55.4L48,70.9C45.4,72.5 42,70.6 42,67.5Z" />
-    <path
-        android:fillColor="#FFFFFFFF"
-        android:pathData="M74,28C74.6,31.6 76.4,33.4 80,34C76.4,34.6 74.6,36.4 74,40C73.4,36.4 71.6,34.6 68,34C71.6,33.4 73.4,31.6 74,28Z" />
+    <!-- Themed icon (Android 13+): the same glyph in one colour. -->
+    <path android:fillType="evenOdd" android:fillColor="#FFFFFFFF" android:pathData="M38,33H70A11,11 0,0 1,81,44V58A11,11 0,0 1,70,69H38A11,11 0,0 1,27,58V44A11,11 0,0 1,38,33ZM38,39H70A5,5 0,0 1,75,44V58A5,5 0,0 1,70,63H38A5,5 0,0 1,33,58V44A5,5 0,0 1,38,39Z" />
+    <path android:fillColor="#FFFFFFFF" android:pathData="M45,72.5H63A3,3 0,0 1,66,75.5V75.5A3,3 0,0 1,63,78.5H45A3,3 0,0 1,42,75.5V75.5A3,3 0,0 1,45,72.5Z" />
+    <group
+        android:pivotX="57"
+        android:pivotY="52"
+        android:scaleX="0.40"
+        android:scaleY="0.40"
+        android:translateX="-2.2"
+        android:translateY="-1">
+        <path android:fillColor="#FFFFFFFF" android:pathData="M42,36.5C42,33.4 45.4,31.5 48,33.1L72.6,48.6C75.1,50.2 75.1,53.8 72.6,55.4L48,70.9C45.4,72.5 42,70.6 42,67.5Z" />
+    </group>
 </vector>

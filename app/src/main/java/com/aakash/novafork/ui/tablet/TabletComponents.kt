@@ -42,6 +42,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -67,6 +68,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -91,9 +93,9 @@ import com.aakash.novafork.ui.model.MediaKind
 import com.aakash.novafork.ui.model.ShowCardUi
 import com.aakash.novafork.ui.model.VideoCardUi
 import com.aakash.novafork.ui.theme.NovaColors
+import kotlin.math.roundToInt
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
-import kotlin.math.roundToInt
 
 // ---------------------------------------------------------------------------------------------
 // Insets and small helpers
@@ -279,17 +281,22 @@ internal fun TabletLoading(modifier: Modifier = Modifier) {
     }
 }
 
-/** The brand mark: amber → coral disc with a play glyph. */
+/** The brand mark: the launcher icon's look, a flat iOS-blue rounded square with the screen-and-play glyph. */
 @Composable
 internal fun BrandMark(modifier: Modifier = Modifier, size: Dp = 40.dp) {
     Box(
         modifier
             .size(size)
-            .clip(CircleShape)
-            .background(Brush.linearGradient(listOf(NovaColors.Amber, NovaColors.Coral))),
+            .clip(RoundedCornerShape(size * 0.24f))
+            .background(NovaColors.IosBlue),
         contentAlignment = Alignment.Center,
     ) {
-        NovaIcon(R.drawable.ic_play_arrow, contentDescription = null, tint = Color.White, modifier = Modifier.size(size * 0.6f))
+        Icon(
+            painterResource(R.drawable.ic_launcher_foreground),
+            contentDescription = null,
+            tint = Color.Unspecified,
+            modifier = Modifier.size(size * 1.5f),
+        )
     }
 }
 
