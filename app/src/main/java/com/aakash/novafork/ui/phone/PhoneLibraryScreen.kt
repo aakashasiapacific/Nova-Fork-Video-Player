@@ -10,10 +10,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.GridItemSpan
-import androidx.compose.foundation.lazy.grid.LazyGridState
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
@@ -42,11 +38,11 @@ import com.aakash.novafork.ui.common.ScanBanner
 import com.aakash.novafork.ui.common.VideoMenuBox
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.LibraryFilter
+import com.aakash.novafork.ui.model.LibraryItemUi
 import com.aakash.novafork.ui.model.LibrarySort
 import com.aakash.novafork.ui.model.LibraryUi
 import com.aakash.novafork.ui.model.Route
 import com.aakash.novafork.ui.model.ScanUi
-import com.aakash.novafork.ui.model.TimelineSectionUi
 
 @Composable
 fun PhoneLibraryScreen(
@@ -90,7 +86,8 @@ fun PhoneLibraryScreen(
             if (library.items.isEmpty()) {
                 LibraryEmpty(filter = library.filter, actions = actions)
             } else if (library.timeline.isNotEmpty()) {
-                PhoneTimelineGrid(sections = library.timeline, actions = actions, state = gridState)
+                // All videos, newest first, as one gapless grid (each card says when it arrived).
+                PhoneLibraryGrid(items = library.timeline.map { LibraryItemUi.Video(it) }, actions = actions, state = gridState)
             } else {
                 PhoneLibraryGrid(items = library.items, actions = actions, state = gridState)
             }
@@ -194,36 +191,3 @@ private fun emptyContentFor(filter: LibraryFilter): EmptyContent = when (filter)
         "Home videos, unidentified files and saved streams appear here.",
     )
 }
-
-/**
- * All videos as one endless timeline, newest first: a full-width date header ("Today",
- * "March 2026") above each group's posters.
- */
-@Composable
-private fun PhoneTimelineGrid(sections: List<TimelineSectionUi>, actions: AppActions, state: LazyGridState) {
-    val dims = LocalNovaDimens.current
-    LazyVerticalGrid(
-        columns = GridCells.Adaptive(dims.gridMinCell),
-        modifier = Modifier.fillMaxSize(),
-        state = state,
-        contentPadding = PaddingValues(start = dims.gutter, end = dims.gutter, top = 8.dp, bottom = dims.sectionSpacing + LocalBottomBarSpace.current),
-        horizontalArrangement = Arrangement.spacedBy(dims.rowSpacing),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        sections.forEachIndexed { index, section ->
-            item(key = "header:$index:${section.label}", span = { GridItemSpan(maxLineSpan) }, contentType = "header") {
-                Text(
-                    text = section.label,
-                    style = MaterialTheme.typography.titleLarge,
-                    modifier = Modifier.padding(top = if (index == 0) 4.dp else 16.dp),
-                )
-            }
-            items(section.videos, key = { "v:${it.id}" }, contentType = { "poster" }) { card ->
-                VideoMenuBox(videoId = card.id, title = card.displayTitle(), actions = actions, showDetails = false) { openMenu ->
-                    PhonePosterCard(card, onClick = { actions.openVideo(card.id) }, onLongClick = openMenu)
-                }
-            }
-        }
-    }
-}
-

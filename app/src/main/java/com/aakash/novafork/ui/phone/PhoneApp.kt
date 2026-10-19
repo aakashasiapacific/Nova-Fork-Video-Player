@@ -99,8 +99,8 @@ fun PhoneApp(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
     // (and other saveable state) for when the user comes back.
     val pageStates = rememberSaveableStateHolder()
     val top = state.route.top
-    // The tab bar shrinks while a page scrolls down and comes back when it scrolls up; a tab
-    // change always shows it in full.
+    // The tab bar shrinks while a page scrolls down and comes back when it scrolls up, reaches
+    // its end or the tab changes.
     var barCollapsed by remember { mutableStateOf(false) }
     LaunchedEffect(top) { barCollapsed = false }
     val collapseThreshold = with(LocalDensity.current) { BarCollapseScroll.toPx() }
@@ -108,6 +108,12 @@ fun PhoneApp(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
         object : NestedScrollConnection {
             var travel = 0f
             override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
+                // The end of the page: nothing below to make room for, so the full bar comes back.
+                if (available.y < 0f) {
+                    barCollapsed = false
+                    travel = 0f
+                    return Offset.Zero
+                }
                 val dy = consumed.y
                 if (dy == 0f) return Offset.Zero
                 travel = if (travel * dy < 0) dy else travel + dy

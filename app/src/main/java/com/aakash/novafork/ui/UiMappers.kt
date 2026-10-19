@@ -34,7 +34,6 @@ import com.aakash.novafork.ui.model.SearchUi
 import com.aakash.novafork.ui.model.SeasonUi
 import com.aakash.novafork.ui.model.ShowDetailsUi
 import com.aakash.novafork.ui.model.SourceUi
-import com.aakash.novafork.ui.model.TimelineSectionUi
 import com.aakash.novafork.ui.model.VideoCardUi
 import com.aakash.novafork.ui.model.VideoDetailsUi
 import java.time.Instant
@@ -240,32 +239,38 @@ object UiMappers {
         )
     }
 
-    /** Every video (episodes one by one), newest first, grouped by when it reached the device. */
-    private fun timeline(index: LibraryIndex, now: Long, zone: ZoneId): List<TimelineSectionUi> {
+    /**
+     * Every video (episodes one by one), newest first by when it reached the device, as one
+     * gapless grid: each card's second line says when it arrived ("Today · 2h 37m").
+     */
+    private fun timeline(index: LibraryIndex, now: Long, zone: ZoneId): List<VideoCardUi> {
         val today = Instant.ofEpochMilli(now).atZone(zone).toLocalDate()
         return index.videos
             .sortedWith(compareByDescending<IndexedVideo> { it.video.dateAdded }.thenBy(NaturalOrder) { it.sortKey })
-            .groupConsecutiveBy { timelineLabel(Instant.ofEpochMilli(it.video.dateAdded).atZone(zone).toLocalDate(), today) }
-            .map { (label, videos) -> TimelineSectionUi(label, videos.map { it.card }) }
+            .map { video ->
+                val card = video.card
+                val arrived = arrivedLabel(Instant.ofEpochMilli(video.video.dateAdded).atZone(zone).toLocalDate(), today)
+                // Episodes keep their "S1 · E4"; the rest show their length.
+                val detail = if (card.kind == MediaKind.EPISODE) card.subtitle else timelineDuration(card.durationMs)
+                card.copy(subtitle = joinMeta(arrived, detail))
+            }
     }
 
-    private fun <T, K> List<T>.groupConsecutiveBy(key: (T) -> K): List<Pair<K, List<T>>> {
-        val groups = mutableListOf<Pair<K, MutableList<T>>>()
-        for (item in this) {
-            val k = key(item)
-            if (groups.isEmpty() || groups.last().first != k) groups += k to mutableListOf()
-            groups.last().second += item
+    private fun timelineDuration(durationMs: Long?): String? {
+        if (durationMs == null || durationMs <= 0L) return null
+        return if (durationMs < 60_000L) Formats.clock(durationMs) else Formats.runtime(((durationMs + 30_000L) / 60_000L).toInt())
+    }
+
+    /** "Today", "Yesterday", a weekday this week, then "12 Mar", and "12 Mar 2024" for earlier years. */
+    internal fun arrivedLabel(day: LocalDate, today: LocalDate): String {
+        val month = day.month.getDisplayName(TextStyle.SHORT, Locale.getDefault())
+        return when {
+            !day.isBefore(today) -> "Today"
+            day == today.minusDays(1) -> "Yesterday"
+            day.isAfter(today.minusDays(7)) -> day.dayOfWeek.getDisplayName(TextStyle.FULL, Locale.getDefault())
+            day.year == today.year -> "${day.dayOfMonth} $month"
+            else -> "${day.dayOfMonth} $month ${day.year}"
         }
-        return groups
-    }
-
-    /** "Today", "Yesterday", "This week", then "October" for this year's months and "March 2024" before. */
-    internal fun timelineLabel(day: LocalDate, today: LocalDate): String = when {
-        !day.isBefore(today) -> "Today"
-        day == today.minusDays(1) -> "Yesterday"
-        day.isAfter(today.minusDays(7)) -> "This week"
-        day.year == today.year -> day.month.getDisplayName(TextStyle.FULL, Locale.getDefault())
-        else -> "${day.month.getDisplayName(TextStyle.FULL, Locale.getDefault())} ${day.year}"
     }
 
     private class Entry(

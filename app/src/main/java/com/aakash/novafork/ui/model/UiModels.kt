@@ -147,14 +147,12 @@ data class LibraryUi(
     val items: List<LibraryItemUi> = emptyList(),
     val counts: Map<LibraryFilter, Int> = emptyMap(),
     /**
-     * All videos newest first, by when they reached the device, in date groups ("Today",
-     * "March 2026"): what "All videos" shows when sorted by Recently added. Empty otherwise.
+     * Every video newest first, by when it reached the device, each card's second line saying
+     * when ("Today · 2h 37m"): what "All videos" shows when sorted by Recently added, as one
+     * gapless grid. Empty otherwise.
      */
-    val timeline: List<TimelineSectionUi> = emptyList(),
+    val timeline: List<VideoCardUi> = emptyList(),
 )
-
-@Immutable
-data class TimelineSectionUi(val label: String, val videos: List<VideoCardUi>)
 
 @Immutable
 data class VideoDetailsUi(

@@ -172,31 +172,31 @@ class UiMappersTest {
     }
 
     @Test
-    fun allVideosIsATimelineNewestFirst() {
+    fun allVideosIsAGaplessTimelineNewestFirst() {
         val utc = java.time.ZoneOffset.UTC
         val library = UiMappers.library(index, LibraryFilter.ALL, LibrarySort.RECENT, now = FakeLibrary.NOW, zone = utc)
-        val timeline = library.timeline.flatMap { it.videos }
         // Every video, episodes one by one, newest first.
-        assertEquals(index.videos.size, timeline.size)
-        val added = timeline.map { card -> index.videos.first { it.id == card.id }.video.dateAdded }
+        assertEquals(index.videos.size, library.timeline.size)
+        val added = library.timeline.map { card -> index.videos.first { it.id == card.id }.video.dateAdded }
         assertEquals(added.sortedDescending(), added)
-        assertTrue(library.timeline.first().label in setOf("Today", "Yesterday"))
-        // A label never repeats: groups are consecutive.
-        assertEquals(library.timeline.map { it.label }.distinct(), library.timeline.map { it.label })
+        // Each card says when it arrived: Dune came a day before "now".
+        val dune = requireNotNull(library.timeline.first { it.id == DUNE }.subtitle)
+        assertTrue(dune, dune.startsWith("Yesterday · 2h "))
         // Other sorts and filters are the plain grid.
         assertTrue(UiMappers.library(index, LibraryFilter.ALL, LibrarySort.TITLE).timeline.isEmpty())
         assertTrue(UiMappers.library(index, LibraryFilter.MOVIES, LibrarySort.RECENT).timeline.isEmpty())
     }
 
     @Test
-    fun timelineLabelsGoFromTodayToMonths() {
+    fun arrivalLabelsGoFromTodayToDates() {
         val today = java.time.LocalDate.of(2026, 10, 19)
-        assertEquals("Today", UiMappers.timelineLabel(today, today))
-        assertEquals("Yesterday", UiMappers.timelineLabel(today.minusDays(1), today))
-        assertEquals("This week", UiMappers.timelineLabel(today.minusDays(5), today))
-        val month = java.time.Month.MARCH.getDisplayName(java.time.format.TextStyle.FULL, java.util.Locale.getDefault())
-        assertEquals(month, UiMappers.timelineLabel(java.time.LocalDate.of(2026, 3, 2), today))
-        assertEquals("$month 2024", UiMappers.timelineLabel(java.time.LocalDate.of(2024, 3, 2), today))
+        assertEquals("Today", UiMappers.arrivedLabel(today, today))
+        assertEquals("Yesterday", UiMappers.arrivedLabel(today.minusDays(1), today))
+        val weekday = today.minusDays(5).dayOfWeek.getDisplayName(java.time.format.TextStyle.FULL, java.util.Locale.getDefault())
+        assertEquals(weekday, UiMappers.arrivedLabel(today.minusDays(5), today))
+        val march = java.time.Month.MARCH.getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.getDefault())
+        assertEquals("2 $march", UiMappers.arrivedLabel(java.time.LocalDate.of(2026, 3, 2), today))
+        assertEquals("2 $march 2024", UiMappers.arrivedLabel(java.time.LocalDate.of(2024, 3, 2), today))
     }
 
     @Test

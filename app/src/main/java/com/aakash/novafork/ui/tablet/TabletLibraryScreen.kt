@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
@@ -51,7 +50,6 @@ import com.aakash.novafork.ui.model.LibraryItemUi
 import com.aakash.novafork.ui.model.LibrarySort
 import com.aakash.novafork.ui.model.LibraryUi
 import com.aakash.novafork.ui.model.Route
-import com.aakash.novafork.ui.model.TimelineSectionUi
 
 /**
  * Library. Landscape: list-detail (poster grid + preview pane driven by [AppActions.preview]).
@@ -66,7 +64,8 @@ internal fun TabletLibraryScreen(
 ) {
     val dims = LocalNovaDimens.current
     val library = state.library
-    val items = library.items
+    // All videos sorted by Recently added: every video newest first, one gapless grid.
+    val items = if (library.timeline.isNotEmpty()) library.timeline.map { LibraryItemUi.Video(it) } else library.items
     val previewKey = state.previewKey
     val listDetail = layout.isExpanded
 
@@ -104,7 +103,6 @@ internal fun TabletLibraryScreen(
             ) {
                 LibraryGrid(
                     items = items,
-                    timeline = library.timeline,
                     selectedKey = previewKey,
                     // A second tap on the previewed title opens it.
                     onClick = { item -> if (item.key == previewKey) actions.openItem(item) else actions.preview(item) },
@@ -134,7 +132,6 @@ internal fun TabletLibraryScreen(
             }
             else -> LibraryGrid(
                 items = items,
-                timeline = library.timeline,
                 selectedKey = null,
                 onClick = { item -> actions.openItem(item) },
                 onLongClick = { item ->
@@ -261,8 +258,6 @@ private fun LibraryGrid(
     contentPadding: PaddingValues,
     actions: AppActions,
     modifier: Modifier = Modifier,
-    /** All videos newest first in date groups (see [com.aakash.novafork.ui.model.LibraryUi.timeline]); replaces [items]. */
-    timeline: List<TimelineSectionUi> = emptyList(),
 ) {
     val dims = LocalNovaDimens.current
     LazyVerticalGrid(
@@ -272,19 +267,8 @@ private fun LibraryGrid(
         horizontalArrangement = Arrangement.spacedBy(dims.rowSpacing),
         verticalArrangement = Arrangement.spacedBy(24.dp),
     ) {
-        if (timeline.isNotEmpty()) {
-            timeline.forEachIndexed { index, section ->
-                item(key = "header:$index:${section.label}", span = { GridItemSpan(maxLineSpan) }, contentType = "header") {
-                    Text(section.label, style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(top = if (index == 0) 0.dp else 8.dp))
-                }
-                items(section.videos.map { LibraryItemUi.Video(it) }, key = { it.key }, contentType = { "poster" }) { item ->
-                    LibraryGridCard(item, selectedKey, onClick, onLongClick, longClickLabel, actions)
-                }
-            }
-        } else {
-            items(items, key = { it.key }, contentType = { "poster" }) { item ->
-                LibraryGridCard(item, selectedKey, onClick, onLongClick, longClickLabel, actions)
-            }
+        items(items, key = { it.key }, contentType = { "poster" }) { item ->
+            LibraryGridCard(item, selectedKey, onClick, onLongClick, longClickLabel, actions)
         }
     }
 }
