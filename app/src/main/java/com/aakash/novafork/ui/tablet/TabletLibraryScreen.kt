@@ -193,7 +193,7 @@ private fun FilterChipRow(library: LibraryUi, onFilter: (LibraryFilter) -> Unit,
         verticalAlignment = Alignment.CenterVertically,
     ) {
         // "Videos" left the library (owner): unidentified files are in All videos' timeline.
-        (LibraryFilter.entries - LibraryFilter.VIDEOS).forEach { filter ->
+        LibraryFilter.entries.filter { it.isChip }.forEach { filter ->
             val selected = filter == library.filter
             val count = library.counts[filter]
             FilterChip(
@@ -335,6 +335,8 @@ private fun LibraryEmpty(filter: LibraryFilter, actions: AppActions, modifier: M
                 LibraryFilter.MOVIES -> "No movies yet"
                 LibraryFilter.SHOWS -> "No TV shows yet"
                 LibraryFilter.VIDEOS, LibraryFilter.ALL -> "No videos yet"
+                LibraryFilter.WATCHLIST -> "Your Watchlist is empty"
+                LibraryFilter.FAVORITES -> "No favorites yet"
             }
             EmptyState(
                 icon = R.drawable.ic_filter_list,

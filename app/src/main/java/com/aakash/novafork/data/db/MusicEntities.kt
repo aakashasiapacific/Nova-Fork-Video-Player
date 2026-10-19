@@ -108,3 +108,13 @@ data class FavoriteSongEntity(
     @PrimaryKey val songId: Long,
     val addedAt: Long,
 )
+
+/**
+ * A movie, show or video starred with the hero's star (schema version 8), keyed like
+ * [WatchlistEntity] ("v:<videoId>", "s:<showKey>").
+ */
+@Entity(tableName = "video_favorites")
+data class VideoFavoriteEntity(
+    @PrimaryKey val itemKey: String,
+    val addedAt: Long,
+)

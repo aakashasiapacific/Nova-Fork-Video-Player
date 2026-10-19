@@ -110,8 +110,12 @@ data class HeroUi(
      */
     val previewUri: String? = null,
     val previewStartMs: Long = 0,
+    /** The clip's width over height (a reel ≈ 0.56): the hero takes this shape for it. */
+    val previewAspect: Float? = null,
     /** On the watchlist (the "+" button shows a check). */
     val onWatchlist: Boolean = false,
+    /** Starred (the hero's star is filled). */
+    val favorite: Boolean = false,
 ) {
     /** The library item key ("v:<id>" / "s:<showKey>"), which the watchlist stores. */
     val itemKey: String
@@ -136,7 +140,20 @@ data class HomeUi(
     val isEmpty: Boolean = true,
 )
 
-enum class LibraryFilter(val label: String) { ALL("All"), MOVIES("Movies"), SHOWS("TV shows"), VIDEOS("Videos") }
+enum class LibraryFilter(val label: String) {
+    ALL("All"),
+    MOVIES("Movies"),
+    SHOWS("TV shows"),
+    VIDEOS("Videos"),
+
+    /** The hero's "+" list and its star list: their own Library pages, not filter chips. */
+    WATCHLIST("Watchlist"),
+    FAVORITES("Favorites"),
+    ;
+
+    /** Shown as a chip on the Library page (Videos left the library; the lists have pages). */
+    val isChip: Boolean get() = this == ALL || this == MOVIES || this == SHOWS
+}
 
 enum class LibrarySort(val label: String) { RECENT("Recently added"), TITLE("Title"), YEAR("Year"), RATING("Rating") }
 

@@ -154,6 +154,19 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
     private val watchlist: StateFlow<List<String>> =
         graph.music.observeWatchlist().stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
+    /** Starred movies, shows and videos, most recently starred first. */
+    private val videoFavorites: StateFlow<List<String>> =
+        graph.music.observeVideoFavorites().stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    private val favoritesMemo = Memo<Pair<LibraryIndex, List<String>>, List<LibraryItemUi>> { (index, keys) ->
+        if (keys.isEmpty()) {
+            emptyList()
+        } else {
+            val byKey = UiMappers.library(index, LibraryFilter.ALL, LibrarySort.RECENT).items.associateBy { it.key }
+            keys.mapNotNull { byKey[it] }
+        }
+    }
+
     /** The watchlist row's items, rebuilt when the library or the list changes. */
     private val watchlistMemo = Memo<Pair<LibraryIndex, List<String>>, List<LibraryItemUi>> { (index, keys) ->
         if (keys.isEmpty()) {
@@ -188,9 +201,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
         library.scanState,
         settingsStore.settings,
         local,
-        combine(playlists, musicLibrary, watchlist) { lists, music, saved -> Triple(lists, music, saved) },
-    ) { index, scan, settings, user, (lists, music, saved) ->
-        assemble(index, scan, settings, user, lists, music, saved)
+        combine(playlists, musicLibrary, watchlist, videoFavorites) { lists, music, saved, starred ->
+            Saved(lists, music, saved, starred)
+        },
+    ) { index, scan, settings, user, extra ->
+        assemble(index, scan, settings, user, extra.lists, extra.music, extra.watchlist, extra.favorites)
     }
         .flowOn(Dispatchers.Default)
         // Seeded with the real settings so the first frame already has the right theme and layout.
@@ -263,6 +278,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
         lists: PlaylistsState,
         music: MusicLibraryData,
         saved: List<String>,
+        starred: List<String>,
     ): AppUiState {
         val route = user.backStack.lastOrNull() ?: Route.Home
         val previewKey = user.previewKey
@@ -276,16 +292,23 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
         return AppUiState(
             route = route,
             canGoBack = user.backStack.size > 1,
-            home = if (saved.isEmpty()) {
+            home = if (saved.isEmpty() && starred.isEmpty()) {
                 index.home
             } else {
                 val keys = saved.toHashSet()
+                val stars = starred.toHashSet()
                 index.home.copy(
-                    hero = index.home.hero.map { hero -> if (hero.itemKey in keys) hero.copy(onWatchlist = true) else hero },
+                    hero = index.home.hero.map { hero ->
+                        hero.copy(onWatchlist = hero.itemKey in keys, favorite = hero.itemKey in stars)
+                    },
                     watchlist = watchlistMemo[index to saved],
                 )
             },
-            library = libraryMemo[Triple(index, user.filter, user.sort)],
+            library = when (user.filter) {
+                LibraryFilter.WATCHLIST -> LibraryUi(filter = user.filter, sort = user.sort, items = watchlistMemo[index to saved])
+                LibraryFilter.FAVORITES -> LibraryUi(filter = user.filter, sort = user.sort, items = favoritesMemo[index to starred])
+                else -> libraryMemo[Triple(index, user.filter, user.sort)]
+            },
             browse = browse,
             browseDir = (route as? Route.BrowseDir)?.let { browseDirFor(index, it, user.listings, scan) },
             videoDetails = videoId?.let { UiMappers.videoDetails(index, it) },
@@ -460,6 +483,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
             dismissDialog()
             showMessage("Back to TMDB's artwork")
         }
+    }
+
+    override fun toggleFavorite(itemKey: String) {
+        val on = itemKey in videoFavorites.value
+        launchSafely("Couldn't change your favorites") { graph.music.setVideoFavorite(itemKey, favorite = !on) }
     }
 
     override fun toggleWatchlist(itemKey: String) {
@@ -1543,6 +1571,14 @@ private class Memo<K, V>(private val compute: (K) -> V) {
 }
 
 /** The posters and backdrops the user picked in "Change artwork", over TMDB's defaults. */
+/** The playlists, music library, watchlist and favorites, combined as one input of the UI state. */
+private class Saved(
+    val lists: PlaylistsState,
+    val music: MusicLibraryData,
+    val watchlist: List<String>,
+    val favorites: List<String>,
+)
+
 private fun withArtworkChoices(rows: List<VideoWithMeta>, choices: List<ArtworkChoiceEntity>): List<VideoWithMeta> {
     if (choices.isEmpty()) return rows
     val byKey = choices.associateBy { it.metadataKey }

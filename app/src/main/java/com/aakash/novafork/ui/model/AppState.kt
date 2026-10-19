@@ -313,6 +313,9 @@ interface AppActions {
     /** The hero's "+": adds the item ([HeroUi.itemKey]) to the watchlist, or takes it off. */
     fun toggleWatchlist(itemKey: String) {}
 
+    /** The hero's star: adds the item to Favorites, or takes it out. */
+    fun toggleFavorite(itemKey: String) {}
+
     /** Plays songs from search results (see [MusicResultUi]). */
     fun playMusic(songIds: List<Long>, startIndex: Int) {}
 

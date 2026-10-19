@@ -16,11 +16,13 @@ import com.aakash.novafork.R
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.LibraryFilter
+import com.aakash.novafork.ui.model.LibrarySort
 import com.aakash.novafork.ui.model.Route
 
 /**
- * The way into the whole library, at the end of Home (phone and tablet): All videos (everything,
- * newest first), Movies, TV shows, then folders, sources and playlists.
+ * The way into the whole library, at the end of Home (phone and tablet): Recently added (every
+ * video, newest first), Watchlist, Favorites, All videos (A–Z), Movies, TV shows, then folders,
+ * sources and playlists.
  */
 @Composable
 fun HomeLibraryLinks(actions: AppActions, modifier: Modifier = Modifier) {
@@ -30,7 +32,16 @@ fun HomeLibraryLinks(actions: AppActions, modifier: Modifier = Modifier) {
             title = "Library",
             modifier = Modifier.padding(start = dims.gutter, end = 4.dp, bottom = 4.dp),
         )
-        LibraryLink(R.drawable.ic_video_library, "All videos") { actions.openLibrary(LibraryFilter.ALL) }
+        LibraryLink(R.drawable.ic_history, "Recently added") {
+            actions.openLibrary(LibraryFilter.ALL)
+            actions.setLibrarySort(LibrarySort.RECENT)
+        }
+        LibraryLink(R.drawable.ic_add, "Watchlist") { actions.openLibrary(LibraryFilter.WATCHLIST) }
+        LibraryLink(R.drawable.ic_star, "Favorites") { actions.openLibrary(LibraryFilter.FAVORITES) }
+        LibraryLink(R.drawable.ic_video_library, "All videos") {
+            actions.openLibrary(LibraryFilter.ALL)
+            actions.setLibrarySort(LibrarySort.TITLE)
+        }
         LibraryLink(R.drawable.ic_movie, "Movies") { actions.openLibrary(LibraryFilter.MOVIES) }
         LibraryLink(R.drawable.ic_tv, "TV shows") { actions.openLibrary(LibraryFilter.SHOWS) }
         LibraryLink(R.drawable.ic_folder, "Folders, sources and playlists") { actions.navigate(Route.Browse) }

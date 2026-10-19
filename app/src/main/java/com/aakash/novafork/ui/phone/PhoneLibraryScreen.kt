@@ -65,17 +65,23 @@ fun PhoneLibraryScreen(
 
     Column(modifier.fillMaxSize()) {
         PhoneTopBar(
-            title = "Library",
+            title = when {
+                !library.filter.isChip -> library.filter.label
+                library.filter == LibraryFilter.ALL && library.sort == LibrarySort.RECENT -> "Recently added"
+                library.filter == LibraryFilter.ALL -> "All videos"
+                else -> "Library"
+            },
             onBack = actions::back,
             actions = {
                 IconButton(onClick = { actions.navigate(Route.Search) }) {
                     NovaIcon(R.drawable.ic_search, contentDescription = "Search")
                 }
-                SortMenu(current = library.sort, onSelect = actions::setLibrarySort)
+                if (library.filter.isChip) SortMenu(current = library.sort, onSelect = actions::setLibrarySort)
             },
         )
         ScanBanner(scan)
-        FilterChipsRow(library = library, onSelect = actions::setLibraryFilter)
+        // The Watchlist and Favorites pages are lists of their own, without the chips.
+        if (library.filter.isChip) FilterChipsRow(library = library, onSelect = actions::setLibraryFilter)
         PhonePullToRefresh(
             scanning = scan.running,
             onRefresh = actions::refresh,
@@ -135,8 +141,7 @@ private fun FilterChipsRow(library: LibraryUi, onSelect: (LibraryFilter) -> Unit
         contentPadding = PaddingValues(horizontal = dims.gutter, vertical = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        // "Videos" left the library (owner): unidentified files are in All videos' timeline.
-        items(LibraryFilter.entries - LibraryFilter.VIDEOS, key = { it.name }) { filter ->
+        items(LibraryFilter.entries.filter { it.isChip }, key = { it.name }) { filter ->
             val selected = filter == library.filter
             val count = library.counts[filter]
             FilterChip(
@@ -189,5 +194,15 @@ private fun emptyContentFor(filter: LibraryFilter): EmptyContent = when (filter)
         R.drawable.ic_video_file,
         "No other videos",
         "Home videos, unidentified files and saved streams appear here.",
+    )
+    LibraryFilter.WATCHLIST -> EmptyContent(
+        R.drawable.ic_add,
+        "Your Watchlist is empty",
+        "Tap + on the Home hero to save something for later.",
+    )
+    LibraryFilter.FAVORITES -> EmptyContent(
+        R.drawable.ic_star,
+        "No favorites yet",
+        "Tap the star on the Home hero to add a movie, show or video.",
     )
 }

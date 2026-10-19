@@ -153,7 +153,20 @@ private fun HomeFeed(home: HomeUi, scan: ScanUi, permission: PermissionUi, actio
     )
     BoxWithConstraints(Modifier.fillMaxSize()) {
         // Portrait: the 16:9 backdrop with the poster, title and Play under it; landscape: wide.
-        val heroHeight = if (maxWidth > maxHeight) maxHeight * 0.85f else maxWidth * 9f / 16f + DetailsHeroBelowBackdrop + WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+        val portrait = maxWidth <= maxHeight
+        val statusBar = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+        val heroHeight = if (portrait) statusBar + maxWidth * 9f / 16f + DetailsHeroBelowBackdrop else maxHeight * 0.85f
+        // Each page takes its own shape: a clip its video's (a reel stands tall), capped so a
+        // row still peeks out below; titles the backdrop-and-poster layout.
+        val clipMax = maxHeight * 0.78f
+        val pageHeight: (HeroUi) -> Dp = { hero ->
+            val aspect = hero.previewAspect
+            if (portrait && hero.previewUri != null && aspect != null) {
+                (statusBar + maxWidth / aspect).coerceIn(statusBar + maxWidth * 9f / 16f, clipMax)
+            } else {
+                heroHeight
+            }
+        }
         LazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize(),
@@ -171,7 +184,8 @@ private fun HomeFeed(home: HomeUi, scan: ScanUi, permission: PermissionUi, actio
                         onToggleMute = { muted = !muted },
                         actions = actions,
                         // Landscape: the backdrop fills the hero, the title sits on the left.
-                        wide = maxWidth > maxHeight,
+                        wide = !portrait,
+                        pageHeight = pageHeight,
                     )
                 }
             } else {

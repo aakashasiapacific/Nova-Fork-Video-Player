@@ -167,6 +167,15 @@ UI, following Apple Music:
   button; title pages and clips start below the status bar, clear of the punch hole.
 - Home has the Watchlist strip again (backdrop cards), under Continue watching.
 
+**Build 48 (owner's test of build 47):**
+- Hero: the poster sits under the backdrop (never over its subject); a sliver of the picture runs
+  under the status bar, softly darkened; each page takes its own height (a reel stands tall, a
+  film is backdrop plus poster row); the dots stay at one height; Play, star (video Favorites,
+  Room v8 `video_favorites`) and "+".
+- Library: Recently added (timeline), Watchlist, Favorites, All videos (A–Z), Movies, TV shows,
+  Folders.
+- Now Playing closes by dragging down anywhere, as in Apple Music.
+
 ## 6. Decisions on the former open questions (owner, 2026-10-16)
 
 1. **Library and sources are split:**

@@ -151,6 +151,7 @@ object UiMappers {
             playVideoId = video.id,
             playLabel = playLabel(resume = true, code = code),
             previewUri = shortClip(video),
+            previewAspect = clipAspect(video),
         )
     }
 
@@ -173,6 +174,7 @@ object UiMappers {
             playVideoId = video.id,
             playLabel = if (video.inProgress) "Resume" else "Play",
             previewUri = shortClip(video),
+            previewAspect = clipAspect(video),
         )
     }
 
@@ -194,6 +196,7 @@ object UiMappers {
             playVideoId = next.id,
             playLabel = showPlayLabel(next),
             previewUri = shortClip(next),
+            previewAspect = clipAspect(next),
         )
     }
 
@@ -202,6 +205,13 @@ object UiMappers {
      * film playing in the poster isn't a preview. Null for longer videos, ones whose length isn't
      * known yet and network files.
      */
+    /** A clip's width over height (a phone reel ≈ 0.56), so the hero can take its shape; null when unknown. */
+    private fun clipAspect(video: IndexedVideo): Float? {
+        val width = video.video.width ?: return null
+        val height = video.video.height ?: return null
+        return if (width > 0 && height > 0) width.toFloat() / height else null
+    }
+
     private fun shortClip(video: IndexedVideo): String? {
         val duration = video.video.durationMs ?: return null
         return video.card.artwork.frameSource.takeIf { duration in 1..HERO_CLIP_MAX_MS }
@@ -224,6 +234,8 @@ object UiMappers {
             LibraryFilter.MOVIES -> movies
             LibraryFilter.SHOWS -> shows
             LibraryFilter.VIDEOS -> videos
+            // Built from their saved keys by the view model.
+            LibraryFilter.WATCHLIST, LibraryFilter.FAVORITES -> emptyList()
         }
         return LibraryUi(
             filter = filter,

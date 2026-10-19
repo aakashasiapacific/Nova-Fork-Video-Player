@@ -11,6 +11,7 @@ import com.aakash.novafork.core.audio.MusicKeys
 import com.aakash.novafork.data.MusicDiagnostics
 import com.aakash.novafork.data.MusicSourceCount
 import com.aakash.novafork.data.StoragePermissions
+import com.aakash.novafork.data.db.FavoriteSongEntity
 import com.aakash.novafork.data.db.MusicPlaylistRow
 import com.aakash.novafork.data.db.NovaDatabase
 import com.aakash.novafork.data.db.PlaylistEntity
@@ -19,7 +20,7 @@ import com.aakash.novafork.data.db.SQL_CHUNK
 import com.aakash.novafork.data.db.SongEntity
 import com.aakash.novafork.data.db.SourceEntity
 import com.aakash.novafork.data.db.SourceType
-import com.aakash.novafork.data.db.FavoriteSongEntity
+import com.aakash.novafork.data.db.VideoFavoriteEntity
 import com.aakash.novafork.data.db.WatchlistEntity
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -69,6 +70,7 @@ class MusicRepository(
     private val playlistDao = database.playlistDao()
     private val watchlistDao = database.watchlistDao()
     private val favoriteDao = database.favoriteSongDao()
+    private val videoFavoriteDao = database.videoFavoriteDao()
     private val sourceDao = database.sourceDao()
 
     private val scanMutex = Mutex()
@@ -341,6 +343,18 @@ class MusicRepository(
     suspend fun removeFromWatchlist(itemKey: String) = watchlistDao.remove(itemKey)
 
     suspend fun isOnWatchlist(itemKey: String): Boolean = watchlistDao.count(itemKey) > 0
+
+    // Video favorites (the hero's star)
+
+    fun observeVideoFavorites(): Flow<List<String>> = videoFavoriteDao.observeKeys()
+
+    suspend fun setVideoFavorite(itemKey: String, favorite: Boolean) {
+        if (favorite) {
+            videoFavoriteDao.add(VideoFavoriteEntity(itemKey = itemKey, addedAt = now()))
+        } else {
+            videoFavoriteDao.remove(itemKey)
+        }
+    }
 
     // Favorites (Apple Music's star)
 

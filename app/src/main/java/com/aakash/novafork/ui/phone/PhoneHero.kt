@@ -1,5 +1,6 @@
 package com.aakash.novafork.ui.phone
 
+import androidx.annotation.DrawableRes
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
@@ -18,6 +19,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -25,6 +28,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
@@ -88,6 +92,7 @@ internal const val HERO_PREVIEW_DELAY_MS = 2_500L
 /** The dot row and the mute button sit this far above the hero's bottom edge. */
 private val HeroDotsBottom = 16.dp
 private val HeroContentBottom = 52.dp
+private val DotsRowHeight = 44.dp
 
 /**
  * The Home hero: from the very top of the screen (under a clear status bar) down to [height],
@@ -115,6 +120,11 @@ internal fun PhoneHeroPager(
     actions: AppActions,
     wide: Boolean = false,
     contentStart: Dp = 24.dp,
+    /**
+     * Each page's own height (a reel is taller than a film's backdrop); the hero glides between
+     * them as pages change. Null: always [height].
+     */
+    pageHeight: ((HeroUi) -> Dp)? = null,
 ) {
     val dragged by pagerState.interactionSource.collectIsDraggedAsState()
     val settled = pagerState.settledPage
@@ -129,10 +139,12 @@ internal fun PhoneHeroPager(
         timer.animateTo(1f, tween(durationMillis = dwell.toInt(), easing = LinearEasing))
         pagerState.animateScrollToPage((pagerState.currentPage + 1) % heroes.size)
     }
+    val targetHeight = pageHeight?.let { forPage -> heroes.getOrNull(pagerState.currentPage)?.let(forPage) } ?: height
+    val shownHeight by animateDpAsState(targetHeight, tween(durationMillis = 320), label = "heroHeight")
     Box(
         Modifier
             .fillMaxWidth()
-            .height(height),
+            .height(shownHeight),
     ) {
         HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
             val hero = heroes.getOrNull(page)
@@ -151,7 +163,9 @@ internal fun PhoneHeroPager(
             Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
-                .padding(start = 16.dp, end = 12.dp, bottom = HeroDotsBottom),
+                .padding(start = 16.dp, end = 12.dp, bottom = HeroDotsBottom)
+                // One fixed row height: the dots stay put whether or not the mute button shows.
+                .height(DotsRowHeight),
         ) {
             if (heroes.size > 1) {
                 PagerDots(
@@ -317,92 +331,120 @@ private fun DetailsStyleHeroPage(
 ) {
     val background = MaterialTheme.colorScheme.background
     val posterShape = RoundedCornerShape(10.dp)
-    Box(
+    val statusBar = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    Column(
         Modifier
             .fillMaxSize()
             .clickable(onClickLabel = "Details", onClick = openTarget),
     ) {
-        // The backdrop in its own 16:9 shape, never cropped to fill a taller box, and below the
-        // status bar so the camera's punch hole doesn't cover it.
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .statusBarsPadding()
-                .aspectRatio(16f / 9f),
-        ) {
-            WideHeroArt(artwork = hero.artwork, modifier = Modifier.fillMaxSize())
-            HeroClip(hero = hero, preview = preview, muted = muted)
+        // The backdrop at 16:9 below the status bar (clear of the punch hole); a sliver of it
+        // runs on under the status bar, darkened, so the bar isn't a blank strip.
+        BoxWithConstraints(Modifier.fillMaxWidth()) {
             Box(
                 Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.verticalGradient(
-                            0f to Color.Transparent,
-                            0.6f to Color.Transparent,
-                            1f to background,
-                        ),
-                    ),
-            )
-        }
-        Column(
-            Modifier
-                .align(Alignment.BottomStart)
-                .fillMaxWidth()
-                .padding(start = 20.dp, end = 20.dp, bottom = HeroContentBottom),
-        ) {
-            Row(verticalAlignment = Alignment.Bottom) {
+                    .fillMaxWidth()
+                    .height(statusBar + maxWidth * 9f / 16f),
+            ) {
+                WideHeroArt(artwork = hero.artwork, modifier = Modifier.fillMaxSize(), alignment = Alignment.BottomCenter)
                 Box(
                     Modifier
-                        .width(DetailsPosterWidth)
-                        .aspectRatio(2f / 3f)
-                        .shadow(12.dp, posterShape)
-                        .clip(posterShape)
-                        .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                        .border(1.dp, Color.White.copy(alpha = 0.12f), posterShape),
+                        .padding(top = statusBar)
+                        .fillMaxSize(),
                 ) {
-                    PosterArt(artwork = hero.artwork, title = hero.title, modifier = Modifier.fillMaxSize())
+                    HeroClip(hero = hero, preview = preview, muted = muted)
                 }
-                Spacer(Modifier.width(16.dp))
-                Column(Modifier.weight(1f)) {
-                    HeroTitle(
-                        title = hero.title,
-                        logoUrl = hero.artwork.logoUrl,
-                        textStyle = MaterialTheme.typography.headlineMedium,
-                        textAlign = TextAlign.Start,
-                        logoAlignment = Alignment.BottomStart,
-                        maxWidthFraction = 1f,
-                        logoHeight = 72.dp,
+                StatusBarShade(statusBar)
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(
+                                0f to Color.Transparent,
+                                0.7f to Color.Transparent,
+                                1f to background,
+                            ),
+                        ),
+                )
+            }
+        }
+        // Poster and title under the backdrop, never over its subject.
+        Row(
+            Modifier.padding(start = 20.dp, end = 20.dp, top = 12.dp),
+            verticalAlignment = Alignment.Bottom,
+        ) {
+            Box(
+                Modifier
+                    .width(DetailsPosterWidth)
+                    .aspectRatio(2f / 3f)
+                    .shadow(12.dp, posterShape)
+                    .clip(posterShape)
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                    .border(1.dp, Color.White.copy(alpha = 0.12f), posterShape),
+            ) {
+                PosterArt(artwork = hero.artwork, title = hero.title, modifier = Modifier.fillMaxSize())
+            }
+            Spacer(Modifier.width(16.dp))
+            Column(Modifier.weight(1f)) {
+                HeroTitle(
+                    title = hero.title,
+                    logoUrl = hero.artwork.logoUrl,
+                    textStyle = MaterialTheme.typography.headlineSmall,
+                    textAlign = TextAlign.Start,
+                    logoAlignment = Alignment.BottomStart,
+                    maxWidthFraction = 1f,
+                    logoHeight = 64.dp,
+                )
+                val rating = hero.rating
+                val meta = hero.metaLine
+                if (rating != null && rating > 0f) {
+                    RatingPill(rating, onImage = true, modifier = Modifier.padding(top = 8.dp))
+                }
+                if (!meta.isNullOrBlank()) {
+                    Text(
+                        text = meta,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.White.copy(alpha = 0.72f),
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(top = 6.dp),
                     )
-                    val rating = hero.rating
-                    val meta = hero.metaLine
-                    if (rating != null && rating > 0f) {
-                        RatingPill(rating, onImage = true, modifier = Modifier.padding(top = 8.dp))
-                    }
-                    if (!meta.isNullOrBlank()) {
-                        Text(
-                            text = meta,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = Color.White.copy(alpha = 0.72f),
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.padding(top = 6.dp),
-                        )
-                    }
-                    highlightOf(hero)?.let { highlight ->
-                        Text(
-                            text = highlight,
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White,
-                            modifier = Modifier.padding(top = 4.dp),
-                        )
-                    }
+                }
+                highlightOf(hero)?.let { highlight ->
+                    Text(
+                        text = highlight,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
                 }
             }
-            Spacer(Modifier.height(20.dp))
-            HeroActions(hero = hero, play = play, actions = actions, playModifier = Modifier.fillMaxWidth(0.8f))
         }
+        HeroActions(
+            hero = hero,
+            play = play,
+            actions = actions,
+            fillPlay = true,
+            modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 18.dp),
+        )
     }
+}
+
+/** Darkens the status bar strip of a picture that runs under it: soft, darker at the very top. */
+@Composable
+private fun StatusBarShade(statusBar: Dp) {
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .height(statusBar * 2)
+            .background(
+                Brush.verticalGradient(
+                    0f to Color.Black.copy(alpha = 0.85f),
+                    0.5f to Color.Black.copy(alpha = 0.55f),
+                    1f to Color.Transparent,
+                ),
+            ),
+    )
 }
 
 /**
@@ -413,13 +455,19 @@ private fun DetailsStyleHeroPage(
 @Composable
 private fun ClipHeroPage(hero: HeroUi, preview: Boolean, muted: Boolean) {
     val background = MaterialTheme.colorScheme.background
-    Box(
-        Modifier
-            .fillMaxSize()
-            .statusBarsPadding(),
-    ) {
+    val statusBar = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    // The hero takes the clip's own shape (see PhoneHeroPager's pageHeight) below the status
+    // bar; the frame runs on under the bar, shaded, so it isn't a blank strip.
+    Box(Modifier.fillMaxSize()) {
         BackdropArt(artwork = hero.artwork, modifier = Modifier.fillMaxSize())
-        HeroClip(hero = hero, preview = preview, muted = muted)
+        Box(
+            Modifier
+                .padding(top = statusBar)
+                .fillMaxSize(),
+        ) {
+            HeroClip(hero = hero, preview = preview, muted = muted)
+        }
+        StatusBarShade(statusBar)
         Box(
             Modifier
                 .fillMaxSize()
@@ -458,29 +506,32 @@ private fun HeroClip(hero: HeroUi, preview: Boolean, muted: Boolean) {
     }
 }
 
-private val DetailsPosterWidth = 118.dp
+private val DetailsPosterWidth = 104.dp
 
 /**
- * How tall the phone hero is below its 16:9 backdrop: the poster overlapping the backdrop's
- * lower edge, the Play row and the dots. The hero's height is width × 9/16 plus this.
+ * How tall the phone hero is below its 16:9 backdrop: the poster and title row, the Play row
+ * and the dots. The hero's height is the status bar plus width × 9/16 plus this.
  */
-internal val DetailsHeroBelowBackdrop = 250.dp
+internal val DetailsHeroBelowBackdrop = 300.dp
 
-/** The hero's white Play pill and round "+" (watchlist). [playModifier] sizes the pill. */
+/**
+ * The hero's buttons: the white Play pill, a round star (Favorites) and a round "+"
+ * (Watchlist). [fillPlay]: Play takes the row's free width (phone); otherwise a set width.
+ */
 @Composable
 private fun HeroActions(
     hero: HeroUi,
     play: () -> Unit,
     actions: AppActions,
     modifier: Modifier = Modifier,
-    playModifier: Modifier = Modifier.widthIn(min = 180.dp, max = 260.dp),
+    fillPlay: Boolean = false,
 ) {
     Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Button(
             onClick = play,
-            modifier = playModifier.height(50.dp),
+            modifier = (if (fillPlay) Modifier.weight(1f) else Modifier.widthIn(min = 160.dp, max = 240.dp)).height(50.dp),
             colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black),
-            contentPadding = PaddingValues(horizontal = 28.dp),
+            contentPadding = PaddingValues(horizontal = 24.dp),
         ) {
             NovaIcon(R.drawable.ic_play_arrow, contentDescription = null, modifier = Modifier.size(24.dp))
             Text(
@@ -492,19 +543,30 @@ private fun HeroActions(
                 modifier = Modifier.padding(start = 6.dp),
             )
         }
-        IconButton(
+        RoundHeroButton(
+            icon = if (hero.favorite) R.drawable.ic_star else R.drawable.ic_star_outline,
+            description = if (hero.favorite) "Remove from Favorites" else "Add to Favorites",
+            onClick = { actions.toggleFavorite(hero.itemKey) },
+        )
+        RoundHeroButton(
+            icon = if (hero.onWatchlist) R.drawable.ic_check else R.drawable.ic_add,
+            description = if (hero.onWatchlist) "Remove from Watchlist" else "Add to Watchlist",
             onClick = { actions.toggleWatchlist(hero.itemKey) },
-            modifier = Modifier.size(50.dp),
-            colors = IconButtonDefaults.iconButtonColors(
-                containerColor = Color.White.copy(alpha = 0.18f),
-                contentColor = Color.White,
-            ),
-        ) {
-            NovaIcon(
-                if (hero.onWatchlist) R.drawable.ic_check else R.drawable.ic_add,
-                contentDescription = if (hero.onWatchlist) "Remove from Watchlist" else "Add to Watchlist",
-            )
-        }
+        )
+    }
+}
+
+@Composable
+private fun RoundHeroButton(@DrawableRes icon: Int, description: String, onClick: () -> Unit) {
+    IconButton(
+        onClick = onClick,
+        modifier = Modifier.size(50.dp),
+        colors = IconButtonDefaults.iconButtonColors(
+            containerColor = Color.White.copy(alpha = 0.18f),
+            contentColor = Color.White,
+        ),
+    ) {
+        NovaIcon(icon, contentDescription = description)
     }
 }
 
@@ -513,14 +575,14 @@ private fun HeroActions(
  * as on the iPad; the portrait key art is the last resort.
  */
 @Composable
-private fun WideHeroArt(artwork: Artwork, modifier: Modifier = Modifier) {
+private fun WideHeroArt(artwork: Artwork, modifier: Modifier = Modifier, alignment: Alignment = Alignment.TopCenter) {
     val candidates = listOfNotNull(artwork.backdropUrl, artwork.stillUrl, artwork.frameSource, artwork.tallUrl, artwork.posterUrl).distinct()
     ArtImage(
         candidates = candidates,
         contentDescription = null,
         modifier = modifier,
         frameSource = artwork.frameSource,
-        alignment = Alignment.TopCenter,
+        alignment = alignment,
     ) {
         ArtPlaceholder(seed = artwork.seed, title = null, modifier = Modifier.fillMaxSize())
     }

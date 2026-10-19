@@ -208,7 +208,21 @@ fun NowPlayingScreen(
         modifier
             .fillMaxSize()
             .offset { IntOffset(0, dragY.value.roundToInt().coerceAtLeast(0)) }
-            .background(Color.Black),
+            .background(Color.Black)
+            // Drag down anywhere to close (lyrics scroll and the sliders keep their own drags).
+            .pointerInput(Unit) {
+                detectVerticalDragGestures(
+                    onDragEnd = {
+                        scope.launch {
+                            if (dragY.value > dismissPx) onDismiss() else dragY.animateTo(0f, spring())
+                        }
+                    },
+                    onDragCancel = { scope.launch { dragY.animateTo(0f, spring()) } },
+                ) { change, amount ->
+                    change.consume()
+                    scope.launch { dragY.snapTo((dragY.value + amount).coerceAtLeast(0f)) }
+                }
+            },
     ) {
         AsyncImage(
             model = now?.artUri,
@@ -230,24 +244,11 @@ fun NowPlayingScreen(
                 .navigationBarsPadding()
                 .padding(horizontal = 28.dp),
         ) {
-            // The grabber: drag the sheet down to close it.
+            // The grabber: a hint; the whole sheet drags down to close, as in Apple Music.
             Box(
                 Modifier
                     .fillMaxWidth()
-                    .height(28.dp)
-                    .pointerInput(Unit) {
-                        detectVerticalDragGestures(
-                            onDragEnd = {
-                                scope.launch {
-                                    if (dragY.value > dismissPx) onDismiss() else dragY.animateTo(0f, spring())
-                                }
-                            },
-                            onDragCancel = { scope.launch { dragY.animateTo(0f, spring()) } },
-                        ) { change, amount ->
-                            change.consume()
-                            scope.launch { dragY.snapTo((dragY.value + amount).coerceAtLeast(0f)) }
-                        }
-                    },
+                    .height(28.dp),
                 contentAlignment = Alignment.Center,
             ) {
                 Box(
