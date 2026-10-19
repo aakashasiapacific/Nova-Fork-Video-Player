@@ -32,21 +32,21 @@ import com.aakash.novafork.ui.model.SourceUi
 
 /**
  * Shows [dialog] (nothing for null). Shared by the phone and tablet UIs; each dialog is modal.
- * [playlists] fill the "Add to playlist" sheet.
+ * [playlists] fill the "Add to Playlist" sheet.
  */
 @Composable
 fun NovaDialogs(dialog: DialogUi?, actions: AppActions, playlists: List<PlaylistUi> = emptyList()) {
     when (dialog) {
         null -> Unit
         DialogUi.AddStream -> StreamUrlDialog(
-            title = "Add stream",
+            title = "Add Stream",
             confirmLabel = "Save",
             askForName = true,
             onConfirm = { name, url -> actions.addStream(name, url) },
             onDismiss = actions::dismissDialog,
         )
         DialogUi.OpenUrl -> StreamUrlDialog(
-            title = "Open network stream",
+            title = "Open Network Stream",
             confirmLabel = "Play",
             askForName = false,
             onConfirm = { _, url -> actions.playUrl(url) },

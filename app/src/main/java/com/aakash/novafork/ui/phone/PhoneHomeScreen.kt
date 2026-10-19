@@ -199,7 +199,7 @@ private fun HomeFeed(home: HomeUi, scan: ScanUi, permission: PermissionUi, actio
             }
             if (home.continueWatching.isNotEmpty()) {
                 item(key = "continue", contentType = "landscapeRow") {
-                    HomeSection(title = "Continue watching") {
+                    HomeSection(title = "Continue Watching") {
                         LandscapeRow(home.continueWatching, actions)
                     }
                 }
@@ -359,7 +359,7 @@ private fun HomeOnboarding(scan: ScanUi, permission: PermissionUi, actions: AppA
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     OutlinedButton(onClick = actions::addFolder, modifier = Modifier.fillMaxWidth()) {
-                        ButtonContent(R.drawable.ic_create_new_folder, "Add a folder")
+                        ButtonContent(R.drawable.ic_create_new_folder, "Add a Folder")
                     }
                     OutlinedButton(
                         onClick = actions::addNetworkSource,

@@ -64,7 +64,7 @@ import com.aakash.novafork.ui.model.PlexSignInUi
 import com.aakash.novafork.ui.model.ServerLibraryUi
 import com.aakash.novafork.ui.model.UpnpServerUi
 
-/** One kind of server the "Add network source" picker offers. */
+/** One kind of server the "Add Network Source" picker offers. */
 private class SourceKind(val type: SourceType, val title: String, val body: String)
 
 private val FileServerKinds = listOf(
@@ -82,14 +82,14 @@ private val MediaServerKinds = listOf(
     SourceKind(SourceType.PLEX, "Plex", "Sign in with a code, or paste a token"),
 )
 
-/** "Add network source": the kinds of server, each going on to its own dialog. */
+/** "Add Network Source": the kinds of server, each going on to its own dialog. */
 @Composable
 internal fun AddSourceDialog(actions: AppActions) {
     NovaAlertDialog(
         form = true,
         onDismissRequest = actions::dismissDialog,
         icon = { NovaIcon(R.drawable.ic_lan, contentDescription = null) },
-        title = { Text("Add network source") },
+        title = { Text("Add Network Source") },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState())) {
                 KindHeader("File servers")

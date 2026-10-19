@@ -126,7 +126,7 @@ sealed interface DialogUi {
     /** Save a stream URL to the library. */
     data object AddStream : DialogUi
 
-    /** Play a URL once without saving ("Open network stream" in VLC). */
+    /** Play a URL once without saving ("Open Network Stream" in VLC). */
     data object OpenUrl : DialogUi
 
     data class SmbServer(
@@ -164,7 +164,7 @@ sealed interface DialogUi {
         val error: String? = null,
     ) : DialogUi
 
-    /** "Add network source": picks the kind of server (SMB, FTP, SFTP, NFS, WebDAV, DLNA/UPnP, Jellyfin, Emby, Plex). */
+    /** "Add Network Source": picks the kind of server (SMB, FTP, SFTP, NFS, WebDAV, DLNA/UPnP, Jellyfin, Emby, Plex). */
     data object AddSource : DialogUi
 
     /** Add or edit an FTP, SFTP, NFS, WebDAV, DLNA/UPnP (by address), Jellyfin, Emby or Plex source. */
@@ -378,7 +378,7 @@ interface AppActions {
 
     fun openPlaylist(playlistId: Long) = navigate(Route.Playlist(playlistId))
 
-    /** Opens the "Add to playlist" sheet for [videoIds]; [label] names them in the sheet's title. */
+    /** Opens the "Add to Playlist" sheet for [videoIds]; [label] names them in the sheet's title. */
     fun addToPlaylist(videoIds: List<Long>, label: String = "") = showDialog(DialogUi.AddToPlaylist(videoIds, label))
 
     /** Appends [videoIds] to the playlist (videos already in it are skipped). */
@@ -398,7 +398,7 @@ interface AppActions {
 
     // Network sources: FTP, SFTP, NFS, WebDAV, DLNA/UPnP, Jellyfin, Emby and Plex (SMB keeps saveSmb/testSmb).
 
-    /** Opens the "Add network source" type picker ([DialogUi.AddSource]). */
+    /** Opens the "Add Network Source" type picker ([DialogUi.AddSource]). */
     fun addNetworkSource() = showDialog(DialogUi.AddSource)
 
     /**

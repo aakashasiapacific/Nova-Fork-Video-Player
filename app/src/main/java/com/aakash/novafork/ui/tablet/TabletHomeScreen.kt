@@ -176,7 +176,7 @@ private fun HomeFeed(home: HomeUi, scan: ScanUi, permission: PermissionUi, layou
             }
             if (home.continueWatching.isNotEmpty()) {
                 item(key = "continue", contentType = "landscapeRow") {
-                    HomeSection(title = "Continue watching") {
+                    HomeSection(title = "Continue Watching") {
                         ContinueWatchingRow(home.continueWatching, actions)
                     }
                 }
@@ -358,7 +358,7 @@ private fun OnboardingText(scan: ScanUi, permission: PermissionUi, actions: AppA
                 }
             }
             FilledTonalButton(onClick = actions::addFolder, modifier = Modifier.fillMaxWidth().height(48.dp)) {
-                ButtonLabel(R.drawable.ic_create_new_folder, "Add a folder")
+                ButtonLabel(R.drawable.ic_create_new_folder, "Add a Folder")
             }
             FilledTonalButton(
                 onClick = actions::addNetworkSource,

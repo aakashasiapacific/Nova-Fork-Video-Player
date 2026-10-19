@@ -319,7 +319,7 @@ private fun LibraryEmpty(filter: LibraryFilter, actions: AppActions, modifier: M
                 icon = R.drawable.ic_video_library,
                 title = "Your library is empty",
                 body = "Add a folder or a network share, or allow access to the videos on this tablet.",
-                actionLabel = "Add a folder",
+                actionLabel = "Add a Folder",
                 onAction = actions::addFolder,
                 secondaryLabel = "Browse sources",
                 onSecondary = { actions.navigate(Route.Browse) },

@@ -232,7 +232,7 @@ private fun SourcesPane(
                 SourceRow(source = source, selected = source.id == selectedSourceId, actions = actions)
             }
             item(key = "addFolder", contentType = "action") {
-                ActionRow(R.drawable.ic_create_new_folder, "Add folder", actions::addFolder)
+                ActionRow(R.drawable.ic_create_new_folder, "Add Folder", actions::addFolder)
             }
 
             sectionHeader("network", "Network")
@@ -240,7 +240,7 @@ private fun SourcesPane(
                 SourceRow(source = source, selected = source.id == selectedSourceId, actions = actions)
             }
             item(key = "addNetwork", contentType = "action") {
-                ActionRow(R.drawable.ic_add, "Add network source", actions::addNetworkSource)
+                ActionRow(R.drawable.ic_add, "Add Network Source", actions::addNetworkSource)
             }
 
             sectionHeader("streams", "Streams")
@@ -252,10 +252,10 @@ private fun SourcesPane(
                 )
             }
             item(key = "addStream", contentType = "action") {
-                ActionRow(R.drawable.ic_add, "Add stream") { actions.showDialog(DialogUi.AddStream) }
+                ActionRow(R.drawable.ic_add, "Add Stream") { actions.showDialog(DialogUi.AddStream) }
             }
             item(key = "openUrl", contentType = "action") {
-                ActionRow(R.drawable.ic_link, "Open network stream") { actions.showDialog(DialogUi.OpenUrl) }
+                ActionRow(R.drawable.ic_link, "Open Network Stream") { actions.showDialog(DialogUi.OpenUrl) }
             }
 
             sectionHeader("playlists", "Playlists")
@@ -500,14 +500,14 @@ private fun BrowseWelcome(actions: AppActions, modifier: Modifier = Modifier) {
                 Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                     ActionTile(
                         icon = R.drawable.ic_create_new_folder,
-                        title = "Add folder",
+                        title = "Add Folder",
                         body = "Any folder on this tablet or an SD card.",
                         onClick = actions::addFolder,
                         modifier = Modifier.weight(1f),
                     )
                     ActionTile(
                         icon = R.drawable.ic_lan,
-                        title = "Add network source",
+                        title = "Add Network Source",
                         body = "SMB, FTP, SFTP, NFS, WebDAV, DLNA, Jellyfin, Emby or Plex.",
                         onClick = actions::addNetworkSource,
                         modifier = Modifier.weight(1f),
@@ -516,14 +516,14 @@ private fun BrowseWelcome(actions: AppActions, modifier: Modifier = Modifier) {
                 Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                     ActionTile(
                         icon = R.drawable.ic_live_tv,
-                        title = "Add stream",
+                        title = "Add Stream",
                         body = "Save a live channel or video URL to your library.",
                         onClick = { actions.showDialog(DialogUi.AddStream) },
                         modifier = Modifier.weight(1f),
                     )
                     ActionTile(
                         icon = R.drawable.ic_link,
-                        title = "Open network stream",
+                        title = "Open Network Stream",
                         body = "Play a link once without saving it.",
                         onClick = { actions.showDialog(DialogUi.OpenUrl) },
                         modifier = Modifier.weight(1f),
@@ -647,7 +647,7 @@ private fun BrowseDirHeader(dir: BrowseDirUi, actions: AppActions, modifier: Mod
             if (dir.videos.isNotEmpty()) {
                 // Plays the videos directly in this folder, not those in its subfolders.
                 FilledTonalButton(onClick = { actions.playFolder(dir.sourceId, dir.path) }) {
-                    ButtonLabel(R.drawable.ic_play_arrow, "Play all")
+                    ButtonLabel(R.drawable.ic_play_arrow, "Play All")
                 }
                 Spacer(Modifier.width(8.dp))
                 OutlinedButton(onClick = { actions.playFolder(dir.sourceId, dir.path, shuffle = true) }) {

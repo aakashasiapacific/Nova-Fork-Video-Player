@@ -66,8 +66,8 @@ fun PhoneLibraryScreen(
         PhoneTopBar(
             title = when {
                 !library.filter.isChip -> library.filter.label
-                library.filter == LibraryFilter.ALL && library.sort == LibrarySort.RECENT -> "Recently added"
-                library.filter == LibraryFilter.ALL -> "All videos"
+                library.filter == LibraryFilter.ALL && library.sort == LibrarySort.RECENT -> "Recently Added"
+                library.filter == LibraryFilter.ALL -> "All Videos"
                 else -> "Library"
             },
             onBack = actions::back,
@@ -160,7 +160,7 @@ private fun LibraryEmpty(filter: LibraryFilter, actions: AppActions) {
             icon = content.icon,
             title = content.title,
             body = content.body,
-            actionLabel = if (filter == LibraryFilter.ALL) "Add a folder" else null,
+            actionLabel = if (filter == LibraryFilter.ALL) "Add a Folder" else null,
             onAction = if (filter == LibraryFilter.ALL) actions::addFolder else null,
         )
     }

@@ -32,18 +32,18 @@ fun HomeLibraryLinks(actions: AppActions, modifier: Modifier = Modifier) {
             title = "Library",
             modifier = Modifier.padding(start = dims.gutter, end = 4.dp, bottom = 4.dp),
         )
-        LibraryLink(R.drawable.ic_history, "Recently added") {
+        LibraryLink(R.drawable.ic_history, "Recently Added") {
             actions.openLibrary(LibraryFilter.ALL)
             actions.setLibrarySort(LibrarySort.RECENT)
         }
         LibraryLink(R.drawable.ic_add, "Watchlist") { actions.openLibrary(LibraryFilter.WATCHLIST) }
         LibraryLink(R.drawable.ic_star, "Favorites") { actions.openLibrary(LibraryFilter.FAVORITES) }
-        LibraryLink(R.drawable.ic_video_library, "All videos") {
+        LibraryLink(R.drawable.ic_video_library, "All Videos") {
             actions.openLibrary(LibraryFilter.ALL)
             actions.setLibrarySort(LibrarySort.TITLE)
         }
         LibraryLink(R.drawable.ic_movie, "Movies") { actions.openLibrary(LibraryFilter.MOVIES) }
-        LibraryLink(R.drawable.ic_tv, "TV shows") { actions.openLibrary(LibraryFilter.SHOWS) }
+        LibraryLink(R.drawable.ic_tv, "TV Shows") { actions.openLibrary(LibraryFilter.SHOWS) }
         LibraryLink(R.drawable.ic_folder, "Folders, sources and playlists") { actions.navigate(Route.Browse) }
     }
 }

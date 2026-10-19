@@ -196,7 +196,7 @@ fun PhoneShowDetailsScreen(
                         PhonePlayAllRow(
                             onPlayAll = { actions.playSeason(details.key, season.number) },
                             onShuffle = { actions.playSeason(details.key, season.number, shuffle = true) },
-                            playLabel = if (seasons.size > 1) "Play season" else "Play all",
+                            playLabel = if (seasons.size > 1) "Play Season" else "Play All",
                             modifier = Modifier.padding(start = dims.gutter, end = dims.gutter, bottom = 8.dp),
                         )
                     }
@@ -222,7 +222,7 @@ fun PhoneShowDetailsScreen(
             menu = if (identifyVideoId != null) {
                 { close ->
                     NovaMenuItem(
-                        text = { Text("Identify show…") },
+                        text = { Text("Identify Show…") },
                         leadingIcon = { NovaIcon(R.drawable.ic_search, contentDescription = null) },
                         onClick = {
                             close()
@@ -230,7 +230,7 @@ fun PhoneShowDetailsScreen(
                         },
                     )
                     NovaMenuItem(
-                        text = { Text("Change artwork…") },
+                        text = { Text("Change Artwork…") },
                         leadingIcon = { NovaIcon(R.drawable.ic_image, contentDescription = null) },
                         onClick = {
                             close()

@@ -40,11 +40,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.coerceAtMost
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.aakash.novafork.R
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
 import com.aakash.novafork.ui.common.ArtImage
@@ -357,7 +358,8 @@ internal fun OverviewBlock(
         if (!tagline.isNullOrBlank()) {
             Text(
                 text = tagline,
-                style = MaterialTheme.typography.bodyLarge.copy(fontStyle = FontStyle.Italic),
+                // Apple TV sets its one-line summaries upright and bold, never in italics.
+                style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.onSurface,
             )
             Spacer(Modifier.height(8.dp))
@@ -383,9 +385,10 @@ internal fun OverviewBlock(
                 )
                 if (canToggle) {
                     Text(
-                        text = if (expanded) "Less" else "More",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.primary,
+                        // Apple TV's caps "MORE" in white after a cut-off synopsis.
+                        text = if (expanded) "LESS" else "MORE",
+                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, letterSpacing = 0.4.sp),
+                        color = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.padding(vertical = 6.dp),
                     )
                 }

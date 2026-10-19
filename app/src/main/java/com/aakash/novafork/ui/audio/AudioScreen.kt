@@ -327,7 +327,8 @@ private fun LibraryHome(
                 }
             }
         }
-        scan.error?.let { error -> row("error") { Text(error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) } }
+        // Without access the card below says it all; the scan's own error would only repeat it.
+        if (hasAccess) scan.error?.let { error -> row("error") { Text(error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) } }
         if (!hasAccess) row("access") { AccessCard(onRequestAccess) }
         // Apple Music's Library, cut down to what the owner uses: playlists, favorites, albums.
         row("playlists") { CategoryRow(R.drawable.ic_playlist_play, "Playlists") { ctx.onOpen(PLAYLISTS) } }

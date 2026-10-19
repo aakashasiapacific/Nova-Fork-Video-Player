@@ -41,7 +41,7 @@ fun VideoMenuBox(
                 )
             }
             NovaMenuItem(
-                text = { Text("Add to playlist") },
+                text = { Text("Add to Playlist") },
                 leadingIcon = { NovaIcon(R.drawable.ic_playlist_add, contentDescription = null) },
                 onClick = {
                     open = false

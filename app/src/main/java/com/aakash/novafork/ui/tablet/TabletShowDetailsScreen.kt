@@ -30,7 +30,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
@@ -105,7 +104,7 @@ internal fun TabletShowDetailsScreen(
                     item(key = "playSeason", span = { GridItemSpan(maxLineSpan) }, contentType = "playSeason") {
                         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                             FilledTonalButton(onClick = { actions.playSeason(details.key, season.number) }) {
-                                ButtonLabel(R.drawable.ic_play_arrow, if (seasons.size > 1) "Play ${season.title}" else "Play all")
+                                ButtonLabel(R.drawable.ic_play_arrow, if (seasons.size > 1) "Play ${season.title}" else "Play All")
                             }
                             OutlinedButton(onClick = { actions.playSeason(details.key, season.number, shuffle = true) }) {
                                 ButtonLabel(R.drawable.ic_shuffle, "Shuffle")
@@ -237,7 +236,6 @@ private fun ShowText(details: ShowDetailsUi) {
             Text(
                 text = details.tagline,
                 style = MaterialTheme.typography.titleMedium,
-                fontStyle = FontStyle.Italic,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }

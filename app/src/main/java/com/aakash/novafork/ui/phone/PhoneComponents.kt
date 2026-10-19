@@ -227,21 +227,7 @@ internal fun PhoneShowCard(
     )
 }
 
-/** Round translucent play mark drawn over 16:9 art. */
-@Composable
-internal fun PlayGlyph(modifier: Modifier = Modifier, size: Dp = 40.dp) {
-    Box(
-        modifier
-            .size(size)
-            .clip(CircleShape)
-            .background(Color.Black.copy(alpha = 0.45f)),
-        contentAlignment = Alignment.Center,
-    ) {
-        NovaIcon(R.drawable.ic_play_arrow, contentDescription = null, tint = Color.White, modifier = Modifier.size(size * 0.6f))
-    }
-}
-
-/** 16:9 card (continue watching, next episode): art with play mark and progress, text below. */
+/** 16:9 card (continue watching, next episode): art with progress, text below, as in Apple TV. */
 @Composable
 internal fun PhoneLandscapeCard(
     card: VideoCardUi,
@@ -263,7 +249,6 @@ internal fun PhoneLandscapeCard(
         width = width,
         progress = card.progress,
         watched = card.watched,
-        playMark = true,
     )
 }
 
@@ -288,7 +273,6 @@ internal fun PhoneWideVideoCard(
         onLongClick = onLongClick,
         progress = card.progress,
         watched = card.watched,
-        playMark = false,
     )
 }
 
@@ -308,7 +292,6 @@ internal fun PhoneWideShowCard(
         modifier = modifier,
         progress = null,
         watched = show.episodeCount > 0 && show.unwatchedCount == 0,
-        playMark = false,
     )
 }
 
@@ -322,7 +305,6 @@ private fun WideCardLayout(
     modifier: Modifier,
     progress: Float?,
     watched: Boolean,
-    playMark: Boolean,
     onLongClick: (() -> Unit)? = null,
     width: Dp = LocalNovaDimens.current.landscapeCardWidth,
 ) {
@@ -341,8 +323,7 @@ private fun WideCardLayout(
                 .background(MaterialTheme.colorScheme.surfaceContainerHigh),
         ) {
             // A card without any 16:9 picture names its title on the placeholder.
-            LandscapeArt(artwork = artwork, title = artTitle, modifier = Modifier.fillMaxSize(), showTitleOnPlaceholder = !playMark)
-            if (playMark) PlayGlyph(Modifier.align(Alignment.Center))
+            LandscapeArt(artwork = artwork, title = artTitle, modifier = Modifier.fillMaxSize())
             if (watched) WatchedBadge(Modifier.align(Alignment.TopEnd).padding(6.dp))
             ProgressStrip(progress, Modifier.align(Alignment.BottomStart))
         }
@@ -419,13 +400,13 @@ internal fun PhoneVideoRow(
     }
 }
 
-/** "Play all" and "Shuffle" side by side, for a folder, a season or a playlist. */
+/** "Play All" and "Shuffle" side by side, for a folder, a season or a playlist. */
 @Composable
 internal fun PhonePlayAllRow(
     onPlayAll: () -> Unit,
     onShuffle: () -> Unit,
     modifier: Modifier = Modifier,
-    playLabel: String = "Play all",
+    playLabel: String = "Play All",
 ) {
     // Apple's Play and Shuffle: two equal grey pills with the accent on icon and label.
     Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -475,7 +456,6 @@ internal fun PhoneEpisodeRow(
                     .background(MaterialTheme.colorScheme.surfaceContainerHigh),
             ) {
                 LandscapeArt(artwork = episode.artwork, title = episode.title, modifier = Modifier.fillMaxSize())
-                PlayGlyph(Modifier.align(Alignment.Center), size = 32.dp)
                 if (episode.watched) WatchedBadge(Modifier.align(Alignment.TopEnd).padding(4.dp))
                 ProgressStrip(episode.progress, Modifier.align(Alignment.BottomStart))
             }

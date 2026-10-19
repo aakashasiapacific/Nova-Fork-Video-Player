@@ -150,7 +150,7 @@ data class HomeUi(
 enum class LibraryFilter(val label: String) {
     ALL("All"),
     MOVIES("Movies"),
-    SHOWS("TV shows"),
+    SHOWS("TV Shows"),
     VIDEOS("Videos"),
 
     /** The hero's "+" list and its star list: their own Library pages, not filter chips. */
@@ -162,7 +162,7 @@ enum class LibraryFilter(val label: String) {
     val isChip: Boolean get() = this == ALL || this == MOVIES || this == SHOWS
 }
 
-enum class LibrarySort(val label: String) { RECENT("Recently added"), TITLE("Title"), YEAR("Year"), RATING("Rating") }
+enum class LibrarySort(val label: String) { RECENT("Recently Added"), TITLE("Title"), YEAR("Year"), RATING("Rating") }
 
 @Immutable
 data class LibraryUi(
@@ -172,7 +172,7 @@ data class LibraryUi(
     val counts: Map<LibraryFilter, Int> = emptyMap(),
     /**
      * Every video newest first, by when it reached the device, each card's second line saying
-     * when ("Today · 2h 37m"): what "All videos" shows when sorted by Recently added, as one
+     * when ("Today · 2h 37m"): what "All Videos" shows when sorted by Recently added, as one
      * gapless grid. Empty otherwise.
      */
     val timeline: List<VideoCardUi> = emptyList(),

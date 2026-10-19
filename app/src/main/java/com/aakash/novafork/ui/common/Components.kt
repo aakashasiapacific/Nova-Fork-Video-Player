@@ -70,15 +70,20 @@ fun RatingPill(rating: Float?, modifier: Modifier = Modifier, onImage: Boolean =
     }
 }
 
-/** Thin progress strip for the bottom edge of a card. Draws nothing for null/0. */
+/**
+ * Progress on a card, as Apple TV draws it: a rounded bar inset from the picture's bottom edge
+ * on a translucent track. Draws nothing for null/0.
+ */
 @Composable
-fun ProgressStrip(progress: Float?, modifier: Modifier = Modifier, height: Dp = 3.dp) {
+fun ProgressStrip(progress: Float?, modifier: Modifier = Modifier, height: Dp = 4.dp) {
     if (progress == null || progress <= 0f) return
     Box(
         modifier
+            .padding(horizontal = 8.dp, vertical = 7.dp)
             .fillMaxWidth()
             .height(height)
-            .background(Color.White.copy(alpha = 0.25f)),
+            .clip(CircleShape)
+            .background(Color.White.copy(alpha = 0.3f)),
     ) {
         Box(
             Modifier

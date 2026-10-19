@@ -148,7 +148,7 @@ internal fun TabletSearchScreen(
             search.query.trim() == query.trim() -> SearchMessage {
                 EmptyState(
                     icon = R.drawable.ic_search,
-                    title = "No matches",
+                    title = "No Matches",
                     body = "Nothing in your library matches “${query.trim()}”.",
                 )
             }

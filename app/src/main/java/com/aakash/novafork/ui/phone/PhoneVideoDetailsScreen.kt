@@ -93,7 +93,7 @@ fun PhoneVideoDetailsScreen(
                 item(key = "next") {
                     Column(Modifier.padding(top = dims.sectionSpacing)) {
                         SectionHeader(
-                            title = "Next episode",
+                            title = "Next Episode",
                             modifier = Modifier.padding(start = dims.gutter, end = dims.gutter, bottom = 10.dp),
                         )
                         PhoneLandscapeCard(
@@ -129,7 +129,7 @@ fun PhoneVideoDetailsScreen(
                     },
                 )
                 NovaMenuItem(
-                    text = { Text("Change artwork…") },
+                    text = { Text("Change Artwork…") },
                     leadingIcon = { NovaIcon(R.drawable.ic_image, contentDescription = null) },
                     onClick = {
                         close()
@@ -137,7 +137,7 @@ fun PhoneVideoDetailsScreen(
                     },
                 )
                 NovaMenuItem(
-                    text = { Text(if (details.watched) "Mark as unwatched" else "Mark as watched") },
+                    text = { Text(if (details.watched) "Mark as Unwatched" else "Mark as Watched") },
                     leadingIcon = {
                         NovaIcon(
                             if (details.watched) R.drawable.ic_visibility_off else R.drawable.ic_check_circle,
@@ -150,7 +150,7 @@ fun PhoneVideoDetailsScreen(
                     },
                 )
                 NovaMenuItem(
-                    text = { Text("Add to playlist") },
+                    text = { Text("Add to Playlist") },
                     leadingIcon = { NovaIcon(R.drawable.ic_playlist_add, contentDescription = null) },
                     onClick = {
                         close()
@@ -198,7 +198,7 @@ private fun PlaySection(details: VideoDetailsUi, actions: AppActions, modifier: 
                 TextButton(onClick = { actions.play(details.id, startOver = true) }) {
                     NovaIcon(R.drawable.ic_restart_alt, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(6.dp))
-                    Text("Start over")
+                    Text("Start Over")
                 }
             }
         }

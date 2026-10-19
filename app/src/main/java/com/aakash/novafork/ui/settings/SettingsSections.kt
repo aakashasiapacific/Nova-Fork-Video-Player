@@ -127,7 +127,7 @@ private fun libraryGroups(state: SettingsUi, actions: AppActions): List<Settings
                 ActionRow(
                     shape = shape,
                     icon = R.drawable.ic_create_new_folder,
-                    title = "Add folder",
+                    title = "Add Folder",
                     summary = "Pick a folder on this device, a USB drive or an SD card",
                     onClick = actions::addFolder,
                 )
@@ -149,7 +149,7 @@ private fun libraryGroups(state: SettingsUi, actions: AppActions): List<Settings
                 ActionRow(
                     shape = shape,
                     icon = R.drawable.ic_lan,
-                    title = "Add network source",
+                    title = "Add Network Source",
                     summary = "SMB, FTP, SFTP, NFS, WebDAV, DLNA, Jellyfin, Emby or Plex",
                     onClick = actions::addNetworkSource,
                 )

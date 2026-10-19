@@ -357,7 +357,7 @@ private fun DetailsStyleHeroPage(
                     modifier = Modifier.padding(top = 4.dp),
                 )
             }
-            // Rating and "Continue watching" share a line, so the block stays short.
+            // Rating and "Continue Watching" share a line, so the block stays short.
             val rating = hero.rating
             val highlight = highlightOf(hero)
             if ((rating != null && rating > 0f) || highlight != null) {
@@ -542,7 +542,7 @@ private fun WideHeroArt(artwork: Artwork, modifier: Modifier = Modifier, alignme
 private fun highlightOf(hero: HeroUi): String? {
     val progress = hero.progress
     return when {
-        progress != null && progress > 0f -> "Continue watching"
+        progress != null && progress > 0f -> "Continue Watching"
         hero.onWatchlist -> "On your Watchlist"
         else -> null
     }

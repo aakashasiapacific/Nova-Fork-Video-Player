@@ -54,7 +54,7 @@ import com.aakash.novafork.ui.model.PlaylistUi
 /** Playlist names are short labels; longer input is cut rather than refused. */
 private const val MAX_NAME_LENGTH = 80
 
-/** "Add to playlist": every playlist (most recently changed first) and New playlist on top. */
+/** "Add to Playlist": every playlist (most recently changed first) and New playlist on top. */
 @Composable
 internal fun AddToPlaylistSheet(dialog: DialogUi.AddToPlaylist, playlists: List<PlaylistUi>, actions: AppActions) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -66,7 +66,7 @@ internal fun AddToPlaylistSheet(dialog: DialogUi.AddToPlaylist, playlists: List<
         dragHandle = { IosGrabber() },
     ) {
         Column(Modifier.padding(start = 24.dp, end = 24.dp, bottom = 8.dp)) {
-            Text("Add to playlist", style = MaterialTheme.typography.titleLarge)
+            Text("Add to Playlist", style = MaterialTheme.typography.titleLarge)
             if (dialog.label.isNotBlank()) {
                 Text(
                     text = dialog.label,

@@ -135,7 +135,7 @@ private fun PlaylistMenu(playlist: PlaylistDetailsUi, actions: AppActions) {
                 },
             )
             NovaMenuItem(
-                text = { Text("Delete playlist") },
+                text = { Text("Delete Playlist") },
                 destructive = true,
                 leadingIcon = { NovaIcon(R.drawable.ic_delete, contentDescription = null) },
                 onClick = {

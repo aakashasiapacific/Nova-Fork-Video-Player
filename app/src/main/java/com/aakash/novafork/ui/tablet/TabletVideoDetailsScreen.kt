@@ -27,7 +27,6 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
@@ -158,7 +157,7 @@ private fun VideoBody(details: VideoDetailsUi, actions: AppActions) {
             TabletPlayButton(label = details.playLabel, onClick = { actions.play(details.id) })
             if (started) {
                 FilledTonalButton(onClick = { actions.play(details.id, startOver = true) }, modifier = Modifier.height(48.dp)) {
-                    ButtonLabel(R.drawable.ic_restart_alt, "Start over")
+                    ButtonLabel(R.drawable.ic_restart_alt, "Start Over")
                 }
             }
             if (!isStream) {
@@ -177,7 +176,7 @@ private fun VideoBody(details: VideoDetailsUi, actions: AppActions) {
                 onClick = { actions.addToPlaylist(listOf(details.id), details.title) },
                 modifier = Modifier.height(48.dp),
             ) {
-                ButtonLabel(R.drawable.ic_playlist_add, "Add to playlist")
+                ButtonLabel(R.drawable.ic_playlist_add, "Add to Playlist")
             }
         }
         WatchProgress(progress = details.progress, positionMs = details.positionMs, durationMs = details.durationMs)
@@ -193,7 +192,6 @@ private fun VideoBody(details: VideoDetailsUi, actions: AppActions) {
             Text(
                 text = details.tagline,
                 style = MaterialTheme.typography.titleMedium,
-                fontStyle = FontStyle.Italic,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
@@ -201,7 +199,7 @@ private fun VideoBody(details: VideoDetailsUi, actions: AppActions) {
         val next = details.nextEpisode
         if (next != null) {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Next episode", style = MaterialTheme.typography.titleLarge)
+                Text("Next Episode", style = MaterialTheme.typography.titleLarge)
                 TabletLandscapeCard(
                     card = next,
                     onClick = { actions.play(next.id) },

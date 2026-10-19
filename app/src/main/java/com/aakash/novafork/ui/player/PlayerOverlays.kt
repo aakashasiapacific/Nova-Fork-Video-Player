@@ -286,7 +286,7 @@ internal fun ResumeBanner(
                     maxLines = 1,
                 )
                 Spacer(Modifier.width(4.dp))
-                TextButton(onClick = onStartOver) { Text("Start over") }
+                TextButton(onClick = onStartOver) { Text("Start Over") }
                 PlayerIconButton(
                     icon = R.drawable.ic_close,
                     contentDescription = "Dismiss",
@@ -340,7 +340,7 @@ private fun UpNextContent(item: UpNextUi, onPlayNow: () -> Unit, onCancel: () ->
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
                     Text(
-                        text = "Up next",
+                        text = "Up Next",
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.primary,
                     )

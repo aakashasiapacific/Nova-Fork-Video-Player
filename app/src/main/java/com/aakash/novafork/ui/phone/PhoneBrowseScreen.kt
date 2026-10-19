@@ -135,13 +135,13 @@ private fun LazyListScope.browseItems(
     sectionHeader("folders", "Folders")
     items(folders, key = { "src:${it.id}" }) { source -> SourceRow(source, actions) }
     item(key = "addFolder") {
-        ActionRow(R.drawable.ic_create_new_folder, "Add folder", actions::addFolder)
+        ActionRow(R.drawable.ic_create_new_folder, "Add Folder", actions::addFolder)
     }
 
     sectionHeader("network", "Network")
     items(network, key = { "src:${it.id}" }) { source -> SourceRow(source, actions) }
     item(key = "addNetwork") {
-        ActionRow(R.drawable.ic_add, "Add network source", actions::addNetworkSource)
+        ActionRow(R.drawable.ic_add, "Add Network Source", actions::addNetworkSource)
     }
 
     sectionHeader("streams", "Streams")
@@ -153,10 +153,10 @@ private fun LazyListScope.browseItems(
         )
     }
     item(key = "addStream") {
-        ActionRow(R.drawable.ic_add, "Add stream") { actions.showDialog(DialogUi.AddStream) }
+        ActionRow(R.drawable.ic_add, "Add Stream") { actions.showDialog(DialogUi.AddStream) }
     }
     item(key = "openUrl") {
-        ActionRow(R.drawable.ic_link, "Open network stream") { actions.showDialog(DialogUi.OpenUrl) }
+        ActionRow(R.drawable.ic_link, "Open Network Stream") { actions.showDialog(DialogUi.OpenUrl) }
     }
 
     sectionHeader("playlists", "Playlists")

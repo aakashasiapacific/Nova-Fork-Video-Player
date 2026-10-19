@@ -101,7 +101,7 @@ fun PhoneSearchScreen(
                     search.isEmpty && query.isNotEmpty() -> CenteredScrollable(Modifier.padding(bottom = listSpace)) {
                         EmptyState(
                             icon = R.drawable.ic_search,
-                            title = "No results",
+                            title = "No Results",
                             body = "Nothing in your library matches “$query”.",
                         )
                     }

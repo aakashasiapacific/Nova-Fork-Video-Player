@@ -326,3 +326,16 @@ The owner asked for Apple Music to be copied more precisely, with less clutter. 
     playlist with its cover.
   - The artist page opens on a big picture with the name over it and a round red Play button.
   - An album ends with "More by <artist>".
+
+## 12. Apple's wording and quieter cards (overnight, 2026-10-19; build 59)
+
+- **Title Case,** as Apple's apps use for headers, buttons and menus: Continue Watching, Recently
+  Added, All Videos, TV Shows, Up Next, Add to Playlist, Play All, Mark as Watched and so on.
+  Sentences stay in sentence case.
+- **No play circle** over Continue Watching cards or episode stills; Apple TV draws none.
+- **Progress:** a rounded bar inset from the bottom of the picture on a translucent track,
+  replacing a strip along the edge.
+- **Synopsis:**
+  - the toggle reads "MORE" / "LESS" in white caps;
+  - taglines are upright and bold, not italic.
+- **Audio without access:** only the access card shows, not a red error line repeating it.
