@@ -55,7 +55,7 @@ fun HeroTitle(
         Text(
             text = title,
             style = textStyle,
-            fontWeight = FontWeight.ExtraBold,
+            fontWeight = FontWeight.Bold,
             color = Color.White,
             textAlign = textAlign,
             maxLines = 2,

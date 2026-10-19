@@ -7,8 +7,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -23,7 +21,9 @@ import com.aakash.novafork.R
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
 import com.aakash.novafork.ui.common.EmptyState
 import com.aakash.novafork.ui.common.LocalBottomBarSpace
+import com.aakash.novafork.ui.common.NovaDropdownMenu
 import com.aakash.novafork.ui.common.NovaIcon
+import com.aakash.novafork.ui.common.NovaMenuItem
 import com.aakash.novafork.ui.common.VideoMenuBox
 import com.aakash.novafork.ui.dialogs.playlistCountLabel
 import com.aakash.novafork.ui.model.AppActions
@@ -108,8 +108,8 @@ private fun PlaylistMenu(playlist: PlaylistDetailsUi, actions: AppActions) {
         IconButton(onClick = { open = true }) {
             NovaIcon(R.drawable.ic_more_vert, contentDescription = "Playlist options")
         }
-        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-            DropdownMenuItem(
+        NovaDropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            NovaMenuItem(
                 text = { Text("Rename") },
                 leadingIcon = { NovaIcon(R.drawable.ic_edit, contentDescription = null) },
                 onClick = {
@@ -117,8 +117,9 @@ private fun PlaylistMenu(playlist: PlaylistDetailsUi, actions: AppActions) {
                     actions.showDialog(DialogUi.RenamePlaylist(playlist.id, playlist.name))
                 },
             )
-            DropdownMenuItem(
+            NovaMenuItem(
                 text = { Text("Delete playlist") },
+                destructive = true,
                 leadingIcon = { NovaIcon(R.drawable.ic_delete, contentDescription = null) },
                 onClick = {
                     open = false

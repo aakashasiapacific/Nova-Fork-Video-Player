@@ -38,7 +38,7 @@ import com.aakash.novafork.ui.model.ScanUi
 import com.aakash.novafork.ui.theme.NovaColors
 import java.util.Locale
 
-/** Icon from res/drawable (Material Icons Round, see docs/ARCHITECTURE.md for the list). */
+/** Icon from res/drawable (Framework7 Icons, MIT: see docs/ARCHITECTURE.md for the list). */
 @Composable
 fun NovaIcon(
     @DrawableRes res: Int,

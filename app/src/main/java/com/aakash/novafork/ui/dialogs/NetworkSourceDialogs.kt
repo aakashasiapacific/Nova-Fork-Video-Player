@@ -18,9 +18,6 @@ import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
@@ -54,6 +51,9 @@ import androidx.compose.ui.window.DialogProperties
 import com.aakash.novafork.R
 import com.aakash.novafork.data.db.SourceType
 import com.aakash.novafork.ui.NetworkForms
+import com.aakash.novafork.ui.common.IosCheckCircle
+import com.aakash.novafork.ui.common.IosSpinner
+import com.aakash.novafork.ui.common.NovaAlertDialog
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.sourceTypeIcon
 import com.aakash.novafork.ui.model.AppActions
@@ -85,7 +85,8 @@ private val MediaServerKinds = listOf(
 /** "Add network source": the kinds of server, each going on to its own dialog. */
 @Composable
 internal fun AddSourceDialog(actions: AppActions) {
-    AlertDialog(
+    NovaAlertDialog(
+        form = true,
         onDismissRequest = actions::dismissDialog,
         icon = { NovaIcon(R.drawable.ic_lan, contentDescription = null) },
         title = { Text("Add network source") },
@@ -198,7 +199,8 @@ internal fun NetworkServerDialog(dialog: DialogUi.NetworkServer, actions: AppAct
     val canTest = address.isNotBlank() && !dialog.testing
     val canSave = canTest && !noLibrary && (type != SourceType.PLEX || token.isNotBlank())
 
-    AlertDialog(
+    NovaAlertDialog(
+        form = true,
         onDismissRequest = actions::dismissDialog,
         properties = DialogProperties(dismissOnClickOutside = false),
         icon = { NovaIcon(sourceTypeIcon(type), contentDescription = null) },
@@ -283,7 +285,7 @@ internal fun NetworkServerDialog(dialog: DialogUi.NetworkServer, actions: AppAct
                     }
                     if (dialog.testing) {
                         Spacer(Modifier.width(16.dp))
-                        CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                        IosSpinner(Modifier.size(20.dp), strokeWidth = 2.dp)
                     }
                 }
                 if (!dialog.testing && result != null) TestResultLine(result)
@@ -411,7 +413,7 @@ private fun LibraryChoice(
                         .toggleable(value = on, role = Role.Checkbox, onValueChange = { onChoose(library, it) }),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Checkbox(checked = on, onCheckedChange = null, modifier = Modifier.padding(10.dp))
+                    IosCheckCircle(checked = on, modifier = Modifier.padding(10.dp))
                     Text(library.name, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
             }
@@ -477,7 +479,7 @@ private fun PlexSignInPanel(signIn: PlexSignInUi?, form: NetworkSourceForm, acti
                     Text("Enter this code at $link", style = MaterialTheme.typography.bodyMedium)
                     val code = signIn.code
                     if (code == null) {
-                        CircularProgressIndicator(Modifier.size(28.dp), strokeWidth = 2.dp)
+                        IosSpinner(Modifier.size(28.dp), strokeWidth = 2.dp)
                     } else {
                         Text(
                             text = code,
@@ -486,7 +488,7 @@ private fun PlexSignInPanel(signIn: PlexSignInUi?, form: NetworkSourceForm, acti
                         )
                     }
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+                        IosSpinner(Modifier.size(16.dp), strokeWidth = 2.dp)
                         Spacer(Modifier.width(10.dp))
                         Text(
                             text = "Waiting for plex.tv…",
@@ -594,7 +596,8 @@ private fun SecretField(value: String, onValueChange: (String) -> Unit, label: S
 /** DLNA/UPnP servers that answered on this network; tapping one adds it. */
 @Composable
 internal fun UpnpServersDialog(dialog: DialogUi.UpnpServers, actions: AppActions) {
-    AlertDialog(
+    NovaAlertDialog(
+        form = true,
         onDismissRequest = actions::dismissDialog,
         icon = { NovaIcon(sourceTypeIcon(SourceType.UPNP), contentDescription = null) },
         title = { Text("DLNA servers") },
@@ -605,7 +608,7 @@ internal fun UpnpServersDialog(dialog: DialogUi.UpnpServers, actions: AppActions
             ) {
                 if (dialog.searching) {
                     Row(Modifier.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                        IosSpinner(Modifier.size(20.dp), strokeWidth = 2.dp)
                         Spacer(Modifier.width(12.dp))
                         Text("Looking for media servers on this network…", style = MaterialTheme.typography.bodyMedium)
                     }

@@ -259,3 +259,21 @@ Notes on how they were built:
   top 60%, fading into a blurred copy, which crops far less than filling the whole hero.
 - Dragging along the tab bar picks a tab. The pages themselves don't switch on a swipe, because
   the hero and the rows already scroll sideways.
+
+## 9. iOS design language, not "fake iOS" (owner, 2026-10-19; built in build 56)
+
+The owner said the app looked like fake iOS: the Material star and audio icons and many other
+details gave it away. Decisions:
+- **Icons:** Framework7 Icons (MIT), which are drawn in the SF Symbols style. Apple's SF Symbols
+  and SF Pro may not ship on Android, so the font stays Inter.
+- **Switches:** iOS's green pill switch.
+- **Settings:** an inset-grouped list, as in iOS Settings. Each group is one rounded card with
+  hairline separators, grey caps headers and coloured icon tiles. Choices open a pop-up menu
+  from the value on the right.
+- **Menus and dialogs:** iOS context menus (wide, rounded, 17pt rows, red destructive rows) and
+  iOS alerts (centred title and message, full-width buttons under a hairline). Sheets get iOS's
+  grabber and rounder corners.
+- **Type:** iOS's type scale. Large titles are bold, not extra-bold, and body text is 17.
+- Also swept: the spinner is iOS's spoked one; filter chips are capsules with no checkmark; tabs
+  inside sheets and dialogs are iOS segmented controls; checkboxes became switches or
+  selection circles; radio buttons became a trailing checkmark.

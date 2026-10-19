@@ -7,8 +7,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.PrimaryTabRow
-import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -19,6 +17,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import com.aakash.novafork.ui.common.IosColors
+import com.aakash.novafork.ui.common.IosGrabber
+import com.aakash.novafork.ui.common.IosSegmentedControl
+import com.aakash.novafork.ui.common.IosSheetShape
 import com.aakash.novafork.ui.model.PlayerActions
 import com.aakash.novafork.ui.model.PlayerUiState
 
@@ -47,17 +49,18 @@ internal fun TrackSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        containerColor = IosColors.GroupedCard,
+        shape = IosSheetShape,
+        dragHandle = { IosGrabber() },
     ) {
-        PrimaryTabRow(selectedTabIndex = tab, containerColor = Color.Transparent) {
-            SheetTabs.forEachIndexed { index, title ->
-                Tab(
-                    selected = tab == index,
-                    onClick = { tab = index },
-                    text = { Text(title) },
-                )
-            }
-        }
+        IosSegmentedControl(
+            options = SheetTabs,
+            selectedIndex = tab,
+            onSelect = { tab = it },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 4.dp),
+        )
         Column(
             Modifier
                 .fillMaxWidth()

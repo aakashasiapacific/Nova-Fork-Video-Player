@@ -7,7 +7,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -24,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import com.aakash.novafork.R
 import com.aakash.novafork.ui.InputRules
+import com.aakash.novafork.ui.common.NovaAlertDialog
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.DialogUi
@@ -108,7 +108,8 @@ private fun StreamUrlDialog(
         }
     }
 
-    AlertDialog(
+    NovaAlertDialog(
+        form = true,
         onDismissRequest = onDismiss,
         // A stray tap outside should not throw away a pasted URL.
         properties = DialogProperties(dismissOnClickOutside = false),
@@ -168,7 +169,7 @@ private fun StreamUrlDialog(
 
 @Composable
 private fun ConfirmRemoveSourceDialog(source: SourceUi, onConfirm: () -> Unit, onDismiss: () -> Unit) {
-    AlertDialog(
+    NovaAlertDialog(
         onDismissRequest = onDismiss,
         icon = { NovaIcon(R.drawable.ic_delete, contentDescription = null) },
         title = { Text("Remove ${source.name}?") },

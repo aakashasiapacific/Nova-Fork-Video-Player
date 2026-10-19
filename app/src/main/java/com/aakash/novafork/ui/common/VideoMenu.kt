@@ -1,8 +1,6 @@
 package com.aakash.novafork.ui.common
 
 import androidx.compose.foundation.layout.Box
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -31,9 +29,9 @@ fun VideoMenuBox(
     var open by remember { mutableStateOf(false) }
     Box(modifier) {
         content { open = true }
-        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+        NovaDropdownMenu(expanded = open, onDismissRequest = { open = false }) {
             if (showDetails) {
-                DropdownMenuItem(
+                NovaMenuItem(
                     text = { Text("Details") },
                     leadingIcon = { NovaIcon(R.drawable.ic_info, contentDescription = null) },
                     onClick = {
@@ -42,7 +40,7 @@ fun VideoMenuBox(
                     },
                 )
             }
-            DropdownMenuItem(
+            NovaMenuItem(
                 text = { Text("Add to playlist") },
                 leadingIcon = { NovaIcon(R.drawable.ic_playlist_add, contentDescription = null) },
                 onClick = {

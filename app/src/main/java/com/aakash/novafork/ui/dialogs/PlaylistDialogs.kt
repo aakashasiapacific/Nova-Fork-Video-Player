@@ -17,7 +17,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
@@ -41,7 +40,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import com.aakash.novafork.R
+import com.aakash.novafork.ui.common.IosColors
+import com.aakash.novafork.ui.common.IosGrabber
+import com.aakash.novafork.ui.common.IosSheetShape
 import com.aakash.novafork.ui.common.LandscapeArt
+import com.aakash.novafork.ui.common.NovaAlertDialog
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.Artwork
@@ -58,7 +61,9 @@ internal fun AddToPlaylistSheet(dialog: DialogUi.AddToPlaylist, playlists: List<
     ModalBottomSheet(
         onDismissRequest = actions::dismissDialog,
         sheetState = sheetState,
-        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        containerColor = IosColors.GroupedCard,
+        shape = IosSheetShape,
+        dragHandle = { IosGrabber() },
     ) {
         Column(Modifier.padding(start = 24.dp, end = 24.dp, bottom = 8.dp)) {
             Text("Add to playlist", style = MaterialTheme.typography.titleLarge)
@@ -137,7 +142,8 @@ internal fun PlaylistNameDialog(
 ) {
     var name by remember { mutableStateOf(initialName) }
     val canSave = name.isNotBlank()
-    AlertDialog(
+    NovaAlertDialog(
+        form = true,
         onDismissRequest = onDismiss,
         properties = DialogProperties(dismissOnClickOutside = false),
         icon = { NovaIcon(R.drawable.ic_playlist_add, contentDescription = null) },
@@ -167,7 +173,7 @@ internal fun PlaylistNameDialog(
 
 @Composable
 internal fun ConfirmDeletePlaylistDialog(name: String, onConfirm: () -> Unit, onDismiss: () -> Unit) {
-    AlertDialog(
+    NovaAlertDialog(
         onDismissRequest = onDismiss,
         icon = { NovaIcon(R.drawable.ic_delete, contentDescription = null) },
         title = { Text("Delete $name?") },

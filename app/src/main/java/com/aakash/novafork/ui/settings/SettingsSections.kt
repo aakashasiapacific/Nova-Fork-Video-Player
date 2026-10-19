@@ -12,8 +12,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -43,6 +41,8 @@ import com.aakash.novafork.data.LayoutMode
 import com.aakash.novafork.data.Settings
 import com.aakash.novafork.data.TmdbHost
 import com.aakash.novafork.data.db.SourceType
+import com.aakash.novafork.ui.common.IosSpinner
+import com.aakash.novafork.ui.common.NovaAlertDialog
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.sourceTypeIcon
 import com.aakash.novafork.ui.model.AppActions
@@ -383,7 +383,7 @@ private fun TmdbKeyRow(shape: Shape, state: SettingsUi, actions: AppActions) {
                 Spacer(Modifier.width(8.dp))
                 val checking = state.keyStatus == KeyStatus.CHECKING
                 if (checking) {
-                    CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                    IosSpinner(Modifier.size(18.dp), strokeWidth = 2.dp)
                 }
                 TextButton(
                     onClick = actions::checkTmdbKey,
@@ -434,7 +434,7 @@ private fun ClearMetadataRow(shape: Shape, onConfirm: () -> Unit) {
         onClick = { confirming = true },
     )
     if (confirming) {
-        AlertDialog(
+        NovaAlertDialog(
             onDismissRequest = { confirming = false },
             title = { Text("Clear metadata?") },
             text = {

@@ -19,7 +19,6 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -37,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
 import com.aakash.novafork.ui.adaptive.DeviceLayout
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
+import com.aakash.novafork.ui.common.NovaChip
 import com.aakash.novafork.ui.common.RatingPill
 import com.aakash.novafork.ui.common.VideoMenuBox
 import com.aakash.novafork.ui.common.metaLine
@@ -263,7 +263,7 @@ private fun SeasonSelector(
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         seasons.forEach { season ->
-            FilterChip(
+            NovaChip(
                 selected = season.number == selected,
                 onClick = { onSelect(season.number) },
                 label = {

@@ -16,7 +16,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -32,6 +31,7 @@ import com.aakash.novafork.core.format.Formats
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
 import com.aakash.novafork.ui.common.LocalBottomBarSpace
 import com.aakash.novafork.ui.common.NovaIcon
+import com.aakash.novafork.ui.common.NovaMenuItem
 import com.aakash.novafork.ui.common.SectionHeader
 import com.aakash.novafork.ui.common.metaLine
 import com.aakash.novafork.ui.model.AppActions
@@ -120,7 +120,7 @@ fun PhoneVideoDetailsScreen(
             onBack = actions::back,
             modifier = Modifier.align(Alignment.TopStart),
             menu = { close ->
-                DropdownMenuItem(
+                NovaMenuItem(
                     text = { Text("Identify…") },
                     leadingIcon = { NovaIcon(R.drawable.ic_search, contentDescription = null) },
                     onClick = {
@@ -128,7 +128,7 @@ fun PhoneVideoDetailsScreen(
                         actions.identify(details.id)
                     },
                 )
-                DropdownMenuItem(
+                NovaMenuItem(
                     text = { Text("Change artwork…") },
                     leadingIcon = { NovaIcon(R.drawable.ic_image, contentDescription = null) },
                     onClick = {
@@ -136,7 +136,7 @@ fun PhoneVideoDetailsScreen(
                         actions.changeArtwork(details.id)
                     },
                 )
-                DropdownMenuItem(
+                NovaMenuItem(
                     text = { Text(if (details.watched) "Mark as unwatched" else "Mark as watched") },
                     leadingIcon = {
                         NovaIcon(
@@ -149,7 +149,7 @@ fun PhoneVideoDetailsScreen(
                         actions.setWatched(details.id, !details.watched)
                     },
                 )
-                DropdownMenuItem(
+                NovaMenuItem(
                     text = { Text("Add to playlist") },
                     leadingIcon = { NovaIcon(R.drawable.ic_playlist_add, contentDescription = null) },
                     onClick = {

@@ -11,9 +11,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalContentColor
@@ -41,6 +38,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
 import com.aakash.novafork.core.format.Formats
+import com.aakash.novafork.ui.common.IosSpinner
+import com.aakash.novafork.ui.common.NovaDropdownMenu
+import com.aakash.novafork.ui.common.NovaMenuItem
 import com.aakash.novafork.ui.model.PlayerUiState
 import com.aakash.novafork.ui.model.RepeatMode
 import com.aakash.novafork.ui.model.TrackUi
@@ -153,9 +153,9 @@ internal fun PlayerMoreMenu(
             buttonSize = buttonSize,
             iconSize = iconSize,
         )
-        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+        NovaDropdownMenu(expanded = open, onDismissRequest = { open = false }) {
             items.forEach { item ->
-                DropdownMenuItem(
+                NovaMenuItem(
                     text = { Text(item.label) },
                     leadingIcon = { Icon(painterResource(item.icon), contentDescription = null) },
                     onClick = {
@@ -253,7 +253,7 @@ internal fun PlayPauseButton(
             )
         }
         if (buffering) {
-            CircularProgressIndicator(modifier = Modifier.fillMaxSize(), color = Color.White, strokeWidth = 3.dp)
+            IosSpinner(modifier = Modifier.fillMaxSize(), color = Color.White, strokeWidth = 3.dp)
         }
     }
 }

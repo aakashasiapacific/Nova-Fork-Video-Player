@@ -36,9 +36,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -68,7 +65,10 @@ import com.aakash.novafork.ui.adaptive.DeviceLayout
 import com.aakash.novafork.ui.common.DeviceAccessCard
 import com.aakash.novafork.ui.common.DeviceStorageEmptyState
 import com.aakash.novafork.ui.common.EmptyState
+import com.aakash.novafork.ui.common.IosSpinner
+import com.aakash.novafork.ui.common.NovaDropdownMenu
 import com.aakash.novafork.ui.common.NovaIcon
+import com.aakash.novafork.ui.common.NovaMenuItem
 import com.aakash.novafork.ui.common.ScanBanner
 import com.aakash.novafork.ui.common.VideoMenuBox
 import com.aakash.novafork.ui.common.deviceAccessNotice
@@ -337,7 +337,7 @@ private fun SourceRow(source: SourceUi, selected: Boolean, actions: AppActions) 
             }
             Spacer(Modifier.width(8.dp))
             if (source.isScanning) {
-                CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                IosSpinner(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
             } else {
                 Text(
                     text = source.videoCount.toString(),
@@ -349,8 +349,8 @@ private fun SourceRow(source: SourceUi, selected: Boolean, actions: AppActions) 
                 IconButton(onClick = { menuOpen = true }) {
                     NovaIcon(R.drawable.ic_more_vert, contentDescription = "Options for ${source.name}")
                 }
-                DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                    DropdownMenuItem(
+                NovaDropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                    NovaMenuItem(
                         text = { Text("Rescan") },
                         leadingIcon = { NovaIcon(R.drawable.ic_refresh, contentDescription = null) },
                         onClick = {
@@ -359,7 +359,7 @@ private fun SourceRow(source: SourceUi, selected: Boolean, actions: AppActions) 
                         },
                     )
                     if (source.type.isNetworkShare || source.type.isMediaServer) {
-                        DropdownMenuItem(
+                        NovaMenuItem(
                             text = { Text("Edit") },
                             leadingIcon = { NovaIcon(R.drawable.ic_edit, contentDescription = null) },
                             onClick = {
@@ -368,8 +368,9 @@ private fun SourceRow(source: SourceUi, selected: Boolean, actions: AppActions) 
                             },
                         )
                     }
-                    DropdownMenuItem(
+                    NovaMenuItem(
                         text = { Text("Remove") },
+                        destructive = true,
                         leadingIcon = { NovaIcon(R.drawable.ic_delete, contentDescription = null) },
                         onClick = {
                             menuOpen = false

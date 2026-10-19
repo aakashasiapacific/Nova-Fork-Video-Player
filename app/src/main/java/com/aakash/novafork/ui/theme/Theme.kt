@@ -19,7 +19,6 @@ val Inter = FontFamily(
     Font(R.font.inter_medium, FontWeight.Medium),
     Font(R.font.inter_semibold, FontWeight.SemiBold),
     Font(R.font.inter_bold, FontWeight.Bold),
-    Font(R.font.inter_extrabold, FontWeight.ExtraBold),
 )
 
 /** Colours that are the same in both themes. */
@@ -85,30 +84,38 @@ private val DarkScheme: ColorScheme = darkColorScheme(
     surfaceContainerHighest = Color(0xFF3A3A3C),
 )
 
-private fun TextStyle.inter(weight: FontWeight? = null, tracking: Float? = null): TextStyle = copy(
+private fun ios(size: Float, line: Float, weight: FontWeight, tracking: Float): TextStyle = Base.bodyLarge.copy(
     fontFamily = Inter,
-    fontWeight = weight ?: fontWeight,
-    letterSpacing = tracking?.sp ?: letterSpacing,
+    fontWeight = weight,
+    fontSize = size.sp,
+    lineHeight = line.sp,
+    letterSpacing = tracking.sp,
 )
 
 private val Base = Typography()
 
+/**
+ * iOS's text styles (dark Settings / Apple TV / Apple Music) set in Inter: Large Title 34 bold,
+ * Title 1 28, Title 2 22, Title 3 20, Headline 17 semibold, Body 17, Subheadline 15, Footnote 13,
+ * Caption 12 and 11. Nothing is heavier than bold. Inter runs wider than SF Pro, so every size
+ * is tracked a little tighter than Apple's table to keep the same line lengths.
+ */
 val NovaTypography = Typography(
-    displayLarge = Base.displayLarge.inter(FontWeight.ExtraBold, -1f),
-    displayMedium = Base.displayMedium.inter(FontWeight.ExtraBold, -0.8f),
-    displaySmall = Base.displaySmall.inter(FontWeight.Bold, -0.5f),
-    headlineLarge = Base.headlineLarge.inter(FontWeight.Bold, -0.4f),
-    headlineMedium = Base.headlineMedium.inter(FontWeight.Bold, -0.3f),
-    headlineSmall = Base.headlineSmall.inter(FontWeight.SemiBold, -0.2f),
-    titleLarge = Base.titleLarge.inter(FontWeight.SemiBold, -0.1f),
-    titleMedium = Base.titleMedium.inter(FontWeight.SemiBold),
-    titleSmall = Base.titleSmall.inter(FontWeight.SemiBold),
-    bodyLarge = Base.bodyLarge.inter(),
-    bodyMedium = Base.bodyMedium.inter(),
-    bodySmall = Base.bodySmall.inter(),
-    labelLarge = Base.labelLarge.inter(FontWeight.SemiBold),
-    labelMedium = Base.labelMedium.inter(FontWeight.Medium),
-    labelSmall = Base.labelSmall.inter(FontWeight.Medium),
+    displayLarge = ios(40f, 46f, FontWeight.Bold, -0.8f),
+    displayMedium = ios(36f, 42f, FontWeight.Bold, -0.7f),
+    displaySmall = ios(34f, 41f, FontWeight.Bold, -0.6f),
+    headlineLarge = ios(34f, 41f, FontWeight.Bold, -0.6f),
+    headlineMedium = ios(28f, 34f, FontWeight.Bold, -0.5f),
+    headlineSmall = ios(22f, 28f, FontWeight.Bold, -0.35f),
+    titleLarge = ios(20f, 25f, FontWeight.SemiBold, -0.3f),
+    titleMedium = ios(17f, 22f, FontWeight.SemiBold, -0.3f),
+    titleSmall = ios(15f, 20f, FontWeight.SemiBold, -0.2f),
+    bodyLarge = ios(17f, 22f, FontWeight.Normal, -0.3f),
+    bodyMedium = ios(15f, 20f, FontWeight.Normal, -0.2f),
+    bodySmall = ios(13f, 18f, FontWeight.Normal, -0.1f),
+    labelLarge = ios(15f, 20f, FontWeight.SemiBold, -0.2f),
+    labelMedium = ios(12f, 16f, FontWeight.Medium, 0f),
+    labelSmall = ios(11f, 13f, FontWeight.Medium, 0.05f),
 )
 
 /**

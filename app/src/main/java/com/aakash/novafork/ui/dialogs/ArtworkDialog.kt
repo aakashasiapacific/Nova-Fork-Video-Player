@@ -15,8 +15,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -30,20 +28,23 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.aakash.novafork.core.tmdb.TmdbClient
+import com.aakash.novafork.ui.common.IosSpinner
+import com.aakash.novafork.ui.common.NovaAlertDialog
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.DialogUi
 
 /** "Change artwork": TMDB's posters and backdrops for a title; a tap uses one. */
 @Composable
 internal fun ChangeArtworkDialog(dialog: DialogUi.ChangeArtwork, actions: AppActions) {
-    AlertDialog(
+    NovaAlertDialog(
+        form = true,
         onDismissRequest = actions::dismissDialog,
         title = { Text("Artwork for ${dialog.title}") },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 when {
                     dialog.loading -> Box(Modifier.fillMaxWidth().height(120.dp), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator()
+                        IosSpinner()
                     }
                     dialog.error != null -> Text(dialog.error, color = MaterialTheme.colorScheme.error)
                     else -> {

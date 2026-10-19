@@ -32,12 +32,13 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.aakash.novafork.ui.adaptive.DeviceLayout
-import com.aakash.novafork.ui.common.NovaIcon
+import com.aakash.novafork.ui.common.IosColors
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.SettingsUi
 
@@ -159,29 +160,29 @@ private fun TabletSettings(state: SettingsUi, actions: AppActions, modifier: Mod
     }
 }
 
+/** iPadOS Settings' sidebar row: icon tile and title, filled blue when selected. */
 @Composable
 private fun SectionListItem(section: SettingsSection, selected: Boolean, onClick: () -> Unit) {
     val colors = MaterialTheme.colorScheme
     Surface(
         onClick = onClick,
-        shape = RoundedCornerShape(16.dp),
-        color = if (selected) colors.secondaryContainer else colors.background,
-        contentColor = if (selected) colors.onSecondaryContainer else colors.onSurface,
+        shape = RoundedCornerShape(12.dp),
+        color = if (selected) colors.primary else Color.Transparent,
+        contentColor = Color.White,
         modifier = Modifier.fillMaxWidth(),
     ) {
         Row(
-            Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+            Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            NovaIcon(section.icon, contentDescription = null, modifier = Modifier.size(24.dp))
-            Spacer(Modifier.width(16.dp))
+            IconTile(section.icon, tileColor(section.icon))
+            Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
-                Text(section.title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Spacer(Modifier.height(2.dp))
+                Text(section.title, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(
                     text = section.summary,
                     style = MaterialTheme.typography.bodySmall,
-                    color = if (selected) colors.onSecondaryContainer else colors.onSurfaceVariant,
+                    color = if (selected) Color.White.copy(alpha = 0.8f) else IosColors.SecondaryLabel,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )

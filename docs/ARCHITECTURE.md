@@ -259,22 +259,44 @@ phone's own; the volume keys show an iOS-style pill, `VolumeHud`, instead of the
 except in picture-in-picture), lock mode,
 resume banner, up-next card, buffering spinner, error card.
 
-## Icons (res/drawable, Material Icons Round, white fill — tint with `Icon`)
+## Icons (res/drawable, Framework7 Icons, white fill — tint with `Icon`)
 
-`ic_add ic_arrow_back ic_aspect_ratio ic_audiotrack ic_brightness_6 ic_cast_connected ic_check
+Converted from framework7-icons 5.0.5 (MIT; SF-Symbols-style shapes, since Apple's SF Symbols
+may not ship on Android) by a one-off script: the 56-unit SVG path sits in a 60-unit viewport
+(2 units of padding) so the glyphs keep the optical size the old Material icons had. Each file
+names its source glyph and carries the MIT notice. Keep the `ic_` names when swapping a glyph.
+
+`ic_add ic_arrow_back ic_aspect_ratio ic_audiotrack ic_brightness_6 ic_cast_connected ic_check ic_chevron_up_down
 ic_cast ic_check_circle ic_chevron_right ic_close ic_cloud ic_computer ic_create_new_folder ic_dark_mode
 ic_delete ic_dns ic_done_all ic_edit ic_error ic_expand_more ic_filter_list ic_folder
 ic_folder_open ic_folder_special ic_forward_10 ic_fullscreen ic_fullscreen_exit ic_grid_view ic_hd
 ic_hide_image ic_history ic_home ic_image ic_info ic_key ic_lan ic_language ic_link ic_live_tv
-ic_lock ic_lock_open ic_more_vert ic_movie ic_pause ic_phone_android ic_picture_in_picture_alt
+ic_lock ic_lock_open ic_more_vert ic_movie ic_music_notes ic_pause ic_person ic_phone_android ic_picture_in_picture_alt
 ic_play_arrow ic_playlist_add ic_playlist_play ic_public ic_refresh ic_repeat ic_repeat_one ic_replay ic_replay_10 ic_restart_alt
 ic_screen_rotation ic_sd_storage ic_search ic_settings ic_shuffle ic_skip_next ic_skip_previous
-ic_smart_display ic_sort ic_speed ic_star ic_storage ic_subtitles ic_subtitles_off ic_theaters
+ic_smart_display ic_sort ic_speed ic_star ic_star_outline ic_storage ic_subtitles ic_subtitles_off ic_theaters
 ic_timer ic_tune ic_tv ic_video_file ic_video_library ic_view_list ic_visibility
 ic_visibility_off ic_volume_off ic_volume_up ic_wifi`
 
 Use `NovaIcon(R.drawable.ic_x, "desc")` or `Icon(painterResource(R.drawable.ic_x), …)`.
 (`ic_forward_10`/`ic_replay_10` show "10"; for other step sizes use ic_replay / ic_skip_next etc.)
+
+## iOS controls (ui/common/IosComponents.kt)
+
+Material's stock widgets read as Android, so the app draws iOS's own instead; use these, not the
+Material ones: `IosSwitch` (green 51×31 pill), `NovaAlertDialog` (iOS alert, same parameters as
+AlertDialog; `form = true` keeps fields start-aligned), `NovaDropdownMenu` + `NovaMenuItem`
+(context menu; `destructive` turns a row red), `NovaChip` (capsule filter, white when selected,
+no checkmark), `IosSpinner` (8-spoke activity indicator), `IosSegmentedControl`,
+`IosCheckCircle` (multi-select), `IosGrabber` + `IosSheetShape` for bottom sheets, and
+`IosColors` for the dark system colours. Settings rows (settings/SettingsRows.kt) are an
+inset-grouped list: one `#1C1C1E` card per group, hairlines inset under the text, grey caps
+headers, coloured icon tiles (`tileColor`), values on the right with a pop-up menu.
+
+Type follows iOS's text styles in Inter (theme/Theme.kt): headlineLarge = Large Title 34 bold,
+headlineMedium = Title 1 28, headlineSmall = Title 2 22, titleLarge = Title 3 20,
+titleMedium = Headline 17 semibold, bodyLarge = Body 17, bodyMedium = Subheadline 15,
+bodySmall = Footnote 13, labelMedium/labelSmall = Captions 12/11. Nothing heavier than bold.
 
 ## Screenshot tests (CI)
 

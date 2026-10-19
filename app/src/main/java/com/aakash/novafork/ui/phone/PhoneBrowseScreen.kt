@@ -15,9 +15,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
@@ -39,8 +36,11 @@ import com.aakash.novafork.data.db.SourceType
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
 import com.aakash.novafork.ui.common.DeviceAccessCard
 import com.aakash.novafork.ui.common.DeviceAccessNotice
+import com.aakash.novafork.ui.common.IosSpinner
 import com.aakash.novafork.ui.common.LocalBottomBarSpace
+import com.aakash.novafork.ui.common.NovaDropdownMenu
 import com.aakash.novafork.ui.common.NovaIcon
+import com.aakash.novafork.ui.common.NovaMenuItem
 import com.aakash.novafork.ui.common.ScanBanner
 import com.aakash.novafork.ui.common.deviceAccessNotice
 import com.aakash.novafork.ui.dialogs.playlistCountLabel
@@ -220,14 +220,14 @@ private fun SourceRow(source: SourceUi, actions: AppActions) {
         trailingContent = {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (source.isScanning) {
-                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                    IosSpinner(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
                 }
                 Box {
                     IconButton(onClick = { menuOpen = true }) {
                         NovaIcon(R.drawable.ic_more_vert, contentDescription = "Options for ${source.name}")
                     }
-                    DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                        DropdownMenuItem(
+                    NovaDropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                        NovaMenuItem(
                             text = { Text("Rescan") },
                             leadingIcon = { NovaIcon(R.drawable.ic_refresh, contentDescription = null) },
                             onClick = {
@@ -236,7 +236,7 @@ private fun SourceRow(source: SourceUi, actions: AppActions) {
                             },
                         )
                         if (source.type.isNetworkShare || source.type.isMediaServer) {
-                            DropdownMenuItem(
+                            NovaMenuItem(
                                 text = { Text("Edit") },
                                 leadingIcon = { NovaIcon(R.drawable.ic_edit, contentDescription = null) },
                                 onClick = {
@@ -245,8 +245,9 @@ private fun SourceRow(source: SourceUi, actions: AppActions) {
                                 },
                             )
                         }
-                        DropdownMenuItem(
+                        NovaMenuItem(
                             text = { Text("Remove") },
+                            destructive = true,
                             leadingIcon = { NovaIcon(R.drawable.ic_delete, contentDescription = null) },
                             onClick = {
                                 menuOpen = false

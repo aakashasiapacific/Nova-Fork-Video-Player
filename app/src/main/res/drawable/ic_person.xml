@@ -1,10 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Framework7 Icons (person_fill), MIT License, Copyright (c) 2016 Vladimir Kharlampidi, https://github.com/framework7io/framework7-icons -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"
     android:height="24dp"
-    android:viewportWidth="24"
-    android:viewportHeight="24">
-    <!-- Person (round head, rounded shoulders), like iOS's "person.fill". -->
-    <path
-        android:fillColor="#FFFFFFFF"
-        android:pathData="M12,12.2c2.3,0 4.1,-1.9 4.1,-4.2S14.3,3.8 12,3.8 7.9,5.7 7.9,8s1.8,4.2 4.1,4.2zM12,14.2c-3.6,0 -7.3,1.9 -7.3,4.6v0.4c0,0.6 0.5,1 1,1h12.6c0.6,0 1,-0.4 1,-1v-0.4c0,-2.7 -3.7,-4.6 -7.3,-4.6z" />
+    android:viewportWidth="60"
+    android:viewportHeight="60">
+    <group
+        android:translateX="2"
+        android:translateY="2">
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="M 28.0117 27.3672 C 33.0508 27.3672 37.3867 22.8672 37.3867 17.0078 C 37.3867 11.2187 33.0274 6.9297 28.0117 6.9297 C 22.9961 6.9297 18.6367 11.3125 18.6367 17.0547 C 18.6367 22.8672 22.9961 27.3672 28.0117 27.3672 Z M 13.2930 49.0703 L 42.7305 49.0703 C 46.4101 49.0703 47.7226 48.0156 47.7226 45.9531 C 47.7226 39.9062 40.1523 31.5625 28.0117 31.5625 C 15.8477 31.5625 8.2774 39.9062 8.2774 45.9531 C 8.2774 48.0156 9.5898 49.0703 13.2930 49.0703 Z" />
+    </group>
 </vector>

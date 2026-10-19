@@ -14,7 +14,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ScrollableTabRow
@@ -35,6 +34,7 @@ import com.aakash.novafork.R
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
 import com.aakash.novafork.ui.common.LocalBottomBarSpace
 import com.aakash.novafork.ui.common.NovaIcon
+import com.aakash.novafork.ui.common.NovaMenuItem
 import com.aakash.novafork.ui.common.SectionHeader
 import com.aakash.novafork.ui.common.VideoMenuBox
 import com.aakash.novafork.ui.common.metaLine
@@ -194,7 +194,7 @@ fun PhoneShowDetailsScreen(
             modifier = Modifier.align(Alignment.TopStart),
             menu = if (identifyVideoId != null) {
                 { close ->
-                    DropdownMenuItem(
+                    NovaMenuItem(
                         text = { Text("Identify show…") },
                         leadingIcon = { NovaIcon(R.drawable.ic_search, contentDescription = null) },
                         onClick = {
@@ -202,7 +202,7 @@ fun PhoneShowDetailsScreen(
                             actions.identify(identifyVideoId)
                         },
                     )
-                    DropdownMenuItem(
+                    NovaMenuItem(
                         text = { Text("Change artwork…") },
                         leadingIcon = { NovaIcon(R.drawable.ic_image, contentDescription = null) },
                         onClick = {

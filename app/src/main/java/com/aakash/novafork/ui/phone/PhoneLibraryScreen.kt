@@ -13,10 +13,6 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -33,7 +29,10 @@ import com.aakash.novafork.R
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
 import com.aakash.novafork.ui.common.EmptyState
 import com.aakash.novafork.ui.common.LocalBottomBarSpace
+import com.aakash.novafork.ui.common.NovaChip
+import com.aakash.novafork.ui.common.NovaDropdownMenu
 import com.aakash.novafork.ui.common.NovaIcon
+import com.aakash.novafork.ui.common.NovaMenuItem
 import com.aakash.novafork.ui.common.ScanBanner
 import com.aakash.novafork.ui.common.VideoMenuBox
 import com.aakash.novafork.ui.model.AppActions
@@ -108,7 +107,7 @@ private fun SortMenu(current: LibrarySort, onSelect: (LibrarySort) -> Unit) {
         IconButton(onClick = { expanded = true }) {
             NovaIcon(R.drawable.ic_sort, contentDescription = "Sort")
         }
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+        NovaDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             Text(
                 text = "Sort by",
                 style = MaterialTheme.typography.labelMedium,
@@ -116,7 +115,7 @@ private fun SortMenu(current: LibrarySort, onSelect: (LibrarySort) -> Unit) {
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
             )
             LibrarySort.entries.forEach { sort ->
-                DropdownMenuItem(
+                NovaMenuItem(
                     text = { Text(sort.label) },
                     onClick = {
                         expanded = false
@@ -144,15 +143,10 @@ private fun FilterChipsRow(library: LibraryUi, onSelect: (LibraryFilter) -> Unit
         items(LibraryFilter.entries.filter { it.isChip }, key = { it.name }) { filter ->
             val selected = filter == library.filter
             val count = library.counts[filter]
-            FilterChip(
+            NovaChip(
                 selected = selected,
                 onClick = { onSelect(filter) },
                 label = { Text(if (count != null) "${filter.label} · $count" else filter.label) },
-                leadingIcon = if (selected) {
-                    { NovaIcon(R.drawable.ic_check, contentDescription = null, modifier = Modifier.size(FilterChipDefaults.IconSize)) }
-                } else {
-                    null
-                },
             )
         }
     }

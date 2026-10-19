@@ -21,8 +21,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
@@ -41,7 +39,12 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
+import com.aakash.novafork.ui.common.IosColors
+import com.aakash.novafork.ui.common.IosGrabber
+import com.aakash.novafork.ui.common.IosSheetShape
+import com.aakash.novafork.ui.common.IosSpinner
 import com.aakash.novafork.ui.common.LandscapeArt
+import com.aakash.novafork.ui.common.NovaChip
 import com.aakash.novafork.ui.model.CastDeviceUi
 import com.aakash.novafork.ui.model.PlayerActions
 import com.aakash.novafork.ui.model.PlayerUiState
@@ -60,7 +63,9 @@ internal fun PlayerListSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        containerColor = IosColors.GroupedCard,
+        shape = IosSheetShape,
+        dragHandle = { IosGrabber() },
     ) {
         Text(
             text = sheet.title,
@@ -97,14 +102,14 @@ private fun QueueOptions(state: PlayerUiState, actions: PlayerActions, onDismiss
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             if (state.canShuffle) {
-                FilterChip(
+                NovaChip(
                     selected = state.shuffle,
                     onClick = actions::toggleShuffle,
                     label = { Text(if (state.shuffle) "Shuffle on" else "Shuffle off") },
                     leadingIcon = { ChipIcon(R.drawable.ic_shuffle) },
                 )
             }
-            FilterChip(
+            NovaChip(
                 selected = state.repeatMode != RepeatMode.OFF,
                 onClick = actions::cycleRepeat,
                 label = { Text(state.repeatMode.label) },
@@ -241,7 +246,7 @@ private fun CastOptions(state: PlayerUiState, actions: PlayerActions, onDismiss:
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                IosSpinner(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
                 Spacer(Modifier.width(14.dp))
                 Text(
                     text = "Looking for Chromecasts and TVs on this Wi-Fi…",

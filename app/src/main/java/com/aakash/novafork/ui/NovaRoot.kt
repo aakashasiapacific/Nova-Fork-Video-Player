@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -26,6 +25,7 @@ import com.aakash.novafork.ui.adaptive.LocalDeviceLayout
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
 import com.aakash.novafork.ui.adaptive.dimensFor
 import com.aakash.novafork.ui.adaptive.rememberDeviceLayout
+import com.aakash.novafork.ui.common.NovaAlertDialog
 import com.aakash.novafork.ui.dialogs.NovaDialogs
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.AppUiState
@@ -86,7 +86,7 @@ fun NovaRoot(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
 /** Shown once after a crash so the report can be sent to the developer. */
 @Composable
 private fun CrashReportDialog(report: String, actions: AppActions) {
-    AlertDialog(
+    NovaAlertDialog(
         onDismissRequest = actions::dismissCrashReport,
         title = { Text("Nova Fork closed unexpectedly") },
         text = {

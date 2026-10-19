@@ -11,8 +11,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -35,6 +33,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import com.aakash.novafork.R
+import com.aakash.novafork.ui.common.IosSpinner
+import com.aakash.novafork.ui.common.NovaAlertDialog
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.DialogUi
@@ -75,7 +75,8 @@ internal fun SmbServerDialog(dialog: DialogUi.SmbServer, actions: AppActions) {
     // The share may still be empty: a full address pasted into Server ("smb://nas/Movies") fills it in.
     val canSubmit = host.isNotBlank() && !dialog.testing
 
-    AlertDialog(
+    NovaAlertDialog(
+        form = true,
         onDismissRequest = actions::dismissDialog,
         properties = DialogProperties(dismissOnClickOutside = false),
         icon = { NovaIcon(R.drawable.ic_lan, contentDescription = null) },
@@ -166,7 +167,7 @@ internal fun SmbServerDialog(dialog: DialogUi.SmbServer, actions: AppActions) {
                     }
                     if (dialog.testing) {
                         Spacer(Modifier.width(16.dp))
-                        CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                        IosSpinner(Modifier.size(20.dp), strokeWidth = 2.dp)
                     }
                 }
                 if (!dialog.testing && result != null) TestResultLine(result)

@@ -19,10 +19,6 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -40,7 +36,10 @@ import com.aakash.novafork.R
 import com.aakash.novafork.ui.adaptive.DeviceLayout
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
 import com.aakash.novafork.ui.common.EmptyState
+import com.aakash.novafork.ui.common.NovaChip
+import com.aakash.novafork.ui.common.NovaDropdownMenu
 import com.aakash.novafork.ui.common.NovaIcon
+import com.aakash.novafork.ui.common.NovaMenuItem
 import com.aakash.novafork.ui.common.ScanBanner
 import com.aakash.novafork.ui.common.VideoMenuBox
 import com.aakash.novafork.ui.model.AppActions
@@ -196,7 +195,7 @@ private fun FilterChipRow(library: LibraryUi, onFilter: (LibraryFilter) -> Unit,
         LibraryFilter.entries.filter { it.isChip }.forEach { filter ->
             val selected = filter == library.filter
             val count = library.counts[filter]
-            FilterChip(
+            NovaChip(
                 selected = selected,
                 onClick = { onFilter(filter) },
                 label = {
@@ -207,11 +206,6 @@ private fun FilterChipRow(library: LibraryUi, onFilter: (LibraryFilter) -> Unit,
                             Text(count.toString(), color = LocalContentColor.current.copy(alpha = 0.65f))
                         }
                     }
-                },
-                leadingIcon = if (selected) {
-                    { NovaIcon(R.drawable.ic_check, contentDescription = null, modifier = Modifier.size(FilterChipDefaults.IconSize)) }
-                } else {
-                    null
                 },
             )
         }
@@ -229,9 +223,9 @@ private fun SortMenu(sort: LibrarySort, onSort: (LibrarySort) -> Unit) {
             Spacer(Modifier.width(4.dp))
             NovaIcon(R.drawable.ic_expand_more, contentDescription = null, modifier = Modifier.size(18.dp))
         }
-        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+        NovaDropdownMenu(expanded = open, onDismissRequest = { open = false }) {
             LibrarySort.entries.forEach { option ->
-                DropdownMenuItem(
+                NovaMenuItem(
                     text = { Text(option.label) },
                     onClick = {
                         open = false
@@ -289,7 +283,7 @@ private fun LibraryGridCard(
             title = item.card.primaryLine(),
             actions = actions,
             extraItems = { close ->
-                DropdownMenuItem(
+                NovaMenuItem(
                     text = { Text("Play") },
                     leadingIcon = { NovaIcon(R.drawable.ic_play_arrow, contentDescription = null) },
                     onClick = {

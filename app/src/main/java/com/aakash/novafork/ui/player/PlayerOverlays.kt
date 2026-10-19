@@ -36,7 +36,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -61,6 +60,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
 import com.aakash.novafork.core.format.Formats
+import com.aakash.novafork.ui.common.IosSpinner
 import com.aakash.novafork.ui.common.LandscapeArt
 import com.aakash.novafork.ui.model.GestureFeedback
 import com.aakash.novafork.ui.model.UpNextUi
@@ -183,7 +183,7 @@ private fun VolumeTrack(fill: Float, vertical: Boolean) {
 
 @Composable
 internal fun BufferingIndicator(modifier: Modifier = Modifier) {
-    CircularProgressIndicator(modifier = modifier.size(48.dp), color = Color.White, strokeWidth = 3.dp)
+    IosSpinner(modifier = modifier.size(48.dp), color = Color.White, strokeWidth = 3.dp)
 }
 
 /** "−10s" / "+20s" halves shown on the side that was double-tapped. */
