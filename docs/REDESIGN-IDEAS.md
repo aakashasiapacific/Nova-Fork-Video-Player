@@ -340,9 +340,11 @@ The owner asked for Apple Music to be copied more precisely, with less clutter. 
   - taglines are upright and bold, not italic.
 - **Audio without access:** only the access card shows, not a red error line repeating it.
 
-## 13. Build 60 (overnight, 2026-10-19)
+## 13. Builds 60–61 (overnight, 2026-10-19)
 
 - **Mini player:** a sideways swipe skips, as in Apple Music: left for the next song, right for
   the one before. The song slides with the finger and springs back.
 - **Buttons:** Material's outlined buttons ("Test connection", "Add folder", "Identify",
   "Mark as Watched" on tablet) became iOS's grey filled buttons.
+- **Episode rows (build 61):** Apple TV's small grey caps above the title ("EPISODE 3"), replacing
+  a blue "E3".

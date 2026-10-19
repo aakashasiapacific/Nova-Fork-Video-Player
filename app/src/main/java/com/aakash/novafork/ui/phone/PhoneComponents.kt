@@ -51,10 +51,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.aakash.novafork.R
 import com.aakash.novafork.core.format.Formats
 import com.aakash.novafork.data.db.SourceType
@@ -460,11 +462,13 @@ internal fun PhoneEpisodeRow(
             }
             Spacer(Modifier.width(14.dp))
             Column(Modifier.weight(1f)) {
-                if (episode.code.isNotBlank()) {
+                // Apple TV's small grey caps above an episode's title: "EPISODE 3".
+                val label = if (episode.episode > 0) "EPISODE ${episode.episode}" else episode.code.uppercase()
+                if (label.isNotBlank()) {
                     Text(
-                        text = episode.code,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.primary,
+                        text = label,
+                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold, letterSpacing = 0.3.sp),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
                 Text(
