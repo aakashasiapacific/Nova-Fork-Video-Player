@@ -2,9 +2,12 @@ package com.aakash.novafork.ui.common
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.SurfaceTexture
 import android.graphics.drawable.BitmapDrawable
 import android.os.ParcelFileDescriptor
 import android.util.Log
+import android.view.Surface
+import android.view.TextureView
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
@@ -32,7 +35,6 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.videolan.libvlc.MediaPlayer
-import org.videolan.libvlc.util.VLCVideoLayout
 import java.util.concurrent.atomic.AtomicReference
 
 /**
@@ -51,7 +53,10 @@ internal fun HeroVideoPreview(uri: String, startMs: Long, muted: Boolean, modifi
     LaunchedEffect(preview) { preview.start(uri, startMs, muted) { showing = true } }
     LaunchedEffect(preview, muted) { preview.setMuted(muted) }
     AndroidView(
-        factory = { viewContext -> VLCVideoLayout(viewContext).also { preview.attach(it) } },
+        // Our own TextureView (not libVLC's VLCVideoLayout): we hand libVLC its Surface and take
+        // it back before the view goes. libVLC's own TextureView handling crashes (NPE in
+        // AWindow) when the view is torn down before its first frame.
+        factory = { viewContext -> TextureView(viewContext).also { it.surfaceTextureListener = preview.surfaceListener } },
         modifier = modifier.graphicsLayer { this.alpha = alpha },
     )
 }
@@ -60,13 +65,36 @@ internal fun HeroVideoPreview(uri: String, startMs: Long, muted: Boolean, modifi
 private class PreviewPlayer(private val context: Context) {
     private var player: MediaPlayer? = null
     private var descriptor: ParcelFileDescriptor? = null
-    private var layout: VLCVideoLayout? = null
+    private var surface: Surface? = null
+    private var surfaceWidth = 0
+    private var surfaceHeight = 0
     private var muted = true
     private var released = false
 
-    fun attach(view: VLCVideoLayout) {
-        layout = view
-        player?.let { attachTo(it, view) }
+    /** The TextureView's surface comes and goes; libVLC draws on it only while it exists. */
+    val surfaceListener = object : TextureView.SurfaceTextureListener {
+        override fun onSurfaceTextureAvailable(texture: SurfaceTexture, width: Int, height: Int) {
+            surface = Surface(texture)
+            surfaceWidth = width
+            surfaceHeight = height
+            player?.let { bindSurface(it) }
+        }
+
+        override fun onSurfaceTextureSizeChanged(texture: SurfaceTexture, width: Int, height: Int) {
+            surfaceWidth = width
+            surfaceHeight = height
+            player?.vlcVout?.setWindowSize(width, height)
+        }
+
+        override fun onSurfaceTextureDestroyed(texture: SurfaceTexture): Boolean {
+            // Take the surface away from libVLC first, then free it.
+            unbindSurface()
+            surface?.release()
+            surface = null
+            return true
+        }
+
+        override fun onSurfaceTextureUpdated(texture: SurfaceTexture) = Unit
     }
 
     suspend fun start(uri: String, startMs: Long, startMuted: Boolean, onFirstFrame: () -> Unit) {
@@ -106,7 +134,7 @@ private class PreviewPlayer(private val context: Context) {
             descriptor = opened.descriptor
             mediaPlayer.setVolume(if (muted) 0 else FULL_VOLUME)
             player = mediaPlayer
-            layout?.let { attachTo(mediaPlayer, it) }
+            bindSurface(mediaPlayer)
             mediaPlayer.play()
         } catch (e: RuntimeException) {
             Log.w(TAG, "The hero preview couldn't start", e)
@@ -124,18 +152,36 @@ private class PreviewPlayer(private val context: Context) {
         player?.let {
             it.setEventListener(null)
             it.stop()
-            it.detachViews()
-            it.release()
         }
+        unbindSurface()
+        player?.release()
         player = null
         descriptor.closeQuietly()
         descriptor = null
     }
 
-    private fun attachTo(mediaPlayer: MediaPlayer, view: VLCVideoLayout) {
-        // A TextureView, so the video scrolls and fades with the rest of the page.
-        mediaPlayer.attachViews(view, null, false, true)
-        mediaPlayer.setVideoScale(MediaPlayer.ScaleType.SURFACE_FILL)
+    /** Gives libVLC the surface (once both exist), cropped to fill it. */
+    private fun bindSurface(mediaPlayer: MediaPlayer) {
+        val target = surface ?: return
+        val vout = mediaPlayer.vlcVout
+        if (vout.areViewsAttached()) return
+        try {
+            vout.setVideoSurface(target, null)
+            vout.attachViews()
+            vout.setWindowSize(surfaceWidth, surfaceHeight)
+            mediaPlayer.setVideoScale(MediaPlayer.ScaleType.SURFACE_FILL)
+        } catch (e: RuntimeException) {
+            Log.w(TAG, "The hero preview couldn't use its surface", e)
+        }
+    }
+
+    private fun unbindSurface() {
+        val vout = player?.vlcVout ?: return
+        try {
+            if (vout.areViewsAttached()) vout.detachViews()
+        } catch (e: RuntimeException) {
+            Log.w(TAG, "The hero preview couldn't let go of its surface", e)
+        }
     }
 
     private companion object {
