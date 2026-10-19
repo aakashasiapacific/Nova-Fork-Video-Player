@@ -23,7 +23,6 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -55,6 +54,7 @@ import com.aakash.novafork.ui.common.IosCheckCircle
 import com.aakash.novafork.ui.common.IosSpinner
 import com.aakash.novafork.ui.common.NovaAlertDialog
 import com.aakash.novafork.ui.common.NovaIcon
+import com.aakash.novafork.ui.common.NovaTextField
 import com.aakash.novafork.ui.common.sourceTypeIcon
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.DialogUi
@@ -569,7 +569,7 @@ private fun CleartextWarning(text: String) {
 @Composable
 private fun SecretField(value: String, onValueChange: (String) -> Unit, label: String, supporting: String? = null) {
     var visible by remember { mutableStateOf(false) }
-    OutlinedTextField(
+    NovaTextField(
         value = value,
         onValueChange = onValueChange,
         modifier = Modifier.fillMaxWidth(),

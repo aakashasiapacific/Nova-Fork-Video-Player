@@ -15,7 +15,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -44,6 +43,7 @@ import com.aakash.novafork.data.db.SourceType
 import com.aakash.novafork.ui.common.IosSpinner
 import com.aakash.novafork.ui.common.NovaAlertDialog
 import com.aakash.novafork.ui.common.NovaIcon
+import com.aakash.novafork.ui.common.NovaTextField
 import com.aakash.novafork.ui.common.sourceTypeIcon
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.DialogUi
@@ -337,7 +337,7 @@ private fun TmdbKeyRow(shape: Shape, state: SettingsUi, actions: AppActions) {
                 Text("TMDB API key", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
                 KeyStatusPill(state.keyStatus)
             }
-            OutlinedTextField(
+            NovaTextField(
                 value = edited ?: saved,
                 onValueChange = { text ->
                     edited = text

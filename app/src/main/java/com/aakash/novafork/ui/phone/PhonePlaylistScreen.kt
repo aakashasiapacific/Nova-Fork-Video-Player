@@ -84,14 +84,31 @@ private fun PlaylistContent(playlist: PlaylistDetailsUi, actions: AppActions) {
             }
         }
         itemsIndexed(playlist.videos, key = { _, video -> "video:${video.id}" }) { index, video ->
-            VideoMenuBox(videoId = video.id, title = video.displayTitle(), actions = actions) { openMenu ->
+            // One "…" per row (and a long press) instead of an × on every row: removing sits in
+            // the menu with Details and Add to playlist, as in Apple's apps.
+            VideoMenuBox(
+                videoId = video.id,
+                title = video.displayTitle(),
+                actions = actions,
+                extraItems = { close ->
+                    NovaMenuItem(
+                        text = { Text("Remove from Playlist") },
+                        destructive = true,
+                        leadingIcon = { NovaIcon(R.drawable.ic_delete, contentDescription = null) },
+                        onClick = {
+                            close()
+                            actions.removeFromPlaylist(playlist.id, video.id)
+                        },
+                    )
+                },
+            ) { openMenu ->
                 PhoneVideoRow(
                     card = video,
                     onClick = { actions.playQueue(ids, startIndex = index) },
                     onLongClick = openMenu,
                     trailing = {
-                        IconButton(onClick = { actions.removeFromPlaylist(playlist.id, video.id) }) {
-                            NovaIcon(R.drawable.ic_close, contentDescription = "Remove from playlist")
+                        IconButton(onClick = openMenu) {
+                            NovaIcon(R.drawable.ic_more_vert, contentDescription = "More")
                         }
                     },
                 )

@@ -15,7 +15,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -36,6 +35,7 @@ import com.aakash.novafork.ui.common.IosSegmentedControl
 import com.aakash.novafork.ui.common.IosSpinner
 import com.aakash.novafork.ui.common.NovaAlertDialog
 import com.aakash.novafork.ui.common.NovaIcon
+import com.aakash.novafork.ui.common.NovaTextField
 import com.aakash.novafork.ui.common.PosterArt
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.Artwork
@@ -62,7 +62,7 @@ internal fun IdentifyDialog(dialog: DialogUi.Identify, actions: AppActions) {
         title = { Text("Identify") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(
+                NovaTextField(
                     value = query,
                     onValueChange = { query = it },
                     modifier = Modifier.fillMaxWidth(),

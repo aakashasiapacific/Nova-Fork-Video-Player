@@ -48,7 +48,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
-import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -183,14 +182,23 @@ internal fun TabletPullToRefresh(
         },
         modifier = modifier,
         state = refreshState,
+        // iOS's refresh control: the spinner fades in with the pull and spins while the scan runs.
         indicator = {
-            PullToRefreshDefaults.Indicator(
-                state = refreshState,
-                isRefreshing = pulled,
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .statusBarsPadding(),
-            )
+            val fraction = refreshState.distanceFraction.coerceIn(0f, 1f)
+            if (pulled || fraction > 0f) {
+                IosSpinner(
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .statusBarsPadding()
+                        .padding(top = 18.dp)
+                        .size(28.dp)
+                        .graphicsLayer {
+                            alpha = if (pulled) 1f else fraction
+                            rotationZ = if (pulled) 0f else fraction * 180f
+                        },
+                    color = Color.White.copy(alpha = 0.8f),
+                )
+            }
         },
         content = content,
     )

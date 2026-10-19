@@ -45,15 +45,20 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -64,11 +69,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -86,12 +94,15 @@ import com.aakash.novafork.data.music.MusicLibrary
 import com.aakash.novafork.data.music.MusicLibraryData
 import com.aakash.novafork.data.music.MusicScanState
 import com.aakash.novafork.music.MusicPlayerState
+import com.aakash.novafork.ui.common.IosColors
+import com.aakash.novafork.ui.common.IosGrabber
+import com.aakash.novafork.ui.common.IosSheetShape
 import com.aakash.novafork.ui.common.IosSpinner
 import com.aakash.novafork.ui.common.LocalBottomBarSpace
-import com.aakash.novafork.ui.common.NovaAlertDialog
 import com.aakash.novafork.ui.common.NovaDropdownMenu
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.NovaMenuItem
+import com.aakash.novafork.ui.common.NovaTextField
 import com.aakash.novafork.ui.theme.AudioTheme
 import com.aakash.novafork.ui.theme.NovaColors
 
@@ -221,6 +232,7 @@ fun AudioContent(
         AddToPlaylistDialog(
             song = song,
             playlists = playlists,
+            library = library,
             onPick = { id, name ->
                 actions.addToPlaylist(song, id, name)
                 addingSong = null
@@ -468,15 +480,76 @@ private fun AlbumPage(album: Album, ctx: PageContext) {
             }
         }
         row("footer") { Footer(album.songs) }
+        // Apple Music ends an album with the artist's other albums.
+        val more = ctx.library.artists.firstOrNull { it.key == album.artistKey }?.albums?.filter { it.key != album.key }.orEmpty()
+        if (more.isNotEmpty()) {
+            row("moreTitle") { SectionTitle("More by ${album.artist}") }
+            row("more") {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                    items(more, key = { it.key }) { other ->
+                        AlbumTile(other, Modifier.width(150.dp)) { ctx.onOpen(ALBUM + other.key) }
+                    }
+                }
+            }
+        }
     }
 }
 
-/** An artist: name, Play and Shuffle, their albums in a row, then their top songs. */
+/**
+ * Apple Music's artist header: a big picture (their newest cover, as there are no artist photos)
+ * fading into black, the name over it, and the round red Play button.
+ */
+@Composable
+private fun ArtistHero(artist: Artist, ctx: PageContext) {
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .padding(top = 4.dp, bottom = 8.dp)
+            .aspectRatio(1.15f)
+            .clip(RoundedCornerShape(14.dp)),
+    ) {
+        Cover(artist.albums.firstOrNull()?.artUri, size = 0, corner = 0, modifier = Modifier.fillMaxSize())
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(Brush.verticalGradient(0.45f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.85f))),
+        )
+        Row(
+            Modifier
+                .align(Alignment.BottomStart)
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                artist.name,
+                fontSize = 32.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            Box(
+                Modifier
+                    .size(48.dp)
+                    .clip(CircleShape)
+                    .background(NovaColors.AppleMusicRed)
+                    .clickable(onClickLabel = "Play ${artist.name}", role = Role.Button) { ctx.actions.play(artist.songs, 0, false) },
+                contentAlignment = Alignment.Center,
+            ) {
+                NovaIcon(R.drawable.ic_play_arrow, contentDescription = null, tint = Color.White, modifier = Modifier.size(24.dp))
+            }
+        }
+    }
+}
+
+/** An artist: their picture with Play, their albums in a row, then their top songs. */
 @Composable
 private fun ArtistPage(artist: Artist, ctx: PageContext) {
     AudioPage {
-        header(artist.name, ctx)
-        row("play") { PlayShuffle(artist.songs, ctx.actions) }
+        row("back") { BackRow(ctx) { close -> QueueItems(artist.songs, ctx, close) } }
+        row("hero") { ArtistHero(artist, ctx) }
         if (artist.albums.isNotEmpty()) {
             row("albumsTitle") { SectionTitle("Albums") }
             row("albums") {
@@ -956,7 +1029,14 @@ private fun Footer(songs: List<SongEntity>) {
 }
 
 @Composable
-private fun ListRow(title: String, onClick: () -> Unit, subtitle: String? = null, art: (@Composable () -> Unit)? = null) {
+private fun ListRow(
+    title: String,
+    onClick: () -> Unit,
+    subtitle: String? = null,
+    art: (@Composable () -> Unit)? = null,
+    titleColor: Color = Color.White,
+    chevron: Boolean = true,
+) {
     Column(Modifier.clickable(onClick = onClick)) {
         Row(Modifier.padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
             if (art != null) {
@@ -964,10 +1044,10 @@ private fun ListRow(title: String, onClick: () -> Unit, subtitle: String? = null
                 Spacer(Modifier.width(14.dp))
             }
             Column(Modifier.weight(1f)) {
-                Text(title, fontSize = 17.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(title, fontSize = 17.sp, color = titleColor, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 if (subtitle != null) Text(subtitle, fontSize = 13.sp, color = Color.White.copy(alpha = 0.55f))
             }
-            NovaIcon(R.drawable.ic_chevron_right, contentDescription = null, tint = Color.White.copy(alpha = 0.3f))
+            if (chevron) NovaIcon(R.drawable.ic_chevron_right, contentDescription = null, tint = Color.White.copy(alpha = 0.3f))
         }
         HorizontalDivider(thickness = 0.5.dp, color = Color.White.copy(alpha = 0.12f))
     }
@@ -998,40 +1078,93 @@ private fun Hint(text: String) {
     Text(text, fontSize = 15.sp, color = Color.White.copy(alpha = 0.55f), modifier = Modifier.padding(vertical = 24.dp))
 }
 
+/**
+ * Apple Music's Add to Playlist sheet: New Playlist… first (it opens a name field in place),
+ * then every playlist with its cover and size.
+ */
 @Composable
 private fun AddToPlaylistDialog(
     song: SongEntity,
     playlists: List<MusicPlaylistRow>,
+    library: MusicLibraryData,
     onPick: (playlistId: Long?, newName: String) -> Unit,
     onDismiss: () -> Unit,
 ) {
+    var naming by rememberSaveable { mutableStateOf(false) }
     var name by rememberSaveable { mutableStateOf("") }
-    NovaAlertDialog(
-        form = true,
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val songsById = remember(library) { library.songs.associateBy { it.id } }
+    ModalBottomSheet(
         onDismissRequest = onDismiss,
-        title = { Text("Add “${song.title}” to") },
-        text = {
-            Column {
-                playlists.forEach { row ->
-                    Text(
-                        row.name,
-                        modifier = Modifier.fillMaxWidth().clickable { onPick(row.id, row.name) }.padding(vertical = 12.dp),
+        sheetState = sheetState,
+        containerColor = IosColors.GroupedCard,
+        shape = IosSheetShape,
+        dragHandle = { IosGrabber() },
+    ) {
+        Column(Modifier.padding(horizontal = Gutter).padding(bottom = 24.dp)) {
+            Text(
+                "Add to Playlist",
+                fontSize = 17.sp,
+                fontWeight = FontWeight.SemiBold,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Text(
+                song.title,
+                fontSize = 13.sp,
+                color = Color.White.copy(alpha = 0.55f),
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+            )
+            if (naming) {
+                Row(Modifier.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    NovaTextField(
+                        value = name,
+                        onValueChange = { name = it },
+                        placeholder = { Text("Playlist name") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Done),
+                        keyboardActions = KeyboardActions(onDone = { if (name.isNotBlank()) onPick(null, name.trim()) }),
+                        modifier = Modifier.weight(1f),
                     )
+                    TextButton(onClick = { onPick(null, name.trim()) }, enabled = name.isNotBlank()) {
+                        Text("Create", color = if (name.isNotBlank()) NovaColors.AppleMusicRed else Color.White.copy(alpha = 0.3f))
+                    }
                 }
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = { Text("New playlist") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+            } else {
+                ListRow(
+                    title = "New Playlist…",
+                    titleColor = NovaColors.AppleMusicRed,
+                    art = {
+                        Box(
+                            Modifier
+                                .size(48.dp)
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(Color(0xFF2C2C2E)),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            NovaIcon(R.drawable.ic_add, contentDescription = null, tint = NovaColors.AppleMusicRed, modifier = Modifier.size(22.dp))
+                        }
+                    },
+                    chevron = false,
+                    onClick = { naming = true },
                 )
             }
-        },
-        confirmButton = {
-            TextButton(onClick = { onPick(null, name) }, enabled = name.isNotBlank()) { Text("Create") }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
-    )
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                playlists.forEach { row ->
+                    ListRow(
+                        title = row.name,
+                        subtitle = if (row.songCount == 1) "1 song" else "${row.songCount} songs",
+                        art = { Cover(row.coverSongId?.let(songsById::get)?.let(MusicLibrary::artUri), size = 48, corner = 6) },
+                        chevron = false,
+                        onClick = { onPick(row.id, row.name) },
+                    )
+                }
+            }
+        }
+    }
 }
 
 private val Gutter = 20.dp

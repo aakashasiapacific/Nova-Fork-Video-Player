@@ -7,7 +7,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -25,6 +24,7 @@ import com.aakash.novafork.R
 import com.aakash.novafork.ui.InputRules
 import com.aakash.novafork.ui.common.NovaAlertDialog
 import com.aakash.novafork.ui.common.NovaIcon
+import com.aakash.novafork.ui.common.NovaTextField
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.DialogUi
 import com.aakash.novafork.ui.model.PlaylistUi
@@ -120,7 +120,7 @@ private fun StreamUrlDialog(
                 Modifier.verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                OutlinedTextField(
+                NovaTextField(
                     value = url,
                     onValueChange = {
                         url = it
@@ -143,7 +143,7 @@ private fun StreamUrlDialog(
                     keyboardActions = KeyboardActions(onGo = { submit() }),
                 )
                 if (askForName) {
-                    OutlinedTextField(
+                    NovaTextField(
                         value = name,
                         onValueChange = { name = it },
                         modifier = Modifier.fillMaxWidth(),

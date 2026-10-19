@@ -307,3 +307,22 @@ The owner asked for Apple Music to be copied more precisely, with less clutter. 
     top.
 - **Player:** `MusicPlayer.enqueue` / `PlayQueue.insert` (Play Next, Play Last) and
   `MusicPlayerState.upNext`.
+
+## 11. More iOS, less clutter (overnight, 2026-10-19; build 58)
+
+- **Text fields:** iOS's rounded grey field with no outline. The label sits above it as a small
+  grey caption, as in iOS forms, instead of floating inside (`NovaTextField`).
+- **Notices:** a glass capsule that drops in under the status bar, replacing Material's snackbar
+  (`IosToastHost`).
+- **Pull to refresh:** iOS's spoked spinner fades in with the pull.
+- **Pushed pages (phone):** iOS 26's bar, with a round glass back button and the title centred
+  in 17pt semibold.
+- **Show seasons:** Apple TV's "Season 2 ⌄" pull-down menu, replacing a tab row.
+- **Video playlists:** one "…" per row, with Remove from Playlist in its menu, instead of an ×
+  on every row.
+- **Play / Shuffle:** two equal grey pills with blue icons and labels, as in Apple's apps.
+- **Apple Music:**
+  - "Add to Playlist" is a sheet: New Playlist… (a name field opens in place), then each
+    playlist with its cover.
+  - The artist page opens on a big picture with the name over it and a round red Play button.
+  - An album ends with "More by <artist>".

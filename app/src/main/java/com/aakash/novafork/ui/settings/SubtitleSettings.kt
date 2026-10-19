@@ -13,7 +13,6 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -38,6 +37,7 @@ import com.aakash.novafork.R
 import com.aakash.novafork.data.Settings
 import com.aakash.novafork.player.SubtitleDownloadRules
 import com.aakash.novafork.ui.common.NovaIcon
+import com.aakash.novafork.ui.common.NovaTextField
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.theme.NovaColors
 
@@ -92,7 +92,7 @@ private fun OpenSubtitlesKeyRow(shape: Shape, saved: String, actions: AppActions
                     else -> StatusPill("No key", MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
-            OutlinedTextField(
+            NovaTextField(
                 value = text,
                 onValueChange = { value ->
                     edited = value
@@ -136,7 +136,7 @@ private fun OpenSubtitlesAccountRow(shape: Shape, settings: Settings, actions: A
                     modifier = Modifier.weight(1f),
                 )
             }
-            OutlinedTextField(
+            NovaTextField(
                 value = editedUser ?: settings.opensubtitlesUsername,
                 onValueChange = { value ->
                     editedUser = value
@@ -153,7 +153,7 @@ private fun OpenSubtitlesAccountRow(shape: Shape, settings: Settings, actions: A
                 ),
                 keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
             )
-            OutlinedTextField(
+            NovaTextField(
                 value = editedPassword ?: settings.opensubtitlesPassword,
                 onValueChange = { value ->
                     editedPassword = value
@@ -198,7 +198,7 @@ private fun SubtitleLanguagesRow(shape: Shape, settings: Settings, actions: AppA
                 Spacer(Modifier.width(16.dp))
                 Text("Download languages", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
             }
-            OutlinedTextField(
+            NovaTextField(
                 value = text,
                 onValueChange = { value ->
                     edited = value

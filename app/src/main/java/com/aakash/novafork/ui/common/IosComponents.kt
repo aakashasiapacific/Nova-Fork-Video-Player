@@ -1,5 +1,6 @@
 package com.aakash.novafork.ui.common
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateDpAsState
@@ -8,6 +9,10 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -31,32 +36,45 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.BasicAlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.ProvideTextStyle
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import com.aakash.novafork.R
+import kotlinx.coroutines.delay
 
 /** iOS dark-mode system colours the iOS-style controls below are drawn with. */
 object IosColors {
@@ -386,3 +404,132 @@ fun IosCheckCircle(checked: Boolean, modifier: Modifier = Modifier) {
         }
     }
 }
+
+/**
+ * iOS's text field in place of Material's OutlinedTextField (same parameters): a rounded grey
+ * field with no outline, its [label] as a small grey caption above (iOS forms have no floating
+ * labels), [placeholder] inside while empty, and [supportingText] below, red when [isError].
+ */
+@Composable
+fun NovaTextField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    readOnly: Boolean = false,
+    textStyle: TextStyle = TextStyle.Default,
+    label: (@Composable () -> Unit)? = null,
+    placeholder: (@Composable () -> Unit)? = null,
+    leadingIcon: (@Composable () -> Unit)? = null,
+    trailingIcon: (@Composable () -> Unit)? = null,
+    supportingText: (@Composable () -> Unit)? = null,
+    isError: Boolean = false,
+    visualTransformation: VisualTransformation = VisualTransformation.None,
+    keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
+    keyboardActions: KeyboardActions = KeyboardActions.Default,
+    singleLine: Boolean = false,
+    maxLines: Int = if (singleLine) 1 else Int.MAX_VALUE,
+) {
+    val caption = MaterialTheme.typography.bodySmall
+    val noteColor = if (isError) IosColors.Red else IosColors.SecondaryLabel
+    Column(modifier) {
+        if (label != null) {
+            Box(Modifier.padding(start = 4.dp, bottom = 5.dp)) {
+                CompositionLocalProvider(LocalContentColor provides noteColor) {
+                    ProvideTextStyle(caption.copy(color = noteColor), content = label)
+                }
+            }
+        }
+        BasicTextField(
+            value = value,
+            onValueChange = onValueChange,
+            enabled = enabled,
+            readOnly = readOnly,
+            textStyle = MaterialTheme.typography.bodyLarge.merge(textStyle).copy(
+                color = if (enabled) Color.White else IosColors.SecondaryLabel,
+            ),
+            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+            visualTransformation = visualTransformation,
+            keyboardOptions = keyboardOptions,
+            keyboardActions = keyboardActions,
+            singleLine = singleLine,
+            maxLines = maxLines,
+            modifier = Modifier.fillMaxWidth(),
+            decorationBox = { inner ->
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 44.dp)
+                        .background(Color(0xFF2C2C2E), RoundedCornerShape(10.dp))
+                        .then(if (isError) Modifier.border(1.dp, IosColors.Red, RoundedCornerShape(10.dp)) else Modifier)
+                        .padding(start = if (leadingIcon != null) 6.dp else 12.dp, end = if (trailingIcon != null) 0.dp else 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    if (leadingIcon != null) {
+                        CompositionLocalProvider(LocalContentColor provides IosColors.SecondaryLabel) {
+                            Box(Modifier.padding(end = 6.dp).size(24.dp), contentAlignment = Alignment.Center) { leadingIcon() }
+                        }
+                    }
+                    Box(Modifier.weight(1f).padding(vertical = 11.dp), contentAlignment = Alignment.CenterStart) {
+                        if (value.isEmpty() && placeholder != null) {
+                            CompositionLocalProvider(LocalContentColor provides IosColors.TertiaryLabel) {
+                                ProvideTextStyle(MaterialTheme.typography.bodyLarge.copy(color = Color(0xFF6E6E73)), content = placeholder)
+                            }
+                        }
+                        inner()
+                    }
+                    if (trailingIcon != null) {
+                        CompositionLocalProvider(LocalContentColor provides IosColors.SecondaryLabel, content = trailingIcon)
+                    }
+                }
+            },
+        )
+        if (supportingText != null) {
+            Box(Modifier.padding(start = 4.dp, top = 5.dp)) {
+                CompositionLocalProvider(LocalContentColor provides noteColor) {
+                    ProvideTextStyle(caption.copy(color = noteColor), content = supportingText)
+                }
+            }
+        }
+    }
+}
+
+/**
+ * iOS-style notice in place of Material's snackbar: a glass capsule that drops in under the
+ * status bar for a few seconds. A newer [message] replaces the one on screen; [onShown] runs
+ * once a message has had its time.
+ */
+@Composable
+fun IosToastHost(message: String?, onShown: () -> Unit, modifier: Modifier = Modifier) {
+    var shown by remember { mutableStateOf<String?>(null) }
+    var visible by remember { mutableStateOf(false) }
+    LaunchedEffect(message) {
+        if (message != null) {
+            shown = message
+            visible = true
+            delay(TOAST_MS)
+            visible = false
+            onShown()
+        }
+    }
+    AnimatedVisibility(
+        visible = visible,
+        modifier = modifier,
+        enter = slideInVertically(spring(dampingRatio = 0.8f, stiffness = 500f)) { -it * 2 } + fadeIn(),
+        exit = slideOutVertically(tween(220)) { -it * 2 } + fadeOut(tween(180)),
+    ) {
+        Text(
+            text = shown.orEmpty(),
+            style = MaterialTheme.typography.labelLarge,
+            color = Color.White,
+            textAlign = TextAlign.Center,
+            maxLines = 3,
+            modifier = Modifier
+                .widthIn(max = 360.dp)
+                .glass(RoundedCornerShape(percent = 50))
+                .padding(horizontal = 20.dp, vertical = 12.dp),
+        )
+    }
+}
+
+private const val TOAST_MS = 2_600L

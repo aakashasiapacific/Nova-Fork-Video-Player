@@ -2,6 +2,7 @@ package com.aakash.novafork.ui.phone
 
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -19,6 +20,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyGridScope
@@ -36,10 +38,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
-import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -51,6 +50,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -58,6 +60,7 @@ import com.aakash.novafork.R
 import com.aakash.novafork.core.format.Formats
 import com.aakash.novafork.data.db.SourceType
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
+import com.aakash.novafork.ui.common.GlassCircle
 import com.aakash.novafork.ui.common.IosSpinner
 import com.aakash.novafork.ui.common.LandscapeArt
 import com.aakash.novafork.ui.common.LocalBottomBarSpace
@@ -424,13 +427,27 @@ internal fun PhonePlayAllRow(
     modifier: Modifier = Modifier,
     playLabel: String = "Play all",
 ) {
+    // Apple's Play and Shuffle: two equal grey pills with the accent on icon and label.
     Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        FilledTonalButton(onClick = onPlayAll, modifier = Modifier.weight(1f)) {
-            ButtonContent(R.drawable.ic_play_arrow, playLabel)
-        }
-        OutlinedButton(onClick = onShuffle, modifier = Modifier.weight(1f)) {
-            ButtonContent(R.drawable.ic_shuffle, "Shuffle")
-        }
+        GreyActionPill(R.drawable.ic_play_arrow, playLabel, onPlayAll, Modifier.weight(1f))
+        GreyActionPill(R.drawable.ic_shuffle, "Shuffle", onShuffle, Modifier.weight(1f))
+    }
+}
+
+@Composable
+private fun GreyActionPill(@DrawableRes icon: Int, label: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val accent = MaterialTheme.colorScheme.primary
+    Row(
+        modifier
+            .height(46.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainer)
+            .clickable(role = Role.Button, onClick = onClick),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        NovaIcon(icon, contentDescription = null, tint = accent, modifier = Modifier.size(20.dp))
+        Text(label, style = MaterialTheme.typography.titleMedium, color = accent, modifier = Modifier.padding(start = 6.dp))
     }
 }
 
@@ -542,7 +559,10 @@ internal fun PhoneLibraryGrid(
 // Page scaffolding
 // ---------------------------------------------------------------------------------------------
 
-/** Plain top bar on the page background; root screens get a bolder title. */
+/**
+ * iOS 26's navigation bar: a round glass back button, the title centred in 17pt semibold and the
+ * page's buttons on the right. A root page (no [onBack]) gets a bold title on the left instead.
+ */
 @Composable
 internal fun PhoneTopBar(
     title: String,
@@ -550,27 +570,40 @@ internal fun PhoneTopBar(
     onBack: (() -> Unit)? = null,
     actions: @Composable RowScope.() -> Unit = {},
 ) {
-    TopAppBar(
-        title = {
+    Box(
+        modifier
+            .fillMaxWidth()
+            .statusBarsPadding()
+            .height(56.dp)
+            .padding(horizontal = 12.dp),
+    ) {
+        if (onBack != null) {
+            GlassCircle(onClick = onBack, description = "Back", size = 40.dp, modifier = Modifier.align(Alignment.CenterStart)) {
+                NovaIcon(R.drawable.ic_arrow_back, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
+            }
             Text(
                 text = title,
-                style = if (onBack == null) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.titleLarge,
+                style = MaterialTheme.typography.titleMedium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .padding(horizontal = 100.dp),
             )
-        },
-        modifier = modifier,
-        navigationIcon = {
-            if (onBack != null) {
-                IconButton(onClick = onBack) { NovaIcon(R.drawable.ic_arrow_back, contentDescription = "Back") }
-            }
-        },
-        actions = actions,
-        colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = MaterialTheme.colorScheme.background,
-            scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
-        ),
-    )
+        } else {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.headlineMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .align(Alignment.CenterStart)
+                    .padding(start = 4.dp, end = 100.dp),
+            )
+        }
+        Row(Modifier.align(Alignment.CenterEnd), verticalAlignment = Alignment.CenterVertically, content = actions)
+    }
 }
 
 /**
@@ -627,14 +660,24 @@ internal fun PhonePullToRefresh(
         },
         modifier = modifier,
         state = state,
+        // iOS's refresh control: the spinner fades in as the page is pulled and spins while the
+        // scan runs.
         indicator = {
-            PullToRefreshDefaults.Indicator(
-                state = state,
-                isRefreshing = pulled,
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .then(indicatorModifier),
-            )
+            val fraction = state.distanceFraction.coerceIn(0f, 1f)
+            if (pulled || fraction > 0f) {
+                IosSpinner(
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .then(indicatorModifier)
+                        .padding(top = 18.dp)
+                        .size(26.dp)
+                        .graphicsLayer {
+                            alpha = if (pulled) 1f else fraction
+                            rotationZ = if (pulled) 0f else fraction * 180f
+                        },
+                    color = Color.White.copy(alpha = 0.8f),
+                )
+            }
         },
         content = content,
     )

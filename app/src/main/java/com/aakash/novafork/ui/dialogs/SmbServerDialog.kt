@@ -14,7 +14,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -36,6 +35,7 @@ import com.aakash.novafork.R
 import com.aakash.novafork.ui.common.IosSpinner
 import com.aakash.novafork.ui.common.NovaAlertDialog
 import com.aakash.novafork.ui.common.NovaIcon
+import com.aakash.novafork.ui.common.NovaTextField
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.DialogUi
 import com.aakash.novafork.ui.model.SmbForm
@@ -129,7 +129,7 @@ internal fun SmbServerDialog(dialog: DialogUi.SmbServer, actions: AppActions) {
                     label = "Username (optional)",
                     supporting = "Leave empty for guest access",
                 )
-                OutlinedTextField(
+                NovaTextField(
                     value = password,
                     onValueChange = { password = it },
                     modifier = Modifier.fillMaxWidth(),
@@ -202,7 +202,7 @@ internal fun FormField(
     capitalization: KeyboardCapitalization = KeyboardCapitalization.None,
     imeAction: ImeAction = ImeAction.Next,
 ) {
-    OutlinedTextField(
+    NovaTextField(
         value = value,
         onValueChange = onValueChange,
         modifier = modifier,

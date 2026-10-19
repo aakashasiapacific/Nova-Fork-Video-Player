@@ -21,7 +21,6 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -46,6 +45,7 @@ import com.aakash.novafork.ui.common.IosSheetShape
 import com.aakash.novafork.ui.common.LandscapeArt
 import com.aakash.novafork.ui.common.NovaAlertDialog
 import com.aakash.novafork.ui.common.NovaIcon
+import com.aakash.novafork.ui.common.NovaTextField
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.Artwork
 import com.aakash.novafork.ui.model.DialogUi
@@ -149,7 +149,7 @@ internal fun PlaylistNameDialog(
         icon = { NovaIcon(R.drawable.ic_playlist_add, contentDescription = null) },
         title = { Text(title) },
         text = {
-            OutlinedTextField(
+            NovaTextField(
                 value = name,
                 onValueChange = { name = it.take(MAX_NAME_LENGTH) },
                 modifier = Modifier.fillMaxWidth(),
