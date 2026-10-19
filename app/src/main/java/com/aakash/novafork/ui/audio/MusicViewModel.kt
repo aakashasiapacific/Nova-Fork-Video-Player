@@ -97,6 +97,10 @@ class MusicViewModel(app: Application) : AndroidViewModel(app), AudioActions {
         refreshOpenPlaylist()
     }
 
+    override fun createPlaylist(name: String) = launchSafely {
+        music.createPlaylist(name)
+    }
+
     override fun removeFromPlaylist(song: SongEntity) = launchSafely {
         val open = _openPlaylist.value ?: return@launchSafely
         music.removeFromPlaylist(open.id, song.id)

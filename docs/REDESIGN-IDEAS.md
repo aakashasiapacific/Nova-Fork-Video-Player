@@ -350,3 +350,6 @@ The owner asked for Apple Music to be copied more precisely, with less clutter. 
   a blue "E3".
 - **Tablet (build 62):** the same as the phone. No play circle on Continue Watching cards, and
   "Season 2 ⌄" in place of season chips.
+- **Playlists (build 63):** "New Playlist…" sits first, with a red "+" tile, as in Apple Music,
+  and opens an iOS naming alert. Album captions are 14sp regular, as in Apple Music, not
+  medium weight.

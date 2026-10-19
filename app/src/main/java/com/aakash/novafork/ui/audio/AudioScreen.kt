@@ -99,6 +99,7 @@ import com.aakash.novafork.ui.common.IosGrabber
 import com.aakash.novafork.ui.common.IosSheetShape
 import com.aakash.novafork.ui.common.IosSpinner
 import com.aakash.novafork.ui.common.LocalBottomBarSpace
+import com.aakash.novafork.ui.common.NovaAlertDialog
 import com.aakash.novafork.ui.common.NovaDropdownMenu
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.NovaMenuItem
@@ -349,7 +350,37 @@ private fun LibraryHome(
 private fun PlaylistsPage(playlists: List<MusicPlaylistRow>, ctx: PageContext) {
     AudioPage {
         header("Playlists", ctx)
-        if (playlists.isEmpty()) row("empty") { Hint("No playlists yet. Use + on a song to start one.") }
+        // Apple Music's first row: a red "+" tile and New Playlist….
+        row("new") {
+            var naming by rememberSaveable { mutableStateOf(false) }
+            ListRow(
+                title = "New Playlist…",
+                titleColor = NovaColors.AppleMusicRed,
+                art = {
+                    Box(
+                        Modifier
+                            .size(56.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color(0xFF1C1C1E)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        NovaIcon(R.drawable.ic_add, contentDescription = null, tint = NovaColors.AppleMusicRed, modifier = Modifier.size(24.dp))
+                    }
+                },
+                chevron = false,
+                onClick = { naming = true },
+            )
+            if (naming) {
+                NewPlaylistDialog(
+                    onCreate = { name ->
+                        naming = false
+                        ctx.actions.createPlaylist(name)
+                    },
+                    onDismiss = { naming = false },
+                )
+            }
+        }
+        if (playlists.isEmpty()) row("empty") { Hint("No playlists yet. Make one here, or use “Add to a Playlist…” in a song's menu.") }
         playlists.forEach { playlist ->
             row("p:${playlist.id}") {
                 ListRow(
@@ -752,8 +783,7 @@ private fun AlbumTile(album: Album, modifier: Modifier = Modifier, onClick: () -
         }
         Text(
             album.title,
-            fontSize = 15.sp,
-            fontWeight = FontWeight.Medium,
+            fontSize = 14.sp,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.padding(top = 6.dp),
@@ -1077,6 +1107,30 @@ private fun AccessCard(onRequestAccess: () -> Unit) {
 @Composable
 private fun Hint(text: String) {
     Text(text, fontSize = 15.sp, color = Color.White.copy(alpha = 0.55f), modifier = Modifier.padding(vertical = 24.dp))
+}
+
+/** iOS's naming alert for a new playlist. */
+@Composable
+private fun NewPlaylistDialog(onCreate: (String) -> Unit, onDismiss: () -> Unit) {
+    var name by rememberSaveable { mutableStateOf("") }
+    NovaAlertDialog(
+        form = true,
+        onDismissRequest = onDismiss,
+        title = { Text("New Playlist") },
+        text = {
+            NovaTextField(
+                value = name,
+                onValueChange = { name = it },
+                placeholder = { Text("Playlist name") },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = { if (name.isNotBlank()) onCreate(name.trim()) }),
+                modifier = Modifier.fillMaxWidth(),
+            )
+        },
+        confirmButton = { TextButton(onClick = { onCreate(name.trim()) }, enabled = name.isNotBlank()) { Text("Create") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
 }
 
 /**
