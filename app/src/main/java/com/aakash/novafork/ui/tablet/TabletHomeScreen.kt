@@ -24,6 +24,8 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilledTonalButton
@@ -33,8 +35,11 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -46,12 +51,16 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.coerceIn
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.currentStateAsState
 import com.aakash.novafork.R
 import com.aakash.novafork.ui.adaptive.DeviceLayout
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
 import com.aakash.novafork.ui.common.BackdropArt
 import com.aakash.novafork.ui.common.DeviceAccessCard
 import com.aakash.novafork.ui.common.LandscapeArt
+import com.aakash.novafork.ui.common.LocalHeroPreviewEnabled
 import com.aakash.novafork.ui.common.RatingPill
 import com.aakash.novafork.ui.common.ScanBanner
 import com.aakash.novafork.ui.common.SectionHeader
@@ -65,15 +74,17 @@ import com.aakash.novafork.ui.model.HeroTarget
 import com.aakash.novafork.ui.model.HeroUi
 import com.aakash.novafork.ui.model.HomeUi
 import com.aakash.novafork.ui.model.LibraryFilter
+import com.aakash.novafork.ui.model.LibraryItemUi
+import com.aakash.novafork.ui.model.MediaKind
 import com.aakash.novafork.ui.model.PermissionUi
 import com.aakash.novafork.ui.model.ScanUi
 import com.aakash.novafork.ui.model.ShowCardUi
 import com.aakash.novafork.ui.model.VideoCardUi
+import com.aakash.novafork.ui.phone.PhoneHeroPager
 import kotlinx.coroutines.delay
 
-private const val HERO_ROTATE_MS = 9_000L
-private val HeroBottomPadding = 36.dp
-private val ThumbSpacing = 10.dp
+/** Scrolled this far, the hero is mostly off screen: its preview stops. */
+private const val HERO_VISIBLE_SCROLL_PX = 600
 
 @Composable
 internal fun TabletHomeScreen(
@@ -104,15 +115,37 @@ internal fun TabletHomeScreen(
 @Composable
 private fun HomeFeed(home: HomeUi, scan: ScanUi, permission: PermissionUi, layout: DeviceLayout, actions: AppActions) {
     val dims = LocalNovaDimens.current
+    val listState = rememberLazyListState()
+    val pagerState = rememberPagerState { home.hero.size }
+    // Short clips play with sound; the hero's mute button silences them.
+    var muted by rememberSaveable { mutableStateOf(false) }
+    val previewEnabled = LocalHeroPreviewEnabled.current
+    val lifecycleState by LocalLifecycleOwner.current.lifecycle.currentStateAsState()
+    val heroOnScreen by remember(listState) {
+        derivedStateOf { listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset < HERO_VISIBLE_SCROLL_PX }
+    }
     BoxWithConstraints(Modifier.fillMaxSize()) {
-        val heroHeight = if (constraints.hasBoundedHeight) (maxHeight * 0.56f).coerceIn(360.dp, 580.dp) else 480.dp
+        // The iPad's hero: most of the screen, leaving the top of the first row in view.
+        val heroHeight = if (constraints.hasBoundedHeight) (maxHeight * 0.72f).coerceIn(420.dp, 760.dp) else 560.dp
         LazyColumn(
+            state = listState,
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(bottom = navigationBarBottom() + dims.sectionSpacing),
         ) {
             if (home.hero.isNotEmpty()) {
                 item(key = "hero", contentType = "hero") {
-                    TabletHero(heroes = home.hero, height = heroHeight, layout = layout, scan = scan, actions = actions)
+                    PhoneHeroPager(
+                        heroes = home.hero,
+                        height = heroHeight,
+                        pagerState = pagerState,
+                        previewEnabled = previewEnabled,
+                        previewAllowed = heroOnScreen && lifecycleState.isAtLeast(Lifecycle.State.RESUMED),
+                        muted = muted,
+                        onToggleMute = { muted = !muted },
+                        actions = actions,
+                        wide = true,
+                        contentStart = dims.gutter,
+                    )
                 }
             } else {
                 item(key = "header", contentType = "header") {
@@ -147,46 +180,55 @@ private fun HomeFeed(home: HomeUi, scan: ScanUi, permission: PermissionUi, layou
                     }
                 }
             }
+            if (home.watchlist.isNotEmpty()) {
+                item(key = "watchlist", contentType = "landscapeRow") {
+                    HomeSection(title = "Watchlist") {
+                        ItemWideRow(home.watchlist, actions)
+                    }
+                }
+            }
             if (home.recentlyAdded.isNotEmpty()) {
-                item(key = "recent", contentType = "posterRow") {
+                item(key = "recent", contentType = "landscapeRow") {
                     HomeSection(title = "Recently added") {
-                        VideoPosterRow(home.recentlyAdded, actions)
+                        VideoWideRow(home.recentlyAdded, actions)
                     }
                 }
             }
             if (home.movies.isNotEmpty()) {
-                item(key = "movies", contentType = "posterRow") {
+                item(key = "movies", contentType = "landscapeRow") {
                     HomeSection(title = "Movies", onSeeAll = { actions.seeAll(LibraryFilter.MOVIES) }) {
-                        VideoPosterRow(home.movies, actions)
+                        VideoWideRow(home.movies, actions)
                     }
                 }
             }
             if (home.shows.isNotEmpty()) {
-                item(key = "shows", contentType = "posterRow") {
+                item(key = "shows", contentType = "landscapeRow") {
                     HomeSection(title = "TV shows", onSeeAll = { actions.seeAll(LibraryFilter.SHOWS) }) {
-                        ShowPosterRow(home.shows, actions)
+                        ShowWideRow(home.shows, actions)
                     }
                 }
             }
             if (home.videos.isNotEmpty()) {
-                item(key = "videos", contentType = "posterRow") {
+                item(key = "videos", contentType = "landscapeRow") {
                     HomeSection(title = "Videos", onSeeAll = { actions.seeAll(LibraryFilter.VIDEOS) }) {
-                        VideoPosterRow(home.videos, actions)
+                        VideoWideRow(home.videos, actions)
                     }
                 }
             }
+        }
+        if (home.hero.isNotEmpty()) {
+            ScanBanner(
+                scan = scan,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .statusBarsPadding()
+                    .padding(top = TabletTopBarSpace),
+            )
         }
     }
 }
 
 private fun AppActions.seeAll(filter: LibraryFilter) = openLibrary(filter)
-
-private fun AppActions.openHero(target: HeroTarget) {
-    when (target) {
-        is HeroTarget.Video -> openVideo(target.id)
-        is HeroTarget.Show -> openShow(target.key)
-    }
-}
 
 @Composable
 private fun HomeSection(title: String, onSeeAll: (() -> Unit)? = null, content: @Composable () -> Unit) {
@@ -223,240 +265,79 @@ private fun ContinueWatchingRow(cards: List<VideoCardUi>, actions: AppActions) {
     }
 }
 
+/** Apple TV's rows: 16:9 cards (backdrop, still or a frame) that open the title's page. */
 @Composable
-private fun VideoPosterRow(cards: List<VideoCardUi>, actions: AppActions) {
+private fun VideoWideRow(cards: List<VideoCardUi>, actions: AppActions) {
     val dims = LocalNovaDimens.current
     LazyRow(
         contentPadding = PaddingValues(horizontal = dims.gutter, vertical = 6.dp),
         horizontalArrangement = Arrangement.spacedBy(dims.rowSpacing),
     ) {
         items(cards, key = { it.id }) { card ->
-            TabletVideoPosterCard(
-                card = card,
-                onOpen = { actions.openVideo(it) },
-                onPlay = { actions.play(it) },
-                modifier = Modifier.width(dims.posterWidth),
-            )
+            VideoWideCard(card, actions)
         }
     }
 }
 
 @Composable
-private fun ShowPosterRow(shows: List<ShowCardUi>, actions: AppActions) {
+private fun VideoWideCard(card: VideoCardUi, actions: AppActions) {
+    val stream = card.kind == MediaKind.STREAM
+    // A stream has no page of its own: it plays.
+    val open = { if (stream) actions.play(card.id) else actions.openVideo(card.id) }
+    TabletStillCard(
+        artwork = card.artwork,
+        title = card.primaryLine(),
+        subtitle = card.secondaryLine(),
+        onClick = open,
+        onLongClick = open,
+        onClickLabel = if (stream) "Play" else "Details",
+        progress = card.progress,
+        watched = card.watched,
+        modifier = Modifier.width(LocalNovaDimens.current.landscapeCardWidth),
+    )
+}
+
+@Composable
+private fun ShowWideCard(show: ShowCardUi, actions: AppActions) {
+    TabletStillCard(
+        artwork = show.artwork,
+        title = show.title,
+        subtitle = show.subtitleLine(),
+        onClick = { actions.openShow(show.key) },
+        onLongClick = { actions.openShow(show.key) },
+        onClickLabel = "Details",
+        watched = show.episodeCount > 0 && show.unwatchedCount == 0,
+        modifier = Modifier.width(LocalNovaDimens.current.landscapeCardWidth),
+    )
+}
+
+@Composable
+private fun ShowWideRow(shows: List<ShowCardUi>, actions: AppActions) {
     val dims = LocalNovaDimens.current
     LazyRow(
         contentPadding = PaddingValues(horizontal = dims.gutter, vertical = 6.dp),
         horizontalArrangement = Arrangement.spacedBy(dims.rowSpacing),
     ) {
         items(shows, key = { it.key }) { show ->
-            TabletShowPosterCard(
-                card = show,
-                onClick = { actions.openShow(show.key) },
-                modifier = Modifier.width(dims.posterWidth),
-            )
+            ShowWideCard(show, actions)
         }
     }
 }
 
-// ---------------------------------------------------------------------------------------------
-// Hero
-// ---------------------------------------------------------------------------------------------
-
+/** Movies, shows and videos mixed (the watchlist). */
 @Composable
-private fun TabletHero(heroes: List<HeroUi>, height: Dp, layout: DeviceLayout, scan: ScanUi, actions: AppActions) {
+private fun ItemWideRow(items: List<LibraryItemUi>, actions: AppActions) {
     val dims = LocalNovaDimens.current
-    val posterWidth = if (layout.isExpanded) 190.dp else 150.dp
-    val thumbWidth = if (layout.isExpanded) 150.dp else 120.dp
-    var selected by rememberSaveable { mutableIntStateOf(0) }
-    val index = selected.coerceIn(0, heroes.lastIndex)
-    val hasThumbnails = heroes.size > 1
-    if (hasThumbnails) {
-        // Restarted by every change of index, so picking a thumbnail also resets the timer.
-        LaunchedEffect(index, heroes.size) {
-            delay(HERO_ROTATE_MS)
-            selected = (index + 1) % heroes.size
-        }
-    }
-    Box(
-        Modifier
-            .fillMaxWidth()
-            .height(height),
+    LazyRow(
+        contentPadding = PaddingValues(horizontal = dims.gutter, vertical = 6.dp),
+        horizontalArrangement = Arrangement.spacedBy(dims.rowSpacing),
     ) {
-        Crossfade(targetState = index, animationSpec = tween(durationMillis = 700), label = "hero") { i ->
-            val hero = heroes.getOrNull(i)
-            if (hero != null) {
-                HeroSlide(
-                    hero = hero,
-                    posterWidth = posterWidth,
-                    endReserve = if (hasThumbnails) thumbWidth + 32.dp else 0.dp,
-                    actions = actions,
-                )
+        items(items, key = { it.key }) { item ->
+            when (item) {
+                is LibraryItemUi.Video -> VideoWideCard(item.card, actions)
+                is LibraryItemUi.Show -> ShowWideCard(item.card, actions)
             }
         }
-        if (hasThumbnails) {
-            HeroThumbnails(
-                heroes = heroes,
-                selected = index,
-                thumbWidth = thumbWidth,
-                heroHeight = height,
-                onSelect = { selected = it },
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(end = dims.gutter, bottom = HeroBottomPadding),
-            )
-        }
-        ScanBanner(
-            scan = scan,
-            modifier = Modifier
-                .align(Alignment.TopStart)
-                .statusBarsPadding(),
-        )
-    }
-}
-
-@Composable
-private fun HeroSlide(hero: HeroUi, posterWidth: Dp, endReserve: Dp, actions: AppActions) {
-    val dims = LocalNovaDimens.current
-    val background = MaterialTheme.colorScheme.background
-    val onBackground = MaterialTheme.colorScheme.onBackground
-    Box(Modifier.fillMaxSize()) {
-        BackdropArt(
-            artwork = hero.artwork,
-            modifier = Modifier
-                .fillMaxSize()
-                .startScrim(background, endFraction = 0.75f)
-                .bottomScrim(background, startFraction = 0.4f),
-        )
-        Row(
-            Modifier
-                .align(Alignment.BottomStart)
-                .fillMaxWidth()
-                .padding(start = dims.gutter, end = dims.gutter + endReserve, bottom = HeroBottomPadding),
-            verticalAlignment = Alignment.Bottom,
-        ) {
-            TabletDetailsPoster(artwork = hero.artwork, title = hero.title, width = posterWidth)
-            Spacer(Modifier.width(28.dp))
-            Column(
-                Modifier
-                    .weight(1f, fill = false)
-                    .widthIn(max = 560.dp),
-            ) {
-                Text(
-                    text = hero.title,
-                    style = MaterialTheme.typography.displaySmall,
-                    color = onBackground,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                val meta = hero.metaLine
-                if (!meta.isNullOrBlank() || (hero.rating ?: 0f) > 0f) {
-                    Spacer(Modifier.height(10.dp))
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        if (!meta.isNullOrBlank()) {
-                            Text(
-                                text = meta,
-                                style = MaterialTheme.typography.titleSmall,
-                                color = onBackground.copy(alpha = 0.82f),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.weight(1f, fill = false),
-                            )
-                        }
-                        RatingPill(hero.rating)
-                    }
-                }
-                // The meta line often already lists the genres; only show the ones it doesn't.
-                val genres = hero.genres.filterNot { meta?.contains(it, ignoreCase = true) == true }.take(3)
-                if (genres.isNotEmpty()) {
-                    Spacer(Modifier.height(12.dp))
-                    FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        genres.forEach { TabletTag(it) }
-                    }
-                }
-                if (!hero.overview.isNullOrBlank()) {
-                    Spacer(Modifier.height(14.dp))
-                    Text(
-                        text = hero.overview,
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = onBackground.copy(alpha = 0.82f),
-                        maxLines = 3,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                Spacer(Modifier.height(22.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    TabletPlayButton(
-                        label = hero.playLabel,
-                        onClick = {
-                            val id = hero.playVideoId
-                            if (id != null) actions.play(id) else actions.openHero(hero.target)
-                        },
-                    )
-                    FilledTonalButton(
-                        onClick = { actions.openHero(hero.target) },
-                        modifier = Modifier.height(48.dp),
-                    ) {
-                        ButtonLabel(R.drawable.ic_info, "More info")
-                    }
-                }
-            }
-        }
-    }
-}
-
-/** A column of 16:9 thumbnails at the bottom-end; shows as many as fit, scrolled to the selection. */
-@Composable
-private fun HeroThumbnails(
-    heroes: List<HeroUi>,
-    selected: Int,
-    thumbWidth: Dp,
-    heroHeight: Dp,
-    onSelect: (Int) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val thumbHeight = thumbWidth * 9f / 16f
-    val room = heroHeight - statusBarTop() - HeroBottomPadding - 48.dp
-    val fit = ((room + ThumbSpacing) / (thumbHeight + ThumbSpacing)).toInt().coerceIn(1, heroes.size)
-    val first = (selected - fit + 1).coerceIn(0, heroes.size - fit)
-    Column(modifier, verticalArrangement = Arrangement.spacedBy(ThumbSpacing)) {
-        for (i in first until first + fit) {
-            HeroThumbnail(
-                hero = heroes[i],
-                selected = i == selected,
-                onClick = { onSelect(i) },
-                modifier = Modifier.width(thumbWidth),
-            )
-        }
-    }
-}
-
-@Composable
-private fun HeroThumbnail(hero: HeroUi, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    val shape = RoundedCornerShape(12.dp)
-    val dim by animateFloatAsState(targetValue = if (selected) 0f else 0.45f, label = "thumbDim")
-    Box(
-        modifier
-            .aspectRatio(16f / 9f)
-            .shadow(6.dp, shape)
-            .outlineIf(selected, Color.White, shape)
-            .clickable(onClickLabel = hero.title, onClick = onClick),
-    ) {
-        LandscapeArt(
-            artwork = hero.artwork,
-            title = hero.title,
-            modifier = Modifier
-                .fillMaxSize()
-                .drawWithContent {
-                    drawContent()
-                    drawRect(Color.Black.copy(alpha = dim))
-                },
-        )
     }
 }
 

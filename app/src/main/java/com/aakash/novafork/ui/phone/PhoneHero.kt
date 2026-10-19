@@ -62,6 +62,7 @@ import com.aakash.novafork.R
 import com.aakash.novafork.ui.common.ArtImage
 import com.aakash.novafork.ui.common.ArtPlaceholder
 import com.aakash.novafork.ui.common.BackdropArt
+import com.aakash.novafork.ui.common.HeroTitle
 import com.aakash.novafork.ui.common.HeroVideoPreview
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.RatingPill
@@ -91,6 +92,9 @@ private val HeroContentBottom = 52.dp
  * below. The dots are white and grey, the active one a pill that fills as the auto-advance timer
  * runs; the mute button for previews sits at the end of their row, within thumb reach.
  *
+ * [wide] (tablets, landscape phones): the landscape backdrop fills the hero instead of the
+ * portrait key art, and the title, logo and buttons sit at the lower left, as on the iPad.
+ *
  * [previewEnabled]: the page shown may play a muted preview of its video ([HeroUi.previewUri])
  * once it has been still for a moment ([previewAllowed] = the hero is on screen and the app in
  * front). [muted] is the mute button's state.
@@ -105,6 +109,8 @@ internal fun PhoneHeroPager(
     muted: Boolean,
     onToggleMute: () -> Unit,
     actions: AppActions,
+    wide: Boolean = false,
+    contentStart: Dp = 24.dp,
 ) {
     val dragged by pagerState.interactionSource.collectIsDraggedAsState()
     val settled = pagerState.settledPage
@@ -132,6 +138,8 @@ internal fun PhoneHeroPager(
                     preview = canPreview && page == settled && !dragged,
                     muted = muted,
                     actions = actions,
+                    wide = wide,
+                    contentStart = contentStart,
                 )
             }
         }
@@ -162,7 +170,7 @@ internal fun PhoneHeroPager(
 }
 
 @Composable
-private fun PhoneHeroPage(hero: HeroUi, preview: Boolean, muted: Boolean, actions: AppActions) {
+private fun PhoneHeroPage(hero: HeroUi, preview: Boolean, muted: Boolean, actions: AppActions, wide: Boolean, contentStart: Dp) {
     val openTarget: () -> Unit = {
         when (val target = hero.target) {
             is HeroTarget.Video -> actions.openVideo(target.id)
@@ -180,7 +188,7 @@ private fun PhoneHeroPage(hero: HeroUi, preview: Boolean, muted: Boolean, action
                 .fillMaxSize()
                 .clickable(onClickLabel = "Details", onClick = openTarget),
         ) {
-            HeroArt(artwork = hero.artwork, modifier = Modifier.fillMaxSize())
+            if (wide) WideHeroArt(artwork = hero.artwork, modifier = Modifier.fillMaxSize()) else HeroArt(artwork = hero.artwork, modifier = Modifier.fillMaxSize())
             val uri = hero.previewUri
             if (preview && uri != null) {
                 var started by remember(uri) { mutableStateOf(false) }
@@ -204,22 +212,43 @@ private fun PhoneHeroPage(hero: HeroUi, preview: Boolean, muted: Boolean, action
                         ),
                     ),
             )
+            if (wide) {
+                // The iPad's darker left side, where the title and buttons sit.
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.horizontalGradient(
+                                0f to background.copy(alpha = 0.7f),
+                                0.45f to background.copy(alpha = 0.25f),
+                                0.7f to Color.Transparent,
+                            ),
+                        ),
+                )
+            }
         }
         Column(
-            Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .padding(start = 24.dp, end = 24.dp, bottom = HeroContentBottom),
-            horizontalAlignment = Alignment.CenterHorizontally,
+            if (wide) {
+                Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(start = contentStart, end = 24.dp, bottom = HeroContentBottom)
+                    .widthIn(max = 480.dp)
+            } else {
+                Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .padding(start = contentStart, end = 24.dp, bottom = HeroContentBottom)
+            },
+            horizontalAlignment = if (wide) Alignment.Start else Alignment.CenterHorizontally,
         ) {
-            Text(
-                text = hero.title,
-                style = MaterialTheme.typography.displaySmall,
-                fontWeight = FontWeight.ExtraBold,
-                color = Color.White,
-                textAlign = TextAlign.Center,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
+            HeroTitle(
+                title = hero.title,
+                logoUrl = hero.artwork.logoUrl,
+                textStyle = MaterialTheme.typography.displaySmall,
+                textAlign = if (wide) TextAlign.Start else TextAlign.Center,
+                logoAlignment = if (wide) Alignment.BottomStart else Alignment.BottomCenter,
+                maxWidthFraction = if (wide) 0.8f else 0.72f,
+                logoHeight = if (wide) 110.dp else 96.dp,
             )
             val rating = hero.rating
             val meta = hero.metaLine
@@ -248,6 +277,17 @@ private fun PhoneHeroPage(hero: HeroUi, preview: Boolean, muted: Boolean, action
                     fontWeight = FontWeight.Bold,
                     color = Color.White,
                     modifier = Modifier.padding(top = 6.dp),
+                )
+            }
+            val overview = hero.overview
+            if (wide && !overview.isNullOrBlank()) {
+                Text(
+                    text = overview,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color.White.copy(alpha = 0.82f),
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = 10.dp),
                 )
             }
             Spacer(Modifier.height(18.dp))
@@ -364,6 +404,24 @@ private fun HeroArt(artwork: Artwork, modifier: Modifier = Modifier) {
                 .then(sharpModifier),
             frameSource = artwork.frameSource,
         ) {}
+    }
+}
+
+/**
+ * A wide hero's picture: the landscape backdrop (or still, or a frame of the video) fills it,
+ * as on the iPad; the portrait key art is the last resort.
+ */
+@Composable
+private fun WideHeroArt(artwork: Artwork, modifier: Modifier = Modifier) {
+    val candidates = listOfNotNull(artwork.backdropUrl, artwork.stillUrl, artwork.frameSource, artwork.tallUrl, artwork.posterUrl).distinct()
+    ArtImage(
+        candidates = candidates,
+        contentDescription = null,
+        modifier = modifier,
+        frameSource = artwork.frameSource,
+        alignment = Alignment.TopCenter,
+    ) {
+        ArtPlaceholder(seed = artwork.seed, title = null, modifier = Modifier.fillMaxSize())
     }
 }
 

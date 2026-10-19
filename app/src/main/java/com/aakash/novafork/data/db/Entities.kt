@@ -205,6 +205,11 @@ data class MetadataEntity(
     val castNames: String? = null,
     /** Directors (movies) or creators (shows), comma-separated (version 5), for search. */
     val directors: String? = null,
+    /**
+     * TMDB's title logo (version 6): the title drawn as transparent artwork, shown over the hero
+     * in place of plain text. Null = none.
+     */
+    val logoPath: String? = null,
 )
 
 /**

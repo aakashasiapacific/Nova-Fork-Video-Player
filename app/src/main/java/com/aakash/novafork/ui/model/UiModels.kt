@@ -19,6 +19,8 @@ data class Artwork(
     val frameSource: String? = null,
     /** Portrait key art without text (TMDB's textless poster), for the tall Home hero. */
     val tallUrl: String? = null,
+    /** The title drawn as transparent artwork (TMDB's logo), shown over the hero in place of text. */
+    val logoUrl: String? = null,
     /** Seed for the placeholder colours (usually the title). */
     val seed: String = "",
 )

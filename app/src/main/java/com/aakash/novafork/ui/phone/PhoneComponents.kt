@@ -248,6 +248,80 @@ internal fun PhoneLandscapeCard(
     subtitle: String? = card.displaySubtitle(),
     width: Dp = LocalNovaDimens.current.landscapeCardWidth,
 ) {
+    WideCardLayout(
+        title = title,
+        subtitle = subtitle,
+        artwork = card.artwork,
+        artTitle = card.title,
+        onClick = onClick,
+        modifier = modifier,
+        onLongClick = onLongClick,
+        width = width,
+        progress = card.progress,
+        watched = card.watched,
+        playMark = true,
+    )
+}
+
+/**
+ * Apple TV's row card for a movie or video: 16:9 art (backdrop, still or a frame) with the title
+ * and caption below, opening its page rather than playing.
+ */
+@Composable
+internal fun PhoneWideVideoCard(
+    card: VideoCardUi,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    onLongClick: (() -> Unit)? = null,
+) {
+    WideCardLayout(
+        title = card.displayTitle(),
+        subtitle = card.displaySubtitle(),
+        artwork = card.artwork,
+        artTitle = card.title,
+        onClick = onClick,
+        modifier = modifier,
+        onLongClick = onLongClick,
+        progress = card.progress,
+        watched = card.watched,
+        playMark = false,
+    )
+}
+
+/** [PhoneWideVideoCard] for a TV show ("24 episodes"). */
+@Composable
+internal fun PhoneWideShowCard(
+    show: ShowCardUi,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    WideCardLayout(
+        title = show.title,
+        subtitle = countLabel(show.episodeCount, "episode"),
+        artwork = show.artwork,
+        artTitle = show.title,
+        onClick = onClick,
+        modifier = modifier,
+        progress = null,
+        watched = show.episodeCount > 0 && show.unwatchedCount == 0,
+        playMark = false,
+    )
+}
+
+@Composable
+private fun WideCardLayout(
+    title: String,
+    subtitle: String?,
+    artwork: Artwork,
+    artTitle: String,
+    onClick: () -> Unit,
+    modifier: Modifier,
+    progress: Float?,
+    watched: Boolean,
+    playMark: Boolean,
+    onLongClick: (() -> Unit)? = null,
+    width: Dp = LocalNovaDimens.current.landscapeCardWidth,
+) {
     val shape = RoundedCornerShape(LocalNovaDimens.current.cardRadius)
     Column(
         modifier
@@ -262,10 +336,11 @@ internal fun PhoneLandscapeCard(
                 .clip(shape)
                 .background(MaterialTheme.colorScheme.surfaceContainerHigh),
         ) {
-            LandscapeArt(artwork = card.artwork, title = card.title, modifier = Modifier.fillMaxSize())
-            PlayGlyph(Modifier.align(Alignment.Center))
-            if (card.watched) WatchedBadge(Modifier.align(Alignment.TopEnd).padding(6.dp))
-            ProgressStrip(card.progress, Modifier.align(Alignment.BottomStart))
+            // A card without any 16:9 picture names its title on the placeholder.
+            LandscapeArt(artwork = artwork, title = artTitle, modifier = Modifier.fillMaxSize(), showTitleOnPlaceholder = !playMark)
+            if (playMark) PlayGlyph(Modifier.align(Alignment.Center))
+            if (watched) WatchedBadge(Modifier.align(Alignment.TopEnd).padding(6.dp))
+            ProgressStrip(progress, Modifier.align(Alignment.BottomStart))
         }
         Spacer(Modifier.height(8.dp))
         Text(

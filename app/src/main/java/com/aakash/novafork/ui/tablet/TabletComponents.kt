@@ -564,6 +564,7 @@ internal fun TabletStillCard(
     watched: Boolean = false,
     badge: String? = null,
     highlighted: Boolean = false,
+    onClickLabel: String = "Play",
 ) {
     val dims = LocalNovaDimens.current
     val shape = RoundedCornerShape(dims.cardRadius)
@@ -578,7 +579,7 @@ internal fun TabletStillCard(
             .combinedClickable(
                 interactionSource = interactionSource,
                 indication = null,
-                onClickLabel = "Play",
+                onClickLabel = onClickLabel,
                 onLongClickLabel = "Details",
                 onLongClick = onLongClick,
                 onClick = onClick,

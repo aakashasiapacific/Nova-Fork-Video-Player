@@ -457,7 +457,7 @@ interface MetadataDao {
     @Query("DELETE FROM metadata WHERE `key` NOT IN (SELECT metadataKey FROM videos WHERE metadataKey IS NOT NULL)")
     suspend fun deleteUnreferenced()
 
-    /** TMDB rows saved before version 5, without textless poster and credits yet. */
+    /** TMDB rows saved before version 6, without textless poster, credits and logo yet. */
     @Query("SELECT `key` FROM metadata WHERE castNames IS NULL AND `key` NOT LIKE 'server:%'")
     suspend fun keysWithoutDetails(): List<String>
 

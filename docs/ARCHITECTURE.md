@@ -210,6 +210,14 @@ only `ui/common`, `ui/settings`, `ui/dialogs`, and `ui/model`.
     (libVLC; longer videos show only their art; `HeroUi.previewUri` / `previewStartMs`, `ui/common/HeroPreview.kt`), only where MainActivity
     sets `LocalHeroPreviewEnabled`.
   - The mute button sits at the end of the dots row.
+  - The title is TMDB's logo when it has one (`MetadataEntity.logoPath`, Room v6,
+    `Artwork.logoUrl`, `ui/common/TitleLogo.kt`), else text.
+  - `wide = true` (tablets, landscape phones): the backdrop fills it and the title and buttons sit
+    at the lower left. The tablet's Home uses this same pager (`PhoneHeroPager`).
+- **Tab bars:** `ui/common/NovaTabBar.kt`'s glass capsule is the phone's floating dock (it shrinks
+  to two circles while a page scrolls down) and the tablet's top-centre bar (`TabletTopBar`),
+  which replaced the side rail. Tablet pages other than Home-with-hero and details start below it.
+- **Rows:** every Home row uses 16:9 cards that open the title's page.
 
 The rest of this section is the earlier Material design, still used where the redesign hasn't
 reached yet.

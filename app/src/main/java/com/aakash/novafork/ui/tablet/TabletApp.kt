@@ -40,7 +40,7 @@ import com.aakash.novafork.ui.model.top
 import com.aakash.novafork.ui.settings.SettingsScreen
 
 /**
- * Tablet UI: navigation rail plus one page per route. Pages with artwork draw behind the status
+ * Tablet UI: a floating tab bar at the top centre over one page per route. Pages with artwork draw behind the status
  * bar; the others pad themselves. Dialogs, snackbars and system back belong to the app shell.
  */
 @Composable
@@ -54,21 +54,15 @@ fun TabletApp(state: AppUiState, actions: AppActions, layout: DeviceLayout, modi
         val pageStates = rememberSaveableStateHolder()
         // A Surface (not just a background) so text and icons get onBackground by default.
         Surface(modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-            Row(Modifier.fillMaxSize()) {
-                TabletNavRail(
-                    selected = state.route.top,
-                    onSelect = actions::selectTab,
-                    modifier = Modifier.fillMaxHeight(),
-                )
+            Box(Modifier.fillMaxSize()) {
                 // Keyed by page, so updates within a page recompose it in place while a page change
                 // crossfades and the outgoing page keeps the state it was built with.
                 AnimatedContent(
                     targetState = state,
                     modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
+                        .fillMaxSize()
                         .windowInsetsPadding(
-                            WindowInsets.systemBars.union(WindowInsets.displayCutout).only(WindowInsetsSides.End),
+                            WindowInsets.systemBars.union(WindowInsets.displayCutout).only(WindowInsetsSides.Horizontal),
                         ),
                     transitionSpec = { fadeIn(tween(durationMillis = 240, delayMillis = 40)) togetherWith fadeOut(tween(durationMillis = 160)) },
                     contentAlignment = Alignment.TopStart,
@@ -76,9 +70,20 @@ fun TabletApp(state: AppUiState, actions: AppActions, layout: DeviceLayout, modi
                     label = "tabletPage",
                 ) { pageState ->
                     pageStates.SaveableStateProvider(pageState.route.pageKey().toString()) {
-                        TabletPage(state = pageState, actions = actions, layout = layout)
+                        // Pages with art at the top (Home's hero, details) run under the floating
+                        // bar; the others start below it.
+                        val underBar = pageState.route is Route.VideoDetails || pageState.route is Route.ShowDetails ||
+                            (pageState.route == Route.Home && pageState.home.hero.isNotEmpty())
+                        Box(if (underBar) Modifier.fillMaxSize() else Modifier.fillMaxSize().padding(top = TabletTopBarSpace)) {
+                            TabletPage(state = pageState, actions = actions, layout = layout)
+                        }
                     }
                 }
+                TabletTopBar(
+                    selected = state.route.top,
+                    onSelect = actions::selectTab,
+                    modifier = Modifier.align(Alignment.TopCenter),
+                )
             }
         }
     }

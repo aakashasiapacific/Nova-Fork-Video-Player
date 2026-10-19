@@ -77,10 +77,12 @@ class TmdbClient(
 
     /** With its images (textless and English posters and backdrops) and credits, in one request. */
     suspend fun movie(id: Int): TmdbMovieDetails =
-        get("movie/$id", detailParams(), TmdbMovieDetails.serializer())
+        get("movie/$id", detailParams(), TmdbMovieDetails.serializer()).let { it.copy(logoPath = it.images.logo(logoLanguage())) }
 
     suspend fun tv(id: Int): TmdbTvDetails =
-        get("tv/$id", detailParams(), TmdbTvDetails.serializer())
+        get("tv/$id", detailParams(), TmdbTvDetails.serializer()).let { it.copy(logoPath = it.images.logo(logoLanguage())) }
+
+    private fun logoLanguage(): String = language().substringBefore('-').lowercase()
 
     /** Every poster and backdrop TMDB has for a title, for "Change artwork" (any language). */
     suspend fun images(type: String, id: Int): TmdbImages =
@@ -88,7 +90,7 @@ class TmdbClient(
 
     private fun detailParams(): List<Pair<String, String?>> {
         val language = language()
-        val lang = language.substringBefore('-').lowercase()
+        val lang = logoLanguage()
         // "null" = images without text (textless key art), for the tall Home hero.
         val imageLanguages = listOf("null", lang, "en").distinct().joinToString(",")
         return listOf(

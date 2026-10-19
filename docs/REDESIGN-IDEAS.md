@@ -7,11 +7,14 @@
 - the hero, its dots, the muted preview and the mute button (section 3);
 - the watchlist "+" and its row (section 6.3).
 
-The tablet got the four tabs and the colours in its old side rail; its floating top bar (6.5) and
-hero come later. Still to do on the phone:
-- title logos from TMDB;
-- 16:9 landscape cards in the rows (section 4);
-- personal videos' frame-based hero art.
+**Round 2 (build 40):**
+- TMDB title logos over the hero (phone and tablet), text when a title has none;
+- 16:9 landscape cards in every Home row (section 4), phone and tablet;
+- tablet: the floating tab capsule at the top centre (6.5) replaces the side rail, and the hero is
+  the phone's pager in a wide layout (backdrop, title and buttons at the lower left, dots,
+  previews and mute); landscape phones use the same wide layout.
+
+Still to do: personal videos' frame-based hero art.
 
 These are the owner's decisions and requests for the Apple TV-style redesign, plus what their
 screenshots show. They come before `docs/APPLE-TV-SPEC.md` wherever the two disagree. Nothing here is

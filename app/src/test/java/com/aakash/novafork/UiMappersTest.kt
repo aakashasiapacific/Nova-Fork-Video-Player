@@ -172,6 +172,18 @@ class UiMappersTest {
     }
 
     @Test
+    fun cardsCarryTheTitleLogoForTheHero() {
+        val meta = MetadataEntity(key = "movie:603", tmdbId = 603, type = "movie", title = "The Matrix", logoPath = "/matrix-logo.png")
+        val rows = listOf(
+            VideoWithMeta(video(id = 1, sourceId = DEVICE, uri = "content://media/external/video/media/1", kind = VideoKind.MOVIE, metadataKey = meta.key), meta),
+        )
+        val small = LibraryIndex.build(rows, listOf(device), preferLocalArtwork = false)
+        assertEquals("https://image.tmdb.org/t/p/w500/matrix-logo.png", requireNotNull(small.videosById[1L]).card.artwork.logoUrl)
+        // Without a logo the title is drawn as text.
+        assertNull(card(DUNE).artwork.logoUrl)
+    }
+
+    @Test
     fun personalVideosFillAHeroThatHasRoom() {
         val rows = listOf(
             row(video(id = 1, sourceId = DEVICE, uri = "content://media/external/video/media/1", fileName = "Birthday.mp4")),

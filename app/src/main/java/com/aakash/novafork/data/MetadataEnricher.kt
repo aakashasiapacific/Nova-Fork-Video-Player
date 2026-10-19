@@ -423,6 +423,7 @@ internal fun TmdbMovieDetails.toMetadata(now: Long): MetadataEntity = MetadataEn
     runtimeMin = runtime?.takeIf { it > 0 },
     updatedAt = now,
     textlessPosterPath = images.textlessPoster,
+    logoPath = logoPath,
     castNames = credits.topCast().joinToString(", "),
     directors = credits.directors.joinToString(", "),
 )
@@ -451,6 +452,7 @@ internal fun TmdbTvDetails.toMetadata(now: Long): MetadataEntity {
         seasonPostersJson = if (seasonPosters.isEmpty()) null else seasonPosters.toString(),
         updatedAt = now,
         textlessPosterPath = images.textlessPoster,
+        logoPath = logoPath,
         castNames = credits.topCast().joinToString(", "),
         directors = createdBy.map { it.name }.filter { it.isNotBlank() }.joinToString(", "),
     )

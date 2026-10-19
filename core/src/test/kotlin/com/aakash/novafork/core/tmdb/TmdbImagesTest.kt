@@ -36,4 +36,22 @@ class TmdbImagesTest {
         assertNull(movie.images.textlessPoster)
         assertEquals(emptyList<String>(), movie.credits.topCast())
     }
+
+    @Test
+    fun theLogoIsInTheAppLanguageThenEnglishThenWithoutText() {
+        fun logo(vararg entries: String, language: String = "hi"): String? = json.decodeFromString(
+            TmdbImages.serializer(),
+            """{"logos": [${entries.joinToString(",")}]}""",
+        ).logo(language)
+        val hindi = """{"file_path": "/hi.png", "iso_639_1": "hi", "vote_average": 3.0}"""
+        val english = """{"file_path": "/en.png", "iso_639_1": "en", "vote_average": 5.0}"""
+        val englishBest = """{"file_path": "/en-best.png", "iso_639_1": "en", "vote_average": 8.0}"""
+        val englishSvg = """{"file_path": "/en.svg", "iso_639_1": "en", "vote_average": 9.9}"""
+        val plain = """{"file_path": "/plain.png", "iso_639_1": null, "vote_average": 9.0}"""
+        assertEquals("/hi.png", logo(hindi, english, plain))
+        assertEquals("/en-best.png", logo(english, englishBest, englishSvg, plain))
+        assertEquals("/plain.png", logo(plain, englishSvg))
+        assertNull(logo(englishSvg))
+        assertNull(logo())
+    }
 }

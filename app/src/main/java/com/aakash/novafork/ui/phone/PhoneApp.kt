@@ -73,7 +73,11 @@ import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
 import com.aakash.novafork.ui.adaptive.DeviceLayout
 import com.aakash.novafork.ui.audio.AudioScreen
+import com.aakash.novafork.ui.common.GlassCircle
 import com.aakash.novafork.ui.common.NovaIcon
+import com.aakash.novafork.ui.common.NovaTabCapsule
+import com.aakash.novafork.ui.common.activeColor
+import com.aakash.novafork.ui.common.tabIconRes
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.AppUiState
 import com.aakash.novafork.ui.model.Route
@@ -241,153 +245,23 @@ private fun PhoneNavigationBar(selected: TopDestination, collapsed: Boolean, onE
         ) { small ->
             if (small) {
                 Box(Modifier.fillMaxSize()) {
-                    GlassCircle(onClick = onExpand, description = "Show tabs", modifier = Modifier.align(Alignment.CenterStart)) {
-                        NovaIcon(selected.iconRes(), contentDescription = null, tint = selected.activeColor(), modifier = Modifier.size(24.dp))
+                    GlassCircle(onClick = onExpand, description = "Show tabs", size = TabBarHeight, modifier = Modifier.align(Alignment.CenterStart)) {
+                        NovaIcon(selected.tabIconRes(), contentDescription = null, tint = selected.activeColor(), modifier = Modifier.size(24.dp))
                     }
                     if (selected != TopDestination.SEARCH) {
-                        GlassCircle(onClick = { onSelect(TopDestination.SEARCH) }, description = TopDestination.SEARCH.label, modifier = Modifier.align(Alignment.CenterEnd)) {
-                            NovaIcon(TopDestination.SEARCH.iconRes(), contentDescription = null, tint = Color.White, modifier = Modifier.size(24.dp))
+                        GlassCircle(onClick = { onSelect(TopDestination.SEARCH) }, description = TopDestination.SEARCH.label, size = TabBarHeight, modifier = Modifier.align(Alignment.CenterEnd)) {
+                            NovaIcon(TopDestination.SEARCH.tabIconRes(), contentDescription = null, tint = Color.White, modifier = Modifier.size(24.dp))
                         }
                     }
                 }
             } else {
-                TabCapsule(selected = selected, onSelect = onSelect)
+                NovaTabCapsule(selected = selected, onSelect = onSelect, modifier = Modifier.fillMaxSize())
             }
         }
     }
 }
-
-@Composable
-private fun TabCapsule(selected: TopDestination, onSelect: (TopDestination) -> Unit) {
-    val tabs = TopDestination.entries
-    val currentOnSelect by rememberUpdatedState(onSelect)
-    var dragX by remember { mutableStateOf<Float?>(null) }
-    BoxWithConstraints(
-        Modifier
-            .fillMaxSize()
-            .glass(RoundedCornerShape(percent = 50))
-            .padding(PillInset)
-            .pointerInput(tabs.size) {
-                fun tabAt(x: Float): TopDestination = tabs[(x / size.width * tabs.size).toInt().coerceIn(0, tabs.lastIndex)]
-                detectHorizontalDragGestures(
-                    onDragStart = { dragX = it.x },
-                    onDragEnd = {
-                        dragX?.let { currentOnSelect(tabAt(it)) }
-                        dragX = null
-                    },
-                    onDragCancel = { dragX = null },
-                ) { change, amount ->
-                    change.consume()
-                    dragX = (dragX ?: change.position.x) + amount
-                }
-            },
-    ) {
-        val slot = maxWidth / tabs.size
-        val widthPx = constraints.maxWidth.toFloat().coerceAtLeast(1f)
-        val active = dragX?.let { x -> (x / widthPx * tabs.size).toInt().coerceIn(0, tabs.lastIndex) } ?: tabs.indexOf(selected)
-        val pillX by animateDpAsState(slot * active, animationSpec = spring(dampingRatio = 0.75f, stiffness = Spring.StiffnessMediumLow), label = "tabPill")
-        Box(
-            Modifier
-                .offset(x = pillX)
-                .size(width = slot, height = maxHeight)
-                .clip(RoundedCornerShape(percent = 50))
-                .background(SelectedPillColor),
-        )
-        Row(Modifier.fillMaxSize()) {
-            tabs.forEachIndexed { index, tab ->
-                val isActive = index == active
-                val tint = if (isActive) tab.activeColor() else Color.White
-                Column(
-                    Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
-                        .selectable(
-                            selected = tab == selected,
-                            onClick = { onSelect(tab) },
-                            role = Role.Tab,
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null,
-                        ),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center,
-                ) {
-                    TabIcon(tab = tab, active = isActive, tint = tint)
-                    Text(
-                        tab.label,
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.SemiBold,
-                        color = tint,
-                        maxLines = 1,
-                        modifier = Modifier.padding(top = 2.dp),
-                    )
-                }
-            }
-        }
-    }
-}
-
-/** One of the shrunken bar's round glass buttons. */
-@Composable
-private fun GlassCircle(onClick: () -> Unit, description: String, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
-    Box(
-        modifier
-            .size(TabBarHeight)
-            .glass(CircleShape)
-            .clickable(onClickLabel = description, role = Role.Button, onClick = onClick)
-            .semantics { contentDescription = description },
-        contentAlignment = Alignment.Center,
-    ) { content() }
-}
-
-/** iOS's dark glass: a translucent dark-grey fill, a hairline light edge and a soft shadow. */
-private fun Modifier.glass(shape: Shape): Modifier = this
-    .shadow(elevation = 12.dp, shape = shape, ambientColor = Color.Black, spotColor = Color.Black)
-    .clip(shape)
-    .background(GlassColor)
-    .border(0.5.dp, Color.White.copy(alpha = 0.10f), shape)
 
 private val TabBarHeight = 64.dp
 private val BarCollapseScroll = 32.dp
 private val BarSideMargin = 20.dp
-private val PillInset = 5.dp
-private val GlassColor = Color(0xF21C1C1E)
-private val SelectedPillColor = Color(0xFF3A3A3C)
 
-/**
- * The selected tab's colour, as the owner chose: Video and Preferences iOS blue, Audio Apple
- * Music red, Search white.
- */
-private fun TopDestination.activeColor(): Color = when (this) {
-    TopDestination.VIDEO, TopDestination.SETTINGS -> NovaColors.IosBlue
-    TopDestination.AUDIO -> NovaColors.AppleMusicRed
-    TopDestination.SEARCH -> Color.White
-}
-
-/** A tab's icon; the selected one pops in with a short spring. */
-@Composable
-private fun TabIcon(tab: TopDestination, active: Boolean, tint: Color) {
-    val scale by animateFloatAsState(
-        targetValue = if (active) 1f else 0.9f,
-        animationSpec = spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessMedium),
-        label = "tabIcon",
-    )
-    NovaIcon(
-        tab.iconRes(),
-        contentDescription = null,
-        tint = tint,
-        modifier = Modifier
-            .size(24.dp)
-            .graphicsLayer {
-                scaleX = scale
-                scaleY = scale
-            },
-    )
-}
-
-@DrawableRes
-private fun TopDestination.iconRes(): Int = when (this) {
-    TopDestination.VIDEO -> R.drawable.ic_tv
-    TopDestination.AUDIO -> R.drawable.ic_music_notes
-    TopDestination.SETTINGS -> R.drawable.ic_person
-    TopDestination.SEARCH -> R.drawable.ic_search
-}

@@ -164,6 +164,8 @@ private fun HomeFeed(home: HomeUi, scan: ScanUi, permission: PermissionUi, actio
                         muted = muted,
                         onToggleMute = { muted = !muted },
                         actions = actions,
+                        // Landscape: the backdrop fills the hero, the title sits on the left.
+                        wide = maxWidth > maxHeight,
                     )
                 }
             } else {
@@ -191,37 +193,37 @@ private fun HomeFeed(home: HomeUi, scan: ScanUi, permission: PermissionUi, actio
                 }
             }
             if (home.watchlist.isNotEmpty()) {
-                item(key = "watchlist", contentType = "posterRow") {
+                item(key = "watchlist", contentType = "landscapeRow") {
                     HomeSection(title = "Watchlist") {
-                        ItemPosterRow(home.watchlist, actions)
+                        ItemWideRow(home.watchlist, actions)
                     }
                 }
             }
             if (home.recentlyAdded.isNotEmpty()) {
-                item(key = "recent", contentType = "posterRow") {
+                item(key = "recent", contentType = "landscapeRow") {
                     HomeSection(title = "Recently added") {
-                        VideoPosterRow(home.recentlyAdded, actions)
+                        VideoWideRow(home.recentlyAdded, actions)
                     }
                 }
             }
             if (home.movies.isNotEmpty()) {
-                item(key = "movies", contentType = "posterRow") {
+                item(key = "movies", contentType = "landscapeRow") {
                     HomeSection(title = "Movies", onSeeAll = { actions.seeAll(LibraryFilter.MOVIES) }) {
-                        VideoPosterRow(home.movies, actions)
+                        VideoWideRow(home.movies, actions)
                     }
                 }
             }
             if (home.shows.isNotEmpty()) {
-                item(key = "shows", contentType = "posterRow") {
+                item(key = "shows", contentType = "landscapeRow") {
                     HomeSection(title = "TV shows", onSeeAll = { actions.seeAll(LibraryFilter.SHOWS) }) {
-                        ShowPosterRow(home.shows, actions)
+                        ShowWideRow(home.shows, actions)
                     }
                 }
             }
             if (home.videos.isNotEmpty()) {
-                item(key = "videos", contentType = "posterRow") {
+                item(key = "videos", contentType = "landscapeRow") {
                     HomeSection(title = "Videos", onSeeAll = { actions.seeAll(LibraryFilter.VIDEOS) }) {
-                        VideoPosterRow(home.videos, actions)
+                        VideoWideRow(home.videos, actions)
                     }
                 }
             }
@@ -339,7 +341,7 @@ private fun LandscapeRow(cards: List<VideoCardUi>, actions: AppActions) {
 }
 
 @Composable
-private fun VideoPosterRow(cards: List<VideoCardUi>, actions: AppActions) {
+private fun VideoWideRow(cards: List<VideoCardUi>, actions: AppActions) {
     val dims = LocalNovaDimens.current
     LazyRow(
         contentPadding = PaddingValues(horizontal = dims.gutter),
@@ -347,10 +349,9 @@ private fun VideoPosterRow(cards: List<VideoCardUi>, actions: AppActions) {
     ) {
         items(cards) { card ->
             VideoMenuBox(videoId = card.id, title = card.displayTitle(), actions = actions, showDetails = false) { openMenu ->
-                PhonePosterCard(
+                PhoneWideVideoCard(
                     card = card,
                     onClick = { actions.openVideo(card.id) },
-                    modifier = Modifier.width(dims.posterWidth),
                     onLongClick = openMenu,
                 )
             }
@@ -360,7 +361,7 @@ private fun VideoPosterRow(cards: List<VideoCardUi>, actions: AppActions) {
 
 /** Movies, shows and videos mixed (the watchlist). */
 @Composable
-private fun ItemPosterRow(items: List<LibraryItemUi>, actions: AppActions) {
+private fun ItemWideRow(items: List<LibraryItemUi>, actions: AppActions) {
     val dims = LocalNovaDimens.current
     LazyRow(
         contentPadding = PaddingValues(horizontal = dims.gutter),
@@ -368,15 +369,13 @@ private fun ItemPosterRow(items: List<LibraryItemUi>, actions: AppActions) {
     ) {
         items(items, key = { it.key }) { item ->
             when (item) {
-                is LibraryItemUi.Video -> PhonePosterCard(
+                is LibraryItemUi.Video -> PhoneWideVideoCard(
                     card = item.card,
                     onClick = { actions.openVideo(item.card.id) },
-                    modifier = Modifier.width(dims.posterWidth),
                 )
-                is LibraryItemUi.Show -> PhoneShowCard(
+                is LibraryItemUi.Show -> PhoneWideShowCard(
                     show = item.card,
                     onClick = { actions.openShow(item.card.key) },
-                    modifier = Modifier.width(dims.posterWidth),
                 )
             }
         }
@@ -384,17 +383,16 @@ private fun ItemPosterRow(items: List<LibraryItemUi>, actions: AppActions) {
 }
 
 @Composable
-private fun ShowPosterRow(shows: List<ShowCardUi>, actions: AppActions) {
+private fun ShowWideRow(shows: List<ShowCardUi>, actions: AppActions) {
     val dims = LocalNovaDimens.current
     LazyRow(
         contentPadding = PaddingValues(horizontal = dims.gutter),
         horizontalArrangement = Arrangement.spacedBy(dims.rowSpacing),
     ) {
         items(shows) { show ->
-            PhoneShowCard(
+            PhoneWideShowCard(
                 show = show,
                 onClick = { actions.openShow(show.key) },
-                modifier = Modifier.width(dims.posterWidth),
             )
         }
     }

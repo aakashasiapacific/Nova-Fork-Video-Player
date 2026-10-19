@@ -17,6 +17,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
  * serverId and libraryIds, and videos.remoteId.
  * Version 4 adds music (songs, playlist_songs) and the watchlist.
  * Version 5 adds metadata.textlessPosterPath, castNames and directors, and artwork_choices.
+ * Version 6 adds metadata.logoPath.
  */
 @Database(
     entities = [
@@ -31,7 +32,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         WatchlistEntity::class,
         ArtworkChoiceEntity::class,
     ],
-    version = 5,
+    version = 6,
     exportSchema = true,
 )
 abstract class NovaDatabase : RoomDatabase() {
@@ -141,11 +142,22 @@ abstract class NovaDatabase : RoomDatabase() {
         }
 
         /**
+         * Adds the title logo. TMDB rows are marked as missing their details (castNames NULL), so
+         * the next metadata pass fetches them again, logo included, as it did for version 5.
+         */
+        val MIGRATION_5_6: Migration = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `metadata` ADD COLUMN `logoPath` TEXT")
+                db.execSQL("UPDATE `metadata` SET `castNames` = NULL WHERE `key` LIKE 'movie:%' OR `key` LIKE 'tv:%'")
+            }
+        }
+
+        /**
          * Upgrades between schema versions, oldest first (`Migration(1, 2)`, `Migration(2, 3)`, …).
          * Watch history, resume points and manual matches only survive an app update through these:
          * with a version missing here Room refuses to open the database rather than wipe it.
          */
-        val MIGRATIONS: Array<Migration> = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+        val MIGRATIONS: Array<Migration> = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
 
         fun create(context: Context): NovaDatabase =
             Room.databaseBuilder(context.applicationContext, NovaDatabase::class.java, "nova.db")
