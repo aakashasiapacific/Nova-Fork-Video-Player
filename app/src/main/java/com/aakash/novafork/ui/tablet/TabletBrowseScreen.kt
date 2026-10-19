@@ -41,7 +41,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -650,7 +649,7 @@ private fun BrowseDirHeader(dir: BrowseDirUi, actions: AppActions, modifier: Mod
                     ButtonLabel(R.drawable.ic_play_arrow, "Play All")
                 }
                 Spacer(Modifier.width(8.dp))
-                OutlinedButton(onClick = { actions.playFolder(dir.sourceId, dir.path, shuffle = true) }) {
+                FilledTonalButton(onClick = { actions.playFolder(dir.sourceId, dir.path, shuffle = true) }) {
                     ButtonLabel(R.drawable.ic_shuffle, "Shuffle")
                 }
                 Spacer(Modifier.width(4.dp))

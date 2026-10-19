@@ -37,7 +37,6 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -358,16 +357,16 @@ private fun HomeOnboarding(scan: ScanUi, permission: PermissionUi, actions: AppA
                         .fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    OutlinedButton(onClick = actions::addFolder, modifier = Modifier.fillMaxWidth()) {
+                    FilledTonalButton(onClick = actions::addFolder, modifier = Modifier.fillMaxWidth()) {
                         ButtonContent(R.drawable.ic_create_new_folder, "Add a Folder")
                     }
-                    OutlinedButton(
+                    FilledTonalButton(
                         onClick = actions::addNetworkSource,
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         ButtonContent(R.drawable.ic_lan, "Add a network source")
                     }
-                    OutlinedButton(
+                    FilledTonalButton(
                         onClick = { actions.showDialog(DialogUi.OpenUrl) },
                         modifier = Modifier.fillMaxWidth(),
                     ) {

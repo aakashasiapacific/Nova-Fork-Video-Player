@@ -30,7 +30,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -59,8 +58,8 @@ import com.aakash.novafork.ui.adaptive.DeviceLayout
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
 import com.aakash.novafork.ui.common.BackdropArt
 import com.aakash.novafork.ui.common.DeviceAccessCard
-import com.aakash.novafork.ui.common.LandscapeArt
 import com.aakash.novafork.ui.common.HomeLibraryLinks
+import com.aakash.novafork.ui.common.LandscapeArt
 import com.aakash.novafork.ui.common.LocalHeroPreviewEnabled
 import com.aakash.novafork.ui.common.RatingPill
 import com.aakash.novafork.ui.common.ScanBanner
@@ -366,7 +365,7 @@ private fun OnboardingText(scan: ScanUi, permission: PermissionUi, actions: AppA
             ) {
                 ButtonLabel(R.drawable.ic_lan, "Add a network source")
             }
-            OutlinedButton(
+            FilledTonalButton(
                 onClick = { actions.showDialog(DialogUi.OpenUrl) },
                 modifier = Modifier.fillMaxWidth().height(48.dp),
             ) {

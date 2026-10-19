@@ -23,7 +23,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -124,7 +123,7 @@ private fun PlaylistHeader(playlist: PlaylistDetailsUi, actions: AppActions, mod
             ) {
                 ButtonLabel(R.drawable.ic_shuffle, "Shuffle")
             }
-            OutlinedButton(
+            FilledTonalButton(
                 onClick = { actions.showDialog(DialogUi.RenamePlaylist(playlist.id, playlist.name)) },
                 modifier = Modifier.height(48.dp),
             ) {

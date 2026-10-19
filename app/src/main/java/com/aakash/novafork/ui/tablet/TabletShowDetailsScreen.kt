@@ -21,7 +21,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -106,7 +105,7 @@ internal fun TabletShowDetailsScreen(
                             FilledTonalButton(onClick = { actions.playSeason(details.key, season.number) }) {
                                 ButtonLabel(R.drawable.ic_play_arrow, if (seasons.size > 1) "Play ${season.title}" else "Play All")
                             }
-                            OutlinedButton(onClick = { actions.playSeason(details.key, season.number, shuffle = true) }) {
+                            FilledTonalButton(onClick = { actions.playSeason(details.key, season.number, shuffle = true) }) {
                                 ButtonLabel(R.drawable.ic_shuffle, "Shuffle")
                             }
                         }

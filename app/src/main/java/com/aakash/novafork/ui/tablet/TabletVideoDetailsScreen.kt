@@ -20,7 +20,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -161,10 +160,10 @@ private fun VideoBody(details: VideoDetailsUi, actions: AppActions) {
                 }
             }
             if (!isStream) {
-                OutlinedButton(onClick = { actions.identify(details.id) }, modifier = Modifier.height(48.dp)) {
+                FilledTonalButton(onClick = { actions.identify(details.id) }, modifier = Modifier.height(48.dp)) {
                     ButtonLabel(R.drawable.ic_search, "Identify")
                 }
-                OutlinedButton(onClick = { actions.setWatched(details.id, !details.watched) }, modifier = Modifier.height(48.dp)) {
+                FilledTonalButton(onClick = { actions.setWatched(details.id, !details.watched) }, modifier = Modifier.height(48.dp)) {
                     if (details.watched) {
                         ButtonLabel(R.drawable.ic_visibility_off, "Mark unwatched")
                     } else {
@@ -172,7 +171,7 @@ private fun VideoBody(details: VideoDetailsUi, actions: AppActions) {
                     }
                 }
             }
-            OutlinedButton(
+            FilledTonalButton(
                 onClick = { actions.addToPlaylist(listOf(details.id), details.title) },
                 modifier = Modifier.height(48.dp),
             ) {

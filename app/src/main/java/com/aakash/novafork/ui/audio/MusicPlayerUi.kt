@@ -161,19 +161,42 @@ fun MiniPlayerBar(
     compact: Boolean = false,
 ) {
     val now = player.nowPlaying
+    // As in Apple Music, a sideways swipe on the mini player skips: left for the next song,
+    // right for the one before. The song slides with the finger and springs back.
+    val scope = rememberCoroutineScope()
+    val swipe = remember { Animatable(0f) }
+    val skipPx = with(LocalDensity.current) { 64.dp.toPx() }
     Row(
         modifier
             .fillMaxWidth()
             .height(MiniPlayerHeight)
             .glass(RoundedCornerShape(percent = 50))
             .clickable(onClickLabel = "Open Now Playing", onClick = onOpen)
+            .pointerInput(player.hasNext) {
+                detectHorizontalDragGestures(
+                    onDragEnd = {
+                        val moved = swipe.value
+                        when {
+                            moved < -skipPx && player.hasNext -> actions.next()
+                            moved > skipPx -> actions.previous()
+                        }
+                        scope.launch { swipe.animateTo(0f, spring(dampingRatio = 0.7f)) }
+                    },
+                    onDragCancel = { scope.launch { swipe.animateTo(0f, spring()) } },
+                ) { change, amount ->
+                    change.consume()
+                    scope.launch { swipe.snapTo((swipe.value + amount).coerceIn(-skipPx * 1.6f, skipPx * 1.6f)) }
+                }
+            }
             .padding(start = 10.dp, end = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Cover(now?.artUri, size = 42, corner = 8)
+        Cover(now?.artUri, size = 42, corner = 8, modifier = Modifier.offset { IntOffset((swipe.value * 0.5f).roundToInt(), 0) })
         Column(
             Modifier
                 .weight(1f)
+                .offset { IntOffset(swipe.value.roundToInt(), 0) }
+                .graphicsLayer { alpha = 1f - (kotlin.math.abs(swipe.value) / (skipPx * 2.2f)).coerceIn(0f, 0.7f) }
                 .padding(horizontal = 12.dp),
         ) {
             Text(
