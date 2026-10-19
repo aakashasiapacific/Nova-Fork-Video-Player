@@ -294,20 +294,26 @@ fun NowPlayingScreen(
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
-                // Apple Music's star: adds the song to Favorites.
+                // Apple Music's star: a small translucent circle whose right edge lines up with
+                // the scrubber's (an IconButton would grow to 48dp and stick out past it).
                 if (now != null) {
-                    IconButton(
-                        onClick = { actions.toggleFavorite(now.songId) },
-                        modifier = Modifier
-                            .size(36.dp)
+                    Box(
+                        Modifier
+                            .padding(start = 12.dp)
+                            .size(32.dp)
                             .clip(CircleShape)
-                            .background(Color.White.copy(alpha = 0.15f)),
+                            .background(Color.White.copy(alpha = 0.15f))
+                            .clickable(
+                                onClickLabel = if (favorite) "Remove from Favorites" else "Add to Favorites",
+                                role = Role.Button,
+                            ) { actions.toggleFavorite(now.songId) },
+                        contentAlignment = Alignment.Center,
                     ) {
                         NovaIcon(
                             if (favorite) R.drawable.ic_star else R.drawable.ic_star_outline,
                             contentDescription = if (favorite) "Remove from Favorites" else "Add to Favorites",
                             tint = Color.White,
-                            modifier = Modifier.size(20.dp),
+                            modifier = Modifier.size(18.dp),
                         )
                     }
                 }
