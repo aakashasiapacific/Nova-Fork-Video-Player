@@ -16,6 +16,19 @@
 
 Still to do: personal videos' frame-based hero art.
 
+**Round 3 (build 41, owner's test of build 40):**
+- The phone hero looks like a title's own page: backdrop on top, poster with title (logo), meta and
+  highlight beside it, Play pill and "+" below.
+- Home is only the hero, Continue watching and Library (All videos, Movies, TV shows, Folders,
+  sources and playlists); the Recently added, Movies, TV shows, Videos and Watchlist strips are
+  gone, and "Videos" left the library.
+- All videos (sorted by Recently added) is an endless timeline of every video by when it reached
+  the device, in date groups (Today, Yesterday, This week, months).
+- A picked poster now shows on Home too.
+- No "Not identified" card: Identify stays in the ⋮ menu.
+- The phone tab bar truly floats: no black strip behind it, pages scroll on underneath
+  (`LocalBottomBarSpace` pads their lists).
+
 These are the owner's decisions and requests for the Apple TV-style redesign, plus what their
 screenshots show. They come before `docs/APPLE-TV-SPEC.md` wherever the two disagree. Nothing here is
 implemented yet.

@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
 import com.aakash.novafork.core.format.Formats
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
+import com.aakash.novafork.ui.common.LocalBottomBarSpace
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.SectionHeader
 import com.aakash.novafork.ui.common.metaLine
@@ -49,7 +50,7 @@ fun PhoneVideoDetailsScreen(
         val backdropHeight = detailsBackdropHeight(maxHeight)
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(bottom = dims.sectionSpacing),
+            contentPadding = PaddingValues(bottom = dims.sectionSpacing + LocalBottomBarSpace.current),
         ) {
             item(key = "header") {
                 PhoneDetailsHeader(
@@ -106,14 +107,8 @@ fun PhoneVideoDetailsScreen(
                     }
                 }
             }
-            if (!details.isMatched && details.kind != MediaKind.STREAM) {
-                item(key = "identify") {
-                    IdentifyHintCard(
-                        onIdentify = { actions.identify(details.id) },
-                        modifier = Modifier.padding(start = dims.gutter, end = dims.gutter, top = dims.sectionSpacing),
-                    )
-                }
-            }
+            // An unidentified video is usually not a movie or show at all: no nagging card;
+            // Identify stays in the ⋮ menu.
             item(key = "file") {
                 FileInfo(
                     details = details,

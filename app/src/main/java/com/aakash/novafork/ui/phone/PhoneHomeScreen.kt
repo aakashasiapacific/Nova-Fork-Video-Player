@@ -64,6 +64,8 @@ import com.aakash.novafork.ui.adaptive.LocalNovaDimens
 import com.aakash.novafork.ui.common.BackdropArt
 import com.aakash.novafork.ui.common.DeviceAccessCard
 import com.aakash.novafork.ui.common.EmptyState
+import com.aakash.novafork.ui.common.HomeLibraryLinks
+import com.aakash.novafork.ui.common.LocalBottomBarSpace
 import com.aakash.novafork.ui.common.LocalHeroPreviewEnabled
 import com.aakash.novafork.ui.common.LocalStatusBarIcons
 import com.aakash.novafork.ui.common.NovaIcon
@@ -151,7 +153,7 @@ private fun HomeFeed(home: HomeUi, scan: ScanUi, permission: PermissionUi, actio
         LazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(bottom = dims.sectionSpacing),
+            contentPadding = PaddingValues(bottom = dims.sectionSpacing + LocalBottomBarSpace.current),
         ) {
             if (hasHero) {
                 item(key = "hero", contentType = "hero") {
@@ -192,43 +194,8 @@ private fun HomeFeed(home: HomeUi, scan: ScanUi, permission: PermissionUi, actio
                     }
                 }
             }
-            if (home.watchlist.isNotEmpty()) {
-                item(key = "watchlist", contentType = "landscapeRow") {
-                    HomeSection(title = "Watchlist") {
-                        ItemWideRow(home.watchlist, actions)
-                    }
-                }
-            }
-            if (home.recentlyAdded.isNotEmpty()) {
-                item(key = "recent", contentType = "landscapeRow") {
-                    HomeSection(title = "Recently added") {
-                        VideoWideRow(home.recentlyAdded, actions)
-                    }
-                }
-            }
-            if (home.movies.isNotEmpty()) {
-                item(key = "movies", contentType = "landscapeRow") {
-                    HomeSection(title = "Movies", onSeeAll = { actions.seeAll(LibraryFilter.MOVIES) }) {
-                        VideoWideRow(home.movies, actions)
-                    }
-                }
-            }
-            if (home.shows.isNotEmpty()) {
-                item(key = "shows", contentType = "landscapeRow") {
-                    HomeSection(title = "TV shows", onSeeAll = { actions.seeAll(LibraryFilter.SHOWS) }) {
-                        ShowWideRow(home.shows, actions)
-                    }
-                }
-            }
-            if (home.videos.isNotEmpty()) {
-                item(key = "videos", contentType = "landscapeRow") {
-                    HomeSection(title = "Videos", onSeeAll = { actions.seeAll(LibraryFilter.VIDEOS) }) {
-                        VideoWideRow(home.videos, actions)
-                    }
-                }
-            }
             item(key = "library", contentType = "library") {
-                LibraryEntry(actions)
+                HomeLibraryLinks(actions)
             }
         }
         ScanBanner(
@@ -254,47 +221,6 @@ private fun HeroStatusBar(hero: HeroUi?, active: Boolean) {
     LaunchedEffect(dark) { setDarkIcons(dark) }
     DisposableEffect(Unit) { onDispose { setDarkIcons(false) } }
 }
-
-/** The way into the whole library, at the end of the feed (Library left the tab bar). */
-@Composable
-private fun LibraryEntry(actions: AppActions) {
-    val dims = LocalNovaDimens.current
-    Column(Modifier.fillMaxWidth().padding(top = dims.sectionSpacing)) {
-        SectionHeader(
-            title = "Library",
-            modifier = Modifier.padding(start = dims.gutter, end = 4.dp, bottom = 4.dp),
-        )
-        LibraryLink(R.drawable.ic_video_library, "All videos") { actions.openLibrary(LibraryFilter.ALL) }
-        LibraryLink(R.drawable.ic_movie, "Movies") { actions.openLibrary(LibraryFilter.MOVIES) }
-        LibraryLink(R.drawable.ic_tv, "TV shows") { actions.openLibrary(LibraryFilter.SHOWS) }
-        LibraryLink(R.drawable.ic_video_file, "Videos") { actions.openLibrary(LibraryFilter.VIDEOS) }
-        LibraryLink(R.drawable.ic_folder, "Folders, sources and playlists") { actions.navigate(Route.Browse) }
-    }
-}
-
-@Composable
-private fun LibraryLink(@DrawableRes icon: Int, label: String, onClick: () -> Unit) {
-    val dims = LocalNovaDimens.current
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = dims.gutter, vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        NovaIcon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(
-            label,
-            style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier
-                .padding(start = 16.dp)
-                .weight(1f),
-        )
-        NovaIcon(R.drawable.ic_chevron_right, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
-}
-
-private fun AppActions.seeAll(filter: LibraryFilter) = openLibrary(filter)
 
 // ---------------------------------------------------------------------------------------------
 // Rows
@@ -336,64 +262,6 @@ private fun LandscapeRow(cards: List<VideoCardUi>, actions: AppActions) {
                     subtitle = metaLine(card.displaySubtitle(), remainingLabel(card)).ifEmpty { null },
                 )
             }
-        }
-    }
-}
-
-@Composable
-private fun VideoWideRow(cards: List<VideoCardUi>, actions: AppActions) {
-    val dims = LocalNovaDimens.current
-    LazyRow(
-        contentPadding = PaddingValues(horizontal = dims.gutter),
-        horizontalArrangement = Arrangement.spacedBy(dims.rowSpacing),
-    ) {
-        items(cards) { card ->
-            VideoMenuBox(videoId = card.id, title = card.displayTitle(), actions = actions, showDetails = false) { openMenu ->
-                PhoneWideVideoCard(
-                    card = card,
-                    onClick = { actions.openVideo(card.id) },
-                    onLongClick = openMenu,
-                )
-            }
-        }
-    }
-}
-
-/** Movies, shows and videos mixed (the watchlist). */
-@Composable
-private fun ItemWideRow(items: List<LibraryItemUi>, actions: AppActions) {
-    val dims = LocalNovaDimens.current
-    LazyRow(
-        contentPadding = PaddingValues(horizontal = dims.gutter),
-        horizontalArrangement = Arrangement.spacedBy(dims.rowSpacing),
-    ) {
-        items(items, key = { it.key }) { item ->
-            when (item) {
-                is LibraryItemUi.Video -> PhoneWideVideoCard(
-                    card = item.card,
-                    onClick = { actions.openVideo(item.card.id) },
-                )
-                is LibraryItemUi.Show -> PhoneWideShowCard(
-                    show = item.card,
-                    onClick = { actions.openShow(item.card.key) },
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun ShowWideRow(shows: List<ShowCardUi>, actions: AppActions) {
-    val dims = LocalNovaDimens.current
-    LazyRow(
-        contentPadding = PaddingValues(horizontal = dims.gutter),
-        horizontalArrangement = Arrangement.spacedBy(dims.rowSpacing),
-    ) {
-        items(shows) { show ->
-            PhoneWideShowCard(
-                show = show,
-                onClick = { actions.openShow(show.key) },
-            )
         }
     }
 }

@@ -33,6 +33,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
+import com.aakash.novafork.ui.common.LocalBottomBarSpace
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.SectionHeader
 import com.aakash.novafork.ui.common.VideoMenuBox
@@ -64,7 +65,7 @@ fun PhoneShowDetailsScreen(
         val backdropHeight = detailsBackdropHeight(maxHeight)
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(bottom = dims.sectionSpacing),
+            contentPadding = PaddingValues(bottom = dims.sectionSpacing + LocalBottomBarSpace.current),
         ) {
             item(key = "header") {
                 PhoneDetailsHeader(
@@ -125,14 +126,6 @@ fun PhoneShowDetailsScreen(
                     overview = details.overview,
                     modifier = Modifier.padding(start = dims.gutter, end = dims.gutter, top = 16.dp),
                 )
-            }
-            if (!details.isMatched && identifyVideoId != null) {
-                item(key = "identify") {
-                    IdentifyHintCard(
-                        onIdentify = { actions.identify(identifyVideoId) },
-                        modifier = Modifier.padding(start = dims.gutter, end = dims.gutter, top = dims.sectionSpacing),
-                    )
-                }
             }
             item(key = "seasons") {
                 Column(Modifier.padding(top = dims.sectionSpacing)) {

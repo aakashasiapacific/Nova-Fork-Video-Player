@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
@@ -50,6 +51,7 @@ import com.aakash.novafork.ui.model.LibraryItemUi
 import com.aakash.novafork.ui.model.LibrarySort
 import com.aakash.novafork.ui.model.LibraryUi
 import com.aakash.novafork.ui.model.Route
+import com.aakash.novafork.ui.model.TimelineSectionUi
 
 /**
  * Library. Landscape: list-detail (poster grid + preview pane driven by [AppActions.preview]).
@@ -102,6 +104,7 @@ internal fun TabletLibraryScreen(
             ) {
                 LibraryGrid(
                     items = items,
+                    timeline = library.timeline,
                     selectedKey = previewKey,
                     // A second tap on the previewed title opens it.
                     onClick = { item -> if (item.key == previewKey) actions.openItem(item) else actions.preview(item) },
@@ -131,6 +134,7 @@ internal fun TabletLibraryScreen(
             }
             else -> LibraryGrid(
                 items = items,
+                timeline = library.timeline,
                 selectedKey = null,
                 onClick = { item -> actions.openItem(item) },
                 onLongClick = { item ->
@@ -191,7 +195,8 @@ private fun FilterChipRow(library: LibraryUi, onFilter: (LibraryFilter) -> Unit,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        LibraryFilter.entries.forEach { filter ->
+        // "Videos" left the library (owner): unidentified files are in All videos' timeline.
+        (LibraryFilter.entries - LibraryFilter.VIDEOS).forEach { filter ->
             val selected = filter == library.filter
             val count = library.counts[filter]
             FilterChip(
@@ -256,6 +261,8 @@ private fun LibraryGrid(
     contentPadding: PaddingValues,
     actions: AppActions,
     modifier: Modifier = Modifier,
+    /** All videos newest first in date groups (see [com.aakash.novafork.ui.model.LibraryUi.timeline]); replaces [items]. */
+    timeline: List<TimelineSectionUi> = emptyList(),
 ) {
     val dims = LocalNovaDimens.current
     LazyVerticalGrid(
@@ -265,41 +272,64 @@ private fun LibraryGrid(
         horizontalArrangement = Arrangement.spacedBy(dims.rowSpacing),
         verticalArrangement = Arrangement.spacedBy(24.dp),
     ) {
-        items(items, key = { it.key }, contentType = { "poster" }) { item ->
-            when (item) {
-                // Videos get a menu (Play, Details, Add to playlist) instead of one long-press action.
-                is LibraryItemUi.Video -> VideoMenuBox(
-                    videoId = item.card.id,
-                    title = item.card.primaryLine(),
-                    actions = actions,
-                    extraItems = { close ->
-                        DropdownMenuItem(
-                            text = { Text("Play") },
-                            leadingIcon = { NovaIcon(R.drawable.ic_play_arrow, contentDescription = null) },
-                            onClick = {
-                                close()
-                                actions.play(item.card.id)
-                            },
-                        )
-                    },
-                ) { openMenu ->
-                    TabletLibraryItemCard(
-                        item = item,
-                        onClick = { onClick(item) },
-                        onLongClick = openMenu,
-                        onLongClickLabel = "More options",
-                        selected = item.key == selectedKey,
-                    )
+        if (timeline.isNotEmpty()) {
+            timeline.forEachIndexed { index, section ->
+                item(key = "header:$index:${section.label}", span = { GridItemSpan(maxLineSpan) }, contentType = "header") {
+                    Text(section.label, style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(top = if (index == 0) 0.dp else 8.dp))
                 }
-                is LibraryItemUi.Show -> TabletLibraryItemCard(
-                    item = item,
-                    onClick = { onClick(item) },
-                    onLongClick = { onLongClick(item) },
-                    onLongClickLabel = longClickLabel(item),
-                    selected = item.key == selectedKey,
-                )
+                items(section.videos.map { LibraryItemUi.Video(it) }, key = { it.key }, contentType = { "poster" }) { item ->
+                    LibraryGridCard(item, selectedKey, onClick, onLongClick, longClickLabel, actions)
+                }
+            }
+        } else {
+            items(items, key = { it.key }, contentType = { "poster" }) { item ->
+                LibraryGridCard(item, selectedKey, onClick, onLongClick, longClickLabel, actions)
             }
         }
+    }
+}
+
+@Composable
+private fun LibraryGridCard(
+    item: LibraryItemUi,
+    selectedKey: String?,
+    onClick: (LibraryItemUi) -> Unit,
+    onLongClick: (LibraryItemUi) -> Unit,
+    longClickLabel: (LibraryItemUi) -> String,
+    actions: AppActions,
+) {
+    when (item) {
+        // Videos get a menu (Play, Details, Add to playlist) instead of one long-press action.
+        is LibraryItemUi.Video -> VideoMenuBox(
+            videoId = item.card.id,
+            title = item.card.primaryLine(),
+            actions = actions,
+            extraItems = { close ->
+                DropdownMenuItem(
+                    text = { Text("Play") },
+                    leadingIcon = { NovaIcon(R.drawable.ic_play_arrow, contentDescription = null) },
+                    onClick = {
+                        close()
+                        actions.play(item.card.id)
+                    },
+                )
+            },
+        ) { openMenu ->
+            TabletLibraryItemCard(
+                item = item,
+                onClick = { onClick(item) },
+                onLongClick = openMenu,
+                onLongClickLabel = "More options",
+                selected = item.key == selectedKey,
+            )
+        }
+        is LibraryItemUi.Show -> TabletLibraryItemCard(
+            item = item,
+            onClick = { onClick(item) },
+            onLongClick = { onLongClick(item) },
+            onLongClickLabel = longClickLabel(item),
+            selected = item.key == selectedKey,
+        )
     }
 }
 

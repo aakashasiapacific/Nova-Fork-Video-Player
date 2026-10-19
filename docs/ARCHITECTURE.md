@@ -217,7 +217,11 @@ only `ui/common`, `ui/settings`, `ui/dialogs`, and `ui/model`.
 - **Tab bars:** `ui/common/NovaTabBar.kt`'s glass capsule is the phone's floating dock (it shrinks
   to two circles while a page scrolls down) and the tablet's top-centre bar (`TabletTopBar`),
   which replaced the side rail. Tablet pages other than Home-with-hero and details start below it.
-- **Rows:** every Home row uses 16:9 cards that open the title's page.
+- **Home:** hero, Continue watching, then `HomeLibraryLinks` (phone and tablet). The phone hero
+  is details-page style (`DetailsStyleHeroPage`); `LibraryUi.timeline` turns All videos into a
+  date-grouped timeline.
+- **Floating bar:** pages draw under the phone's tab bar and add `LocalBottomBarSpace` to their
+  lists' bottom padding.
 
 The rest of this section is the earlier Material design, still used where the redesign hasn't
 reached yet.

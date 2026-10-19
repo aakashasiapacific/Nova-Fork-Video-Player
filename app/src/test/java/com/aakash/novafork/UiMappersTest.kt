@@ -172,6 +172,34 @@ class UiMappersTest {
     }
 
     @Test
+    fun allVideosIsATimelineNewestFirst() {
+        val utc = java.time.ZoneOffset.UTC
+        val library = UiMappers.library(index, LibraryFilter.ALL, LibrarySort.RECENT, now = FakeLibrary.NOW, zone = utc)
+        val timeline = library.timeline.flatMap { it.videos }
+        // Every video, episodes one by one, newest first.
+        assertEquals(index.videos.size, timeline.size)
+        val added = timeline.map { card -> index.videos.first { it.id == card.id }.video.dateAdded }
+        assertEquals(added.sortedDescending(), added)
+        assertTrue(library.timeline.first().label in setOf("Today", "Yesterday"))
+        // A label never repeats: groups are consecutive.
+        assertEquals(library.timeline.map { it.label }.distinct(), library.timeline.map { it.label })
+        // Other sorts and filters are the plain grid.
+        assertTrue(UiMappers.library(index, LibraryFilter.ALL, LibrarySort.TITLE).timeline.isEmpty())
+        assertTrue(UiMappers.library(index, LibraryFilter.MOVIES, LibrarySort.RECENT).timeline.isEmpty())
+    }
+
+    @Test
+    fun timelineLabelsGoFromTodayToMonths() {
+        val today = java.time.LocalDate.of(2026, 10, 19)
+        assertEquals("Today", UiMappers.timelineLabel(today, today))
+        assertEquals("Yesterday", UiMappers.timelineLabel(today.minusDays(1), today))
+        assertEquals("This week", UiMappers.timelineLabel(today.minusDays(5), today))
+        val month = java.time.Month.MARCH.getDisplayName(java.time.format.TextStyle.FULL, java.util.Locale.getDefault())
+        assertEquals(month, UiMappers.timelineLabel(java.time.LocalDate.of(2026, 3, 2), today))
+        assertEquals("$month 2024", UiMappers.timelineLabel(java.time.LocalDate.of(2024, 3, 2), today))
+    }
+
+    @Test
     fun cardsCarryTheTitleLogoForTheHero() {
         val meta = MetadataEntity(key = "movie:603", tmdbId = 603, type = "movie", title = "The Matrix", logoPath = "/matrix-logo.png")
         val rows = listOf(

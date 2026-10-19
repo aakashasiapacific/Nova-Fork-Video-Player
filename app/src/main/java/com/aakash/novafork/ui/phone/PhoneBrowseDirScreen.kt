@@ -40,6 +40,7 @@ import com.aakash.novafork.data.db.SourceType
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
 import com.aakash.novafork.ui.common.DeviceStorageEmptyState
 import com.aakash.novafork.ui.common.EmptyState
+import com.aakash.novafork.ui.common.LocalBottomBarSpace
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.VideoMenuBox
 import com.aakash.novafork.ui.model.AppActions
@@ -121,7 +122,7 @@ private fun BrowseDirContent(dir: BrowseDirUi, permission: PermissionUi, actions
         }
         else -> LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(top = 4.dp, bottom = dims.sectionSpacing),
+            contentPadding = PaddingValues(top = 4.dp, bottom = dims.sectionSpacing + LocalBottomBarSpace.current),
         ) {
             if (!error.isNullOrBlank()) {
                 item(key = "error") {

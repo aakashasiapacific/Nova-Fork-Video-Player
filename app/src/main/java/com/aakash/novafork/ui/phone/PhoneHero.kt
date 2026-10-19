@@ -8,6 +8,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -48,6 +49,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -65,6 +67,7 @@ import com.aakash.novafork.ui.common.BackdropArt
 import com.aakash.novafork.ui.common.HeroTitle
 import com.aakash.novafork.ui.common.HeroVideoPreview
 import com.aakash.novafork.ui.common.NovaIcon
+import com.aakash.novafork.ui.common.PosterArt
 import com.aakash.novafork.ui.common.RatingPill
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.Artwork
@@ -86,14 +89,14 @@ private val HeroDotsBottom = 16.dp
 private val HeroContentBottom = 52.dp
 
 /**
- * Apple TV's phone hero: full-bleed from the very top of the screen (under a clear status bar)
- * down to [height], swiped page by page. Each page centres the title, the meta line, a white
- * Play pill and a round "+" (watchlist) in its lower part; the image fades into the black page
- * below. The dots are white and grey, the active one a pill that fills as the auto-advance timer
- * runs; the mute button for previews sits at the end of their row, within thumb reach.
+ * The Home hero: from the very top of the screen (under a clear status bar) down to [height],
+ * swiped page by page. On a phone each page looks like the title's own page: backdrop on top,
+ * poster with title, meta line and highlight beside it, then a white Play pill and a round "+"
+ * (watchlist). The dots are white and grey, the active one a pill that fills as the
+ * auto-advance timer runs; the mute button for clips sits at the end of their row.
  *
- * [wide] (tablets, landscape phones): the landscape backdrop fills the hero instead of the
- * portrait key art, and the title, logo and buttons sit at the lower left, as on the iPad.
+ * [wide] (tablets, landscape phones): the backdrop fills the hero and the title, logo and
+ * buttons sit at the lower left, as on the iPad.
  *
  * [previewEnabled]: the page shown may play a muted preview of its video ([HeroUi.previewUri])
  * once it has been still for a moment ([previewAllowed] = the hero is on screen and the app in
@@ -181,6 +184,10 @@ private fun PhoneHeroPage(hero: HeroUi, preview: Boolean, muted: Boolean, action
         val videoId = hero.playVideoId
         if (videoId != null) actions.play(videoId) else openTarget()
     }
+    if (!wide) {
+        DetailsStyleHeroPage(hero = hero, preview = preview, muted = muted, openTarget = openTarget, play = play, actions = actions)
+        return
+    }
     val background = MaterialTheme.colorScheme.background
     Box(Modifier.fillMaxSize()) {
         Box(
@@ -188,16 +195,8 @@ private fun PhoneHeroPage(hero: HeroUi, preview: Boolean, muted: Boolean, action
                 .fillMaxSize()
                 .clickable(onClickLabel = "Details", onClick = openTarget),
         ) {
-            if (wide) WideHeroArt(artwork = hero.artwork, modifier = Modifier.fillMaxSize()) else HeroArt(artwork = hero.artwork, modifier = Modifier.fillMaxSize())
-            val uri = hero.previewUri
-            if (preview && uri != null) {
-                var started by remember(uri) { mutableStateOf(false) }
-                LaunchedEffect(uri) {
-                    delay(HERO_PREVIEW_DELAY_MS)
-                    started = true
-                }
-                if (started) HeroVideoPreview(uri = uri, startMs = hero.previewStartMs, muted = muted, modifier = Modifier.fillMaxSize())
-            }
+            WideHeroArt(artwork = hero.artwork, modifier = Modifier.fillMaxSize())
+            HeroClip(hero = hero, preview = preview, muted = muted)
             // The image meets the black page: clear at the top, black at the bottom. A layer of
             // its own, so it covers the preview's video view too.
             Box(
@@ -291,119 +290,169 @@ private fun PhoneHeroPage(hero: HeroUi, preview: Boolean, muted: Boolean, action
                 )
             }
             Spacer(Modifier.height(18.dp))
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Button(
-                    onClick = play,
-                    modifier = Modifier
-                        .height(50.dp)
-                        .widthIn(min = 180.dp, max = 260.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black),
-                    contentPadding = PaddingValues(horizontal = 28.dp),
-                ) {
-                    NovaIcon(R.drawable.ic_play_arrow, contentDescription = null, modifier = Modifier.size(24.dp))
-                    Text(
-                        text = hero.playLabel,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(start = 6.dp),
-                    )
-                }
-                IconButton(
-                    onClick = { actions.toggleWatchlist(hero.itemKey) },
-                    modifier = Modifier.size(50.dp),
-                    colors = IconButtonDefaults.iconButtonColors(
-                        containerColor = Color.White.copy(alpha = 0.18f),
-                        contentColor = Color.White,
-                    ),
-                ) {
-                    NovaIcon(
-                        if (hero.onWatchlist) R.drawable.ic_check else R.drawable.ic_add,
-                        contentDescription = if (hero.onWatchlist) "Remove from Watchlist" else "Add to Watchlist",
-                    )
-                }
-            }
+            HeroActions(hero = hero, play = play, actions = actions)
         }
     }
 }
 
 /**
- * The hero's picture, never a bare crop of a wide image:
- * - TMDB's portrait poster without text ([Artwork.tallUrl]) fills the tall hero, as Apple TV's
- *   key art does;
- * - else a backdrop (or still) fills the top 60% (far less cropped than filling the whole hero)
- *   and fades into a blurred copy of itself;
- * - else the poster or a frame of the video, sharp over a blurred copy.
+ * The phone hero in the style of a title's own page (the owner's pick): the landscape backdrop
+ * across the top, fading into the black page, then the poster on the left with the title (its
+ * logo when TMDB has one), meta line and highlight beside it, and the Play pill and "+" below.
  */
 @Composable
-private fun HeroArt(artwork: Artwork, modifier: Modifier = Modifier) {
-    val tall = artwork.tallUrl
-    if (tall != null) {
-        ArtImage(
-            candidates = listOfNotNull(tall, artwork.backdropUrl, artwork.posterUrl),
-            contentDescription = null,
-            modifier = modifier,
-            alignment = Alignment.TopCenter,
-        ) {
-            ArtPlaceholder(seed = artwork.seed, title = null, modifier = Modifier.fillMaxSize())
-        }
-        return
-    }
-    val wide = artwork.backdropUrl ?: artwork.stillUrl
-    val sharp = wide ?: artwork.posterUrl ?: artwork.frameSource
-    if (sharp == null) {
-        BackdropArt(artwork = artwork, modifier = modifier)
-        return
-    }
-    val candidates = listOfNotNull(sharp, artwork.frameSource).distinct()
-    BoxWithConstraints(modifier) {
-        ArtImage(
-            candidates = candidates,
-            contentDescription = null,
-            modifier = Modifier
-                .fillMaxSize()
-                .blur(48.dp),
-            frameSource = artwork.frameSource,
-        ) {
-            ArtPlaceholder(seed = artwork.seed, title = null, modifier = Modifier.fillMaxSize())
-        }
+private fun DetailsStyleHeroPage(
+    hero: HeroUi,
+    preview: Boolean,
+    muted: Boolean,
+    openTarget: () -> Unit,
+    play: () -> Unit,
+    actions: AppActions,
+) {
+    val background = MaterialTheme.colorScheme.background
+    val posterShape = RoundedCornerShape(10.dp)
+    BoxWithConstraints(
+        Modifier
+            .fillMaxSize()
+            .clickable(onClickLabel = "Details", onClick = openTarget),
+    ) {
         Box(
             Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.35f)),
-        )
-        val sharpModifier = when {
-            wide != null -> Modifier
                 .fillMaxWidth()
-                .fillMaxHeight(0.6f)
-                .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
-                .drawWithContent {
-                    drawContent()
-                    // Fades the picture's lower edge into the blur instead of a hard line.
-                    drawRect(
-                        Brush.verticalGradient(0.7f to Color.Black, 1f to Color.Transparent),
-                        blendMode = BlendMode.DstIn,
-                    )
-                }
-            artwork.posterUrl != null -> Modifier
-                .padding(top = maxHeight * 0.09f)
-                .fillMaxHeight(0.5f)
-                .aspectRatio(2f / 3f)
-                .clip(RoundedCornerShape(12.dp))
-            else -> Modifier
-                .padding(top = maxHeight * 0.16f)
-                .fillMaxWidth()
-                .aspectRatio(16f / 9f)
+                .height(maxHeight * BACKDROP_FRACTION),
+        ) {
+            WideHeroArt(artwork = hero.artwork, modifier = Modifier.fillMaxSize())
+            HeroClip(hero = hero, preview = preview, muted = muted)
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            0f to Color.Transparent,
+                            0.5f to Color.Transparent,
+                            1f to background,
+                        ),
+                    ),
+            )
         }
-        ArtImage(
-            candidates = candidates,
-            contentDescription = null,
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .then(sharpModifier),
-            frameSource = artwork.frameSource,
-        ) {}
+        Column(
+            Modifier
+                .align(Alignment.BottomStart)
+                .fillMaxWidth()
+                .padding(start = 20.dp, end = 20.dp, bottom = HeroContentBottom),
+        ) {
+            Row(verticalAlignment = Alignment.Bottom) {
+                Box(
+                    Modifier
+                        .width(DetailsPosterWidth)
+                        .aspectRatio(2f / 3f)
+                        .shadow(12.dp, posterShape)
+                        .clip(posterShape)
+                        .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                        .border(1.dp, Color.White.copy(alpha = 0.12f), posterShape),
+                ) {
+                    PosterArt(artwork = hero.artwork, title = hero.title, modifier = Modifier.fillMaxSize())
+                }
+                Spacer(Modifier.width(16.dp))
+                Column(Modifier.weight(1f)) {
+                    HeroTitle(
+                        title = hero.title,
+                        logoUrl = hero.artwork.logoUrl,
+                        textStyle = MaterialTheme.typography.headlineMedium,
+                        textAlign = TextAlign.Start,
+                        logoAlignment = Alignment.BottomStart,
+                        maxWidthFraction = 1f,
+                        logoHeight = 72.dp,
+                    )
+                    val rating = hero.rating
+                    val meta = hero.metaLine
+                    if (rating != null && rating > 0f) {
+                        RatingPill(rating, onImage = true, modifier = Modifier.padding(top = 8.dp))
+                    }
+                    if (!meta.isNullOrBlank()) {
+                        Text(
+                            text = meta,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Color.White.copy(alpha = 0.72f),
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.padding(top = 6.dp),
+                        )
+                    }
+                    highlightOf(hero)?.let { highlight ->
+                        Text(
+                            text = highlight,
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White,
+                            modifier = Modifier.padding(top = 4.dp),
+                        )
+                    }
+                }
+            }
+            Spacer(Modifier.height(20.dp))
+            HeroActions(hero = hero, play = play, actions = actions, playModifier = Modifier.fillMaxWidth(0.8f))
+        }
+    }
+}
+
+/** After a short still moment, the hero's short clip ([HeroUi.previewUri]) plays over its art. */
+@Composable
+private fun HeroClip(hero: HeroUi, preview: Boolean, muted: Boolean) {
+    val uri = hero.previewUri
+    if (preview && uri != null) {
+        var started by remember(uri) { mutableStateOf(false) }
+        LaunchedEffect(uri) {
+            delay(HERO_PREVIEW_DELAY_MS)
+            started = true
+        }
+        if (started) HeroVideoPreview(uri = uri, startMs = hero.previewStartMs, muted = muted, modifier = Modifier.fillMaxSize())
+    }
+}
+
+/** The details-style hero's backdrop: the top part of the hero, above the poster and title. */
+private const val BACKDROP_FRACTION = 0.62f
+private val DetailsPosterWidth = 118.dp
+
+/** The hero's white Play pill and round "+" (watchlist). [playModifier] sizes the pill. */
+@Composable
+private fun HeroActions(
+    hero: HeroUi,
+    play: () -> Unit,
+    actions: AppActions,
+    modifier: Modifier = Modifier,
+    playModifier: Modifier = Modifier.widthIn(min = 180.dp, max = 260.dp),
+) {
+    Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Button(
+            onClick = play,
+            modifier = playModifier.height(50.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black),
+            contentPadding = PaddingValues(horizontal = 28.dp),
+        ) {
+            NovaIcon(R.drawable.ic_play_arrow, contentDescription = null, modifier = Modifier.size(24.dp))
+            Text(
+                text = hero.playLabel,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(start = 6.dp),
+            )
+        }
+        IconButton(
+            onClick = { actions.toggleWatchlist(hero.itemKey) },
+            modifier = Modifier.size(50.dp),
+            colors = IconButtonDefaults.iconButtonColors(
+                containerColor = Color.White.copy(alpha = 0.18f),
+                contentColor = Color.White,
+            ),
+        ) {
+            NovaIcon(
+                if (hero.onWatchlist) R.drawable.ic_check else R.drawable.ic_add,
+                contentDescription = if (hero.onWatchlist) "Remove from Watchlist" else "Add to Watchlist",
+            )
+        }
     }
 }
 

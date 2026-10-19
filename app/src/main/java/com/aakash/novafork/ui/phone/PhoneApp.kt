@@ -15,9 +15,9 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -25,11 +25,13 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.only
@@ -42,9 +44,9 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -57,23 +59,24 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
 import com.aakash.novafork.ui.adaptive.DeviceLayout
 import com.aakash.novafork.ui.audio.AudioScreen
 import com.aakash.novafork.ui.common.GlassCircle
+import com.aakash.novafork.ui.common.LocalBottomBarSpace
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.NovaTabCapsule
 import com.aakash.novafork.ui.common.activeColor
@@ -87,7 +90,7 @@ import com.aakash.novafork.ui.settings.SettingsScreen
 import com.aakash.novafork.ui.theme.NovaColors
 
 /**
- * Phone UI: bottom navigation plus one full-screen page per route. Dialogs, snackbars and system
+ * Phone UI: a floating tab bar over one full-screen page per route. Dialogs, snackbars and system
  * back are handled by the app shell around this.
  */
 @Composable
@@ -114,38 +117,36 @@ fun PhoneApp(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
             }
         }
     }
-    Scaffold(
-        modifier = modifier,
-        bottomBar = {
-            PhoneNavigationBar(
-                selected = top,
-                collapsed = barCollapsed,
-                onExpand = { barCollapsed = false },
-                onSelect = actions::selectTab,
-            )
-        },
-        // Only the bottom bar is reserved here: pages handle the status bar themselves so that
-        // Home and details artwork can run behind it.
-        contentWindowInsets = WindowInsets(0, 0, 0, 0),
-    ) { innerPadding ->
-        // Keyed by route, so state updates within a page recompose it in place, while a route
-        // change crossfades and the outgoing page keeps showing the state it was built with.
-        AnimatedContent(
-            targetState = state,
-            modifier = Modifier
-                .fillMaxSize()
-                .nestedScroll(barScroll)
-                .padding(innerPadding)
-                .consumeWindowInsets(innerPadding)
-                .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)),
-            transitionSpec = { fadeIn(tween(durationMillis = 220, delayMillis = 40)) togetherWith fadeOut(tween(durationMillis = 140)) },
-            contentKey = { it.route },
-            label = "phoneRoute",
-        ) { pageState ->
-            pageStates.SaveableStateProvider(pageState.route.toString()) {
-                PhonePage(state = pageState, actions = actions)
+    // The bar floats over the page (no strip reserved for it): pages run on behind it and pad
+    // their lists by LocalBottomBarSpace.
+    val barSpace = TabBarHeight + BarTopMargin + BarBottomMargin +
+        WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    Box(modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+        CompositionLocalProvider(LocalBottomBarSpace provides barSpace) {
+            // Keyed by route, so state updates within a page recompose it in place, while a route
+            // change crossfades and the outgoing page keeps showing the state it was built with.
+            AnimatedContent(
+                targetState = state,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .nestedScroll(barScroll)
+                    .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)),
+                transitionSpec = { fadeIn(tween(durationMillis = 220, delayMillis = 40)) togetherWith fadeOut(tween(durationMillis = 140)) },
+                contentKey = { it.route },
+                label = "phoneRoute",
+            ) { pageState ->
+                pageStates.SaveableStateProvider(pageState.route.toString()) {
+                    PhonePage(state = pageState, actions = actions)
+                }
             }
         }
+        PhoneNavigationBar(
+            selected = top,
+            collapsed = barCollapsed,
+            onExpand = { barCollapsed = false },
+            onSelect = actions::selectTab,
+            modifier = Modifier.align(Alignment.BottomCenter),
+        )
     }
 }
 
@@ -206,7 +207,8 @@ private fun PhonePage(state: AppUiState, actions: AppActions) {
             actions = actions,
             modifier = pageModifier,
         )
-        Route.Audio -> AudioScreen(modifier = pageModifier)
+        // The mini player sits above the floating bar, as in Apple Music.
+        Route.Audio -> AudioScreen(modifier = pageModifier.padding(bottom = LocalBottomBarSpace.current))
         // statusBarsPadding (rather than contentPadding) consumes the inset, so it is not applied
         // twice whether Settings draws its own top app bar or a plain list.
         Route.Settings -> SettingsScreen(
@@ -214,7 +216,7 @@ private fun PhonePage(state: AppUiState, actions: AppActions) {
             actions = actions,
             layout = DeviceLayout.PHONE,
             modifier = pageModifier.statusBarsPadding(),
-            contentPadding = PaddingValues(bottom = 16.dp),
+            contentPadding = PaddingValues(bottom = 16.dp + LocalBottomBarSpace.current),
         )
     }
 }
@@ -227,12 +229,18 @@ private fun PhonePage(state: AppUiState, actions: AppActions) {
  * Search on the right; scrolling back up, or tapping the left circle, brings back the full bar.
  */
 @Composable
-private fun PhoneNavigationBar(selected: TopDestination, collapsed: Boolean, onExpand: () -> Unit, onSelect: (TopDestination) -> Unit) {
+private fun PhoneNavigationBar(
+    selected: TopDestination,
+    collapsed: Boolean,
+    onExpand: () -> Unit,
+    onSelect: (TopDestination) -> Unit,
+    modifier: Modifier = Modifier,
+) {
     Box(
-        Modifier
+        modifier
             .fillMaxWidth()
             .navigationBarsPadding()
-            .padding(start = BarSideMargin, end = BarSideMargin, top = 6.dp, bottom = 10.dp)
+            .padding(start = BarSideMargin, end = BarSideMargin, top = BarTopMargin, bottom = BarBottomMargin)
             .height(TabBarHeight),
     ) {
         AnimatedContent(
@@ -264,4 +272,6 @@ private fun PhoneNavigationBar(selected: TopDestination, collapsed: Boolean, onE
 private val TabBarHeight = 64.dp
 private val BarCollapseScroll = 32.dp
 private val BarSideMargin = 20.dp
+private val BarTopMargin = 6.dp
+private val BarBottomMargin = 10.dp
 

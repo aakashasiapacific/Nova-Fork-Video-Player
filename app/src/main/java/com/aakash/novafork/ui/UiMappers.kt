@@ -34,8 +34,14 @@ import com.aakash.novafork.ui.model.SearchUi
 import com.aakash.novafork.ui.model.SeasonUi
 import com.aakash.novafork.ui.model.ShowDetailsUi
 import com.aakash.novafork.ui.model.SourceUi
+import com.aakash.novafork.ui.model.TimelineSectionUi
 import com.aakash.novafork.ui.model.VideoCardUi
 import com.aakash.novafork.ui.model.VideoDetailsUi
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.format.TextStyle
+import java.util.Locale
 
 /**
  * Turns a [LibraryIndex] (plus the scan state and what the user picked) into the screen models.
@@ -204,7 +210,13 @@ object UiMappers {
 
     // Library
 
-    fun library(index: LibraryIndex, filter: LibraryFilter, sort: LibrarySort): LibraryUi {
+    fun library(
+        index: LibraryIndex,
+        filter: LibraryFilter,
+        sort: LibrarySort,
+        now: Long = System.currentTimeMillis(),
+        zone: ZoneId = ZoneId.systemDefault(),
+    ): LibraryUi {
         val movies = index.movies.map(::videoEntry)
         val shows = index.shows.map(::showEntry)
         val videos = index.otherVideos.map(::videoEntry)
@@ -224,7 +236,36 @@ object UiMappers {
                 LibraryFilter.SHOWS to shows.size,
                 LibraryFilter.VIDEOS to videos.size,
             ),
+            timeline = if (filter == LibraryFilter.ALL && sort == LibrarySort.RECENT) timeline(index, now, zone) else emptyList(),
         )
+    }
+
+    /** Every video (episodes one by one), newest first, grouped by when it reached the device. */
+    private fun timeline(index: LibraryIndex, now: Long, zone: ZoneId): List<TimelineSectionUi> {
+        val today = Instant.ofEpochMilli(now).atZone(zone).toLocalDate()
+        return index.videos
+            .sortedWith(compareByDescending<IndexedVideo> { it.video.dateAdded }.thenBy(NaturalOrder) { it.sortKey })
+            .groupConsecutiveBy { timelineLabel(Instant.ofEpochMilli(it.video.dateAdded).atZone(zone).toLocalDate(), today) }
+            .map { (label, videos) -> TimelineSectionUi(label, videos.map { it.card }) }
+    }
+
+    private fun <T, K> List<T>.groupConsecutiveBy(key: (T) -> K): List<Pair<K, List<T>>> {
+        val groups = mutableListOf<Pair<K, MutableList<T>>>()
+        for (item in this) {
+            val k = key(item)
+            if (groups.isEmpty() || groups.last().first != k) groups += k to mutableListOf()
+            groups.last().second += item
+        }
+        return groups
+    }
+
+    /** "Today", "Yesterday", "This week", then "October" for this year's months and "March 2024" before. */
+    internal fun timelineLabel(day: LocalDate, today: LocalDate): String = when {
+        !day.isBefore(today) -> "Today"
+        day == today.minusDays(1) -> "Yesterday"
+        day.isAfter(today.minusDays(7)) -> "This week"
+        day.year == today.year -> day.month.getDisplayName(TextStyle.FULL, Locale.getDefault())
+        else -> "${day.month.getDisplayName(TextStyle.FULL, Locale.getDefault())} ${day.year}"
     }
 
     private class Entry(

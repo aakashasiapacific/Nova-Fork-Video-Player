@@ -1553,6 +1553,8 @@ private fun withArtworkChoices(rows: List<VideoWithMeta>, choices: List<ArtworkC
             meta = meta.copy(
                 posterPath = choice.posterPath ?: meta.posterPath,
                 backdropPath = choice.backdropPath ?: meta.backdropPath,
+                // A picked poster replaces TMDB's textless one wherever that would show.
+                textlessPosterPath = choice.posterPath ?: meta.textlessPosterPath,
             ),
         )
     }

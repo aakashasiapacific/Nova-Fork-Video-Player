@@ -60,6 +60,7 @@ import com.aakash.novafork.core.format.Formats
 import com.aakash.novafork.data.db.SourceType
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
 import com.aakash.novafork.ui.common.LandscapeArt
+import com.aakash.novafork.ui.common.LocalBottomBarSpace
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.PosterArt
 import com.aakash.novafork.ui.common.ProgressStrip
@@ -260,51 +261,6 @@ internal fun PhoneLandscapeCard(
         progress = card.progress,
         watched = card.watched,
         playMark = true,
-    )
-}
-
-/**
- * Apple TV's row card for a movie or video: 16:9 art (backdrop, still or a frame) with the title
- * and caption below, opening its page rather than playing.
- */
-@Composable
-internal fun PhoneWideVideoCard(
-    card: VideoCardUi,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    onLongClick: (() -> Unit)? = null,
-) {
-    WideCardLayout(
-        title = card.displayTitle(),
-        subtitle = card.displaySubtitle(),
-        artwork = card.artwork,
-        artTitle = card.title,
-        onClick = onClick,
-        modifier = modifier,
-        onLongClick = onLongClick,
-        progress = card.progress,
-        watched = card.watched,
-        playMark = false,
-    )
-}
-
-/** [PhoneWideVideoCard] for a TV show ("24 episodes"). */
-@Composable
-internal fun PhoneWideShowCard(
-    show: ShowCardUi,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    WideCardLayout(
-        title = show.title,
-        subtitle = countLabel(show.episodeCount, "episode"),
-        artwork = show.artwork,
-        artTitle = show.title,
-        onClick = onClick,
-        modifier = modifier,
-        progress = null,
-        watched = show.episodeCount > 0 && show.unwatchedCount == 0,
-        playMark = false,
     )
 }
 
@@ -516,7 +472,7 @@ internal fun PhoneLibraryGrid(
         columns = GridCells.Adaptive(dims.gridMinCell),
         modifier = modifier.fillMaxSize(),
         state = state,
-        contentPadding = PaddingValues(start = dims.gutter, end = dims.gutter, top = 8.dp, bottom = dims.sectionSpacing),
+        contentPadding = PaddingValues(start = dims.gutter, end = dims.gutter, top = 8.dp, bottom = dims.sectionSpacing + LocalBottomBarSpace.current),
         horizontalArrangement = Arrangement.spacedBy(dims.rowSpacing),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {

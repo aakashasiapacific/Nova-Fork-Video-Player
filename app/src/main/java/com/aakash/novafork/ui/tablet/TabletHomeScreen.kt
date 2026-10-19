@@ -60,6 +60,7 @@ import com.aakash.novafork.ui.adaptive.LocalNovaDimens
 import com.aakash.novafork.ui.common.BackdropArt
 import com.aakash.novafork.ui.common.DeviceAccessCard
 import com.aakash.novafork.ui.common.LandscapeArt
+import com.aakash.novafork.ui.common.HomeLibraryLinks
 import com.aakash.novafork.ui.common.LocalHeroPreviewEnabled
 import com.aakash.novafork.ui.common.RatingPill
 import com.aakash.novafork.ui.common.ScanBanner
@@ -180,40 +181,8 @@ private fun HomeFeed(home: HomeUi, scan: ScanUi, permission: PermissionUi, layou
                     }
                 }
             }
-            if (home.watchlist.isNotEmpty()) {
-                item(key = "watchlist", contentType = "landscapeRow") {
-                    HomeSection(title = "Watchlist") {
-                        ItemWideRow(home.watchlist, actions)
-                    }
-                }
-            }
-            if (home.recentlyAdded.isNotEmpty()) {
-                item(key = "recent", contentType = "landscapeRow") {
-                    HomeSection(title = "Recently added") {
-                        VideoWideRow(home.recentlyAdded, actions)
-                    }
-                }
-            }
-            if (home.movies.isNotEmpty()) {
-                item(key = "movies", contentType = "landscapeRow") {
-                    HomeSection(title = "Movies", onSeeAll = { actions.seeAll(LibraryFilter.MOVIES) }) {
-                        VideoWideRow(home.movies, actions)
-                    }
-                }
-            }
-            if (home.shows.isNotEmpty()) {
-                item(key = "shows", contentType = "landscapeRow") {
-                    HomeSection(title = "TV shows", onSeeAll = { actions.seeAll(LibraryFilter.SHOWS) }) {
-                        ShowWideRow(home.shows, actions)
-                    }
-                }
-            }
-            if (home.videos.isNotEmpty()) {
-                item(key = "videos", contentType = "landscapeRow") {
-                    HomeSection(title = "Videos", onSeeAll = { actions.seeAll(LibraryFilter.VIDEOS) }) {
-                        VideoWideRow(home.videos, actions)
-                    }
-                }
+            item(key = "library", contentType = "library") {
+                HomeLibraryLinks(actions, Modifier.widthIn(max = 720.dp))
             }
         }
         if (home.hero.isNotEmpty()) {
@@ -227,8 +196,6 @@ private fun HomeFeed(home: HomeUi, scan: ScanUi, permission: PermissionUi, layou
         }
     }
 }
-
-private fun AppActions.seeAll(filter: LibraryFilter) = openLibrary(filter)
 
 @Composable
 private fun HomeSection(title: String, onSeeAll: (() -> Unit)? = null, content: @Composable () -> Unit) {
@@ -260,82 +227,6 @@ private fun ContinueWatchingRow(cards: List<VideoCardUi>, actions: AppActions) {
                     onLongClick = openMenu,
                     modifier = Modifier.width(dims.landscapeCardWidth),
                 )
-            }
-        }
-    }
-}
-
-/** Apple TV's rows: 16:9 cards (backdrop, still or a frame) that open the title's page. */
-@Composable
-private fun VideoWideRow(cards: List<VideoCardUi>, actions: AppActions) {
-    val dims = LocalNovaDimens.current
-    LazyRow(
-        contentPadding = PaddingValues(horizontal = dims.gutter, vertical = 6.dp),
-        horizontalArrangement = Arrangement.spacedBy(dims.rowSpacing),
-    ) {
-        items(cards, key = { it.id }) { card ->
-            VideoWideCard(card, actions)
-        }
-    }
-}
-
-@Composable
-private fun VideoWideCard(card: VideoCardUi, actions: AppActions) {
-    val stream = card.kind == MediaKind.STREAM
-    // A stream has no page of its own: it plays.
-    val open = { if (stream) actions.play(card.id) else actions.openVideo(card.id) }
-    TabletStillCard(
-        artwork = card.artwork,
-        title = card.primaryLine(),
-        subtitle = card.secondaryLine(),
-        onClick = open,
-        onLongClick = open,
-        onClickLabel = if (stream) "Play" else "Details",
-        progress = card.progress,
-        watched = card.watched,
-        modifier = Modifier.width(LocalNovaDimens.current.landscapeCardWidth),
-    )
-}
-
-@Composable
-private fun ShowWideCard(show: ShowCardUi, actions: AppActions) {
-    TabletStillCard(
-        artwork = show.artwork,
-        title = show.title,
-        subtitle = show.subtitleLine(),
-        onClick = { actions.openShow(show.key) },
-        onLongClick = { actions.openShow(show.key) },
-        onClickLabel = "Details",
-        watched = show.episodeCount > 0 && show.unwatchedCount == 0,
-        modifier = Modifier.width(LocalNovaDimens.current.landscapeCardWidth),
-    )
-}
-
-@Composable
-private fun ShowWideRow(shows: List<ShowCardUi>, actions: AppActions) {
-    val dims = LocalNovaDimens.current
-    LazyRow(
-        contentPadding = PaddingValues(horizontal = dims.gutter, vertical = 6.dp),
-        horizontalArrangement = Arrangement.spacedBy(dims.rowSpacing),
-    ) {
-        items(shows, key = { it.key }) { show ->
-            ShowWideCard(show, actions)
-        }
-    }
-}
-
-/** Movies, shows and videos mixed (the watchlist). */
-@Composable
-private fun ItemWideRow(items: List<LibraryItemUi>, actions: AppActions) {
-    val dims = LocalNovaDimens.current
-    LazyRow(
-        contentPadding = PaddingValues(horizontal = dims.gutter, vertical = 6.dp),
-        horizontalArrangement = Arrangement.spacedBy(dims.rowSpacing),
-    ) {
-        items(items, key = { it.key }) { item ->
-            when (item) {
-                is LibraryItemUi.Video -> VideoWideCard(item.card, actions)
-                is LibraryItemUi.Show -> ShowWideCard(item.card, actions)
             }
         }
     }

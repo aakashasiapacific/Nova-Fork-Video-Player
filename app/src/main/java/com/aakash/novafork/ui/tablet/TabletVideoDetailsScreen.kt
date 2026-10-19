@@ -197,14 +197,7 @@ private fun VideoBody(details: VideoDetailsUi, actions: AppActions) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        when {
-            !details.overview.isNullOrBlank() -> Text(details.overview, style = MaterialTheme.typography.bodyLarge)
-            !isStream && !details.isMatched -> Text(
-                text = "No description for this one yet. If the title looks wrong, use Identify to pick the right match.",
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+        if (!details.overview.isNullOrBlank()) Text(details.overview, style = MaterialTheme.typography.bodyLarge)
         val next = details.nextEpisode
         if (next != null) {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {

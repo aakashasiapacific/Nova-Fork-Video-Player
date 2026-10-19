@@ -258,35 +258,6 @@ internal fun OverviewBlock(
     }
 }
 
-/** Card nudging the user to fix an unidentified title. */
-@Composable
-internal fun IdentifyHintCard(onIdentify: () -> Unit, modifier: Modifier = Modifier) {
-    Surface(
-        onClick = onIdentify,
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(LocalNovaDimens.current.cardRadius),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-    ) {
-        Row(
-            Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            NovaIcon(R.drawable.ic_info, contentDescription = null, tint = MaterialTheme.colorScheme.tertiary)
-            Spacer(Modifier.width(12.dp))
-            Column(Modifier.weight(1f)) {
-                Text("Not identified", style = MaterialTheme.typography.titleSmall)
-                Text(
-                    "Pick the right title to get its poster and details.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            Spacer(Modifier.width(8.dp))
-            Text("Identify", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
-        }
-    }
-}
-
 /** Label/value line for the file facts card. */
 @Composable
 internal fun InfoRow(label: String, value: String, modifier: Modifier = Modifier) {

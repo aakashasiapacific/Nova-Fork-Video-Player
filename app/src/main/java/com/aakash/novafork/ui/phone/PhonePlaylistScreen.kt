@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
 import com.aakash.novafork.ui.common.EmptyState
+import com.aakash.novafork.ui.common.LocalBottomBarSpace
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.VideoMenuBox
 import com.aakash.novafork.ui.dialogs.playlistCountLabel
@@ -66,7 +67,7 @@ private fun PlaylistContent(playlist: PlaylistDetailsUi, actions: AppActions) {
     val ids = remember(playlist.videos) { playlist.videos.map { it.id } }
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(bottom = dims.sectionSpacing),
+        contentPadding = PaddingValues(bottom = dims.sectionSpacing + LocalBottomBarSpace.current),
     ) {
         item(key = "header") {
             Column(Modifier.padding(start = dims.gutter, end = dims.gutter, bottom = 8.dp)) {
