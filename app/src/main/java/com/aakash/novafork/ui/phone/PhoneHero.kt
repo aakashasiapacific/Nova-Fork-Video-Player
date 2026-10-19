@@ -311,15 +311,16 @@ private fun DetailsStyleHeroPage(
 ) {
     val background = MaterialTheme.colorScheme.background
     val posterShape = RoundedCornerShape(10.dp)
-    BoxWithConstraints(
+    Box(
         Modifier
             .fillMaxSize()
             .clickable(onClickLabel = "Details", onClick = openTarget),
     ) {
+        // The backdrop in its own 16:9 shape, never cropped to fill a taller box.
         Box(
             Modifier
                 .fillMaxWidth()
-                .height(maxHeight * BACKDROP_FRACTION),
+                .aspectRatio(16f / 9f),
         ) {
             WideHeroArt(artwork = hero.artwork, modifier = Modifier.fillMaxSize())
             HeroClip(hero = hero, preview = preview, muted = muted)
@@ -329,7 +330,7 @@ private fun DetailsStyleHeroPage(
                     .background(
                         Brush.verticalGradient(
                             0f to Color.Transparent,
-                            0.5f to Color.Transparent,
+                            0.6f to Color.Transparent,
                             1f to background,
                         ),
                     ),
@@ -410,9 +411,13 @@ private fun HeroClip(hero: HeroUi, preview: Boolean, muted: Boolean) {
     }
 }
 
-/** The details-style hero's backdrop: the top part of the hero, above the poster and title. */
-private const val BACKDROP_FRACTION = 0.62f
 private val DetailsPosterWidth = 118.dp
+
+/**
+ * How tall the phone hero is below its 16:9 backdrop: the poster overlapping the backdrop's
+ * lower edge, the Play row and the dots. The hero's height is width × 9/16 plus this.
+ */
+internal val DetailsHeroBelowBackdrop = 250.dp
 
 /** The hero's white Play pill and round "+" (watchlist). [playModifier] sizes the pill. */
 @Composable

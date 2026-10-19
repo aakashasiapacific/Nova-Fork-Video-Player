@@ -92,9 +92,6 @@ import com.aakash.novafork.ui.model.VideoCardUi
 import com.aakash.novafork.ui.theme.NovaColors
 import kotlinx.coroutines.delay
 
-/** The hero's share of the screen height in portrait (Apple TV: about 80–82%). */
-private const val HERO_HEIGHT_FRACTION = 0.8f
-
 /** Scrolled less than this, the hero counts as on screen. */
 private const val HERO_VISIBLE_SCROLL_PX = 600
 
@@ -148,8 +145,8 @@ private fun HomeFeed(home: HomeUi, scan: ScanUi, permission: PermissionUi, actio
         active = hasHero && heroOnScreen,
     )
     BoxWithConstraints(Modifier.fillMaxSize()) {
-        // Apple TV's hero is about 80% of the screen; in landscape it leaves room to see a row.
-        val heroHeight = if (maxWidth > maxHeight) maxHeight * 0.85f else maxHeight * HERO_HEIGHT_FRACTION
+        // Portrait: the 16:9 backdrop with the poster, title and Play under it; landscape: wide.
+        val heroHeight = if (maxWidth > maxHeight) maxHeight * 0.85f else maxWidth * 9f / 16f + DetailsHeroBelowBackdrop
         LazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize(),
