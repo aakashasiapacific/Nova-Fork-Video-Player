@@ -268,7 +268,7 @@ private fun CastOptions(state: PlayerUiState, actions: PlayerActions, onDismiss:
         }
         CastRow(
             icon = R.drawable.ic_refresh,
-            label = "Search again",
+            label = "Search Again",
             detail = null,
             onClick = actions::scanForCastDevices,
         )

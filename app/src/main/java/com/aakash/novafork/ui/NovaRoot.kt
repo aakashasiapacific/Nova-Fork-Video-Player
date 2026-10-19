@@ -81,7 +81,7 @@ private fun CrashReportDialog(report: String, actions: AppActions) {
                 modifier = Modifier.verticalScroll(rememberScrollState()),
             )
         },
-        confirmButton = { TextButton(onClick = actions::shareCrashReport) { Text("Share report") } },
+        confirmButton = { TextButton(onClick = actions::shareCrashReport) { Text("Share Report") } },
         dismissButton = { TextButton(onClick = actions::dismissCrashReport) { Text("Dismiss") } },
     )
 }

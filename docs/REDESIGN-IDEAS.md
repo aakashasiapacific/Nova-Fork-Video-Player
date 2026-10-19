@@ -353,3 +353,5 @@ The owner asked for Apple Music to be copied more precisely, with less clutter. 
 - **Playlists (build 63):** "New Playlist…" sits first, with a red "+" tile, as in Apple Music,
   and opens an iOS naming alert. Album captions are 14sp regular, as in Apple Music, not
   medium weight.
+- **Buttons (build 64):** the remaining button labels are in Title Case too ("Allow Access to
+  Videos", "Add a Network Source", "Test Connection", "Try Again", "Back Up").

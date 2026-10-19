@@ -165,9 +165,9 @@ private fun VideoBody(details: VideoDetailsUi, actions: AppActions) {
                 }
                 FilledTonalButton(onClick = { actions.setWatched(details.id, !details.watched) }, modifier = Modifier.height(48.dp)) {
                     if (details.watched) {
-                        ButtonLabel(R.drawable.ic_visibility_off, "Mark unwatched")
+                        ButtonLabel(R.drawable.ic_visibility_off, "Mark as Unwatched")
                     } else {
-                        ButtonLabel(R.drawable.ic_check, "Mark watched")
+                        ButtonLabel(R.drawable.ic_check, "Mark as Watched")
                     }
                 }
             }

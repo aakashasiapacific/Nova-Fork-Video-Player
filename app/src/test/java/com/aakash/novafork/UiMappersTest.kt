@@ -716,10 +716,10 @@ class UiMappersTest {
         assertNull(deviceAccessNotice(PermissionUi(granted = false, deviceScanning = false)))
         val none = requireNotNull(deviceAccessNotice(PermissionUi(granted = false)))
         assertEquals("Nova can't see the videos on this device", none.title)
-        assertEquals("Allow access", none.allowLabel)
+        assertEquals("Allow Access", none.allowLabel)
         val limited = requireNotNull(deviceAccessNotice(PermissionUi(granted = true, partial = true)))
         assertEquals("Nova sees only the videos you picked", limited.title)
-        assertEquals("Allow all", limited.allowLabel)
+        assertEquals("Allow All", limited.allowLabel)
         assertTrue(PermissionUi(granted = false).needsAttention)
         assertFalse(PermissionUi(granted = true).needsAttention)
     }

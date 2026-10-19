@@ -89,7 +89,7 @@ internal fun SubtitleSearchSheet(search: SubtitleSearchUi, actions: PlayerAction
 }
 
 /**
- * Where the subtitles come from, then a spinner, an error with "Try again", "nothing found", or
+ * Where the subtitles come from, then a spinner, an error with "Try Again", "nothing found", or
  * the results; a tap on one downloads it. Shared by the phone sheet and the tablet side panel.
  */
 @Composable
@@ -155,7 +155,7 @@ private fun SearchError(message: String, onRetry: () -> Unit, retryEnabled: Bool
         )
         Spacer(Modifier.width(12.dp))
         Text(text = message, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-        TextButton(onClick = onRetry, enabled = retryEnabled) { Text("Try again") }
+        TextButton(onClick = onRetry, enabled = retryEnabled) { Text("Try Again") }
     }
 }
 

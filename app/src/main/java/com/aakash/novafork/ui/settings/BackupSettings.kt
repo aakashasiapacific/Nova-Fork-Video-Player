@@ -60,7 +60,7 @@ private fun BackupRow(shape: Shape, actions: AppActions) {
     val lastText = remember(last) { if (last == null) "No backup made on this device yet" else "Last backup ${dateTime(last)}" }
     RowSurface(shape = shape, onClick = { if (!backup.working) asking = true }) {
         RowIcon(R.drawable.ic_storage)
-        RowTexts("Back up", lastText, Modifier.weight(1f), note = "Saves a file you can keep or move to another device")
+        RowTexts("Back Up", lastText, Modifier.weight(1f), note = "Saves a file you can keep or move to another device")
         if (backup.working) IosSpinner(Modifier.size(20.dp), strokeWidth = 2.dp)
     }
     if (asking) {
@@ -80,7 +80,7 @@ private fun BackupDialog(onBackUp: (includeSecrets: Boolean) -> Unit, onDismiss:
     NovaAlertDialog(
         form = true,
         onDismissRequest = onDismiss,
-        title = { Text("Back up") },
+        title = { Text("Back Up") },
         text = {
             Column(
                 Modifier.verticalScroll(rememberScrollState()),
@@ -116,7 +116,7 @@ private fun BackupDialog(onBackUp: (includeSecrets: Boolean) -> Unit, onDismiss:
                 }
             }
         },
-        confirmButton = { TextButton(onClick = { onBackUp(includeSecrets) }) { Text("Back up") } },
+        confirmButton = { TextButton(onClick = { onBackUp(includeSecrets) }) { Text("Back Up") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )
 }

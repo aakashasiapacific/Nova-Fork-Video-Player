@@ -127,7 +127,7 @@ private fun LazyListScope.browseItems(
             }
         } else if (!permission.granted) {
             item(key = "allowDevice") {
-                ActionRow(R.drawable.ic_phone_android, "Allow access to videos", actions::requestPermission)
+                ActionRow(R.drawable.ic_phone_android, "Allow Access to Videos", actions::requestPermission)
             }
         }
     }

@@ -387,7 +387,7 @@ private fun UpNextContent(item: UpNextUi, onPlayNow: () -> Unit, onCancel: () ->
                 Button(onClick = onPlayNow) {
                     Icon(painterResource(R.drawable.ic_play_arrow), contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(6.dp))
-                    Text("Play now")
+                    Text("Play Now")
                 }
             }
         }
@@ -432,7 +432,7 @@ internal fun ErrorCard(
                     onClick = onRetry,
                     colors = ButtonDefaults.textButtonColors(contentColor = Color.White),
                 ) {
-                    Text("Try again")
+                    Text("Try Again")
                 }
                 Button(onClick = onClose) { Text("Close") }
             }

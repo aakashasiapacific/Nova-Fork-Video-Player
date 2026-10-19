@@ -345,10 +345,10 @@ private fun HomeOnboarding(scan: ScanUi, permission: PermissionUi, actions: AppA
                     title = "Your videos, with posters",
                     body = "Nova Fork finds the videos on your phone, in folders and on network shares, " +
                         "and dresses them up with posters, backdrops and details.",
-                    actionLabel = if (permission.granted) "Scan again" else "Allow access to videos",
+                    actionLabel = if (permission.granted) "Scan Again" else "Allow Access to Videos",
                     onAction = { if (permission.granted) actions.refresh() else actions.requestPermission() },
                     // The prompt may no longer show (denied twice): the app's settings page always works.
-                    secondaryLabel = if (permission.granted) null else "App settings",
+                    secondaryLabel = if (permission.granted) null else "App Settings",
                     onSecondary = actions::openAppSettings,
                 )
                 Column(
@@ -364,13 +364,13 @@ private fun HomeOnboarding(scan: ScanUi, permission: PermissionUi, actions: AppA
                         onClick = actions::addNetworkSource,
                         modifier = Modifier.fillMaxWidth(),
                     ) {
-                        ButtonContent(R.drawable.ic_lan, "Add a network source")
+                        ButtonContent(R.drawable.ic_lan, "Add a Network Source")
                     }
                     FilledTonalButton(
                         onClick = { actions.showDialog(DialogUi.OpenUrl) },
                         modifier = Modifier.fillMaxWidth(),
                     ) {
-                        ButtonContent(R.drawable.ic_link, "Open a network stream")
+                        ButtonContent(R.drawable.ic_link, "Open a Network Stream")
                     }
                 }
             }

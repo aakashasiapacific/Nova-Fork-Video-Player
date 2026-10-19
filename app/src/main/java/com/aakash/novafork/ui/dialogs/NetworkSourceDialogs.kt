@@ -280,7 +280,7 @@ internal fun NetworkServerDialog(dialog: DialogUi.NetworkServer, actions: AppAct
                         },
                         enabled = canTest,
                     ) {
-                        Text("Test connection")
+                        Text("Test Connection")
                     }
                     if (dialog.testing) {
                         Spacer(Modifier.width(16.dp))
@@ -453,7 +453,7 @@ private fun PlexSignInPanel(signIn: PlexSignInUi?, form: NetworkSourceForm, acti
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    FilledTonalButton(onClick = actions::startPlexSignIn) { Text("Sign in with a code") }
+                    FilledTonalButton(onClick = actions::startPlexSignIn) { Text("Sign In with a Code") }
                 }
                 servers != null -> {
                     Text("Pick a server", style = MaterialTheme.typography.titleSmall)
@@ -470,7 +470,7 @@ private fun PlexSignInPanel(signIn: PlexSignInUi?, form: NetworkSourceForm, acti
                     TextButton(onClick = actions::cancelPlexSignIn) { Text("Cancel") }
                 }
                 error != null -> PanelButtons {
-                    FilledTonalButton(onClick = actions::startPlexSignIn) { Text("Get a new code") }
+                    FilledTonalButton(onClick = actions::startPlexSignIn) { Text("Get a New Code") }
                     TextButton(onClick = actions::cancelPlexSignIn) { Text("Cancel") }
                 }
                 else -> {
@@ -627,12 +627,12 @@ internal fun UpnpServersDialog(dialog: DialogUi.UpnpServers, actions: AppActions
                 }
                 // Servers that don't answer the search (another subnet, multicast blocked) are added by address.
                 TextButton(onClick = { actions.showDialog(DialogUi.NetworkServer(NetworkSourceForm(type = SourceType.UPNP))) }) {
-                    Text("Enter an address instead")
+                    Text("Enter an Address Instead")
                 }
             }
         },
         confirmButton = {
-            TextButton(onClick = actions::discoverUpnpServers, enabled = !dialog.searching) { Text("Search again") }
+            TextButton(onClick = actions::discoverUpnpServers, enabled = !dialog.searching) { Text("Search Again") }
         },
         dismissButton = {
             TextButton(onClick = actions::dismissDialog) { Text("Cancel") }

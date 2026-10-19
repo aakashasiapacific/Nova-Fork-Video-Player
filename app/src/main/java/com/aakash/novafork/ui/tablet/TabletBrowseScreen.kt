@@ -221,7 +221,7 @@ private fun SourcesPane(
                     }
                 } else if (!permission.granted) {
                     item(key = "allowDevice", contentType = "action") {
-                        ActionRow(R.drawable.ic_video_library, "Allow access to videos", actions::requestPermission)
+                        ActionRow(R.drawable.ic_video_library, "Allow Access to Videos", actions::requestPermission)
                     }
                 }
             }
@@ -616,7 +616,7 @@ private fun BrowseDirPane(
                     icon = R.drawable.ic_error,
                     title = "Couldn't open this folder",
                     body = error,
-                    actionLabel = "Try again",
+                    actionLabel = "Try Again",
                     onAction = { actions.rescanSource(dir.sourceId) },
                 )
             }

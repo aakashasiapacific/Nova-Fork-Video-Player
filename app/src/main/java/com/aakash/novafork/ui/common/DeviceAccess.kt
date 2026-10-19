@@ -37,13 +37,13 @@ fun deviceAccessNotice(permission: PermissionUi): DeviceAccessNotice? = when {
         title = "Nova can't see the videos on this device",
         body = "Camera videos, downloads, screen recordings and messaging-app videos stay hidden until " +
             "you allow access to photos and videos.",
-        allowLabel = "Allow access",
+        allowLabel = "Allow Access",
     )
     permission.partial -> DeviceAccessNotice(
         title = "Nova sees only the videos you picked",
         body = "Other camera videos, downloads and screen recordings stay hidden. Allow access to all " +
             "photos and videos to see them.",
-        allowLabel = "Allow all",
+        allowLabel = "Allow All",
     )
     else -> null
 }
@@ -88,7 +88,7 @@ fun DeviceAccessCard(
                 horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                TextButton(onClick = onOpenSettings) { Text("App settings") }
+                TextButton(onClick = onOpenSettings) { Text("App Settings") }
                 Button(onClick = onAllow) { Text(notice.allowLabel) }
             }
         }
@@ -118,7 +118,7 @@ fun DeviceStorageEmptyState(
             modifier = modifier,
             actionLabel = notice.allowLabel,
             onAction = onAllow,
-            secondaryLabel = "App settings",
+            secondaryLabel = "App Settings",
             onSecondary = onOpenSettings,
         )
         !error.isNullOrBlank() -> EmptyState(

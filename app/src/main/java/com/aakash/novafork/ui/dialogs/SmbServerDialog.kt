@@ -163,7 +163,7 @@ internal fun SmbServerDialog(dialog: DialogUi.SmbServer, actions: AppActions) {
                         },
                         enabled = canSubmit,
                     ) {
-                        Text("Test connection")
+                        Text("Test Connection")
                     }
                     if (dialog.testing) {
                         Spacer(Modifier.width(16.dp))

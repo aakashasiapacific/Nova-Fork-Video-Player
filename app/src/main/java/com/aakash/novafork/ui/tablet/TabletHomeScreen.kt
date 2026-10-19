@@ -352,7 +352,7 @@ private fun OnboardingText(scan: ScanUi, permission: PermissionUi, actions: AppA
                 Button(onClick = actions::requestPermission, modifier = Modifier.fillMaxWidth().height(48.dp)) {
                     ButtonLabel(
                         R.drawable.ic_video_library,
-                        if (permission.partial) "Allow access to all videos" else "Allow access to videos",
+                        if (permission.partial) "Allow Access to All Videos" else "Allow Access to Videos",
                     )
                 }
             }
@@ -363,13 +363,13 @@ private fun OnboardingText(scan: ScanUi, permission: PermissionUi, actions: AppA
                 onClick = actions::addNetworkSource,
                 modifier = Modifier.fillMaxWidth().height(48.dp),
             ) {
-                ButtonLabel(R.drawable.ic_lan, "Add a network source")
+                ButtonLabel(R.drawable.ic_lan, "Add a Network Source")
             }
             FilledTonalButton(
                 onClick = { actions.showDialog(DialogUi.OpenUrl) },
                 modifier = Modifier.fillMaxWidth().height(48.dp),
             ) {
-                ButtonLabel(R.drawable.ic_link, "Open a network stream")
+                ButtonLabel(R.drawable.ic_link, "Open a Network Stream")
             }
         }
     }

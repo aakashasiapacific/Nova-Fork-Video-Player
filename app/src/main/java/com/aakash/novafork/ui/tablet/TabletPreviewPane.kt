@@ -110,7 +110,7 @@ private fun VideoPreview(details: VideoDetailsUi, paneColor: Color, actions: App
         Row(verticalAlignment = Alignment.CenterVertically) {
             TabletPlayButton(label = details.playLabel, onClick = { actions.play(details.id) })
             Spacer(Modifier.width(8.dp))
-            TextButton(onClick = { actions.openVideo(details.id) }) { Text("Open details") }
+            TextButton(onClick = { actions.openVideo(details.id) }) { Text("Open Details") }
         }
         WatchProgress(progress = details.progress, positionMs = details.positionMs, durationMs = details.durationMs)
         if (details.kind == MediaKind.EPISODE && !details.showTitle.isNullOrBlank()) {
@@ -147,7 +147,7 @@ private fun ShowPreview(details: ShowDetailsUi, paneColor: Color, actions: AppAc
                 TabletPlayButton(label = details.playLabel, onClick = { actions.play(playId) })
                 Spacer(Modifier.width(8.dp))
             }
-            TextButton(onClick = { actions.openShow(details.key) }) { Text("Open details") }
+            TextButton(onClick = { actions.openShow(details.key) }) { Text("Open Details") }
         }
         val nextUp = details.nextUp
         if (nextUp != null) NextUpRow(nextUp, onClick = { actions.play(nextUp.videoId) })
