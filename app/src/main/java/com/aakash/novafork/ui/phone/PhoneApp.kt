@@ -52,6 +52,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -75,6 +76,10 @@ import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
 import com.aakash.novafork.ui.adaptive.DeviceLayout
 import com.aakash.novafork.ui.audio.AudioScreen
+import com.aakash.novafork.ui.audio.MiniPlayerBar
+import com.aakash.novafork.ui.audio.MiniPlayerHeight
+import com.aakash.novafork.ui.audio.NowPlayingHost
+import com.aakash.novafork.ui.audio.rememberMusicShell
 import com.aakash.novafork.ui.common.GlassCircle
 import com.aakash.novafork.ui.common.LocalBottomBarSpace
 import com.aakash.novafork.ui.common.NovaIcon
@@ -125,8 +130,14 @@ fun PhoneApp(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
     }
     // The bar floats over the page (no strip reserved for it): pages run on behind it and pad
     // their lists by LocalBottomBarSpace.
-    val barSpace = TabBarHeight + BarTopMargin + BarBottomMargin +
-        WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val navBar = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    // Music (the real app only): the mini player floats just above the tab bar on every tab,
+    // and opens Now Playing over everything.
+    val music = rememberMusicShell()
+    val miniPlayerShown = music?.second?.active == true
+    var nowPlayingOpen by rememberSaveable { mutableStateOf(false) }
+    val barSpace = TabBarHeight + BarTopMargin + BarBottomMargin + navBar +
+        (if (miniPlayerShown) MiniPlayerHeight + MiniPlayerGap else 0.dp)
     Box(modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         CompositionLocalProvider(LocalBottomBarSpace provides barSpace) {
             // Keyed by route, so state updates within a page recompose it in place, while a route
@@ -153,6 +164,24 @@ fun PhoneApp(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
             onSelect = actions::selectTab,
             modifier = Modifier.align(Alignment.BottomCenter),
         )
+        if (music != null) {
+            val (viewModel, player) = music
+            if (miniPlayerShown) {
+                MiniPlayerBar(
+                    player = player,
+                    actions = viewModel,
+                    onOpen = { nowPlayingOpen = true },
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(
+                            start = BarSideMargin,
+                            end = BarSideMargin,
+                            bottom = navBar + BarBottomMargin + TabBarHeight + MiniPlayerGap,
+                        ),
+                )
+            }
+            NowPlayingHost(open = nowPlayingOpen, player = player, actions = viewModel, onDismiss = { nowPlayingOpen = false })
+        }
     }
 }
 
@@ -213,8 +242,7 @@ private fun PhonePage(state: AppUiState, actions: AppActions) {
             actions = actions,
             modifier = pageModifier,
         )
-        // The mini player sits above the floating bar, as in Apple Music.
-        Route.Audio -> AudioScreen(modifier = pageModifier.padding(bottom = LocalBottomBarSpace.current))
+        Route.Audio -> AudioScreen(modifier = pageModifier)
         // statusBarsPadding (rather than contentPadding) consumes the inset, so it is not applied
         // twice whether Settings draws its own top app bar or a plain list.
         Route.Settings -> SettingsScreen(
@@ -280,4 +308,5 @@ private val BarCollapseScroll = 32.dp
 private val BarSideMargin = 20.dp
 private val BarTopMargin = 6.dp
 private val BarBottomMargin = 10.dp
+private val MiniPlayerGap = 10.dp
 

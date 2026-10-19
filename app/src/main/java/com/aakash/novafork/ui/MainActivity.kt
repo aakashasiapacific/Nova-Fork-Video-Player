@@ -7,6 +7,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.DocumentsContract
+import android.provider.Settings as AndroidSettings
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
@@ -25,14 +26,14 @@ import androidx.lifecycle.repeatOnLifecycle
 import com.aakash.novafork.data.StoragePermissions
 import com.aakash.novafork.data.backup.BackupManager
 import com.aakash.novafork.player.PlayerIntents
+import com.aakash.novafork.ui.audio.LocalMusicEnabled
 import com.aakash.novafork.ui.common.LocalHeroPreviewEnabled
 import com.aakash.novafork.ui.common.LocalStatusBarIcons
 import com.aakash.novafork.ui.model.AppActions
-import java.time.LocalDate
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import android.provider.Settings as AndroidSettings
+import java.time.LocalDate
 
 /**
  * The library. Hosts [NovaRoot] and adds the actions that need an Activity on top of
@@ -148,6 +149,7 @@ class MainActivity : ComponentActivity() {
             CompositionLocalProvider(
                 LocalStatusBarIcons provides { darkIcons -> setDarkStatusBarIcons(darkIcons) },
                 LocalHeroPreviewEnabled provides true,
+                LocalMusicEnabled provides true,
             ) {
                 NovaRoot(state = state, actions = actions)
             }

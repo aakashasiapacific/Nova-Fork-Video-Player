@@ -1,10 +1,14 @@
 package com.aakash.novafork
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import com.aakash.novafork.core.audio.LrcParser
 import com.aakash.novafork.core.audio.MusicKeys
@@ -16,6 +20,8 @@ import com.aakash.novafork.music.MusicPlayerState
 import com.aakash.novafork.music.NowPlaying
 import com.aakash.novafork.ui.audio.AudioActions
 import com.aakash.novafork.ui.audio.AudioContent
+import com.aakash.novafork.ui.audio.MiniPlayerBar
+import com.aakash.novafork.ui.audio.NowPlayingScreen
 import com.aakash.novafork.ui.model.RepeatMode
 import com.aakash.novafork.ui.theme.AudioTheme
 import com.aakash.novafork.ui.theme.NovaTheme
@@ -28,7 +34,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
-/** Renders the temporary Audio tab to build/screens/audio_*.png with a fake music library. */
+/** Renders the Audio tab, Now Playing and the mini player to build/screens/audio_*.png with a fake music library. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [34], qualifiers = "w411dp-h891dp-port-420dpi")
@@ -86,6 +92,42 @@ class AudioScreensTest {
                     )
                 }
             } }
+        }
+    }
+
+    private fun playing(lyrics: Boolean = false) = MusicPlayerState(
+        active = true,
+        nowPlaying = NowPlaying(1, "Bohemian Rhapsody", "Queen", "A Night at the Opera", MusicLibrary.artUri(songs[0])),
+        isPlaying = true,
+        positionMs = 75_000,
+        durationMs = 354_000,
+        hasNext = true,
+        hasPrevious = true,
+        queueIndex = 0,
+        queueSize = 5,
+        lyrics = if (lyrics) LrcParser.parse("[01:10.00]Is this the real life?\n[01:14.00]Is this just fantasy?\n[01:18.00]Caught in a landslide") else null,
+    )
+
+    @Test
+    fun nowPlaying() {
+        compose.captureScreen("audio_now_playing") {
+            NovaTheme {
+                // No volume row: its polling loop never lets a test go idle.
+                NowPlayingScreen(player = playing(), actions = NoOpAudioActions, onDismiss = {}, showVolume = false)
+            }
+        }
+    }
+
+    @Test
+    fun miniPlayer() {
+        compose.captureScreen("audio_mini_player") {
+            NovaTheme {
+                Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+                    Box(Modifier.fillMaxSize().padding(20.dp), contentAlignment = Alignment.BottomCenter) {
+                        MiniPlayerBar(player = playing(), actions = NoOpAudioActions, onOpen = {})
+                    }
+                }
+            }
         }
     }
 

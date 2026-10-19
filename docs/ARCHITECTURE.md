@@ -222,6 +222,10 @@ only `ui/common`, `ui/settings`, `ui/dialogs`, and `ui/model`.
   date-grouped timeline.
 - **Floating bar:** pages draw under the phone's tab bar and add `LocalBottomBarSpace` to their
   lists' bottom padding.
+- **Music UI:** `ui/audio/AudioScreen.kt` (Apple Music-style Library and its pages, one internal
+  page stack) and `ui/audio/MusicPlayerUi.kt` (`MiniPlayerBar`, `NowPlayingScreen`). The shell
+  (PhoneApp, TabletApp) shows the mini player and Now Playing over every tab when MainActivity
+  sets `LocalMusicEnabled`; `LocalBottomBarSpace` then includes the mini player.
 
 The rest of this section is the earlier Material design, still used where the redesign hasn't
 reached yet.

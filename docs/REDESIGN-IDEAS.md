@@ -145,6 +145,16 @@ UI, following Apple Music:
   - a scrubber, previous / play-pause / next, and volume;
   - buttons for lyrics, the queue and AirPlay-style casting.
 
+**Built (build 44, from Apple Music's dark design as known; owner corrects from the APK):**
+- Library home: big "Library", red-iconed Playlists / Artists / Albums / Songs / Genres rows,
+  Recently Added grid of square covers; each opens a page with a red "‹ back" link and big title.
+- Album page: big cover, title, artist in red, genre · year, grey Play/Shuffle pills with red
+  icons, numbered tracks, "N songs, M minutes". Artist page: albums row and Top Songs.
+- Mini player: a floating glass capsule above the tab bar on every tab (phone and tablet).
+- Now Playing: blurred cover background, big cover (shrinks while paused), title and artist, thin
+  scrubber with times, previous / play-pause / next, system volume, lyrics (big synced lines, tap
+  to jump) and queue (shuffle, repeat, stop) panes; swipe down or back to close. No casting yet.
+
 ## 6. Decisions on the former open questions (owner, 2026-10-16)
 
 1. **Library and sources are split:**

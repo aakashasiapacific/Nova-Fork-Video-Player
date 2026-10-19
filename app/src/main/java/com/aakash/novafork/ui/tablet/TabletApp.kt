@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -19,12 +20,17 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -33,6 +39,11 @@ import com.aakash.novafork.ui.adaptive.LocalDeviceLayout
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
 import com.aakash.novafork.ui.adaptive.dimensFor
 import com.aakash.novafork.ui.audio.AudioScreen
+import com.aakash.novafork.ui.audio.MiniPlayerBar
+import com.aakash.novafork.ui.audio.MiniPlayerHeight
+import com.aakash.novafork.ui.audio.NowPlayingHost
+import com.aakash.novafork.ui.audio.rememberMusicShell
+import com.aakash.novafork.ui.common.LocalBottomBarSpace
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.AppUiState
 import com.aakash.novafork.ui.model.Route
@@ -52,30 +63,39 @@ fun TabletApp(state: AppUiState, actions: AppActions, layout: DeviceLayout, modi
         // Pages leave the composition when navigated away from; this keeps their scroll positions
         // for when the user comes back.
         val pageStates = rememberSaveableStateHolder()
+        // Music (the real app only): a floating mini player at the bottom, Now Playing over all.
+        val music = rememberMusicShell()
+        val miniPlayerShown = music?.second?.active == true
+        var nowPlayingOpen by rememberSaveable { mutableStateOf(false) }
+        val navBar = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
         // A Surface (not just a background) so text and icons get onBackground by default.
         Surface(modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
             Box(Modifier.fillMaxSize()) {
-                // Keyed by page, so updates within a page recompose it in place while a page change
-                // crossfades and the outgoing page keeps the state it was built with.
-                AnimatedContent(
-                    targetState = state,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .windowInsetsPadding(
-                            WindowInsets.systemBars.union(WindowInsets.displayCutout).only(WindowInsetsSides.Horizontal),
-                        ),
-                    transitionSpec = { fadeIn(tween(durationMillis = 240, delayMillis = 40)) togetherWith fadeOut(tween(durationMillis = 160)) },
-                    contentAlignment = Alignment.TopStart,
-                    contentKey = { it.route.pageKey() },
-                    label = "tabletPage",
-                ) { pageState ->
-                    pageStates.SaveableStateProvider(pageState.route.pageKey().toString()) {
-                        // Pages with art at the top (Home's hero, details) run under the floating
-                        // bar; the others start below it.
-                        val underBar = pageState.route is Route.VideoDetails || pageState.route is Route.ShowDetails ||
-                            (pageState.route == Route.Home && pageState.home.hero.isNotEmpty())
-                        Box(if (underBar) Modifier.fillMaxSize() else Modifier.fillMaxSize().padding(top = TabletTopBarSpace)) {
-                            TabletPage(state = pageState, actions = actions, layout = layout)
+                CompositionLocalProvider(
+                    LocalBottomBarSpace provides if (miniPlayerShown) MiniPlayerHeight + 24.dp + navBar else 0.dp,
+                ) {
+                    // Keyed by page, so updates within a page recompose it in place while a page change
+                    // crossfades and the outgoing page keeps the state it was built with.
+                    AnimatedContent(
+                        targetState = state,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .windowInsetsPadding(
+                                WindowInsets.systemBars.union(WindowInsets.displayCutout).only(WindowInsetsSides.Horizontal),
+                            ),
+                        transitionSpec = { fadeIn(tween(durationMillis = 240, delayMillis = 40)) togetherWith fadeOut(tween(durationMillis = 160)) },
+                        contentAlignment = Alignment.TopStart,
+                        contentKey = { it.route.pageKey() },
+                        label = "tabletPage",
+                    ) { pageState ->
+                        pageStates.SaveableStateProvider(pageState.route.pageKey().toString()) {
+                            // Pages with art at the top (Home's hero, details) run under the floating
+                            // bar; the others start below it.
+                            val underBar = pageState.route is Route.VideoDetails || pageState.route is Route.ShowDetails ||
+                                (pageState.route == Route.Home && pageState.home.hero.isNotEmpty())
+                            Box(if (underBar) Modifier.fillMaxSize() else Modifier.fillMaxSize().padding(top = TabletTopBarSpace)) {
+                                TabletPage(state = pageState, actions = actions, layout = layout)
+                            }
                         }
                     }
                 }
@@ -84,6 +104,21 @@ fun TabletApp(state: AppUiState, actions: AppActions, layout: DeviceLayout, modi
                     onSelect = actions::selectTab,
                     modifier = Modifier.align(Alignment.TopCenter),
                 )
+                if (music != null) {
+                    val (viewModel, player) = music
+                    if (miniPlayerShown) {
+                        MiniPlayerBar(
+                            player = player,
+                            actions = viewModel,
+                            onOpen = { nowPlayingOpen = true },
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .padding(bottom = navBar + 16.dp)
+                                .widthIn(max = 520.dp),
+                        )
+                    }
+                    NowPlayingHost(open = nowPlayingOpen, player = player, actions = viewModel, onDismiss = { nowPlayingOpen = false })
+                }
             }
         }
     }
@@ -142,7 +177,7 @@ private fun TabletPage(state: AppUiState, actions: AppActions, layout: DeviceLay
             actions = actions,
             modifier = pageModifier,
         )
-        Route.Audio -> AudioScreen(modifier = pageModifier.windowInsetsPadding(WindowInsets.navigationBars))
+        Route.Audio -> AudioScreen(modifier = pageModifier)
         Route.Settings -> SettingsScreen(
             state = state.settings,
             actions = actions,

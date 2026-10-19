@@ -3,6 +3,14 @@ package com.aakash.novafork.ui.audio
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.DrawableRes
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -11,6 +19,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -18,30 +27,25 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyGridScope
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.ScrollableTabRow
-import androidx.compose.material3.Slider
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -50,31 +54,36 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import coil.compose.AsyncImage
 import com.aakash.novafork.R
 import com.aakash.novafork.data.db.MusicPlaylistRow
 import com.aakash.novafork.data.db.SongEntity
 import com.aakash.novafork.data.music.Album
+import com.aakash.novafork.data.music.Artist
 import com.aakash.novafork.data.music.MusicLibrary
 import com.aakash.novafork.data.music.MusicLibraryData
 import com.aakash.novafork.data.music.MusicScanState
 import com.aakash.novafork.music.MusicPlayerState
+import com.aakash.novafork.ui.common.LocalBottomBarSpace
 import com.aakash.novafork.ui.common.NovaIcon
-import com.aakash.novafork.ui.model.RepeatMode
 import com.aakash.novafork.ui.theme.AudioTheme
+import com.aakash.novafork.ui.theme.NovaColors
 
 /**
- * A plain, temporary Audio tab for testing the music engine on a phone: the library by songs,
- * albums, artists, genres, playlists and recently added, and a mini player with lyrics. The
- * Apple Music-style screens replace it once the design is settled.
+ * The Audio tab, after Apple Music's Library (dark): a big "Library" title, Playlists / Artists /
+ * Albums / Songs / Genres, then a Recently Added grid of covers; each opens its own page (album,
+ * artist, genre, playlist pages with red Play and Shuffle). The mini player and Now Playing live
+ * in the app shell (see [MiniPlayerBar], [NowPlayingScreen]).
  */
 @Composable
 fun AudioScreen(modifier: Modifier = Modifier, viewModel: MusicViewModel = viewModel()) {
@@ -101,19 +110,17 @@ fun AudioScreen(modifier: Modifier = Modifier, viewModel: MusicViewModel = viewM
     }
 }
 
-private enum class AudioTab(val label: String) {
-    SONGS("Songs"),
-    ALBUMS("Albums"),
-    ARTISTS("Artists"),
-    GENRES("Genres"),
-    PLAYLISTS("Playlists"),
-    RECENT("Recently Added"),
-}
-
-/** What the tab shows instead of a list: one album, artist or genre ("album:<key>" …). */
+/** A page of the Audio tab: its route ("songs", "album:<key>" …) and its back-button label. */
+private const val HOME = "home"
+private const val PLAYLISTS = "playlists"
+private const val ARTISTS = "artists"
+private const val ALBUMS = "albums"
+private const val SONGS = "songs"
+private const val GENRES = "genres"
 private const val ALBUM = "album:"
 private const val ARTIST = "artist:"
 private const val GENRE = "genre:"
+private const val STACK_SEPARATOR = "\u0001"
 
 @Composable
 fun AudioContent(
@@ -127,104 +134,60 @@ fun AudioContent(
     onRequestAccess: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var tabIndex by rememberSaveable { mutableStateOf(0) }
-    var detail by rememberSaveable { mutableStateOf<String?>(null) }
-    var addingSong by remember { mutableStateOf<SongEntity?>(null) }
-    val tab = AudioTab.entries[tabIndex]
-    BackHandler(enabled = detail != null || openPlaylist != null) {
-        if (openPlaylist != null) actions.closePlaylist() else detail = null
+    // The pages opened over Library, as one saveable string.
+    var stackText by rememberSaveable { mutableStateOf("") }
+    val stack = if (stackText.isEmpty()) emptyList() else stackText.split(STACK_SEPARATOR)
+    fun open(page: String) {
+        stackText = (stack + page).joinToString(STACK_SEPARATOR)
     }
-    val onAdd: (SongEntity) -> Unit = { addingSong = it }
+    fun back() {
+        if (openPlaylist != null) actions.closePlaylist() else stackText = stack.dropLast(1).joinToString(STACK_SEPARATOR)
+    }
+    var addingSong by remember { mutableStateOf<SongEntity?>(null) }
+    BackHandler(enabled = stack.isNotEmpty() || openPlaylist != null) { back() }
 
-    Column(modifier.statusBarsPadding()) {
-        Header(library = library, scan = scan, onRescan = actions::rescan)
-        if (!hasAccess) AccessCard(onRequestAccess)
-        ScrollableTabRow(selectedTabIndex = tabIndex, edgePadding = 16.dp) {
-            AudioTab.entries.forEachIndexed { index, entry ->
-                Tab(
-                    selected = index == tabIndex,
-                    onClick = {
-                        tabIndex = index
-                        detail = null
-                        actions.closePlaylist()
-                    },
-                    text = { Text(entry.label) },
-                )
-            }
+    val page = if (openPlaylist != null) "playlist:${openPlaylist.id}" else stack.lastOrNull() ?: HOME
+    val backLabel = when {
+        openPlaylist != null -> pageTitle(stack.lastOrNull() ?: HOME, library)
+        stack.size >= 2 -> pageTitle(stack[stack.size - 2], library)
+        else -> "Library"
+    }
+    val nowPlayingId = player.nowPlaying?.songId
+    val ctx = PageContext(
+        library = library,
+        actions = actions,
+        nowPlayingId = nowPlayingId,
+        backLabel = backLabel,
+        onBack = ::back,
+        onOpen = ::open,
+        onAdd = { addingSong = it },
+    )
+    AnimatedContent(
+        targetState = page,
+        modifier = modifier.fillMaxSize(),
+        transitionSpec = {
+            val forward = targetState != HOME && (initialState == HOME || targetState.length >= initialState.length)
+            (slideInHorizontally(tween(260)) { if (forward) it / 4 else -it / 4 } + fadeIn(tween(220))) togetherWith
+                (slideOutHorizontally(tween(260)) { if (forward) -it / 4 else it / 4 } + fadeOut(tween(160)))
+        },
+        label = "audioPage",
+    ) { shown ->
+        when {
+            shown == HOME -> LibraryHome(library, scan, hasAccess, onRequestAccess, ctx)
+            shown.startsWith("playlist:") && openPlaylist != null -> PlaylistPage(openPlaylist, ctx)
+            shown == PLAYLISTS -> PlaylistsPage(playlists, ctx)
+            shown == ARTISTS -> ArtistsPage(library.artists, ctx)
+            shown == ALBUMS -> AlbumsPage("Albums", library.albums, ctx)
+            shown == SONGS -> SongsPage("Songs", library.songs, ctx)
+            shown == GENRES -> GenresPage(ctx)
+            shown.startsWith(ALBUM) -> library.albums.firstOrNull { it.key == shown.removePrefix(ALBUM) }
+                ?.let { AlbumPage(it, ctx) } ?: Missing(ctx)
+            shown.startsWith(ARTIST) -> library.artists.firstOrNull { it.key == shown.removePrefix(ARTIST) }
+                ?.let { ArtistPage(it, ctx) } ?: Missing(ctx)
+            shown.startsWith(GENRE) -> library.genres.firstOrNull { it.name == shown.removePrefix(GENRE) }
+                ?.let { SongsPage(it.name, it.songs, ctx) } ?: Missing(ctx)
+            else -> Missing(ctx)
         }
-        LazyColumn(
-            modifier = Modifier.weight(1f).fillMaxWidth(),
-            contentPadding = PaddingValues(bottom = 16.dp),
-        ) {
-            val shown = detail
-            when {
-                openPlaylist != null -> playlistDetail(openPlaylist, actions, onAdd)
-                shown != null && shown.startsWith(ALBUM) ->
-                    library.albums.firstOrNull { it.key == shown.removePrefix(ALBUM) }?.let { albumDetail(it, actions, onAdd) }
-                shown != null && shown.startsWith(ARTIST) ->
-                    library.artists.firstOrNull { it.key == shown.removePrefix(ARTIST) }?.let { artist ->
-                        item { DetailHeader(title = artist.name, subtitle = "${artist.albums.size} albums · ${artist.songs.size} songs") }
-                        item { PlayButtons(onPlay = { actions.play(artist.songs, 0, false) }, onShuffle = { actions.play(artist.songs, 0, true) }) }
-                        item { SectionTitle("Albums") }
-                        items(artist.albums, key = { "a:" + it.key }) { album -> AlbumRow(album) { detail = ALBUM + album.key } }
-                        item { SectionTitle("Top songs") }
-                        songItems(artist.songs.take(TOP_SONGS), actions, onAdd)
-                    }
-                shown != null && shown.startsWith(GENRE) ->
-                    library.genres.firstOrNull { it.name == shown.removePrefix(GENRE) }?.let { genre ->
-                        item { DetailHeader(title = genre.name, subtitle = "${genre.songs.size} songs") }
-                        item { PlayButtons(onPlay = { actions.play(genre.songs, 0, false) }, onShuffle = { actions.play(genre.songs, 0, true) }) }
-                        songItems(genre.songs, actions, onAdd)
-                    }
-                else -> when (tab) {
-                    AudioTab.SONGS -> {
-                        if (library.songs.isNotEmpty()) {
-                            item {
-                                PlayButtons(
-                                    onPlay = { actions.play(library.songs, 0, false) },
-                                    onShuffle = { actions.play(library.songs, 0, true) },
-                                )
-                            }
-                        }
-                        songItems(library.songs, actions, onAdd)
-                    }
-                    AudioTab.ALBUMS -> items(library.albums, key = { it.key }) { album -> AlbumRow(album) { detail = ALBUM + album.key } }
-                    AudioTab.ARTISTS -> items(library.artists, key = { it.key }) { artist ->
-                        ListItem(
-                            headlineContent = { Text(artist.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                            supportingContent = { Text("${artist.albums.size} albums · ${artist.songs.size} songs") },
-                            leadingContent = { Art(artist.albums.firstOrNull()?.artUri, round = true) },
-                            modifier = Modifier.clickable { detail = ARTIST + artist.key },
-                        )
-                    }
-                    AudioTab.GENRES -> items(library.genres, key = { it.name }) { genre ->
-                        ListItem(
-                            headlineContent = { Text(genre.name) },
-                            supportingContent = { Text("${genre.songs.size} songs") },
-                            modifier = Modifier.clickable { detail = GENRE + genre.name },
-                        )
-                    }
-                    AudioTab.PLAYLISTS -> {
-                        if (playlists.isEmpty()) item { Hint("No playlists yet. Use + on a song to make one.") }
-                        items(playlists, key = { it.id }) { row ->
-                            ListItem(
-                                headlineContent = { Text(row.name) },
-                                supportingContent = { Text("${row.songCount} songs") },
-                                leadingContent = { NovaIcon(R.drawable.ic_playlist_play, contentDescription = null) },
-                                modifier = Modifier.clickable { actions.showPlaylist(row) },
-                            )
-                        }
-                    }
-                    AudioTab.RECENT -> items(library.recentlyAdded, key = { it.key }) { album ->
-                        AlbumRow(album) { detail = ALBUM + album.key }
-                    }
-                }
-            }
-            if (library.songs.isEmpty() && !scan.scanning && hasAccess) {
-                item { Hint("No music found. Songs on this phone and in folders added under Browse show up here.") }
-            }
-        }
-        if (player.active) MiniPlayer(player, actions)
     }
 
     addingSong?.let { song ->
@@ -240,268 +203,531 @@ fun AudioContent(
     }
 }
 
+/** What every page needs: the library, actions, navigation and the playing song. */
+private class PageContext(
+    val library: MusicLibraryData,
+    val actions: AudioActions,
+    val nowPlayingId: Long?,
+    val backLabel: String,
+    val onBack: () -> Unit,
+    val onOpen: (String) -> Unit,
+    val onAdd: (SongEntity) -> Unit,
+)
+
+private fun pageTitle(page: String, library: MusicLibraryData): String = when {
+    page == HOME -> "Library"
+    page == PLAYLISTS -> "Playlists"
+    page == ARTISTS -> "Artists"
+    page == ALBUMS -> "Albums"
+    page == SONGS -> "Songs"
+    page == GENRES -> "Genres"
+    page.startsWith(ALBUM) -> library.albums.firstOrNull { it.key == page.removePrefix(ALBUM) }?.title ?: "Back"
+    page.startsWith(ARTIST) -> library.artists.firstOrNull { it.key == page.removePrefix(ARTIST) }?.name ?: "Back"
+    page.startsWith(GENRE) -> page.removePrefix(GENRE)
+    else -> "Back"
+}
+
+// ---------------------------------------------------------------------------------------------
+// Pages
+// ---------------------------------------------------------------------------------------------
+
+/** Every page is one grid (2 columns of covers; rows span both), padded for the floating bars. */
 @Composable
-private fun Header(library: MusicLibraryData, scan: MusicScanState, onRescan: () -> Unit) {
-    Row(
-        Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp, top = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(Modifier.weight(1f)) {
-            Text("Audio", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-            Text(
-                "Test screen · ${library.songs.size} songs · ${library.albums.size} albums · ${library.artists.size} artists",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+private fun AudioPage(content: LazyGridScope.() -> Unit) {
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(2),
+        modifier = Modifier
+            .fillMaxSize()
+            .statusBarsPadding(),
+        contentPadding = PaddingValues(start = Gutter, end = Gutter, bottom = 24.dp + LocalBottomBarSpace.current),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        verticalArrangement = Arrangement.spacedBy(0.dp),
+        content = content,
+    )
+}
+
+private fun LazyGridScope.row(key: Any? = null, content: @Composable () -> Unit) {
+    item(key = key, span = { GridItemSpan(maxLineSpan) }) { content() }
+}
+
+@Composable
+private fun LibraryHome(
+    library: MusicLibraryData,
+    scan: MusicScanState,
+    hasAccess: Boolean,
+    onRequestAccess: () -> Unit,
+    ctx: PageContext,
+) {
+    AudioPage {
+        row("title") {
+            Row(Modifier.padding(top = 20.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text("Library", fontSize = 34.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                IconButton(onClick = ctx.actions::rescan, enabled = !scan.scanning) {
+                    NovaIcon(R.drawable.ic_refresh, contentDescription = "Rescan music", tint = NovaColors.AppleMusicRed)
+                }
+            }
         }
-        IconButton(onClick = onRescan, enabled = !scan.scanning) {
-            NovaIcon(R.drawable.ic_refresh, contentDescription = "Rescan music")
+        if (scan.scanning) row("scanning") { LinearProgressIndicator(Modifier.fillMaxWidth().padding(vertical = 4.dp)) }
+        scan.error?.let { error -> row("error") { Text(error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) } }
+        if (!hasAccess) row("access") { AccessCard(onRequestAccess) }
+        row("playlists") { CategoryRow(R.drawable.ic_playlist_play, "Playlists") { ctx.onOpen(PLAYLISTS) } }
+        row("artists") { CategoryRow(R.drawable.ic_person, "Artists") { ctx.onOpen(ARTISTS) } }
+        row("albums") { CategoryRow(R.drawable.ic_grid_view, "Albums") { ctx.onOpen(ALBUMS) } }
+        row("songs") { CategoryRow(R.drawable.ic_music_notes, "Songs") { ctx.onOpen(SONGS) } }
+        row("genres") { CategoryRow(R.drawable.ic_tune, "Genres", divider = false) { ctx.onOpen(GENRES) } }
+        if (library.recentlyAdded.isNotEmpty()) {
+            row("recentTitle") { SectionTitle("Recently Added") }
+            items(library.recentlyAdded.take(RECENT_ALBUMS), key = { "recent:" + it.key }) { album ->
+                AlbumTile(album) { ctx.onOpen(ALBUM + album.key) }
+            }
+        } else if (!scan.scanning && hasAccess) {
+            row("empty") { Hint("No music found. Songs on this phone and in folders added under Preferences › Sources show up here.") }
         }
     }
-    if (scan.scanning) LinearProgressIndicator(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp))
-    scan.error?.let {
+}
+
+@Composable
+private fun PlaylistsPage(playlists: List<MusicPlaylistRow>, ctx: PageContext) {
+    AudioPage {
+        header("Playlists", ctx)
+        if (playlists.isEmpty()) row("empty") { Hint("No playlists yet. Use + on a song to start one.") }
+        playlists.forEach { playlist ->
+            row("p:${playlist.id}") {
+                ListRow(
+                    title = playlist.name,
+                    subtitle = if (playlist.songCount == 1) "1 song" else "${playlist.songCount} songs",
+                    art = { Cover(ctx.library.songs.firstOrNull { it.id == playlist.coverSongId }?.let(MusicLibrary::artUri), size = 56) },
+                    onClick = { ctx.actions.showPlaylist(playlist) },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ArtistsPage(artists: List<Artist>, ctx: PageContext) {
+    AudioPage {
+        header("Artists", ctx)
+        artists.forEach { artist ->
+            row("a:${artist.key}") {
+                ListRow(
+                    title = artist.name,
+                    art = { Cover(artist.albums.firstOrNull()?.artUri, size = 48, round = true) },
+                    onClick = { ctx.onOpen(ARTIST + artist.key) },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AlbumsPage(title: String, albums: List<Album>, ctx: PageContext) {
+    AudioPage {
+        header(title, ctx)
+        items(albums, key = { it.key }) { album -> AlbumTile(album) { ctx.onOpen(ALBUM + album.key) } }
+    }
+}
+
+@Composable
+private fun GenresPage(ctx: PageContext) {
+    AudioPage {
+        header("Genres", ctx)
+        ctx.library.genres.forEach { genre ->
+            row("g:${genre.name}") {
+                ListRow(
+                    title = genre.name,
+                    subtitle = if (genre.songs.size == 1) "1 song" else "${genre.songs.size} songs",
+                    onClick = { ctx.onOpen(GENRE + genre.name) },
+                )
+            }
+        }
+    }
+}
+
+/** Songs, a genre: big title, Play and Shuffle, then the songs with their covers. */
+@Composable
+private fun SongsPage(title: String, songs: List<SongEntity>, ctx: PageContext) {
+    AudioPage {
+        header(title, ctx)
+        if (songs.isNotEmpty()) row("play") { PlayShuffle(songs, ctx.actions) }
+        songRows(songs, ctx)
+    }
+}
+
+/** Apple Music's album page: big cover, title, red artist, details, Play/Shuffle and the tracks. */
+@Composable
+private fun AlbumPage(album: Album, ctx: PageContext) {
+    AudioPage {
+        row("back") { BackRow(ctx) }
+        row("cover") {
+            Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+                Box(
+                    Modifier
+                        .padding(top = 8.dp)
+                        .fillMaxWidth(0.72f)
+                        .aspectRatio(1f)
+                        .shadow(18.dp, RoundedCornerShape(10.dp))
+                        .clip(RoundedCornerShape(10.dp)),
+                ) {
+                    Cover(album.artUri, size = 0, corner = 10, modifier = Modifier.fillMaxSize())
+                }
+                Text(
+                    album.title,
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(top = 18.dp),
+                )
+                Text(
+                    album.artist,
+                    fontSize = 20.sp,
+                    color = NovaColors.AppleMusicRed,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.clickable { ctx.onOpen(ARTIST + album.artistKey) },
+                )
+                val genre = album.songs.firstNotNullOfOrNull { it.genre }
+                val details = listOfNotNull(genre, album.year?.toString()).joinToString(" · ")
+                if (details.isNotEmpty()) {
+                    Text(details, fontSize = 13.sp, color = Color.White.copy(alpha = 0.55f), modifier = Modifier.padding(top = 4.dp))
+                }
+            }
+        }
+        row("play") { PlayShuffle(album.songs, ctx.actions) }
+        album.songs.forEachIndexed { index, song ->
+            row("t:${song.id}") {
+                TrackRow(
+                    song = song,
+                    playing = song.id == ctx.nowPlayingId,
+                    onClick = { ctx.actions.play(album.songs, index, false) },
+                    onAdd = { ctx.onAdd(song) },
+                )
+            }
+        }
+        row("footer") { Footer(album.songs) }
+    }
+}
+
+/** An artist: name, Play and Shuffle, their albums in a row, then their top songs. */
+@Composable
+private fun ArtistPage(artist: Artist, ctx: PageContext) {
+    AudioPage {
+        header(artist.name, ctx)
+        row("play") { PlayShuffle(artist.songs, ctx.actions) }
+        if (artist.albums.isNotEmpty()) {
+            row("albumsTitle") { SectionTitle("Albums") }
+            row("albums") {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                    items(artist.albums, key = { it.key }) { album ->
+                        AlbumTile(album, Modifier.width(150.dp)) { ctx.onOpen(ALBUM + album.key) }
+                    }
+                }
+            }
+        }
+        row("songsTitle") { SectionTitle("Top Songs") }
+        songRows(artist.songs.take(TOP_SONGS), ctx)
+    }
+}
+
+@Composable
+private fun PlaylistPage(playlist: OpenPlaylist, ctx: PageContext) {
+    AudioPage {
+        row("back") { BackRow(ctx) }
+        row("cover") {
+            Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+                Box(
+                    Modifier
+                        .padding(top = 8.dp)
+                        .fillMaxWidth(0.72f)
+                        .aspectRatio(1f)
+                        .shadow(18.dp, RoundedCornerShape(10.dp))
+                        .clip(RoundedCornerShape(10.dp)),
+                ) {
+                    Cover(playlist.songs.firstOrNull()?.let(MusicLibrary::artUri), size = 0, corner = 10, modifier = Modifier.fillMaxSize())
+                }
+                Text(playlist.name, fontSize = 22.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 18.dp))
+                Text(
+                    if (playlist.songs.size == 1) "1 song" else "${playlist.songs.size} songs",
+                    fontSize = 13.sp,
+                    color = Color.White.copy(alpha = 0.55f),
+                )
+            }
+        }
+        if (playlist.songs.isNotEmpty()) row("play") { PlayShuffle(playlist.songs, ctx.actions) }
+        playlist.songs.forEachIndexed { index, song ->
+            row("s:${song.id}") {
+                SongRow(
+                    song = song,
+                    playing = song.id == ctx.nowPlayingId,
+                    onClick = { ctx.actions.play(playlist.songs, index, false) },
+                    trailingIcon = R.drawable.ic_close,
+                    trailingLabel = "Remove from playlist",
+                    onTrailing = { ctx.actions.removeFromPlaylist(song) },
+                )
+            }
+        }
+        row("delete") {
+            TextButton(onClick = { ctx.actions.deletePlaylist(playlist.id) }, modifier = Modifier.padding(top = 16.dp)) {
+                Text("Delete Playlist", color = NovaColors.AppleMusicRed)
+            }
+        }
+    }
+}
+
+@Composable
+private fun Missing(ctx: PageContext) {
+    AudioPage {
+        row("back") { BackRow(ctx) }
+        row("hint") { Hint("This is no longer in your library.") }
+    }
+}
+
+// ---------------------------------------------------------------------------------------------
+// Pieces
+// ---------------------------------------------------------------------------------------------
+
+/** A page's back link ("‹ Library", in red) and its big title. */
+private fun LazyGridScope.header(title: String, ctx: PageContext) {
+    row("back") { BackRow(ctx) }
+    row("title") {
         Text(
-            it,
-            color = MaterialTheme.colorScheme.error,
-            style = MaterialTheme.typography.bodySmall,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+            title,
+            fontSize = 34.sp,
+            fontWeight = FontWeight.Bold,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(top = 4.dp, bottom = 12.dp),
         )
     }
 }
 
 @Composable
-private fun AccessCard(onRequestAccess: () -> Unit) {
-    Card(Modifier.fillMaxWidth().padding(16.dp)) {
-        Column(Modifier.padding(16.dp)) {
-            Text("Allow access to music", style = MaterialTheme.typography.titleMedium)
-            Text(
-                "Nova Fork needs permission to see the songs on this phone.",
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.padding(top = 4.dp, bottom = 12.dp),
-            )
-            Button(onClick = onRequestAccess) { Text("Allow") }
-        }
-    }
-}
-
-private fun LazyListScope.songItems(songs: List<SongEntity>, actions: AudioActions, onAdd: (SongEntity) -> Unit, numbered: Boolean = false) {
-    itemsIndexed(songs, key = { _, song -> song.id }) { index, song ->
-        SongRow(song = song, numbered = numbered, onClick = { actions.play(songs, index, false) }, trailing = {
-            IconButton(onClick = { onAdd(song) }) { NovaIcon(R.drawable.ic_playlist_add, contentDescription = "Add to a playlist") }
-        })
-    }
-}
-
-private fun LazyListScope.albumDetail(album: Album, actions: AudioActions, onAdd: (SongEntity) -> Unit) {
-    item {
-        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Art(album.artUri, size = 120)
-            Column(Modifier.padding(start = 16.dp)) {
-                Text(album.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                Text(album.artist, color = MaterialTheme.colorScheme.primary)
-                Text(
-                    listOfNotNull(album.year?.toString(), "${album.songs.size} songs").joinToString(" · "),
-                    style = MaterialTheme.typography.bodySmall,
-                )
-            }
-        }
-    }
-    item { PlayButtons(onPlay = { actions.play(album.songs, 0, false) }, onShuffle = { actions.play(album.songs, 0, true) }) }
-    songItems(album.songs, actions, onAdd, numbered = true)
-}
-
-private fun LazyListScope.playlistDetail(playlist: OpenPlaylist, actions: AudioActions, onAdd: (SongEntity) -> Unit) {
-    item { DetailHeader(title = playlist.name, subtitle = "${playlist.songs.size} songs") }
-    item {
-        Row(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = { actions.play(playlist.songs, 0, false) }, enabled = playlist.songs.isNotEmpty()) { Text("Play") }
-            OutlinedButton(onClick = { actions.play(playlist.songs, 0, true) }, enabled = playlist.songs.isNotEmpty()) { Text("Shuffle") }
-            TextButton(onClick = { actions.deletePlaylist(playlist.id) }) { Text("Delete playlist") }
-        }
-    }
-    itemsIndexed(playlist.songs, key = { _, song -> song.id }) { index, song ->
-        SongRow(song = song, numbered = false, onClick = { actions.play(playlist.songs, index, false) }, trailing = {
-            IconButton(onClick = { actions.removeFromPlaylist(song) }) { NovaIcon(R.drawable.ic_close, contentDescription = "Remove") }
-        })
-    }
-}
-
-@Composable
-private fun SongRow(song: SongEntity, numbered: Boolean, onClick: () -> Unit, trailing: @Composable () -> Unit) {
-    ListItem(
-        headlineContent = { Text(song.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-        supportingContent = {
-            Text(
-                listOfNotNull(song.artist ?: song.albumArtist, song.album, song.durationMs?.let(::formatTime)).joinToString(" · "),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        },
-        leadingContent = {
-            if (numbered) {
-                Text(song.trackNumber?.toString() ?: "–", modifier = Modifier.width(28.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
-            } else {
-                Art(MusicLibrary.artUri(song))
-            }
-        },
-        trailingContent = trailing,
-        modifier = Modifier.clickable(onClick = onClick),
-    )
-}
-
-@Composable
-private fun AlbumRow(album: Album, onClick: () -> Unit) {
-    ListItem(
-        headlineContent = { Text(album.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-        supportingContent = {
-            Text(listOfNotNull(album.artist, album.year?.toString()).joinToString(" · "), maxLines = 1, overflow = TextOverflow.Ellipsis)
-        },
-        leadingContent = { Art(album.artUri, size = 56) },
-        modifier = Modifier.clickable(onClick = onClick),
-    )
-}
-
-@Composable
-private fun Art(uri: String?, size: Int = 48, round: Boolean = false) {
-    val shape = RoundedCornerShape(if (round) (size / 2).dp else 6.dp)
-    Box(
-        Modifier.size(size.dp).clip(shape).background(MaterialTheme.colorScheme.surfaceVariant),
-        contentAlignment = Alignment.Center,
+private fun BackRow(ctx: PageContext) {
+    Row(
+        Modifier
+            .padding(top = 8.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .clickable(onClickLabel = "Back", onClick = ctx.onBack)
+            .padding(vertical = 8.dp, horizontal = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        NovaIcon(R.drawable.ic_audiotrack, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-        if (uri != null) {
-            AsyncImage(model = uri, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-        }
+        NovaIcon(R.drawable.ic_arrow_back, contentDescription = null, tint = NovaColors.AppleMusicRed, modifier = Modifier.size(20.dp))
+        Text(
+            ctx.backLabel,
+            color = NovaColors.AppleMusicRed,
+            fontSize = 17.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(start = 6.dp),
+        )
     }
 }
 
 @Composable
-private fun DetailHeader(title: String, subtitle: String) {
-    Column(Modifier.padding(16.dp)) {
-        Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-        Text(subtitle, style = MaterialTheme.typography.bodySmall)
+private fun CategoryRow(@DrawableRes icon: Int, label: String, divider: Boolean = true, onClick: () -> Unit) {
+    Column(Modifier.clickable(onClick = onClick)) {
+        Row(Modifier.padding(vertical = 13.dp), verticalAlignment = Alignment.CenterVertically) {
+            NovaIcon(icon, contentDescription = null, tint = NovaColors.AppleMusicRed, modifier = Modifier.size(26.dp))
+            Text(label, fontSize = 21.sp, modifier = Modifier.padding(start = 16.dp).weight(1f))
+            NovaIcon(R.drawable.ic_chevron_right, contentDescription = null, tint = Color.White.copy(alpha = 0.3f))
+        }
+        if (divider) HorizontalDivider(Modifier.padding(start = 42.dp), thickness = 0.5.dp, color = Color.White.copy(alpha = 0.15f))
     }
 }
 
 @Composable
 private fun SectionTitle(text: String) {
-    Text(text, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 4.dp))
+    Text(text, fontSize = 22.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 28.dp, bottom = 12.dp))
+}
+
+/** Square cover, title and artist below: Recently Added, Albums, an artist's albums. */
+@Composable
+private fun AlbumTile(album: Album, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    Column(
+        modifier
+            .padding(bottom = 18.dp)
+            .clickable(onClick = onClick),
+    ) {
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .aspectRatio(1f)
+                .clip(RoundedCornerShape(8.dp)),
+        ) {
+            Cover(album.artUri, size = 0, modifier = Modifier.fillMaxSize())
+        }
+        Text(
+            album.title,
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Medium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(top = 6.dp),
+        )
+        Text(album.artist, fontSize = 13.sp, color = Color.White.copy(alpha = 0.55f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+/** Apple Music's Play and Shuffle: two grey pills with red icon and label, side by side. */
+@Composable
+private fun PlayShuffle(songs: List<SongEntity>, actions: AudioActions) {
+    Row(Modifier.padding(vertical = 14.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+        GreyPill(R.drawable.ic_play_arrow, "Play", Modifier.weight(1f)) { actions.play(songs, 0, false) }
+        GreyPill(R.drawable.ic_shuffle, "Shuffle", Modifier.weight(1f)) { actions.play(songs, 0, true) }
+    }
 }
 
 @Composable
-private fun PlayButtons(onPlay: () -> Unit, onShuffle: () -> Unit) {
-    Row(Modifier.padding(horizontal = 16.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Button(onClick = onPlay) {
-            NovaIcon(R.drawable.ic_play_arrow, contentDescription = null)
-            Text("Play", modifier = Modifier.padding(start = 4.dp))
+private fun GreyPill(@DrawableRes icon: Int, label: String, modifier: Modifier, onClick: () -> Unit) {
+    Row(
+        modifier
+            .height(48.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(Color(0xFF1C1C1E))
+            .clickable(onClick = onClick),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        NovaIcon(icon, contentDescription = null, tint = NovaColors.AppleMusicRed, modifier = Modifier.size(22.dp))
+        Text(label, color = NovaColors.AppleMusicRed, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(start = 6.dp))
+    }
+}
+
+private fun LazyGridScope.songRows(songs: List<SongEntity>, ctx: PageContext) {
+    itemsIndexed(songs, key = { _, song -> "song:${song.id}" }, span = { _, _ -> GridItemSpan(maxLineSpan) }) { index, song ->
+        SongRow(
+            song = song,
+            playing = song.id == ctx.nowPlayingId,
+            onClick = { ctx.actions.play(songs, index, false) },
+            trailingIcon = R.drawable.ic_playlist_add,
+            trailingLabel = "Add to a playlist",
+            onTrailing = { ctx.onAdd(song) },
+        )
+    }
+}
+
+/** A song with its cover; the playing one in red. */
+@Composable
+private fun SongRow(
+    song: SongEntity,
+    playing: Boolean,
+    onClick: () -> Unit,
+    @DrawableRes trailingIcon: Int,
+    trailingLabel: String,
+    onTrailing: () -> Unit,
+) {
+    Column(Modifier.clickable(onClick = onClick)) {
+        Row(Modifier.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Cover(MusicLibrary.artUri(song), size = 48, corner = 6)
+            Column(
+                Modifier
+                    .weight(1f)
+                    .padding(start = 12.dp),
+            ) {
+                Text(
+                    song.title,
+                    fontSize = 16.sp,
+                    color = if (playing) NovaColors.AppleMusicRed else Color.White,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    song.artist ?: song.albumArtist ?: "Unknown artist",
+                    fontSize = 13.sp,
+                    color = Color.White.copy(alpha = 0.55f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            IconButton(onClick = onTrailing) {
+                NovaIcon(trailingIcon, contentDescription = trailingLabel, tint = Color.White.copy(alpha = 0.55f))
+            }
         }
-        OutlinedButton(onClick = onShuffle) {
-            NovaIcon(R.drawable.ic_shuffle, contentDescription = null)
-            Text("Shuffle", modifier = Modifier.padding(start = 4.dp))
+        HorizontalDivider(Modifier.padding(start = 60.dp), thickness = 0.5.dp, color = Color.White.copy(alpha = 0.12f))
+    }
+}
+
+/** An album's track: its number (or red bars while playing), title, add. */
+@Composable
+private fun TrackRow(song: SongEntity, playing: Boolean, onClick: () -> Unit, onAdd: () -> Unit) {
+    Column(Modifier.clickable(onClick = onClick)) {
+        Row(Modifier.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.width(32.dp)) {
+                if (playing) {
+                    NovaIcon(R.drawable.ic_volume_up, contentDescription = "Playing", tint = NovaColors.AppleMusicRed, modifier = Modifier.size(18.dp))
+                } else {
+                    Text(song.trackNumber?.toString() ?: "", fontSize = 16.sp, color = Color.White.copy(alpha = 0.55f))
+                }
+            }
+            Text(
+                song.title,
+                fontSize = 16.sp,
+                color = if (playing) NovaColors.AppleMusicRed else Color.White,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            IconButton(onClick = onAdd) {
+                NovaIcon(R.drawable.ic_playlist_add, contentDescription = "Add to a playlist", tint = Color.White.copy(alpha = 0.55f))
+            }
         }
+        HorizontalDivider(Modifier.padding(start = 32.dp), thickness = 0.5.dp, color = Color.White.copy(alpha = 0.12f))
+    }
+}
+
+/** "12 songs, 48 minutes" under an album. */
+@Composable
+private fun Footer(songs: List<SongEntity>) {
+    val minutes = (songs.sumOf { it.durationMs ?: 0L } / 60_000L).toInt()
+    val count = if (songs.size == 1) "1 song" else "${songs.size} songs"
+    Text(
+        if (minutes > 0) "$count, $minutes minutes" else count,
+        fontSize = 13.sp,
+        color = Color.White.copy(alpha = 0.55f),
+        modifier = Modifier.padding(top = 14.dp),
+    )
+}
+
+@Composable
+private fun ListRow(title: String, onClick: () -> Unit, subtitle: String? = null, art: (@Composable () -> Unit)? = null) {
+    Column(Modifier.clickable(onClick = onClick)) {
+        Row(Modifier.padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+            if (art != null) {
+                art()
+                Spacer(Modifier.width(14.dp))
+            }
+            Column(Modifier.weight(1f)) {
+                Text(title, fontSize = 17.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                if (subtitle != null) Text(subtitle, fontSize = 13.sp, color = Color.White.copy(alpha = 0.55f))
+            }
+            NovaIcon(R.drawable.ic_chevron_right, contentDescription = null, tint = Color.White.copy(alpha = 0.3f))
+        }
+        HorizontalDivider(thickness = 0.5.dp, color = Color.White.copy(alpha = 0.12f))
+    }
+}
+
+@Composable
+private fun AccessCard(onRequestAccess: () -> Unit) {
+    Column(
+        Modifier
+            .padding(vertical = 12.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(Color(0xFF1C1C1E))
+            .padding(16.dp),
+    ) {
+        Text("Allow access to music", fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+        Text(
+            "Nova Fork needs permission to see the songs on this phone.",
+            fontSize = 14.sp,
+            color = Color.White.copy(alpha = 0.6f),
+            modifier = Modifier.padding(top = 4.dp, bottom = 12.dp),
+        )
+        Button(onClick = onRequestAccess) { Text("Allow") }
     }
 }
 
 @Composable
 private fun Hint(text: String) {
-    Text(
-        text,
-        style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(24.dp),
-    )
-}
-
-@Composable
-private fun MiniPlayer(player: MusicPlayerState, actions: AudioActions) {
-    var showLyrics by rememberSaveable { mutableStateOf(false) }
-    var scrubbing by remember { mutableStateOf<Float?>(null) }
-    val now = player.nowPlaying
-    Surface(tonalElevation = 3.dp, modifier = Modifier.fillMaxWidth()) {
-        Column {
-            HorizontalDivider()
-            Row(Modifier.padding(start = 12.dp, end = 4.dp, top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                Art(now?.artUri)
-                Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
-                    Text(now?.title ?: "Loading…", maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.SemiBold)
-                    Text(
-                        player.error ?: now?.artist.orEmpty(),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = if (player.error != null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                IconButton(onClick = actions::previous) { NovaIcon(R.drawable.ic_skip_previous, contentDescription = "Previous") }
-                IconButton(onClick = actions::togglePlay) {
-                    NovaIcon(
-                        if (player.isPlaying) R.drawable.ic_pause else R.drawable.ic_play_arrow,
-                        contentDescription = if (player.isPlaying) "Pause" else "Play",
-                    )
-                }
-                IconButton(onClick = actions::next, enabled = player.hasNext) { NovaIcon(R.drawable.ic_skip_next, contentDescription = "Next") }
-            }
-            val duration = player.durationMs.coerceAtLeast(1L).toFloat()
-            Slider(
-                value = (scrubbing ?: player.positionMs.toFloat()).coerceIn(0f, duration),
-                onValueChange = { scrubbing = it },
-                onValueChangeFinished = {
-                    scrubbing?.let { actions.seekTo(it.toLong()) }
-                    scrubbing = null
-                },
-                valueRange = 0f..duration,
-                enabled = player.durationMs > 0,
-                modifier = Modifier.padding(horizontal = 16.dp).height(32.dp),
-            )
-            Row(Modifier.padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    "${formatTime((scrubbing?.toLong() ?: player.positionMs))} / ${formatTime(player.durationMs)} · ${player.queueIndex + 1} of ${player.queueSize}",
-                    style = MaterialTheme.typography.labelSmall,
-                    modifier = Modifier.padding(start = 12.dp).weight(1f),
-                )
-                IconButton(onClick = actions::toggleShuffle) {
-                    NovaIcon(
-                        R.drawable.ic_shuffle,
-                        contentDescription = "Shuffle",
-                        tint = if (player.shuffle) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                IconButton(onClick = actions::cycleRepeat) {
-                    NovaIcon(
-                        if (player.repeat == RepeatMode.ONE) R.drawable.ic_repeat_one else R.drawable.ic_repeat,
-                        contentDescription = "Repeat",
-                        tint = if (player.repeat != RepeatMode.OFF) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                TextButton(onClick = { showLyrics = !showLyrics }, enabled = player.lyrics != null) {
-                    Text(if (showLyrics) "Hide lyrics" else "Lyrics")
-                }
-                IconButton(onClick = actions::closePlayer) { NovaIcon(R.drawable.ic_close, contentDescription = "Close") }
-            }
-            val lyrics = player.lyrics
-            if (showLyrics && lyrics != null) {
-                val active = lyrics.activeIndex(player.positionMs)
-                val listState = rememberLazyListState()
-                LaunchedEffect(active) { if (active > 0) listState.animateScrollToItem((active - 1).coerceAtLeast(0)) }
-                LazyColumn(state = listState, modifier = Modifier.fillMaxWidth().height(160.dp).padding(horizontal = 16.dp)) {
-                    itemsIndexed(lyrics.lines) { index, line ->
-                        Text(
-                            line.text.ifEmpty { "♪" },
-                            style = if (index == active) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyMedium,
-                            fontWeight = if (index == active) FontWeight.Bold else FontWeight.Normal,
-                            color = if (index == active || !lyrics.synced) {
-                                MaterialTheme.colorScheme.onSurface
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            },
-                            modifier = Modifier.padding(vertical = 2.dp),
-                        )
-                    }
-                }
-            }
-            Spacer(Modifier.height(4.dp))
-        }
-    }
+    Text(text, fontSize = 15.sp, color = Color.White.copy(alpha = 0.55f), modifier = Modifier.padding(vertical = 24.dp))
 }
 
 @Composable
@@ -539,12 +765,6 @@ private fun AddToPlaylistDialog(
     )
 }
 
+private val Gutter = 20.dp
 private const val TOP_SONGS = 10
-
-private fun formatTime(ms: Long): String {
-    val totalSeconds = (ms / 1000).coerceAtLeast(0)
-    val hours = totalSeconds / 3600
-    val minutes = (totalSeconds % 3600) / 60
-    val seconds = totalSeconds % 60
-    return if (hours > 0) "%d:%02d:%02d".format(hours, minutes, seconds) else "%d:%02d".format(minutes, seconds)
-}
+private const val RECENT_ALBUMS = 24
