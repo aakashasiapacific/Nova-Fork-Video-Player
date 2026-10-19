@@ -1,5 +1,6 @@
 package com.aakash.novafork.ui.tablet
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -11,6 +12,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -18,6 +20,7 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
@@ -25,16 +28,22 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
 import com.aakash.novafork.ui.adaptive.DeviceLayout
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
 import com.aakash.novafork.ui.common.NovaChip
+import com.aakash.novafork.ui.common.NovaDropdownMenu
+import com.aakash.novafork.ui.common.NovaIcon
+import com.aakash.novafork.ui.common.NovaMenuItem
 import com.aakash.novafork.ui.common.RatingPill
 import com.aakash.novafork.ui.common.VideoMenuBox
 import com.aakash.novafork.ui.common.metaLine
@@ -255,26 +264,39 @@ private fun SeasonSelector(
         Text(seasons.first().title, style = MaterialTheme.typography.titleLarge, modifier = modifier)
         return
     }
-    Row(
-        modifier.horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        seasons.forEach { season ->
-            NovaChip(
-                selected = season.number == selected,
-                onClick = { onSelect(season.number) },
-                label = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(season.title, style = MaterialTheme.typography.labelLarge)
-                        Spacer(Modifier.width(6.dp))
-                        Text(
-                            text = season.episodes.size.toString(),
-                            style = MaterialTheme.typography.labelLarge,
-                            color = LocalContentColor.current.copy(alpha = 0.65f),
-                        )
-                    }
-                },
+    // Apple TV's season picker: "Season 2 ⌄" opening a menu of the seasons.
+    var open by remember { mutableStateOf(false) }
+    Box(modifier) {
+        Row(
+            Modifier
+                .clip(RoundedCornerShape(8.dp))
+                .clickable(onClickLabel = "Choose a season") { open = true }
+                .padding(vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(seasons.firstOrNull { it.number == selected }?.title ?: seasons.first().title, style = MaterialTheme.typography.titleLarge)
+            NovaIcon(
+                R.drawable.ic_expand_more,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = 6.dp).size(20.dp),
             )
+        }
+        NovaDropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            seasons.forEach { season ->
+                NovaMenuItem(
+                    text = { Text("${season.title} · ${season.episodes.size}") },
+                    leadingIcon = {
+                        Box(Modifier.size(18.dp), contentAlignment = Alignment.Center) {
+                            if (season.number == selected) NovaIcon(R.drawable.ic_check, contentDescription = "Selected", modifier = Modifier.size(16.dp))
+                        }
+                    },
+                    onClick = {
+                        open = false
+                        onSelect(season.number)
+                    },
+                )
+            }
         }
     }
 }

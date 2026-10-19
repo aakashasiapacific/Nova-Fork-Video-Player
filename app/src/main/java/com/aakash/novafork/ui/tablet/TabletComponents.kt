@@ -537,16 +537,6 @@ internal fun TabletLandscapeCard(
                     )
                 }
             }
-            Spacer(Modifier.width(12.dp))
-            Box(
-                Modifier
-                    .size(44.dp)
-                    .clip(CircleShape)
-                    .background(Color.White.copy(alpha = 0.22f)),
-                contentAlignment = Alignment.Center,
-            ) {
-                NovaIcon(R.drawable.ic_play_arrow, contentDescription = null, tint = Color.White, modifier = Modifier.size(28.dp))
-            }
         }
         if (card.watched) WatchedBadge(Modifier.align(Alignment.TopEnd).padding(10.dp))
         ProgressStrip(card.progress, Modifier.align(Alignment.BottomCenter), height = 4.dp)

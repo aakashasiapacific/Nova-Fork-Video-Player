@@ -348,3 +348,5 @@ The owner asked for Apple Music to be copied more precisely, with less clutter. 
   "Mark as Watched" on tablet) became iOS's grey filled buttons.
 - **Episode rows (build 61):** Apple TV's small grey caps above the title ("EPISODE 3"), replacing
   a blue "E3".
+- **Tablet (build 62):** the same as the phone. No play circle on Continue Watching cards, and
+  "Season 2 ⌄" in place of season chips.
