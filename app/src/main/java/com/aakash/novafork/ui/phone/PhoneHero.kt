@@ -340,9 +340,8 @@ private fun DetailsStyleHeroPage(
                 textAlign = TextAlign.Start,
                 logoAlignment = Alignment.BottomStart,
                 maxWidthFraction = 1f,
-                logoHeight = 56.dp,
+                logoHeight = 48.dp,
             )
-            val rating = hero.rating
             val meta = hero.metaLine
             if (!meta.isNullOrBlank()) {
                 Text(
@@ -354,17 +353,27 @@ private fun DetailsStyleHeroPage(
                     modifier = Modifier.padding(top = 4.dp),
                 )
             }
-            if (rating != null && rating > 0f) {
-                RatingPill(rating, onImage = true, modifier = Modifier.padding(top = 8.dp))
-            }
-            highlightOf(hero)?.let { highlight ->
-                Text(
-                    text = highlight,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White,
-                    modifier = Modifier.padding(top = 6.dp),
-                )
+            // Rating and "Continue watching" share a line, so the block stays short.
+            val rating = hero.rating
+            val highlight = highlightOf(hero)
+            if ((rating != null && rating > 0f) || highlight != null) {
+                Row(
+                    Modifier.padding(top = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    RatingPill(rating, onImage = true)
+                    if (highlight != null) {
+                        Text(
+                            text = highlight,
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
             }
         }
         HeroActions(
@@ -372,7 +381,7 @@ private fun DetailsStyleHeroPage(
             play = play,
             actions = actions,
             fillPlay = true,
-            modifier = Modifier.padding(start = dims.gutter, end = dims.gutter, top = 18.dp),
+            modifier = Modifier.padding(start = dims.gutter, end = dims.gutter, top = HeroActionsGap),
         )
     }
 }
@@ -391,14 +400,20 @@ private fun HeroClip(hero: HeroUi, preview: Boolean, muted: Boolean) {
     }
 }
 
-private val DetailsPosterWidth = 104.dp
+private val HeroActionsGap = 18.dp
+private val HeroButtonHeight = 50.dp
+
+/** The dots sit this far under the Play row. */
+private val HeroDotsGap = 26.dp
 
 /**
- * How tall the phone hero is below its 16:9 backdrop: the rest of the poster and title row (see
- * BackdropPosterHeader), the Play row and the dots. The hero's height is the status bar plus
+ * How tall the phone hero is below its 16:9 backdrop, sized to what is in it and no more: the
+ * poster's part under the backdrop, the Play row, then the dots (centred in their row, which
+ * ends [HeroDotsBottom] above the hero's bottom). The hero's height is the status bar plus
  * width × 9/16 plus this.
  */
-internal val DetailsHeroBelowBackdrop = 310.dp
+internal fun heroBelowBackdrop(posterWidth: Dp): Dp =
+    posterWidth * 1.5f - PosterOverlap + HeroActionsGap + HeroButtonHeight + HeroDotsGap + DotsRowHeight / 2 + HeroDotsBottom
 
 /**
  * The hero's buttons: the white Play pill, a round star (Favorites) and a round "+"

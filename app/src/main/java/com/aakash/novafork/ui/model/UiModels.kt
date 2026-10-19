@@ -21,9 +21,18 @@ data class Artwork(
     val tallUrl: String? = null,
     /** The title drawn as transparent artwork (TMDB's logo), shown over the hero in place of text. */
     val logoUrl: String? = null,
+    /** The video's width over height, for showing its frame in its own shape. */
+    val frameAspect: Float? = null,
     /** Seed for the placeholder colours (usually the title). */
     val seed: String = "",
-)
+) {
+    /**
+     * Only a frame of the video exists: no poster, backdrop or still (a camera-roll clip, a saved
+     * YouTube video), so there is nothing to lay out as backdrop plus poster.
+     */
+    val frameOnly: Boolean
+        get() = posterUrl == null && tallUrl == null && backdropUrl == null && stillUrl == null && frameSource != null
+}
 
 enum class MediaKind { MOVIE, EPISODE, VIDEO, STREAM }
 

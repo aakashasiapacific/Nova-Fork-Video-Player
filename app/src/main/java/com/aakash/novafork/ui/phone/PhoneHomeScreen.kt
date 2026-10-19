@@ -155,7 +155,7 @@ private fun HomeFeed(home: HomeUi, scan: ScanUi, permission: PermissionUi, actio
         // Portrait: the 16:9 backdrop with the poster, title and Play under it; landscape: wide.
         val portrait = maxWidth <= maxHeight
         val statusBar = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-        val heroHeight = if (portrait) statusBar + maxWidth * 9f / 16f + DetailsHeroBelowBackdrop else maxHeight * 0.85f
+        val heroHeight = if (portrait) statusBar + maxWidth * 9f / 16f + heroBelowBackdrop(dims.detailPosterWidth) else maxHeight * 0.85f
         LazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize(),

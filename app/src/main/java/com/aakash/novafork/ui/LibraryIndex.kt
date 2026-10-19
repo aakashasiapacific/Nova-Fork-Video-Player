@@ -151,6 +151,7 @@ private fun indexVideo(
             backdropUrl = video.localBackdrop,
             stillUrl = video.localThumb,
             frameSource = frameSourceOf(video.uri),
+            frameAspect = frameAspectOf(video),
             seed = title,
         )
     }
@@ -269,6 +270,7 @@ private fun movieArtwork(video: VideoEntity, meta: MetadataEntity?, seed: String
         // A movie's "<name>.jpg" is often a poster, so it is only the landscape fallback.
         stillUrl = video.localThumb.takeIf { backdrop == null },
         frameSource = frameSourceOf(video.uri),
+            frameAspect = frameAspectOf(video),
         seed = seed,
         tallUrl = TmdbClient.posterUrl(meta?.textlessPosterPath, TALL_SIZE),
         logoUrl = TmdbClient.posterUrl(meta?.logoPath, LOGO_SIZE),
@@ -294,6 +296,7 @@ private fun episodeArtwork(
         backdropUrl = pick(TmdbClient.backdropUrl(meta?.backdropPath), video.localBackdrop, preferLocal),
         stillUrl = pick(TmdbClient.stillUrl(video.episodeStillPath), video.localThumb, preferLocal),
         frameSource = frameSourceOf(video.uri),
+            frameAspect = frameAspectOf(video),
         seed = seed,
     )
 }
@@ -504,4 +507,11 @@ internal fun percentDecode(text: String): String {
     }
     if (bytes.size() > 0) out.append(bytes.toString(Charsets.UTF_8.name()))
     return out.toString()
+}
+
+/** A video's width over height, when known. */
+private fun frameAspectOf(video: VideoEntity): Float? {
+    val width = video.width ?: return null
+    val height = video.height ?: return null
+    return if (width > 0 && height > 0) width.toFloat() / height else null
 }

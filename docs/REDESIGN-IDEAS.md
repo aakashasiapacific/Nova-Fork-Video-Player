@@ -180,6 +180,12 @@ UI, following Apple Music:
 one header (`BackdropPosterHeader`: 16:9 backdrop, poster 40dp into its faded edge), so the poster
 stays put when a title is opened; each hero page shows for 3.5 s instead of 7 s.
 
+**Build 52:** the hero is sized to its content (no empty band under the Play row: height =
+status bar + 16:9 backdrop + `heroBelowBackdrop`); the text beside the poster is a short block
+(title or logo, meta, rating with "Continue watching" on one line). A video with only a frame (camera
+roll, saved YouTube: `Artwork.frameOnly`) shows one picture, its frame in its own shape on a blurred
+copy of itself, with the title under it, instead of a backdrop plus a poster.
+
 ## 6. Decisions on the former open questions (owner, 2026-10-16)
 
 1. **Library and sources are split:**

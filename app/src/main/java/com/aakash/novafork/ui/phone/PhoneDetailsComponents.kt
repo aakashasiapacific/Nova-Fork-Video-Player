@@ -36,6 +36,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
@@ -47,6 +48,8 @@ import androidx.compose.ui.unit.coerceAtMost
 import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
+import com.aakash.novafork.ui.common.ArtImage
+import com.aakash.novafork.ui.common.ArtPlaceholder
 import com.aakash.novafork.ui.common.BackdropArt
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.PosterArt
@@ -83,6 +86,18 @@ internal fun BackdropPosterHeader(
     val background = MaterialTheme.colorScheme.background
     BoxWithConstraints(modifier.fillMaxWidth()) {
         val backdropHeight = statusBar + minOf(maxWidth * 9f / 16f, maxBackdropHeight)
+        if (artwork.frameOnly) {
+            // A camera-roll or saved video: one picture, the frame in its own shape, and the
+            // title under it; no second copy of it as a poster.
+            Column(Modifier.fillMaxWidth()) {
+                FramePicture(artwork = artwork, statusBar = statusBar, height = backdropHeight, maxWidth = maxWidth)
+                Column(
+                    Modifier.padding(start = dims.gutter, end = dims.gutter, top = 12.dp),
+                    content = info,
+                )
+            }
+            return@BoxWithConstraints
+        }
         Box(
             Modifier
                 .fillMaxWidth()
@@ -126,6 +141,72 @@ internal fun BackdropPosterHeader(
                 content = info,
             )
         }
+    }
+}
+
+/**
+ * A frame of a video in its own shape (a vertical camera clip stays vertical) on a blurred,
+ * darkened copy of itself that fills [height] and fades into the page.
+ */
+@Composable
+private fun FramePicture(artwork: Artwork, statusBar: Dp, height: Dp, maxWidth: Dp) {
+    val background = MaterialTheme.colorScheme.background
+    val shape = RoundedCornerShape(12.dp)
+    val candidates = listOfNotNull(artwork.frameSource)
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .height(height),
+        contentAlignment = Alignment.TopCenter,
+    ) {
+        ArtImage(
+            candidates = candidates,
+            contentDescription = null,
+            modifier = Modifier
+                .fillMaxSize()
+                .blur(40.dp),
+            frameSource = artwork.frameSource,
+        ) {
+            ArtPlaceholder(seed = artwork.seed, title = null, modifier = Modifier.fillMaxSize())
+        }
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.45f)),
+        )
+        // The sharp frame, as large as fits under the status bar, never wider than the page.
+        val aspect = (artwork.frameAspect ?: (16f / 9f)).coerceIn(0.4f, 2.4f)
+        val room = height - statusBar - 24.dp
+        val frameWidth = minOf(room * aspect, maxWidth - 40.dp)
+        Box(
+            Modifier
+                .padding(top = statusBar + 12.dp)
+                .width(frameWidth)
+                .height(frameWidth / aspect)
+                .shadow(16.dp, shape)
+                .clip(shape),
+        ) {
+            ArtImage(
+                candidates = candidates,
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize(),
+                frameSource = artwork.frameSource,
+            ) {
+                ArtPlaceholder(seed = artwork.seed, title = null, modifier = Modifier.fillMaxSize())
+            }
+        }
+        StatusBarShade(statusBar)
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        0f to Color.Transparent,
+                        0.75f to Color.Transparent,
+                        1f to background,
+                    ),
+                ),
+        )
     }
 }
 

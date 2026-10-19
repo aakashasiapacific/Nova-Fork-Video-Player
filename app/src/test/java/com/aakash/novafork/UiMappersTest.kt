@@ -223,6 +223,10 @@ class UiMappersTest {
         val hero = UiMappers.home(small).hero
         assertEquals(setOf(HeroTarget.Video(1), HeroTarget.Video(2)), hero.map { it.target }.toSet())
         assertTrue(hero.all { it.artwork.frameSource != null })
+        // Camera-roll style videos have only a frame: one picture, not a backdrop plus a poster.
+        assertTrue(hero.all { it.artwork.frameOnly })
+        // A matched movie has real artwork.
+        assertFalse(index.home.hero.first { it.target == HeroTarget.Video(DUNE) }.artwork.frameOnly)
         // These run two minutes: longer than a hero clip, so they show a still frame and don't play.
         assertTrue(hero.all { it.previewUri == null })
     }
