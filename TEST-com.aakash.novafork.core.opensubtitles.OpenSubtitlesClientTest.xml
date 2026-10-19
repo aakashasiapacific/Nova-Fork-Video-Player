@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.aakash.novafork.core.opensubtitles.OpenSubtitlesClientTest" tests="30" skipped="0" failures="0" errors="0" timestamp="2026-10-19T18:56:16.308Z" hostname="runnervm8k3b6" time="1.7">
+  <properties/>
+  <testcase name="throttledDownloadWithQuotaDetailsIsTheQuota" classname="com.aakash.novafork.core.opensubtitles.OpenSubtitlesClientTest" time="0.074"/>
+  <testcase name="anOldTokenIsRenewed" classname="com.aakash.novafork.core.opensubtitles.OpenSubtitlesClientTest" time="0.239"/>
+  <testcase name="episodesUseTheShowIdsAndNumbers" classname="com.aakash.novafork.core.opensubtitles.OpenSubtitlesClientTest" time="0.047"/>
+  <testcase name="withoutAHashTheIdsThenTheTitleAreTried" classname="com.aakash.novafork.core.opensubtitles.OpenSubtitlesClientTest" time="0.059"/>
+  <testcase name="quotaMessageFormats" classname="com.aakash.novafork.core.opensubtitles.OpenSubtitlesClientTest" time="0.031"/>
+  <testcase name="networkFailuresBecomeReadable" classname="com.aakash.novafork.core.opensubtitles.OpenSubtitlesClientTest" time="0.045"/>
+  <testcase name="otherErrorsCarryTheServerMessage" classname="com.aakash.novafork.core.opensubtitles.OpenSubtitlesClientTest" time="0.008"/>
+  <testcase name="answerWithoutALinkIsUnreadable" classname="com.aakash.novafork.core.opensubtitles.OpenSubtitlesClientTest" time="0.008"/>
+  <testcase name="searchDoesNotLogIn" classname="com.aakash.novafork.core.opensubtitles.OpenSubtitlesClientTest" time="0.01"/>
+  <testcase name="quotaReachedNamesTheResetTime" classname="com.aakash.novafork.core.opensubtitles.OpenSubtitlesClientTest" time="0.014"/>
+  <testcase name="loginTokenIsUsedForDownloadsAndKept" classname="com.aakash.novafork.core.opensubtitles.OpenSubtitlesClientTest" time="0.193"/>
+  <testcase name="serverErrorsAreRetriedThenReported" classname="com.aakash.novafork.core.opensubtitles.OpenSubtitlesClientTest" time="0.115"/>
+  <testcase name="missingKeyFailsWithoutARequest" classname="com.aakash.novafork.core.opensubtitles.OpenSubtitlesClientTest" time="0.006"/>
+  <testcase name="entriesWithoutFilesAreSkipped" classname="com.aakash.novafork.core.opensubtitles.OpenSubtitlesClientTest" time="0.013"/>
+  <testcase name="refusedKeyIsReported" classname="com.aakash.novafork.core.opensubtitles.OpenSubtitlesClientTest" time="0.012"/>
+  <testcase name="wrongPasswordIsReportedAndNotRetried" classname="com.aakash.novafork.core.opensubtitles.OpenSubtitlesClientTest" time="0.053"/>
+  <testcase name="tooLargeFileIsRefused" classname="com.aakash.novafork.core.opensubtitles.OpenSubtitlesClientTest" time="0.055"/>
+  <testcase name="searchSendsKeyUserAgentAndSortedLowerCaseParameters" classname="com.aakash.novafork.core.opensubtitles.OpenSubtitlesClientTest" time="0.013"/>
+  <testcase name="resultsAreParsed" classname="com.aakash.novafork.core.opensubtitles.OpenSubtitlesClientTest" time="0.012"/>
+  <testcase name="stillThrottledIsReported" classname="com.aakash.novafork.core.opensubtitles.OpenSubtitlesClientTest" time="0.054"/>
+  <testcase name="throttledRequestIsRetriedOnceAfterRetryAfter" classname="com.aakash.novafork.core.opensubtitles.OpenSubtitlesClientTest" time="0.069"/>
+  <testcase name="garbageIsUnreadable" classname="com.aakash.novafork.core.opensubtitles.OpenSubtitlesClientTest" time="0.005"/>
+  <testcase name="expiredLinkIsNotFound" classname="com.aakash.novafork.core.opensubtitles.OpenSubtitlesClientTest" time="0.007"/>
+  <testcase name="invalidHashIsLeftOut" classname="com.aakash.novafork.core.opensubtitles.OpenSubtitlesClientTest" time="0.014"/>
+  <testcase name="anonymousDownloadFetchesTheLinkWithoutTheKey" classname="com.aakash.novafork.core.opensubtitles.OpenSubtitlesClientTest" time="0.062"/>
+  <testcase name="nothingToSearchWithSendsNothing" classname="com.aakash.novafork.core.opensubtitles.OpenSubtitlesClientTest" time="0.004"/>
+  <testcase name="aServerErrorThatGoesAwayIsHidden" classname="com.aakash.novafork.core.opensubtitles.OpenSubtitlesClientTest" time="0.07"/>
+  <testcase name="fallsBackFromIdsToTheHashToTheTitle" classname="com.aakash.novafork.core.opensubtitles.OpenSubtitlesClientTest" time="0.199"/>
+  <testcase name="aRefusedTokenGetsOneFreshLogin" classname="com.aakash.novafork.core.opensubtitles.OpenSubtitlesClientTest" time="0.192"/>
+  <testcase name="stopsAtTheFirstTryThatFindsSomething" classname="com.aakash.novafork.core.opensubtitles.OpenSubtitlesClientTest" time="0.01"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

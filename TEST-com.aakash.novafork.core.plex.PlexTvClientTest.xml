@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.aakash.novafork.core.plex.PlexTvClientTest" tests="10" skipped="0" failures="0" errors="0" timestamp="2026-10-19T18:56:18.609Z" hostname="runnervm8k3b6" time="0.54">
+  <properties/>
+  <testcase name="theApprovalPageCarriesTheClientAndTheCode" classname="com.aakash.novafork.core.plex.PlexTvClientTest" time="0.013"/>
+  <testcase name="signingInWithAPassword" classname="com.aakash.novafork.core.plex.PlexTvClientTest" time="0.062"/>
+  <testcase name="waitingForTheCodePollsUntilItIsLinked" classname="com.aakash.novafork.core.plex.PlexTvClientTest" time="0.111"/>
+  <testcase name="aCheckThatFailsOnTheWayKeepsTheWaitGoing" classname="com.aakash.novafork.core.plex.PlexTvClientTest" time="0.114"/>
+  <testcase name="aPinIsCreatedForThisApp" classname="com.aakash.novafork.core.plex.PlexTvClientTest" time="0.047"/>
+  <testcase name="onlyServersAreListed" classname="com.aakash.novafork.core.plex.PlexTvClientTest" time="0.007"/>
+  <testcase name="aRefusedAccountTokenIsA401" classname="com.aakash.novafork.core.plex.PlexTvClientTest" time="0.01"/>
+  <testcase name="anExpiredCodeStopsTheWait" classname="com.aakash.novafork.core.plex.PlexTvClientTest" time="0.109"/>
+  <testcase name="runningOutOfTimeWhilePlexTvIsDownSaysWhy" classname="com.aakash.novafork.core.plex.PlexTvClientTest" time="0.044"/>
+  <testcase name="onlyTheCodeItselfEndsTheWaitEarly" classname="com.aakash.novafork.core.plex.PlexTvClientTest" time="0.02"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

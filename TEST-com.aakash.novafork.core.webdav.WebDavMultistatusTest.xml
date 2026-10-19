@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.aakash.novafork.core.webdav.WebDavMultistatusTest" tests="12" skipped="0" failures="0" errors="0" timestamp="2026-10-19T18:56:22.717Z" hostname="runnervm8k3b6" time="0.031">
+  <properties/>
+  <testcase name="rcloneListingAtTheRoot" classname="com.aakash.novafork.core.webdav.WebDavMultistatusTest" time="0.008"/>
+  <testcase name="otherNamespacesAreIgnored" classname="com.aakash.novafork.core.webdav.WebDavMultistatusTest" time="0.0"/>
+  <testcase name="defaultNamespaceWithoutPrefix" classname="com.aakash.novafork.core.webdav.WebDavMultistatusTest" time="0.0"/>
+  <testcase name="nextcloudListing" classname="com.aakash.novafork.core.webdav.WebDavMultistatusTest" time="0.004"/>
+  <testcase name="hrefSegmentsAreDecoded" classname="com.aakash.novafork.core.webdav.WebDavMultistatusTest" time="0.001"/>
+  <testcase name="unboundPrefixIsReadAsDav" classname="com.aakash.novafork.core.webdav.WebDavMultistatusTest" time="0.0"/>
+  <testcase name="iisFullUrlHrefsAndCaseInsensitiveSelf" classname="com.aakash.novafork.core.webdav.WebDavMultistatusTest" time="0.0"/>
+  <testcase name="statusAndDateParsing" classname="com.aakash.novafork.core.webdav.WebDavMultistatusTest" time="0.004"/>
+  <testcase name="entitiesCdataCommentsAndDoctypeAreHandled" classname="com.aakash.novafork.core.webdav.WebDavMultistatusTest" time="0.0"/>
+  <testcase name="truncatedBodyKeepsCompleteResponses" classname="com.aakash.novafork.core.webdav.WebDavMultistatusTest" time="0.001"/>
+  <testcase name="failedResponsesAndPropstatsAreSkipped" classname="com.aakash.novafork.core.webdav.WebDavMultistatusTest" time="0.001"/>
+  <testcase name="apacheListing" classname="com.aakash.novafork.core.webdav.WebDavMultistatusTest" time="0.006"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.aakash.novafork.core.opensubtitles.OpenSubtitlesHashTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-10-19T18:56:18.014Z" hostname="runnervm8k3b6" time="0.081">
+  <properties/>
+  <testcase name="skipsTheMiddleOfALargerFile" classname="com.aakash.novafork.core.opensubtitles.OpenSubtitlesHashTest" time="0.034"/>
+  <testcase name="sumsWrapAroundAndChunksMayOverlap" classname="com.aakash.novafork.core.opensubtitles.OpenSubtitlesHashTest" time="0.007"/>
+  <testcase name="twoSeparateChunks" classname="com.aakash.novafork.core.opensubtitles.OpenSubtitlesHashTest" time="0.027"/>
+  <testcase name="tooSmallOrMissingGivesNull" classname="com.aakash.novafork.core.opensubtitles.OpenSubtitlesHashTest" time="0.003"/>
+  <testcase name="zerosHashToTheSize" classname="com.aakash.novafork.core.opensubtitles.OpenSubtitlesHashTest" time="0.002"/>
+  <testcase name="computeMatchesTheFileVersion" classname="com.aakash.novafork.core.opensubtitles.OpenSubtitlesHashTest" time="0.007"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

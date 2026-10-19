@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.aakash.novafork.core.plex.PlexServerClientTest" tests="13" skipped="0" failures="0" errors="0" timestamp="2026-10-19T18:56:18.331Z" hostname="runnervm8k3b6" time="0.275">
+  <properties/>
+  <testcase name="aServerBehindAProxyPathKeepsItsPath" classname="com.aakash.novafork.core.plex.PlexServerClientTest" time="0.022"/>
+  <testcase name="onlyLibraryPathsAreFollowed" classname="com.aakash.novafork.core.plex.PlexServerClientTest" time="0.007"/>
+  <testcase name="fileImageAndPlayUrls" classname="com.aakash.novafork.core.plex.PlexServerClientTest" time="0.008"/>
+  <testcase name="sectionItemsArePaged" classname="com.aakash.novafork.core.plex.PlexServerClientTest" time="0.082"/>
+  <testcase name="identityTellsAPlexServerFromSomethingElse" classname="com.aakash.novafork.core.plex.PlexServerClientTest" time="0.056"/>
+  <testcase name="unreachableServersGiveReadableMessages" classname="com.aakash.novafork.core.plex.PlexServerClientTest" time="0.014"/>
+  <testcase name="legacyAndNewGuidsGiveProviderIds" classname="com.aakash.novafork.core.plex.PlexServerClientTest" time="0.004"/>
+  <testcase name="theTokenNeverShowsInPrintedObjects" classname="com.aakash.novafork.core.plex.PlexServerClientTest" time="0.012"/>
+  <testcase name="itemsDecodeWhetherIdsComeAsNumbersOrStrings" classname="com.aakash.novafork.core.plex.PlexServerClientTest" time="0.016"/>
+  <testcase name="aServerOpenToTheNetworkIsAskedWithoutAToken" classname="com.aakash.novafork.core.plex.PlexServerClientTest" time="0.01"/>
+  <testcase name="aRefusedSignInSaysWhatToDo" classname="com.aakash.novafork.core.plex.PlexServerClientTest" time="0.008"/>
+  <testcase name="requestsCarryTheTokenAndTheAppsIdentity" classname="com.aakash.novafork.core.plex.PlexServerClientTest" time="0.012"/>
+  <testcase name="timelineAndWatchedState" classname="com.aakash.novafork.core.plex.PlexServerClientTest" time="0.02"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

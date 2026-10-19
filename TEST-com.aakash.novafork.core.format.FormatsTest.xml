@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.aakash.novafork.core.format.FormatsTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-10-19T18:56:14.358Z" hostname="runnervm8k3b6" time="0.065">
+  <properties/>
+  <testcase name="episodeCode" classname="com.aakash.novafork.core.format.FormatsTest" time="0.001"/>
+  <testcase name="clockUsesAsciiDigitsInEveryLocale" classname="com.aakash.novafork.core.format.FormatsTest" time="0.035"/>
+  <testcase name="size" classname="com.aakash.novafork.core.format.FormatsTest" time="0.008"/>
+  <testcase name="clock" classname="com.aakash.novafork.core.format.FormatsTest" time="0.01"/>
+  <testcase name="remaining" classname="com.aakash.novafork.core.format.FormatsTest" time="0.0"/>
+  <testcase name="runtime" classname="com.aakash.novafork.core.format.FormatsTest" time="0.01"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
