@@ -326,6 +326,10 @@ private fun DetailsStyleHeroPage(
     actions: AppActions,
 ) {
     val dims = LocalNovaDimens.current
+    if (hero.artwork.frameOnly) {
+        FrameHeroPage(hero = hero, openTarget = openTarget, play = play, actions = actions)
+        return
+    }
     // The same header as the title's own page, so opening it keeps everything in place.
     Column(
         Modifier
@@ -383,6 +387,51 @@ private fun DetailsStyleHeroPage(
             fillPlay = true,
             modifier = Modifier.padding(start = dims.gutter, end = dims.gutter, top = HeroActionsGap),
         )
+    }
+}
+
+/**
+ * A camera-roll or saved video in the hero: its frame (in its own shape) takes all the room the
+ * title pages give their poster, then the title, the buttons and the dots, so it fills the same
+ * hero height without an empty band.
+ */
+@Composable
+private fun FrameHeroPage(hero: HeroUi, openTarget: () -> Unit, play: () -> Unit, actions: AppActions) {
+    val dims = LocalNovaDimens.current
+    Column(
+        Modifier
+            .fillMaxSize()
+            .clickable(onClickLabel = "Details", onClick = openTarget),
+    ) {
+        FramePicture(artwork = hero.artwork, modifier = Modifier.weight(1f))
+        Text(
+            text = hero.title,
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold,
+            color = Color.White,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(start = dims.gutter, end = dims.gutter, top = 4.dp),
+        )
+        val meta = hero.metaLine
+        if (!meta.isNullOrBlank()) {
+            Text(
+                text = meta,
+                style = MaterialTheme.typography.bodyMedium,
+                color = Color.White.copy(alpha = 0.72f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(start = dims.gutter, end = dims.gutter, top = 2.dp),
+            )
+        }
+        HeroActions(
+            hero = hero,
+            play = play,
+            actions = actions,
+            fillPlay = true,
+            modifier = Modifier.padding(start = dims.gutter, end = dims.gutter, top = 14.dp),
+        )
+        Spacer(Modifier.height(HeroDotsGap + DotsRowHeight / 2 + HeroDotsBottom))
     }
 }
 

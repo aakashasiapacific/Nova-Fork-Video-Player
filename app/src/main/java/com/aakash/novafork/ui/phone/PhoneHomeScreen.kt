@@ -54,6 +54,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
@@ -145,6 +146,9 @@ private fun HomeFeed(home: HomeUi, scan: ScanUi, permission: PermissionUi, actio
         derivedStateOf { listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset < HERO_VISIBLE_SCROLL_PX }
     }
     val resumed = lifecycleState.isAtLeast(Lifecycle.State.RESUMED)
+    val scrolled by remember(listState) {
+        derivedStateOf { listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 0 }
+    }
     HeroStatusBar(
         hero = home.hero.getOrNull(pagerState.settledPage),
         // Portrait heroes start below the status bar (clear of the punch hole): only the wide
@@ -211,6 +215,23 @@ private fun HomeFeed(home: HomeUi, scan: ScanUi, permission: PermissionUi, actio
                 HomeLibraryLinks(actions)
             }
         }
+        // Once the page scrolls, a dark fade sits behind the status bar so the rows passing
+        // under the clock and icons don't clash with them.
+        val shade by animateFloatAsState(if (scrolled) 1f else 0f, label = "statusShade")
+        Box(
+            Modifier
+                .align(Alignment.TopCenter)
+                .fillMaxWidth()
+                .height(statusBar + 16.dp)
+                .graphicsLayer { alpha = shade }
+                .background(
+                    Brush.verticalGradient(
+                        0f to Color.Black.copy(alpha = 0.92f),
+                        0.6f to Color.Black.copy(alpha = 0.7f),
+                        1f to Color.Transparent,
+                    ),
+                ),
+        )
         ScanBanner(
             scan = scan,
             modifier = Modifier

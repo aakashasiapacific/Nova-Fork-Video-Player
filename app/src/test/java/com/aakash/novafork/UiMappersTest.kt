@@ -200,6 +200,23 @@ class UiMappersTest {
     }
 
     @Test
+    fun meaninglessFileNamesGetReadableTitles() {
+        val utc = java.time.ZoneOffset.UTC
+        val day = java.time.format.DateTimeFormatter.ofPattern("d MMM yyyy", java.util.Locale.getDefault())
+        fun on(y: Int, m: Int, d: Int) = java.time.LocalDate.of(y, m, d).format(day)
+        assertEquals("Video · ${on(2024, 5, 12)}", com.aakash.novafork.ui.friendlyVideoTitle("VID_20240512_183012", 0L, utc))
+        assertEquals("Video · ${on(2024, 5, 12)}", com.aakash.novafork.ui.friendlyVideoTitle("VID-20240512-WA0003", 0L, utc))
+        assertEquals("Video · ${on(2024, 5, 12)}", com.aakash.novafork.ui.friendlyVideoTitle("PXL_20240512_101500123", 0L, utc))
+        assertEquals("Screen recording · ${on(2026, 10, 16)}", com.aakash.novafork.ui.friendlyVideoTitle("Screen_Recording_20261016_145003", 0L, utc))
+        // A number for a name: the day the file arrived.
+        val added = java.time.LocalDate.of(2026, 2, 25).atStartOfDay(utc).toInstant().toEpochMilli()
+        assertEquals("Video · ${on(2026, 2, 25)}", com.aakash.novafork.ui.friendlyVideoTitle("17936004744169077", added, utc))
+        // Real names stay.
+        assertEquals("Goa trip - Palolem sunset", com.aakash.novafork.ui.friendlyVideoTitle("Goa trip - Palolem sunset", added, utc))
+        assertEquals("Science Fiction and Identity", com.aakash.novafork.ui.friendlyVideoTitle("Science Fiction and Identity", added, utc))
+    }
+
+    @Test
     fun cardsCarryTheTitleLogoForTheHero() {
         val meta = MetadataEntity(key = "movie:603", tmdbId = 603, type = "movie", title = "The Matrix", logoPath = "/matrix-logo.png")
         val rows = listOf(
@@ -403,7 +420,7 @@ class UiMappersTest {
         assertEquals(listOf("Panchayat", "The Office", "Shōgun"), byRating.take(3))
         assertEquals(
             "unrated last",
-            listOf("Big Buck Bunny", "Goa trip - Palolem sunset", "Tears of Steel", "VID_20250914_183012"),
+            listOf("Big Buck Bunny", "Goa trip - Palolem sunset", "Tears of Steel", com.aakash.novafork.ui.friendlyVideoTitle("VID_20250914_183012", 0L)),
             byRating.takeLast(4),
         )
 

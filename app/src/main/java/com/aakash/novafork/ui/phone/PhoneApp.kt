@@ -176,7 +176,7 @@ fun PhoneApp(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
             onSelect = actions::selectTab,
             modifier = Modifier.align(Alignment.BottomCenter),
             miniPlayer = if (music != null && miniInBar) {
-                { miniModifier -> MiniPlayerBar(player = music.second, actions = music.first, onOpen = { nowPlayingOpen = true }, modifier = miniModifier) }
+                { miniModifier -> MiniPlayerBar(player = music.second, actions = music.first, onOpen = { nowPlayingOpen = true }, modifier = miniModifier, compact = true) }
             } else {
                 null
             },

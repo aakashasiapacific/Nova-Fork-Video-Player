@@ -91,7 +91,7 @@ internal fun BackdropPosterHeader(
             // A camera-roll or saved video: one picture, the frame in its own shape, and the
             // title under it; no second copy of it as a poster.
             Column(Modifier.fillMaxWidth()) {
-                FramePicture(artwork = artwork, statusBar = statusBar, height = backdropHeight, maxWidth = pageWidth)
+                FramePicture(artwork = artwork, modifier = Modifier.height(backdropHeight))
                 Column(
                     Modifier.padding(start = dims.gutter, end = dims.gutter, top = 12.dp),
                     content = info,
@@ -147,19 +147,20 @@ internal fun BackdropPosterHeader(
 
 /**
  * A frame of a video in its own shape (a vertical camera clip stays vertical) on a blurred,
- * darkened copy of itself that fills [height] and fades into the page.
+ * darkened copy of itself that fills the height [modifier] gives it, from the top of the screen
+ * (the status bar strip shaded), fading into the page.
  */
 @Composable
-private fun FramePicture(artwork: Artwork, statusBar: Dp, height: Dp, maxWidth: Dp) {
+internal fun FramePicture(artwork: Artwork, modifier: Modifier = Modifier) {
     val background = MaterialTheme.colorScheme.background
     val shape = RoundedCornerShape(12.dp)
     val candidates = listOfNotNull(artwork.frameSource)
-    Box(
-        Modifier
-            .fillMaxWidth()
-            .height(height),
+    val statusBar = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    BoxWithConstraints(
+        modifier.fillMaxWidth(),
         contentAlignment = Alignment.TopCenter,
     ) {
+        val height = maxHeight
         ArtImage(
             candidates = candidates,
             contentDescription = null,
@@ -203,7 +204,7 @@ private fun FramePicture(artwork: Artwork, statusBar: Dp, height: Dp, maxWidth: 
                 .background(
                     Brush.verticalGradient(
                         0f to Color.Transparent,
-                        0.75f to Color.Transparent,
+                        0.88f to Color.Transparent,
                         1f to background,
                     ),
                 ),

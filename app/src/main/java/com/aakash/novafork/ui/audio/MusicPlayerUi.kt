@@ -131,6 +131,8 @@ fun MiniPlayerBar(
     actions: AudioActions,
     onOpen: () -> Unit,
     modifier: Modifier = Modifier,
+    /** In the shrunk tab bar: no Next button, so the song's title has room. */
+    compact: Boolean = false,
 ) {
     val now = player.nowPlaying
     Row(
@@ -172,13 +174,15 @@ fun MiniPlayerBar(
                 modifier = Modifier.size(30.dp),
             )
         }
-        IconButton(onClick = actions::next, enabled = player.hasNext) {
-            NovaIcon(
-                R.drawable.ic_skip_next,
-                contentDescription = "Next",
-                tint = Color.White.copy(alpha = if (player.hasNext) 1f else 0.35f),
-                modifier = Modifier.size(28.dp),
-            )
+        if (!compact) {
+            IconButton(onClick = actions::next, enabled = player.hasNext) {
+                NovaIcon(
+                    R.drawable.ic_skip_next,
+                    contentDescription = "Next",
+                    tint = Color.White.copy(alpha = if (player.hasNext) 1f else 0.35f),
+                    modifier = Modifier.size(28.dp),
+                )
+            }
         }
     }
 }

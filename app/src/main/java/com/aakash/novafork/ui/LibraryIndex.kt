@@ -21,6 +21,10 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import java.io.ByteArrayOutputStream
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 /** A present video with the labels and artwork every screen uses. */
@@ -134,7 +138,7 @@ private fun indexVideo(
     val title = when (kind) {
         MediaKind.MOVIE -> meta?.title.nonBlank() ?: video.parsedTitle.ifBlank { baseName }
         MediaKind.EPISODE -> video.episodeTitle.nonBlank() ?: video.episode?.let { "Episode $it" } ?: baseName
-        MediaKind.VIDEO -> baseName
+        MediaKind.VIDEO -> friendlyVideoTitle(baseName, video.dateAdded)
         MediaKind.STREAM -> meta?.title.nonBlank() ?: source?.name.nonBlank() ?: video.parsedTitle.ifBlank { baseName }
     }
     val artwork = when (kind) {
@@ -514,4 +518,31 @@ private fun frameAspectOf(video: VideoEntity): Float? {
     val width = video.width ?: return null
     val height = video.height ?: return null
     return if (width > 0 && height > 0) width.toFloat() / height else null
+}
+
+private val CAMERA_NAME = Regex(
+    """(?i)^(vid|pxl|mvimg|img|screen[_ -]?recording|screenrecord|video|inshot)?[_ -]*((?:19|20)\d{2})-?(\d{2})-?(\d{2})(?:[_ .-].*)?$""",
+)
+private val ID_NAME = Regex("""^[0-9_-]{8,}$|^[0-9a-fA-F-]{20,}$""")
+
+/**
+ * A readable title for a file whose name means nothing: a camera's "VID_20240512_183012" or a
+ * screen recording becomes "Video · 12 May 2024" (from the date in the name); a download named
+ * by a number ("17936004744169077", Instagram and WhatsApp saves) becomes "Video · <the day it
+ * arrived>". Other names stay as they are.
+ */
+internal fun friendlyVideoTitle(baseName: String, dateAdded: Long, zone: ZoneId = ZoneId.systemDefault()): String {
+    val format = DateTimeFormatter.ofPattern("d MMM yyyy", Locale.getDefault())
+    CAMERA_NAME.matchEntire(baseName.trim())?.let { match ->
+        val (prefix, year, month, day) = match.destructured
+        val date = runCatching { LocalDate.of(year.toInt(), month.toInt(), day.toInt()) }.getOrNull()
+        if (date != null) {
+            val label = if (prefix.startsWith("screen", ignoreCase = true)) "Screen recording" else "Video"
+            return "$label · ${date.format(format)}"
+        }
+    }
+    if (ID_NAME.matches(baseName.trim()) && dateAdded > 0) {
+        return "Video · ${Instant.ofEpochMilli(dateAdded).atZone(zone).toLocalDate().format(format)}"
+    }
+    return baseName
 }
