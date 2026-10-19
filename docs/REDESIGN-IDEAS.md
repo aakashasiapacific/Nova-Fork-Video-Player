@@ -176,6 +176,10 @@ UI, following Apple Music:
   Folders.
 - Now Playing closes by dragging down anywhere, as in Apple Music.
 
+**Build 51:** clips no longer play in the hero (dropped); the hero and the details pages share
+one header (`BackdropPosterHeader`: 16:9 backdrop, poster 40dp into its faded edge), so the poster
+stays put when a title is opened; each hero page shows for 3.5 s instead of 7 s.
+
 ## 6. Decisions on the former open questions (owner, 2026-10-16)
 
 1. **Library and sources are split:**

@@ -60,7 +60,7 @@ fun PhoneVideoDetailsScreen(
                     meta = metaLine(details.year?.toString(), details.runtimeLabel, details.episodeCode),
                     rating = details.rating,
                     genres = details.genres,
-                    backdropHeight = backdropHeight,
+                    maxBackdropHeight = backdropHeight,
                 )
             }
             item(key = "play") {

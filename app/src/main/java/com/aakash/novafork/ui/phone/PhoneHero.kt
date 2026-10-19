@@ -66,6 +66,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
+import com.aakash.novafork.ui.adaptive.LocalNovaDimens
 import com.aakash.novafork.ui.common.ArtImage
 import com.aakash.novafork.ui.common.ArtPlaceholder
 import com.aakash.novafork.ui.common.BackdropArt
@@ -81,7 +82,7 @@ import com.aakash.novafork.ui.model.HeroUi
 import kotlinx.coroutines.delay
 
 /** A hero without a preview moves on after this long, like Apple TV's. */
-internal const val HERO_AUTO_ADVANCE_MS = 7_000L
+internal const val HERO_AUTO_ADVANCE_MS = 3_500L
 
 /** With a preview playing it stays longer, so there is time to watch. */
 internal const val HERO_PREVIEW_DWELL_MS = 30_000L
@@ -198,11 +199,6 @@ private fun PhoneHeroPage(hero: HeroUi, preview: Boolean, muted: Boolean, action
     val play: () -> Unit = {
         val videoId = hero.playVideoId
         if (videoId != null) actions.play(videoId) else openTarget()
-    }
-    // A short clip (a reel, a phone video) plays right in the hero: no poster, Play or "+".
-    if (hero.previewUri != null) {
-        ClipHeroPage(hero = hero, preview = preview, muted = muted)
-        return
     }
     if (!wide) {
         DetailsStyleHeroPage(hero = hero, preview = preview, muted = muted, openTarget = openTarget, play = play, actions = actions)
@@ -329,95 +325,46 @@ private fun DetailsStyleHeroPage(
     play: () -> Unit,
     actions: AppActions,
 ) {
-    val background = MaterialTheme.colorScheme.background
-    val posterShape = RoundedCornerShape(10.dp)
-    val statusBar = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    val dims = LocalNovaDimens.current
+    // The same header as the title's own page, so opening it keeps everything in place.
     Column(
         Modifier
             .fillMaxSize()
             .clickable(onClickLabel = "Details", onClick = openTarget),
     ) {
-        // The backdrop at 16:9 below the status bar (clear of the punch hole); a sliver of it
-        // runs on under the status bar, darkened, so the bar isn't a blank strip.
-        BoxWithConstraints(Modifier.fillMaxWidth()) {
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .height(statusBar + maxWidth * 9f / 16f),
-            ) {
-                WideHeroArt(artwork = hero.artwork, modifier = Modifier.fillMaxSize(), alignment = Alignment.BottomCenter)
-                Box(
-                    Modifier
-                        .padding(top = statusBar)
-                        .fillMaxSize(),
-                ) {
-                    HeroClip(hero = hero, preview = preview, muted = muted)
-                }
-                StatusBarShade(statusBar)
-                Box(
-                    Modifier
-                        .fillMaxSize()
-                        .background(
-                            Brush.verticalGradient(
-                                0f to Color.Transparent,
-                                0.7f to Color.Transparent,
-                                1f to background,
-                            ),
-                        ),
+        BackdropPosterHeader(artwork = hero.artwork, title = hero.title) {
+            HeroTitle(
+                title = hero.title,
+                logoUrl = hero.artwork.logoUrl,
+                textStyle = MaterialTheme.typography.headlineSmall,
+                textAlign = TextAlign.Start,
+                logoAlignment = Alignment.BottomStart,
+                maxWidthFraction = 1f,
+                logoHeight = 56.dp,
+            )
+            val rating = hero.rating
+            val meta = hero.metaLine
+            if (!meta.isNullOrBlank()) {
+                Text(
+                    text = meta,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color.White.copy(alpha = 0.72f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = 4.dp),
                 )
             }
-        }
-        // Poster and title under the backdrop, never over its subject.
-        Row(
-            Modifier.padding(start = 20.dp, end = 20.dp, top = 12.dp),
-            verticalAlignment = Alignment.Bottom,
-        ) {
-            Box(
-                Modifier
-                    .width(DetailsPosterWidth)
-                    .aspectRatio(2f / 3f)
-                    .shadow(12.dp, posterShape)
-                    .clip(posterShape)
-                    .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                    .border(1.dp, Color.White.copy(alpha = 0.12f), posterShape),
-            ) {
-                PosterArt(artwork = hero.artwork, title = hero.title, modifier = Modifier.fillMaxSize())
+            if (rating != null && rating > 0f) {
+                RatingPill(rating, onImage = true, modifier = Modifier.padding(top = 8.dp))
             }
-            Spacer(Modifier.width(16.dp))
-            Column(Modifier.weight(1f)) {
-                HeroTitle(
-                    title = hero.title,
-                    logoUrl = hero.artwork.logoUrl,
-                    textStyle = MaterialTheme.typography.headlineSmall,
-                    textAlign = TextAlign.Start,
-                    logoAlignment = Alignment.BottomStart,
-                    maxWidthFraction = 1f,
-                    logoHeight = 64.dp,
+            highlightOf(hero)?.let { highlight ->
+                Text(
+                    text = highlight,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                    modifier = Modifier.padding(top = 6.dp),
                 )
-                val rating = hero.rating
-                val meta = hero.metaLine
-                if (rating != null && rating > 0f) {
-                    RatingPill(rating, onImage = true, modifier = Modifier.padding(top = 8.dp))
-                }
-                if (!meta.isNullOrBlank()) {
-                    Text(
-                        text = meta,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Color.White.copy(alpha = 0.72f),
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(top = 6.dp),
-                    )
-                }
-                highlightOf(hero)?.let { highlight ->
-                    Text(
-                        text = highlight,
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White,
-                        modifier = Modifier.padding(top = 4.dp),
-                    )
-                }
             }
         }
         HeroActions(
@@ -425,69 +372,7 @@ private fun DetailsStyleHeroPage(
             play = play,
             actions = actions,
             fillPlay = true,
-            modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 18.dp),
-        )
-    }
-}
-
-/** Darkens the status bar strip of a picture that runs under it: soft, darker at the very top. */
-@Composable
-private fun StatusBarShade(statusBar: Dp) {
-    Box(
-        Modifier
-            .fillMaxWidth()
-            .height(statusBar * 2)
-            .background(
-                Brush.verticalGradient(
-                    0f to Color.Black.copy(alpha = 0.85f),
-                    0.5f to Color.Black.copy(alpha = 0.55f),
-                    1f to Color.Transparent,
-                ),
-            ),
-    )
-}
-
-/**
- * A short clip's hero page, kept minimal: the clip (its first frame until it plays) fills the
- * hero below the status bar, with one small caption at the lower left; the mute button sits by
- * the dots. Clips rarely have real titles, so no big title, poster, Play or "+".
- */
-@Composable
-private fun ClipHeroPage(hero: HeroUi, preview: Boolean, muted: Boolean) {
-    val background = MaterialTheme.colorScheme.background
-    val statusBar = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-    // The hero takes the clip's own shape (see PhoneHeroPager's pageHeight) below the status
-    // bar; the frame runs on under the bar, shaded, so it isn't a blank strip.
-    Box(Modifier.fillMaxSize()) {
-        BackdropArt(artwork = hero.artwork, modifier = Modifier.fillMaxSize())
-        Box(
-            Modifier
-                .padding(top = statusBar)
-                .fillMaxSize(),
-        ) {
-            HeroClip(hero = hero, preview = preview, muted = muted)
-        }
-        StatusBarShade(statusBar)
-        Box(
-            Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        0f to Color.Transparent,
-                        0.75f to Color.Transparent,
-                        1f to background,
-                    ),
-                ),
-        )
-        Text(
-            text = listOfNotNull(hero.title, hero.metaLine?.takeIf { it.isNotBlank() }).joinToString(" · "),
-            style = MaterialTheme.typography.labelLarge,
-            color = Color.White.copy(alpha = 0.85f),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier
-                .align(Alignment.BottomStart)
-                .padding(start = 20.dp, end = 72.dp, bottom = HeroDotsBottom + 34.dp),
+            modifier = Modifier.padding(start = dims.gutter, end = dims.gutter, top = 18.dp),
         )
     }
 }
@@ -509,10 +394,11 @@ private fun HeroClip(hero: HeroUi, preview: Boolean, muted: Boolean) {
 private val DetailsPosterWidth = 104.dp
 
 /**
- * How tall the phone hero is below its 16:9 backdrop: the poster and title row, the Play row
- * and the dots. The hero's height is the status bar plus width × 9/16 plus this.
+ * How tall the phone hero is below its 16:9 backdrop: the rest of the poster and title row (see
+ * BackdropPosterHeader), the Play row and the dots. The hero's height is the status bar plus
+ * width × 9/16 plus this.
  */
-internal val DetailsHeroBelowBackdrop = 300.dp
+internal val DetailsHeroBelowBackdrop = 310.dp
 
 /**
  * The hero's buttons: the white Play pill, a round star (Favorites) and a round "+"

@@ -6,14 +6,19 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -49,39 +54,54 @@ import com.aakash.novafork.ui.common.RatingPill
 import com.aakash.novafork.ui.common.bottomScrim
 import com.aakash.novafork.ui.model.Artwork
 
-private val BackdropHeight = 280.dp
+/**
+ * How far the poster reaches up into the backdrop's faded lower edge, on the Home hero and the
+ * details pages alike (so opening a title from the hero keeps the poster where it was).
+ */
+internal val PosterOverlap = 40.dp
 
-/** How far the details poster reaches up into the backdrop. */
-private val PosterOverlap = 64.dp
-
-/** 280dp, but at most half the page so a phone in landscape still shows the title. */
-internal fun detailsBackdropHeight(pageHeight: Dp): Dp = BackdropHeight.coerceAtMost(pageHeight * 0.5f)
+/** At most half the page for the picture, so a phone in landscape still shows the title. */
+internal fun detailsBackdropHeight(pageHeight: Dp): Dp = pageHeight * 0.5f
 
 /**
- * Backdrop that melts into the page, with the poster overlapping its bottom edge and the title
- * block beside the poster.
+ * The phone's title header, shared by the Home hero and the details pages so both look the same:
+ * the backdrop at 16:9 (at most [maxBackdropHeight]) below the status bar, with a darkened sliver
+ * of it running under the bar, fading into the page; the poster reaching [PosterOverlap] up into
+ * the faded edge; [info] beside the poster, starting below the picture.
  */
 @Composable
-internal fun PhoneDetailsHeader(
+internal fun BackdropPosterHeader(
     artwork: Artwork,
     title: String,
-    meta: String,
-    rating: Float?,
-    genres: List<String>,
     modifier: Modifier = Modifier,
-    originalTitle: String? = null,
-    backdropHeight: Dp = BackdropHeight,
+    maxBackdropHeight: Dp = Dp.Infinity,
+    info: @Composable ColumnScope.() -> Unit,
 ) {
     val dims = LocalNovaDimens.current
     val posterShape = RoundedCornerShape(10.dp)
-    Box(modifier.fillMaxWidth()) {
-        BackdropArt(
-            artwork = artwork,
-            modifier = Modifier
+    val statusBar = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    val background = MaterialTheme.colorScheme.background
+    BoxWithConstraints(modifier.fillMaxWidth()) {
+        val backdropHeight = statusBar + minOf(maxWidth * 9f / 16f, maxBackdropHeight)
+        Box(
+            Modifier
                 .fillMaxWidth()
-                .height(backdropHeight)
-                .bottomScrim(MaterialTheme.colorScheme.background, startFraction = 0.3f),
-        )
+                .height(backdropHeight),
+        ) {
+            BackdropArt(artwork = artwork, modifier = Modifier.fillMaxSize())
+            StatusBarShade(statusBar)
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            0f to Color.Transparent,
+                            0.6f to Color.Transparent,
+                            1f to background,
+                        ),
+                    ),
+            )
+        }
         Row(
             Modifier
                 .fillMaxWidth()
@@ -103,45 +123,78 @@ internal fun PhoneDetailsHeader(
                 Modifier
                     .weight(1f)
                     .padding(top = PosterOverlap + 8.dp),
-            ) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.headlineSmall,
-                    maxLines = 3,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                if (!originalTitle.isNullOrBlank() && originalTitle != title) {
-                    Text(
-                        text = originalTitle,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                if (meta.isNotEmpty()) {
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        text = meta,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                if (rating != null && rating > 0f) {
-                    Spacer(Modifier.height(8.dp))
-                    RatingPill(rating)
-                }
-                if (genres.isNotEmpty()) {
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        text = genres.joinToString(", "),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-            }
+                content = info,
+            )
+        }
+    }
+}
+
+/** Darkens the status bar strip of a picture that runs under it: soft, darker at the very top. */
+@Composable
+internal fun StatusBarShade(statusBar: Dp) {
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .height(statusBar * 2)
+            .background(
+                Brush.verticalGradient(
+                    0f to Color.Black.copy(alpha = 0.85f),
+                    0.5f to Color.Black.copy(alpha = 0.55f),
+                    1f to Color.Transparent,
+                ),
+            ),
+    )
+}
+
+/** The details pages' header: [BackdropPosterHeader] with the title, meta, rating and genres. */
+@Composable
+internal fun PhoneDetailsHeader(
+    artwork: Artwork,
+    title: String,
+    meta: String,
+    rating: Float?,
+    genres: List<String>,
+    modifier: Modifier = Modifier,
+    originalTitle: String? = null,
+    maxBackdropHeight: Dp = Dp.Infinity,
+) {
+    BackdropPosterHeader(artwork = artwork, title = title, modifier = modifier, maxBackdropHeight = maxBackdropHeight) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.headlineSmall,
+            maxLines = 3,
+            overflow = TextOverflow.Ellipsis,
+        )
+        if (!originalTitle.isNullOrBlank() && originalTitle != title) {
+            Text(
+                text = originalTitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        if (meta.isNotEmpty()) {
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = meta,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        if (rating != null && rating > 0f) {
+            Spacer(Modifier.height(8.dp))
+            RatingPill(rating)
+        }
+        if (genres.isNotEmpty()) {
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = genres.joinToString(", "),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }

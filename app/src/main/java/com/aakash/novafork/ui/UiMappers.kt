@@ -50,7 +50,6 @@ object UiMappers {
     private const val CONTINUE_WATCHING_LIMIT = 20
     private const val RECENTLY_ADDED_LIMIT = 30
     private const val HERO_LIMIT = 6
-    private const val HERO_CLIP_MAX_MS = 60_000L
     /** Newest movies and shows considered for the hero before the backdrop preference is applied. */
     private const val HERO_RECENT_CANDIDATES = 12
     private const val SEARCH_LIMIT = 60
@@ -150,8 +149,6 @@ object UiMappers {
             progress = video.card.progress,
             playVideoId = video.id,
             playLabel = playLabel(resume = true, code = code),
-            previewUri = shortClip(video),
-            previewAspect = clipAspect(video),
         )
     }
 
@@ -173,8 +170,6 @@ object UiMappers {
             progress = video.card.progress,
             playVideoId = video.id,
             playLabel = if (video.inProgress) "Resume" else "Play",
-            previewUri = shortClip(video),
-            previewAspect = clipAspect(video),
         )
     }
 
@@ -195,26 +190,7 @@ object UiMappers {
             genres = genres,
             playVideoId = next.id,
             playLabel = showPlayLabel(next),
-            previewUri = shortClip(next),
-            previewAspect = clipAspect(next),
         )
-    }
-
-    /**
-     * The hero plays only short clips (a minute or less, like a trailer), from the start: a long
-     * film playing in the poster isn't a preview. Null for longer videos, ones whose length isn't
-     * known yet and network files.
-     */
-    /** A clip's width over height (a phone reel ≈ 0.56), so the hero can take its shape; null when unknown. */
-    private fun clipAspect(video: IndexedVideo): Float? {
-        val width = video.video.width ?: return null
-        val height = video.video.height ?: return null
-        return if (width > 0 && height > 0) width.toFloat() / height else null
-    }
-
-    private fun shortClip(video: IndexedVideo): String? {
-        val duration = video.video.durationMs ?: return null
-        return video.card.artwork.frameSource.takeIf { duration in 1..HERO_CLIP_MAX_MS }
     }
 
     // Library

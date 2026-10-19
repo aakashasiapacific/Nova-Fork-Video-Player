@@ -78,7 +78,7 @@ fun PhoneShowDetailsScreen(
                     ),
                     rating = details.rating,
                     genres = details.genres,
-                    backdropHeight = backdropHeight,
+                    maxBackdropHeight = backdropHeight,
                 )
             }
             item(key = "play") {

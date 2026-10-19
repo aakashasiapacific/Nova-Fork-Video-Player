@@ -110,8 +110,6 @@ data class HeroUi(
      */
     val previewUri: String? = null,
     val previewStartMs: Long = 0,
-    /** The clip's width over height (a reel ≈ 0.56): the hero takes this shape for it. */
-    val previewAspect: Float? = null,
     /** On the watchlist (the "+" button shows a check). */
     val onWatchlist: Boolean = false,
     /** Starred (the hero's star is filled). */
