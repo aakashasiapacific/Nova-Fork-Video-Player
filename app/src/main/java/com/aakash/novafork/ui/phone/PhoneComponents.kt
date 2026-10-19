@@ -264,6 +264,51 @@ internal fun PhoneLandscapeCard(
     )
 }
 
+/**
+ * Apple TV's row card for a movie or video: 16:9 art (backdrop, still or a frame) with the title
+ * and caption below, opening its page rather than playing.
+ */
+@Composable
+internal fun PhoneWideVideoCard(
+    card: VideoCardUi,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    onLongClick: (() -> Unit)? = null,
+) {
+    WideCardLayout(
+        title = card.displayTitle(),
+        subtitle = card.displaySubtitle(),
+        artwork = card.artwork,
+        artTitle = card.title,
+        onClick = onClick,
+        modifier = modifier,
+        onLongClick = onLongClick,
+        progress = card.progress,
+        watched = card.watched,
+        playMark = false,
+    )
+}
+
+/** [PhoneWideVideoCard] for a TV show ("24 episodes"). */
+@Composable
+internal fun PhoneWideShowCard(
+    show: ShowCardUi,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    WideCardLayout(
+        title = show.title,
+        subtitle = countLabel(show.episodeCount, "episode"),
+        artwork = show.artwork,
+        artTitle = show.title,
+        onClick = onClick,
+        modifier = modifier,
+        progress = null,
+        watched = show.episodeCount > 0 && show.unwatchedCount == 0,
+        playMark = false,
+    )
+}
+
 @Composable
 private fun WideCardLayout(
     title: String,

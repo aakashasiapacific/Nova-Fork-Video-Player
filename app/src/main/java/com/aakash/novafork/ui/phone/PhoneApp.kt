@@ -2,6 +2,7 @@ package com.aakash.novafork.ui.phone
 
 import androidx.annotation.DrawableRes
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
@@ -23,6 +24,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.asPaddingValues
@@ -73,6 +75,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.aakash.novafork.R
 import com.aakash.novafork.ui.adaptive.DeviceLayout
 import com.aakash.novafork.ui.audio.AudioScreen
@@ -107,7 +110,6 @@ fun PhoneApp(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
     // The tab bar shrinks while a page scrolls down and comes back when it scrolls up, reaches
     // its end or the tab changes.
     var barCollapsed by remember { mutableStateOf(false) }
-    LaunchedEffect(top) { barCollapsed = false }
     val collapseThreshold = with(LocalDensity.current) { BarCollapseScroll.toPx() }
     val barScroll = remember {
         object : NestedScrollConnection {
@@ -134,10 +136,20 @@ fun PhoneApp(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
     // Music (the real app only): the mini player floats just above the tab bar on every tab,
     // and opens Now Playing over everything.
     val music = rememberMusicShell()
-    val miniPlayerShown = music?.second?.active == true
+    val player = music?.second
+    // The mini player, as in Apple Music on iOS 26: while a song plays it floats above the full
+    // bar, and sits between the current tab and Search when the bar is shrunk. A paused song
+    // only shows in the shrunk bar (which shrinks to show it); a queue brought back after the
+    // app was closed only on the Audio tab.
+    val hasQueue = player != null && player.active && (!player.restored || top == TopDestination.AUDIO)
+    val playing = player?.playRequested == true
+    LaunchedEffect(top) { barCollapsed = hasQueue && !playing }
+    LaunchedEffect(hasQueue, playing) { if (hasQueue && !playing) barCollapsed = true }
+    val miniAboveBar = hasQueue && playing && !barCollapsed
+    val miniInBar = hasQueue && barCollapsed
     var nowPlayingOpen by rememberSaveable { mutableStateOf(false) }
     val barSpace = TabBarHeight + BarTopMargin + BarBottomMargin + navBar +
-        (if (miniPlayerShown) MiniPlayerHeight + MiniPlayerGap else 0.dp)
+        (if (miniAboveBar) MiniPlayerHeight + MiniPlayerGap else 0.dp)
     Box(modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         CompositionLocalProvider(LocalBottomBarSpace provides barSpace) {
             // Keyed by route, so state updates within a page recompose it in place, while a route
@@ -163,24 +175,36 @@ fun PhoneApp(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
             onExpand = { barCollapsed = false },
             onSelect = actions::selectTab,
             modifier = Modifier.align(Alignment.BottomCenter),
+            miniPlayer = if (music != null && miniInBar) {
+                { miniModifier -> MiniPlayerBar(player = music.second, actions = music.first, onOpen = { nowPlayingOpen = true }, modifier = miniModifier) }
+            } else {
+                null
+            },
         )
         if (music != null) {
-            val (viewModel, player) = music
-            if (miniPlayerShown) {
-                MiniPlayerBar(
-                    player = player,
-                    actions = viewModel,
-                    onOpen = { nowPlayingOpen = true },
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(
-                            start = BarSideMargin,
-                            end = BarSideMargin,
-                            bottom = navBar + BarBottomMargin + TabBarHeight + MiniPlayerGap,
-                        ),
-                )
+            val (viewModel, musicState) = music
+            AnimatedVisibility(
+                visible = miniAboveBar,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(
+                        start = BarSideMargin,
+                        end = BarSideMargin,
+                        bottom = navBar + BarBottomMargin + TabBarHeight + MiniPlayerGap,
+                    ),
+                enter = fadeIn(tween(200)) + scaleIn(tween(240), initialScale = 0.9f),
+                exit = fadeOut(tween(140)),
+            ) {
+                MiniPlayerBar(player = musicState, actions = viewModel, onOpen = { nowPlayingOpen = true })
             }
-            NowPlayingHost(open = nowPlayingOpen, player = player, actions = viewModel, onDismiss = { nowPlayingOpen = false })
+            val favorites by viewModel.favorites.collectAsStateWithLifecycle()
+            NowPlayingHost(
+                open = nowPlayingOpen,
+                player = musicState,
+                actions = viewModel,
+                favorite = musicState.nowPlaying?.songId in favorites,
+                onDismiss = { nowPlayingOpen = false },
+            )
         }
     }
 }
@@ -269,6 +293,8 @@ private fun PhoneNavigationBar(
     onExpand: () -> Unit,
     onSelect: (TopDestination) -> Unit,
     modifier: Modifier = Modifier,
+    /** The mini player for the shrunk bar's middle, sized by the modifier it gets; null = none. */
+    miniPlayer: (@Composable (Modifier) -> Unit)? = null,
 ) {
     Box(
         modifier
@@ -286,12 +312,23 @@ private fun PhoneNavigationBar(
             label = "tabBarCollapse",
         ) { small ->
             if (small) {
-                Box(Modifier.fillMaxSize()) {
-                    GlassCircle(onClick = onExpand, description = "Show tabs", size = TabBarHeight, modifier = Modifier.align(Alignment.CenterStart)) {
+                // The current tab (tap: the full bar), the mini player when there is one, Search.
+                Row(Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
+                    GlassCircle(onClick = onExpand, description = "Show tabs", size = TabBarHeight) {
                         NovaIcon(selected.tabIconRes(), contentDescription = null, tint = selected.activeColor(), modifier = Modifier.size(24.dp))
                     }
+                    if (miniPlayer != null) {
+                        miniPlayer(
+                            Modifier
+                                .weight(1f)
+                                .padding(horizontal = 8.dp)
+                                .height(TabBarHeight),
+                        )
+                    } else {
+                        Spacer(Modifier.weight(1f))
+                    }
                     if (selected != TopDestination.SEARCH) {
-                        GlassCircle(onClick = { onSelect(TopDestination.SEARCH) }, description = TopDestination.SEARCH.label, size = TabBarHeight, modifier = Modifier.align(Alignment.CenterEnd)) {
+                        GlassCircle(onClick = { onSelect(TopDestination.SEARCH) }, description = TopDestination.SEARCH.label, size = TabBarHeight) {
                             NovaIcon(TopDestination.SEARCH.tabIconRes(), contentDescription = null, tint = Color.White, modifier = Modifier.size(24.dp))
                         }
                     }

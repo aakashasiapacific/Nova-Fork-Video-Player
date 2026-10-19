@@ -98,3 +98,13 @@ data class WatchlistEntity(
     @PrimaryKey val itemKey: String,
     val addedAt: Long,
 )
+
+/**
+ * A song starred with Apple Music's star button (schema version 7). Kept apart from [SongEntity]
+ * so rescans never touch it; a song that left the library just stops showing.
+ */
+@Entity(tableName = "song_favorites")
+data class FavoriteSongEntity(
+    @PrimaryKey val songId: Long,
+    val addedAt: Long,
+)

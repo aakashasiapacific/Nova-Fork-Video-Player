@@ -23,4 +23,7 @@ interface AudioActions {
     fun addToPlaylist(song: SongEntity, playlistId: Long?, newName: String)
     fun removeFromPlaylist(song: SongEntity)
     fun deletePlaylist(playlistId: Long)
+
+    /** Apple Music's star: adds the song to Favorites, or takes it out. */
+    fun toggleFavorite(songId: Long)
 }

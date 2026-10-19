@@ -1,5 +1,6 @@
 package com.aakash.novafork.ui.phone
 
+import android.content.res.Configuration
 import androidx.annotation.DrawableRes
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
@@ -13,10 +14,13 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
@@ -50,6 +54,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -142,11 +147,13 @@ private fun HomeFeed(home: HomeUi, scan: ScanUi, permission: PermissionUi, actio
     val resumed = lifecycleState.isAtLeast(Lifecycle.State.RESUMED)
     HeroStatusBar(
         hero = home.hero.getOrNull(pagerState.settledPage),
-        active = hasHero && heroOnScreen,
+        // Portrait heroes start below the status bar (clear of the punch hole): only the wide
+        // landscape hero has a picture behind it.
+        active = hasHero && heroOnScreen && LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE,
     )
     BoxWithConstraints(Modifier.fillMaxSize()) {
         // Portrait: the 16:9 backdrop with the poster, title and Play under it; landscape: wide.
-        val heroHeight = if (maxWidth > maxHeight) maxHeight * 0.85f else maxWidth * 9f / 16f + DetailsHeroBelowBackdrop
+        val heroHeight = if (maxWidth > maxHeight) maxHeight * 0.85f else maxWidth * 9f / 16f + DetailsHeroBelowBackdrop + WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
         LazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize(),
@@ -188,6 +195,13 @@ private fun HomeFeed(home: HomeUi, scan: ScanUi, permission: PermissionUi, actio
                 item(key = "continue", contentType = "landscapeRow") {
                     HomeSection(title = "Continue watching") {
                         LandscapeRow(home.continueWatching, actions)
+                    }
+                }
+            }
+            if (home.watchlist.isNotEmpty()) {
+                item(key = "watchlist", contentType = "landscapeRow") {
+                    HomeSection(title = "Watchlist") {
+                        WatchlistRow(home.watchlist, actions)
                     }
                 }
             }
@@ -240,6 +254,23 @@ private fun HomeSection(
             onAction = onSeeAll,
         )
         content()
+    }
+}
+
+/** What the hero's "+" saved: backdrop cards that open the title. */
+@Composable
+private fun WatchlistRow(items: List<LibraryItemUi>, actions: AppActions) {
+    val dims = LocalNovaDimens.current
+    LazyRow(
+        contentPadding = PaddingValues(horizontal = dims.gutter),
+        horizontalArrangement = Arrangement.spacedBy(dims.rowSpacing),
+    ) {
+        items(items, key = { it.key }) { item ->
+            when (item) {
+                is LibraryItemUi.Video -> PhoneWideVideoCard(card = item.card, onClick = { actions.openVideo(item.card.id) })
+                is LibraryItemUi.Show -> PhoneWideShowCard(show = item.card, onClick = { actions.openShow(item.card.key) })
+            }
+        }
     }
 }
 

@@ -68,6 +68,11 @@ data class MusicPlayerState(
     val error: String? = null,
     /** The song's .lrc lyrics, once loaded; null when it has none. */
     val lyrics: Lyrics? = null,
+    /**
+     * The queue came back after the app was closed (cleared from recents) and hasn't played
+     * since: paused at its song and position, shown only on the Audio tab.
+     */
+    val restored: Boolean = false,
 )
 
 /**
@@ -94,6 +99,11 @@ class MusicPlayer(
 
     /** The current song played to its end; play() opens it again. */
     private var ended = false
+
+    /** Where a restored song resumes once it plays (0 = from the start). */
+    private var pendingSeekMs = 0L
+    private var lastSavedAt = 0L
+    private val resumePrefs = appContext.getSharedPreferences(RESUME_PREFS, Context.MODE_PRIVATE)
     private var pausedByFocusLoss = false
     private var durationSaved = false
 
@@ -129,6 +139,58 @@ class MusicPlayer(
 
     val hasContent: Boolean get() = _state.value.active
 
+    init {
+        scope.launch { restore() }
+    }
+
+    /** Brings back the queue saved when the app was last closed, paused (see [MusicPlayerState.restored]). */
+    private suspend fun restore() {
+        if (_state.value.active) return
+        val ids = resumePrefs.getString(KEY_QUEUE, null)?.split(',')?.mapNotNull { it.toLongOrNull() }.orEmpty()
+        if (ids.isEmpty()) return
+        val position = resumePrefs.getInt(KEY_POSITION, 0).coerceIn(0, ids.lastIndex)
+        val song = try {
+            music.song(ids[position])
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.w(TAG, "Couldn't restore the queue", e)
+            null
+        } ?: return
+        if (_state.value.active) return
+        queue.set(ids, position, shuffle = false)
+        pendingSeekMs = resumePrefs.getLong(KEY_POSITION_MS, 0L).coerceAtLeast(0L)
+        val repeat = resumePrefs.getString(KEY_REPEAT, null)?.let { runCatching { RepeatMode.valueOf(it) }.getOrNull() } ?: RepeatMode.OFF
+        _state.value = MusicPlayerState(
+            active = true,
+            nowPlaying = nowPlaying(song),
+            positionMs = pendingSeekMs,
+            durationMs = song.durationMs ?: 0,
+            repeat = repeat,
+            restored = true,
+        ).withQueue()
+        lyricsJob = scope.launch {
+            val lyrics = music.lyrics(song)
+            if (_state.value.nowPlaying?.songId == song.id) _state.update { it.copy(lyrics = lyrics) }
+        }
+    }
+
+    /** Remembers the queue, song and position for after the app is closed. */
+    private fun saveResume() {
+        val state = _state.value
+        if (!state.active || queue.isEmpty) {
+            resumePrefs.edit().clear().apply()
+            return
+        }
+        lastSavedAt = System.currentTimeMillis()
+        resumePrefs.edit()
+            .putString(KEY_QUEUE, queue.playOrder.joinToString(","))
+            .putInt(KEY_POSITION, queue.position)
+            .putLong(KEY_POSITION_MS, state.positionMs)
+            .putString(KEY_REPEAT, state.repeat.name)
+            .apply()
+    }
+
     /**
      * Plays [songIds] (in library order) starting with [startIndex]; with [shuffle] the rest
      * follow in random order. Replaces what was queued.
@@ -136,14 +198,15 @@ class MusicPlayer(
     fun playSongs(songIds: List<Long>, startIndex: Int = 0, shuffle: Boolean = false) {
         if (songIds.isEmpty()) return
         queue.set(songIds, startIndex, shuffle)
-        _state.update { it.copy(active = true, isBuffering = true, playRequested = true, shuffle = shuffle) }
+        pendingSeekMs = 0L
+        _state.update { it.copy(active = true, isBuffering = true, playRequested = true, shuffle = shuffle, restored = false) }
         MusicService.start(appContext)
         startCurrent()
     }
 
     fun play() {
         if (!hasContent || _state.value.nowPlaying == null) return
-        _state.update { it.copy(playRequested = true) }
+        _state.update { it.copy(playRequested = true, restored = false) }
         // The service may have stopped while paused (Android ends idle ones); this brings back
         // its notification and media session.
         MusicService.start(appContext)
@@ -162,6 +225,7 @@ class MusicPlayer(
         pausedByFocusLoss = false
         _state.update { it.copy(playRequested = false) }
         mediaPlayer?.pause()
+        saveResume()
     }
 
     fun togglePlay() {
@@ -213,8 +277,12 @@ class MusicPlayer(
         _state.update { it.copy(repeat = next).withQueue() }
     }
 
-    /** Stops and forgets the queue; the notification goes. */
-    fun close() {
+    /**
+     * Stops the player; the notification goes. [forget] drops the queue for good; without it
+     * (the app cleared from recents) the queue is kept for the next start, paused.
+     */
+    fun close(forget: Boolean = true) {
+        if (forget) resumePrefs.edit().clear().apply() else saveResume()
         loadJob?.cancel()
         lyricsJob?.cancel()
         skipJob?.cancel()
@@ -234,6 +302,7 @@ class MusicPlayer(
 
     private fun moveTo(position: Int) {
         queue.moveTo(position) ?: return
+        pendingSeekMs = 0L
         startCurrent()
     }
 
@@ -264,7 +333,8 @@ class MusicPlayer(
                     // A new song always starts playing (next/previous while paused too).
                     playRequested = true,
                     isBuffering = true,
-                    positionMs = 0,
+                    restored = false,
+                    positionMs = pendingSeekMs,
                     durationMs = song.durationMs ?: 0,
                     error = null,
                     lyrics = null,
@@ -298,6 +368,7 @@ class MusicPlayer(
             audio.requestFocus()
             audio.registerNoisyReceiver()
             player.play()
+            saveResume()
         }
     }
 
@@ -336,13 +407,23 @@ class MusicPlayer(
 
     private fun onEvent(event: MediaPlayer.Event) {
         when (event.type) {
-            MediaPlayer.Event.Playing -> _state.update { it.copy(isPlaying = true, isBuffering = false, error = null) }
+            MediaPlayer.Event.Playing -> {
+                _state.update { it.copy(isPlaying = true, isBuffering = false, error = null) }
+                // A restored song picks up where it was left.
+                if (pendingSeekMs > 0L) {
+                    mediaPlayer?.setTime(pendingSeekMs)
+                    pendingSeekMs = 0L
+                }
+            }
             MediaPlayer.Event.Paused, MediaPlayer.Event.Stopped -> _state.update { it.copy(isPlaying = false) }
             MediaPlayer.Event.Buffering -> {
                 val buffering = event.buffering < 100f
                 if (buffering != _state.value.isBuffering) _state.update { it.copy(isBuffering = buffering) }
             }
-            MediaPlayer.Event.TimeChanged -> _state.update { it.copy(positionMs = event.timeChanged.coerceAtLeast(0L)) }
+            MediaPlayer.Event.TimeChanged -> {
+                _state.update { it.copy(positionMs = event.timeChanged.coerceAtLeast(0L)) }
+                if (System.currentTimeMillis() - lastSavedAt > SAVE_EVERY_MS) saveResume()
+            }
             MediaPlayer.Event.LengthChanged -> {
                 val length = event.lengthChanged
                 if (length > 0) {
@@ -445,5 +526,12 @@ class MusicPlayer(
         /** "Previous" restarts the song after this much of it played. */
         const val RESTART_AFTER_MS = 3_000L
         const val SKIP_AFTER_ERROR_MS = 1_500L
+        const val SAVE_EVERY_MS = 5_000L
+
+        const val RESUME_PREFS = "music_resume"
+        const val KEY_QUEUE = "queue"
+        const val KEY_POSITION = "position"
+        const val KEY_POSITION_MS = "positionMs"
+        const val KEY_REPEAT = "repeat"
     }
 }

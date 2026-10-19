@@ -112,8 +112,7 @@ class AudioScreensTest {
     fun nowPlaying() {
         compose.captureScreen("audio_now_playing") {
             NovaTheme {
-                // No volume row: its polling loop never lets a test go idle.
-                NowPlayingScreen(player = playing(), actions = NoOpAudioActions, onDismiss = {}, showVolume = false)
+                NowPlayingScreen(player = playing(), actions = NoOpAudioActions, onDismiss = {}, favorite = true)
             }
         }
     }
@@ -170,6 +169,7 @@ class AudioScreensTest {
 
     private object NoOpAudioActions : AudioActions {
         override fun rescan() = Unit
+        override fun toggleFavorite(songId: Long) = Unit
         override fun play(songs: List<SongEntity>, index: Int, shuffle: Boolean) = Unit
         override fun togglePlay() = Unit
         override fun next() = Unit

@@ -1,6 +1,5 @@
 package com.aakash.novafork.ui.audio
 
-import android.media.AudioManager
 import androidx.activity.compose.BackHandler
 import androidx.annotation.DrawableRes
 import androidx.compose.animation.AnimatedContent
@@ -108,14 +107,14 @@ fun rememberMusicShell(): Pair<MusicViewModel, MusicPlayerState>? {
  * does.
  */
 @Composable
-fun NowPlayingHost(open: Boolean, player: MusicPlayerState, actions: AudioActions, onDismiss: () -> Unit) {
+fun NowPlayingHost(open: Boolean, player: MusicPlayerState, actions: AudioActions, favorite: Boolean, onDismiss: () -> Unit) {
     LaunchedEffect(player.active) { if (!player.active && open) onDismiss() }
     AnimatedVisibility(
         visible = open && player.active,
         enter = slideInVertically(tween(320)) { it },
         exit = slideOutVertically(tween(260)) { it },
     ) {
-        NowPlayingScreen(player = player, actions = actions, onDismiss = onDismiss)
+        NowPlayingScreen(player = player, actions = actions, onDismiss = onDismiss, favorite = favorite)
     }
 }
 
@@ -197,7 +196,7 @@ fun NowPlayingScreen(
     actions: AudioActions,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
-    showVolume: Boolean = true,
+    favorite: Boolean = false,
 ) {
     BackHandler(onBack = onDismiss)
     val now = player.nowPlaying
@@ -276,21 +275,42 @@ fun NowPlayingScreen(
                     }
                 }
             }
-            Text(
-                now?.title ?: "Loading…",
-                fontSize = 22.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.White,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                player.error ?: listOfNotNull(now?.artist, now?.album).joinToString(" — "),
-                fontSize = 18.sp,
-                color = if (player.error != null) NovaColors.AppleMusicRed else Color.White.copy(alpha = 0.6f),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        now?.title ?: "Loading…",
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        player.error ?: listOfNotNull(now?.artist, now?.album).joinToString(" — "),
+                        fontSize = 18.sp,
+                        color = if (player.error != null) NovaColors.AppleMusicRed else Color.White.copy(alpha = 0.6f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                // Apple Music's star: adds the song to Favorites.
+                if (now != null) {
+                    IconButton(
+                        onClick = { actions.toggleFavorite(now.songId) },
+                        modifier = Modifier
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(Color.White.copy(alpha = 0.15f)),
+                    ) {
+                        NovaIcon(
+                            if (favorite) R.drawable.ic_star else R.drawable.ic_star_outline,
+                            contentDescription = if (favorite) "Remove from Favorites" else "Add to Favorites",
+                            tint = Color.White,
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
+                }
+            }
             Spacer(Modifier.height(20.dp))
             Scrubber(player, actions)
             Spacer(Modifier.height(18.dp))
@@ -307,10 +327,6 @@ fun NowPlayingScreen(
                     onClick = actions::togglePlay,
                 )
                 BigControl(R.drawable.ic_skip_next, "Next", size = 44, enabled = player.hasNext, onClick = actions::next)
-            }
-            if (showVolume) {
-                Spacer(Modifier.height(18.dp))
-                VolumeRow()
             }
             Spacer(Modifier.height(14.dp))
             Row(
@@ -468,39 +484,6 @@ private fun Scrubber(player: MusicPlayerState, actions: AudioActions) {
         val shownMs = (fraction * duration).toLong()
         Text(formatTime(shownMs), fontSize = 12.sp, color = Color.White.copy(alpha = 0.6f), modifier = Modifier.weight(1f))
         Text("-" + formatTime((player.durationMs - shownMs).coerceAtLeast(0)), fontSize = 12.sp, color = Color.White.copy(alpha = 0.6f))
-    }
-}
-
-/** The system music volume, as in Now Playing; follows the volume keys too. */
-@Composable
-private fun VolumeRow() {
-    val context = LocalContext.current
-    val audio = remember { context.getSystemService(AudioManager::class.java) } ?: return
-    val max = remember { audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC).coerceAtLeast(1) }
-    var volume by remember { mutableFloatStateOf(audio.getStreamVolume(AudioManager.STREAM_MUSIC) / max.toFloat()) }
-    var dragging by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) {
-        // The volume keys change it behind our back: follow them.
-        while (true) {
-            delay(400)
-            if (!dragging) volume = audio.getStreamVolume(AudioManager.STREAM_MUSIC) / max.toFloat()
-        }
-    }
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        NovaIcon(R.drawable.ic_volume_off, contentDescription = null, tint = Color.White.copy(alpha = 0.6f), modifier = Modifier.size(18.dp))
-        ThinSlider(
-            value = volume,
-            onChange = {
-                dragging = true
-                volume = it
-                audio.setStreamVolume(AudioManager.STREAM_MUSIC, (it * max).roundToInt(), 0)
-            },
-            onChangeFinished = { dragging = false },
-            modifier = Modifier
-                .weight(1f)
-                .padding(horizontal = 12.dp),
-        )
-        NovaIcon(R.drawable.ic_volume_up, contentDescription = null, tint = Color.White.copy(alpha = 0.6f), modifier = Modifier.size(18.dp))
     }
 }
 

@@ -118,7 +118,8 @@ class MusicService : Service() {
     /** Music plays on in the background, until the app is cleared from recents (owner's choice). */
     override fun onTaskRemoved(rootIntent: Intent?) {
         super.onTaskRemoved(rootIntent)
-        player.close()
+        // Stops, but keeps the queue: the next start shows it paused on the Audio tab.
+        player.close(forget = false)
         if (foreground) stopForeground(STOP_FOREGROUND_REMOVE)
         foreground = false
         notificationManager.cancel(NOTIFICATION_ID)

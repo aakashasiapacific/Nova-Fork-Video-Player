@@ -155,6 +155,18 @@ UI, following Apple Music:
   scrubber with times, previous / play-pause / next, system volume, lyrics (big synced lines, tap
   to jump) and queue (shuffle, repeat, stop) panes; swipe down or back to close. No casting yet.
 
+**Build 46 (owner's test of build 45):**
+- Library home is only Playlists, Favorites (Apple Music's star, in Now Playing; Room v7
+  `song_favorites`) and the albums grid (newest first, no "Recently Added" title).
+- Now Playing has no volume slider; a star sits beside the title.
+- The mini player follows Apple Music on iOS 26: above the full tab bar while a song plays; in
+  the shrunk bar between the current tab and Search. A paused song shows only in the shrunk bar
+  (the bar shrinks to show it). The last queue is kept when the app is cleared from recents and
+  comes back paused, shown only on the Audio tab.
+- Hero: a short clip (under a minute) fills its page with only a small caption and the mute
+  button; title pages and clips start below the status bar, clear of the punch hole.
+- Home has the Watchlist strip again (backdrop cards), under Continue watching.
+
 ## 6. Decisions on the former open questions (owner, 2026-10-16)
 
 1. **Library and sources are split:**

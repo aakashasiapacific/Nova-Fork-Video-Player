@@ -34,6 +34,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.aakash.novafork.ui.adaptive.DeviceLayout
 import com.aakash.novafork.ui.adaptive.LocalDeviceLayout
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
@@ -47,6 +48,7 @@ import com.aakash.novafork.ui.common.LocalBottomBarSpace
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.AppUiState
 import com.aakash.novafork.ui.model.Route
+import com.aakash.novafork.ui.model.TopDestination
 import com.aakash.novafork.ui.model.top
 import com.aakash.novafork.ui.settings.SettingsScreen
 
@@ -65,7 +67,8 @@ fun TabletApp(state: AppUiState, actions: AppActions, layout: DeviceLayout, modi
         val pageStates = rememberSaveableStateHolder()
         // Music (the real app only): a floating mini player at the bottom, Now Playing over all.
         val music = rememberMusicShell()
-        val miniPlayerShown = music?.second?.active == true
+        // A queue brought back after the app was closed shows only on the Audio tab.
+        val miniPlayerShown = music?.second?.let { it.active && (!it.restored || state.route.top == TopDestination.AUDIO) } == true
         var nowPlayingOpen by rememberSaveable { mutableStateOf(false) }
         val navBar = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
         // A Surface (not just a background) so text and icons get onBackground by default.
@@ -117,7 +120,14 @@ fun TabletApp(state: AppUiState, actions: AppActions, layout: DeviceLayout, modi
                                 .widthIn(max = 520.dp),
                         )
                     }
-                    NowPlayingHost(open = nowPlayingOpen, player = player, actions = viewModel, onDismiss = { nowPlayingOpen = false })
+                    val favorites by viewModel.favorites.collectAsStateWithLifecycle()
+                    NowPlayingHost(
+                        open = nowPlayingOpen,
+                        player = player,
+                        actions = viewModel,
+                        favorite = player.nowPlaying?.songId in favorites,
+                        onDismiss = { nowPlayingOpen = false },
+                    )
                 }
             }
         }

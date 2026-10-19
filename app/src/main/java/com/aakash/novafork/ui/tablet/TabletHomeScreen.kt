@@ -181,6 +181,13 @@ private fun HomeFeed(home: HomeUi, scan: ScanUi, permission: PermissionUi, layou
                     }
                 }
             }
+            if (home.watchlist.isNotEmpty()) {
+                item(key = "watchlist", contentType = "landscapeRow") {
+                    HomeSection(title = "Watchlist") {
+                        WatchlistRow(home.watchlist, actions)
+                    }
+                }
+            }
             item(key = "library", contentType = "library") {
                 HomeLibraryLinks(actions, Modifier.widthIn(max = 720.dp))
             }
@@ -209,6 +216,36 @@ private fun HomeSection(title: String, onSeeAll: (() -> Unit)? = null, content: 
         )
         Spacer(Modifier.height(8.dp))
         content()
+    }
+}
+
+/** What the hero's "+" saved: 16:9 backdrop cards that open the title. */
+@Composable
+private fun WatchlistRow(items: List<LibraryItemUi>, actions: AppActions) {
+    val dims = LocalNovaDimens.current
+    LazyRow(
+        contentPadding = PaddingValues(horizontal = dims.gutter, vertical = 6.dp),
+        horizontalArrangement = Arrangement.spacedBy(dims.rowSpacing),
+    ) {
+        items(items, key = { it.key }) { item ->
+            val open: () -> Unit = {
+                when (item) {
+                    is LibraryItemUi.Video -> actions.openVideo(item.card.id)
+                    is LibraryItemUi.Show -> actions.openShow(item.card.key)
+                }
+            }
+            TabletStillCard(
+                artwork = when (item) {
+                    is LibraryItemUi.Video -> item.card.artwork
+                    is LibraryItemUi.Show -> item.card.artwork
+                },
+                title = item.title,
+                onClick = open,
+                onLongClick = open,
+                onClickLabel = "Details",
+                modifier = Modifier.width(dims.landscapeCardWidth),
+            )
+        }
     }
 }
 

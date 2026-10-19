@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.pager.HorizontalPager
@@ -184,6 +185,11 @@ private fun PhoneHeroPage(hero: HeroUi, preview: Boolean, muted: Boolean, action
         val videoId = hero.playVideoId
         if (videoId != null) actions.play(videoId) else openTarget()
     }
+    // A short clip (a reel, a phone video) plays right in the hero: no poster, Play or "+".
+    if (hero.previewUri != null) {
+        ClipHeroPage(hero = hero, preview = preview, muted = muted)
+        return
+    }
     if (!wide) {
         DetailsStyleHeroPage(hero = hero, preview = preview, muted = muted, openTarget = openTarget, play = play, actions = actions)
         return
@@ -316,10 +322,12 @@ private fun DetailsStyleHeroPage(
             .fillMaxSize()
             .clickable(onClickLabel = "Details", onClick = openTarget),
     ) {
-        // The backdrop in its own 16:9 shape, never cropped to fill a taller box.
+        // The backdrop in its own 16:9 shape, never cropped to fill a taller box, and below the
+        // status bar so the camera's punch hole doesn't cover it.
         Box(
             Modifier
                 .fillMaxWidth()
+                .statusBarsPadding()
                 .aspectRatio(16f / 9f),
         ) {
             WideHeroArt(artwork = hero.artwork, modifier = Modifier.fillMaxSize())
@@ -394,6 +402,45 @@ private fun DetailsStyleHeroPage(
             Spacer(Modifier.height(20.dp))
             HeroActions(hero = hero, play = play, actions = actions, playModifier = Modifier.fillMaxWidth(0.8f))
         }
+    }
+}
+
+/**
+ * A short clip's hero page, kept minimal: the clip (its first frame until it plays) fills the
+ * hero below the status bar, with one small caption at the lower left; the mute button sits by
+ * the dots. Clips rarely have real titles, so no big title, poster, Play or "+".
+ */
+@Composable
+private fun ClipHeroPage(hero: HeroUi, preview: Boolean, muted: Boolean) {
+    val background = MaterialTheme.colorScheme.background
+    Box(
+        Modifier
+            .fillMaxSize()
+            .statusBarsPadding(),
+    ) {
+        BackdropArt(artwork = hero.artwork, modifier = Modifier.fillMaxSize())
+        HeroClip(hero = hero, preview = preview, muted = muted)
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        0f to Color.Transparent,
+                        0.75f to Color.Transparent,
+                        1f to background,
+                    ),
+                ),
+        )
+        Text(
+            text = listOfNotNull(hero.title, hero.metaLine?.takeIf { it.isNotBlank() }).joinToString(" · "),
+            style = MaterialTheme.typography.labelLarge,
+            color = Color.White.copy(alpha = 0.85f),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .padding(start = 20.dp, end = 72.dp, bottom = HeroDotsBottom + 34.dp),
+        )
     }
 }
 

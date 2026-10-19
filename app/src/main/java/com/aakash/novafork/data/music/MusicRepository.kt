@@ -19,6 +19,7 @@ import com.aakash.novafork.data.db.SQL_CHUNK
 import com.aakash.novafork.data.db.SongEntity
 import com.aakash.novafork.data.db.SourceEntity
 import com.aakash.novafork.data.db.SourceType
+import com.aakash.novafork.data.db.FavoriteSongEntity
 import com.aakash.novafork.data.db.WatchlistEntity
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -67,6 +68,7 @@ class MusicRepository(
     private val playlistSongDao = database.playlistSongDao()
     private val playlistDao = database.playlistDao()
     private val watchlistDao = database.watchlistDao()
+    private val favoriteDao = database.favoriteSongDao()
     private val sourceDao = database.sourceDao()
 
     private val scanMutex = Mutex()
@@ -339,6 +341,14 @@ class MusicRepository(
     suspend fun removeFromWatchlist(itemKey: String) = watchlistDao.remove(itemKey)
 
     suspend fun isOnWatchlist(itemKey: String): Boolean = watchlistDao.count(itemKey) > 0
+
+    // Favorites (Apple Music's star)
+
+    fun observeFavorites(): Flow<List<Long>> = favoriteDao.observeIds()
+
+    suspend fun setFavorite(songId: Long, favorite: Boolean) {
+        if (favorite) favoriteDao.add(FavoriteSongEntity(songId = songId, addedAt = now())) else favoriteDao.remove(songId)
+    }
 
     private companion object {
         const val TAG = "MusicRepository"

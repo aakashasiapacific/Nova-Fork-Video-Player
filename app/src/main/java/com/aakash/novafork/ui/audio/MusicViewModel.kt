@@ -38,6 +38,10 @@ class MusicViewModel(app: Application) : AndroidViewModel(app), AudioActions {
         music.observePlaylists().stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
     val playerState: StateFlow<MusicPlayerState> = player.state
 
+    /** Starred song ids, most recently starred first. */
+    val favorites: StateFlow<List<Long>> =
+        music.observeFavorites().stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
     private val _hasAccess = MutableStateFlow(StoragePermissions.hasAudioAccess(app))
     val hasAccess: StateFlow<Boolean> = _hasAccess.asStateFlow()
 
@@ -98,6 +102,10 @@ class MusicViewModel(app: Application) : AndroidViewModel(app), AudioActions {
     override fun deletePlaylist(playlistId: Long) = launchSafely {
         music.deletePlaylist(playlistId)
         if (_openPlaylist.value?.id == playlistId) _openPlaylist.value = null
+    }
+
+    override fun toggleFavorite(songId: Long) = launchSafely {
+        music.setFavorite(songId, favorite = songId !in favorites.value)
     }
 
     private suspend fun refreshOpenPlaylist() {

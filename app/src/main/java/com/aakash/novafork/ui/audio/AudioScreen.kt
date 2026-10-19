@@ -93,6 +93,7 @@ fun AudioScreen(modifier: Modifier = Modifier, viewModel: MusicViewModel = viewM
     val player by viewModel.playerState.collectAsStateWithLifecycle()
     val hasAccess by viewModel.hasAccess.collectAsStateWithLifecycle()
     val openPlaylist by viewModel.openPlaylist.collectAsStateWithLifecycle()
+    val favorites by viewModel.favorites.collectAsStateWithLifecycle()
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.onAccessChecked() }
     val access = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { viewModel.onAccessChecked() }
     AudioTheme {
@@ -106,6 +107,7 @@ fun AudioScreen(modifier: Modifier = Modifier, viewModel: MusicViewModel = viewM
             actions = viewModel,
             onRequestAccess = { access.launch(viewModel.permission) },
             modifier = modifier,
+            favorites = favorites,
         )
     }
 }
@@ -113,6 +115,7 @@ fun AudioScreen(modifier: Modifier = Modifier, viewModel: MusicViewModel = viewM
 /** A page of the Audio tab: its route ("songs", "album:<key>" …) and its back-button label. */
 private const val HOME = "home"
 private const val PLAYLISTS = "playlists"
+private const val FAVORITES = "favorites"
 private const val ARTISTS = "artists"
 private const val ALBUMS = "albums"
 private const val SONGS = "songs"
@@ -133,6 +136,8 @@ fun AudioContent(
     actions: AudioActions,
     onRequestAccess: () -> Unit,
     modifier: Modifier = Modifier,
+    /** Starred song ids, most recently starred first. */
+    favorites: List<Long> = emptyList(),
 ) {
     // The pages opened over Library, as one saveable string.
     var stackText by rememberSaveable { mutableStateOf("") }
@@ -176,6 +181,10 @@ fun AudioContent(
             shown == HOME -> LibraryHome(library, scan, hasAccess, onRequestAccess, ctx)
             shown.startsWith("playlist:") && openPlaylist != null -> PlaylistPage(openPlaylist, ctx)
             shown == PLAYLISTS -> PlaylistsPage(playlists, ctx)
+            shown == FAVORITES -> {
+                val byId = library.songs.associateBy { it.id }
+                FavoritesPage(favorites.mapNotNull { byId[it] }, ctx)
+            }
             shown == ARTISTS -> ArtistsPage(library.artists, ctx)
             shown == ALBUMS -> AlbumsPage("Albums", library.albums, ctx)
             shown == SONGS -> SongsPage("Songs", library.songs, ctx)
@@ -217,6 +226,7 @@ private class PageContext(
 private fun pageTitle(page: String, library: MusicLibraryData): String = when {
     page == HOME -> "Library"
     page == PLAYLISTS -> "Playlists"
+    page == FAVORITES -> "Favorites"
     page == ARTISTS -> "Artists"
     page == ALBUMS -> "Albums"
     page == SONGS -> "Songs"
@@ -270,14 +280,13 @@ private fun LibraryHome(
         if (scan.scanning) row("scanning") { LinearProgressIndicator(Modifier.fillMaxWidth().padding(vertical = 4.dp)) }
         scan.error?.let { error -> row("error") { Text(error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) } }
         if (!hasAccess) row("access") { AccessCard(onRequestAccess) }
+        // Apple Music's Library, cut down to what the owner uses: playlists, favorites, albums.
         row("playlists") { CategoryRow(R.drawable.ic_playlist_play, "Playlists") { ctx.onOpen(PLAYLISTS) } }
-        row("artists") { CategoryRow(R.drawable.ic_person, "Artists") { ctx.onOpen(ARTISTS) } }
-        row("albums") { CategoryRow(R.drawable.ic_grid_view, "Albums") { ctx.onOpen(ALBUMS) } }
-        row("songs") { CategoryRow(R.drawable.ic_music_notes, "Songs") { ctx.onOpen(SONGS) } }
-        row("genres") { CategoryRow(R.drawable.ic_tune, "Genres", divider = false) { ctx.onOpen(GENRES) } }
+        row("favorites") { CategoryRow(R.drawable.ic_star, "Favorites", divider = false) { ctx.onOpen(FAVORITES) } }
         if (library.recentlyAdded.isNotEmpty()) {
-            row("recentTitle") { SectionTitle("Recently Added") }
-            items(library.recentlyAdded.take(RECENT_ALBUMS), key = { "recent:" + it.key }) { album ->
+            row("albumsTitle") { SectionTitle("Albums") }
+            // Newest first.
+            items(library.recentlyAdded, key = { "album:" + it.key }) { album ->
                 AlbumTile(album) { ctx.onOpen(ALBUM + album.key) }
             }
         } else if (!scan.scanning && hasAccess) {
@@ -338,6 +347,29 @@ private fun GenresPage(ctx: PageContext) {
                     title = genre.name,
                     subtitle = if (genre.songs.size == 1) "1 song" else "${genre.songs.size} songs",
                     onClick = { ctx.onOpen(GENRE + genre.name) },
+                )
+            }
+        }
+    }
+}
+
+/** Starred songs, most recently starred first; the red star takes one out. */
+@Composable
+private fun FavoritesPage(songs: List<SongEntity>, ctx: PageContext) {
+    AudioPage {
+        header("Favorites", ctx)
+        if (songs.isEmpty()) row("empty") { Hint("No favorites yet. Tap the star in Now Playing to add a song.") }
+        if (songs.isNotEmpty()) row("play") { PlayShuffle(songs, ctx.actions) }
+        songs.forEachIndexed { index, song ->
+            row("f:${song.id}") {
+                SongRow(
+                    song = song,
+                    playing = song.id == ctx.nowPlayingId,
+                    onClick = { ctx.actions.play(songs, index, false) },
+                    trailingIcon = R.drawable.ic_star,
+                    trailingLabel = "Remove from Favorites",
+                    onTrailing = { ctx.actions.toggleFavorite(song.id) },
+                    trailingTint = NovaColors.AppleMusicRed,
                 )
             }
         }
@@ -614,6 +646,7 @@ private fun SongRow(
     @DrawableRes trailingIcon: Int,
     trailingLabel: String,
     onTrailing: () -> Unit,
+    trailingTint: Color = Color.White.copy(alpha = 0.55f),
 ) {
     Column(Modifier.clickable(onClick = onClick)) {
         Row(Modifier.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -639,7 +672,7 @@ private fun SongRow(
                 )
             }
             IconButton(onClick = onTrailing) {
-                NovaIcon(trailingIcon, contentDescription = trailingLabel, tint = Color.White.copy(alpha = 0.55f))
+                NovaIcon(trailingIcon, contentDescription = trailingLabel, tint = trailingTint)
             }
         }
         HorizontalDivider(Modifier.padding(start = 60.dp), thickness = 0.5.dp, color = Color.White.copy(alpha = 0.12f))
@@ -767,4 +800,3 @@ private fun AddToPlaylistDialog(
 
 private val Gutter = 20.dp
 private const val TOP_SONGS = 10
-private const val RECENT_ALBUMS = 24

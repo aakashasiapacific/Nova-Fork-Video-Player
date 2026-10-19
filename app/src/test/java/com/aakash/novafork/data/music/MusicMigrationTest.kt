@@ -38,7 +38,7 @@ class MusicMigrationTest {
 
         val database = NovaDatabase.create(context)
         try {
-            assertEquals(6, database.openHelper.writableDatabase.version)
+            assertEquals(7, database.openHelper.writableDatabase.version)
             assertEquals(60_000L, database.videoDao().byId(MOVIE_ID)?.positionMs)
             assertEquals(listOf("Movies night"), database.playlistDao().observeWithCounts().first().map { it.name })
 

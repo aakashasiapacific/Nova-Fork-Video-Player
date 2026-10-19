@@ -143,3 +143,19 @@ interface WatchlistDao {
     @Query("SELECT COUNT(*) FROM watchlist WHERE itemKey = :itemKey")
     suspend fun count(itemKey: String): Int
 }
+
+@Dao
+interface FavoriteSongDao {
+    /** Starred song ids, most recently starred first. */
+    @Query("SELECT songId FROM song_favorites ORDER BY addedAt DESC, songId")
+    fun observeIds(): Flow<List<Long>>
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun add(entry: FavoriteSongEntity)
+
+    @Query("DELETE FROM song_favorites WHERE songId = :songId")
+    suspend fun remove(songId: Long)
+
+    @Query("SELECT COUNT(*) FROM song_favorites WHERE songId = :songId")
+    suspend fun count(songId: Long): Int
+}
