@@ -85,12 +85,13 @@ internal fun BackdropPosterHeader(
     val statusBar = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val background = MaterialTheme.colorScheme.background
     BoxWithConstraints(modifier.fillMaxWidth()) {
-        val backdropHeight = statusBar + minOf(maxWidth * 9f / 16f, maxBackdropHeight)
+        val pageWidth = maxWidth
+        val backdropHeight = statusBar + minOf(pageWidth * 9f / 16f, maxBackdropHeight)
         if (artwork.frameOnly) {
             // A camera-roll or saved video: one picture, the frame in its own shape, and the
             // title under it; no second copy of it as a poster.
             Column(Modifier.fillMaxWidth()) {
-                FramePicture(artwork = artwork, statusBar = statusBar, height = backdropHeight, maxWidth = maxWidth)
+                FramePicture(artwork = artwork, statusBar = statusBar, height = backdropHeight, maxWidth = pageWidth)
                 Column(
                     Modifier.padding(start = dims.gutter, end = dims.gutter, top = 12.dp),
                     content = info,
