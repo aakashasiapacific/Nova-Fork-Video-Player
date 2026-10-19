@@ -73,6 +73,8 @@ data class MusicPlayerState(
      * since: paused at its song and position, shown only on the Audio tab.
      */
     val restored: Boolean = false,
+    /** The songs queued after this one, in play order (the first [UP_NEXT_LIMIT]); Now Playing's queue. */
+    val upNext: List<Long> = emptyList(),
 )
 
 /**
@@ -247,6 +249,21 @@ class MusicPlayer(
         }
         val position = queue.previousPosition(wrap = state.repeat == RepeatMode.ALL)
         if (position == null) seekTo(0) else moveTo(position)
+    }
+
+    /**
+     * Apple Music's Play Next ([next]) and Play Last: queues [songIds] after the playing song or
+     * after the whole queue. With nothing queued they simply play.
+     */
+    fun enqueue(songIds: List<Long>, next: Boolean) {
+        if (songIds.isEmpty()) return
+        if (!hasContent || queue.isEmpty) {
+            playSongs(songIds)
+            return
+        }
+        queue.insert(songIds, next)
+        _state.update { it.withQueue() }
+        saveResume()
     }
 
     /** Plays the song at [position] of the play order. */
@@ -497,6 +514,7 @@ class MusicPlayer(
             hasPrevious = queue.previousPosition(wrap = wrap) != null,
             queueIndex = queue.position,
             queueSize = queue.size,
+            upNext = queue.upNext(UP_NEXT_LIMIT),
         )
     }
 
@@ -527,6 +545,7 @@ class MusicPlayer(
         const val RESTART_AFTER_MS = 3_000L
         const val SKIP_AFTER_ERROR_MS = 1_500L
         const val SAVE_EVERY_MS = 5_000L
+        const val UP_NEXT_LIMIT = 50
 
         const val RESUME_PREFS = "music_resume"
         const val KEY_QUEUE = "queue"

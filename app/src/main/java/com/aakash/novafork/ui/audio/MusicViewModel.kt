@@ -64,6 +64,10 @@ class MusicViewModel(app: Application) : AndroidViewModel(app), AudioActions {
         player.playSongs(songs.map { it.id }, index, shuffle)
     }
 
+    override fun enqueue(songs: List<SongEntity>, next: Boolean) = player.enqueue(songs.map { it.id }, next)
+
+    override fun skipAhead(ahead: Int) = player.skipTo(player.state.value.queueIndex + ahead)
+
     override fun togglePlay() = player.togglePlay()
 
     override fun next() = player.next()

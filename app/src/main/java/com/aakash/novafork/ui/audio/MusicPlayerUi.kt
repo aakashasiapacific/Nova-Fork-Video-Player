@@ -1,12 +1,17 @@
 package com.aakash.novafork.ui.audio
 
+import android.os.Build
 import androidx.activity.compose.BackHandler
 import androidx.annotation.DrawableRes
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -14,7 +19,9 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -75,14 +82,16 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.aakash.novafork.R
+import com.aakash.novafork.data.db.SongEntity
+import com.aakash.novafork.data.music.MusicLibrary
 import com.aakash.novafork.music.MusicPlayerState
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.glass
 import com.aakash.novafork.ui.model.RepeatMode
 import com.aakash.novafork.ui.theme.NovaColors
+import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlin.math.roundToInt
 
 /**
  * The real app turns this on (MainActivity): the music mini player and Now Playing then live in
@@ -107,14 +116,31 @@ fun rememberMusicShell(): Pair<MusicViewModel, MusicPlayerState>? {
  * does.
  */
 @Composable
-fun NowPlayingHost(open: Boolean, player: MusicPlayerState, actions: AudioActions, favorite: Boolean, onDismiss: () -> Unit) {
+fun NowPlayingHost(
+    open: Boolean,
+    player: MusicPlayerState,
+    actions: AudioActions,
+    favorite: Boolean,
+    onDismiss: () -> Unit,
+    upNext: List<SongEntity> = emptyList(),
+) {
     LaunchedEffect(player.active) { if (!player.active && open) onDismiss() }
     AnimatedVisibility(
         visible = open && player.active,
         enter = slideInVertically(tween(320)) { it },
         exit = slideOutVertically(tween(260)) { it },
     ) {
-        NowPlayingScreen(player = player, actions = actions, onDismiss = onDismiss, favorite = favorite)
+        NowPlayingScreen(player = player, actions = actions, onDismiss = onDismiss, favorite = favorite, upNext = upNext)
+    }
+}
+
+/** The songs after the playing one, looked up in the library for Now Playing's queue. */
+@Composable
+fun rememberUpNext(viewModel: MusicViewModel, player: MusicPlayerState): List<SongEntity> {
+    val library by viewModel.library.collectAsStateWithLifecycle()
+    return remember(player.upNext, library) {
+        val byId = library.songs.associateBy { it.id }
+        player.upNext.mapNotNull { byId[it] }
     }
 }
 
@@ -201,6 +227,8 @@ fun NowPlayingScreen(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
     favorite: Boolean = false,
+    /** The songs queued after this one (see [rememberUpNext]). */
+    upNext: List<SongEntity> = emptyList(),
 ) {
     BackHandler(onBack = onDismiss)
     val now = player.nowPlaying
@@ -228,18 +256,33 @@ fun NowPlayingScreen(
                 }
             },
     ) {
+        // Apple Music's living background: the cover, blurred to colour and slowly turning.
+        // Android before 12 can't blur, so there the cover sits under a darker veil instead.
+        val drift = rememberInfiniteTransition(label = "drift")
+        val turn by drift.animateFloat(
+            initialValue = 0f,
+            targetValue = 360f,
+            animationSpec = infiniteRepeatable(tween(durationMillis = 90_000, easing = LinearEasing)),
+            label = "driftTurn",
+        )
+        val canBlur = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
         AsyncImage(
             model = now?.artUri,
             contentDescription = null,
             contentScale = ContentScale.Crop,
             modifier = Modifier
                 .fillMaxSize()
+                .graphicsLayer {
+                    scaleX = 1.8f
+                    scaleY = 1.8f
+                    rotationZ = turn
+                }
                 .blur(90.dp),
         )
         Box(
             Modifier
                 .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.5f)),
+                .background(Color.Black.copy(alpha = if (canBlur) 0.45f else 0.78f)),
         )
         Column(
             Modifier
@@ -262,6 +305,14 @@ fun NowPlayingScreen(
                         .background(Color.White.copy(alpha = 0.4f)),
                 )
             }
+            if (pane != NowPlayingPane.ART) {
+                // Lyrics and the queue keep the song in a small header, as in Apple Music.
+                Row(Modifier.padding(top = 8.dp, bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Cover(now?.artUri, size = 64, corner = 8)
+                    SongTitles(player, Modifier.weight(1f).padding(start = 14.dp), small = true)
+                    if (now != null) FavoriteButton(favorite) { actions.toggleFavorite(now.songId) }
+                }
+            }
             Box(
                 Modifier
                     .weight(1f)
@@ -276,50 +327,14 @@ fun NowPlayingScreen(
                     when (shown) {
                         NowPlayingPane.ART -> BigCover(player)
                         NowPlayingPane.LYRICS -> LyricsPane(player, actions)
-                        NowPlayingPane.QUEUE -> QueuePane(player, actions)
+                        NowPlayingPane.QUEUE -> QueuePane(player, actions, upNext)
                     }
                 }
             }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        now?.title ?: "Loading…",
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Text(
-                        player.error ?: listOfNotNull(now?.artist, now?.album).joinToString(" — "),
-                        fontSize = 18.sp,
-                        color = if (player.error != null) NovaColors.AppleMusicRed else Color.White.copy(alpha = 0.6f),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                // Apple Music's star: a small translucent circle whose right edge lines up with
-                // the scrubber's (an IconButton would grow to 48dp and stick out past it).
-                if (now != null) {
-                    Box(
-                        Modifier
-                            .padding(start = 12.dp)
-                            .size(32.dp)
-                            .clip(CircleShape)
-                            .background(Color.White.copy(alpha = 0.15f))
-                            .clickable(
-                                onClickLabel = if (favorite) "Remove from Favorites" else "Add to Favorites",
-                                role = Role.Button,
-                            ) { actions.toggleFavorite(now.songId) },
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        NovaIcon(
-                            if (favorite) R.drawable.ic_star else R.drawable.ic_star_outline,
-                            contentDescription = if (favorite) "Remove from Favorites" else "Add to Favorites",
-                            tint = Color.White,
-                            modifier = Modifier.size(18.dp),
-                        )
-                    }
+            if (pane == NowPlayingPane.ART) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    SongTitles(player, Modifier.weight(1f))
+                    if (now != null) FavoriteButton(favorite) { actions.toggleFavorite(now.songId) }
                 }
             }
             Spacer(Modifier.height(20.dp))
@@ -330,14 +345,14 @@ fun NowPlayingScreen(
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                BigControl(R.drawable.ic_skip_previous, "Previous", size = 44, onClick = actions::previous)
+                BigControl(R.drawable.ic_skip_previous, "Previous", size = 40, onClick = actions::previous)
                 BigControl(
                     if (player.isPlaying) R.drawable.ic_pause else R.drawable.ic_play_arrow,
                     if (player.isPlaying) "Pause" else "Play",
-                    size = 64,
+                    size = 54,
                     onClick = actions::togglePlay,
                 )
-                BigControl(R.drawable.ic_skip_next, "Next", size = 44, enabled = player.hasNext, onClick = actions::next)
+                BigControl(R.drawable.ic_skip_next, "Next", size = 40, enabled = player.hasNext, onClick = actions::next)
             }
             Spacer(Modifier.height(14.dp))
             Row(
@@ -347,7 +362,7 @@ fun NowPlayingScreen(
                 horizontalArrangement = Arrangement.SpaceEvenly,
             ) {
                 PaneButton(
-                    icon = R.drawable.ic_subtitles,
+                    icon = if (pane == NowPlayingPane.LYRICS) R.drawable.ic_lyrics_on else R.drawable.ic_lyrics,
                     label = "Lyrics",
                     active = pane == NowPlayingPane.LYRICS,
                     enabled = player.lyrics != null,
@@ -359,6 +374,55 @@ fun NowPlayingScreen(
                 ) { pane = if (pane == NowPlayingPane.QUEUE) NowPlayingPane.ART else NowPlayingPane.QUEUE }
             }
         }
+    }
+}
+
+/** Title (scrolling when it is too long, as in Apple Music) and artist, or the player's error. */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun SongTitles(player: MusicPlayerState, modifier: Modifier = Modifier, small: Boolean = false) {
+    val now = player.nowPlaying
+    Column(modifier) {
+        Text(
+            now?.title ?: "Loading…",
+            fontSize = if (small) 17.sp else 22.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = Color.White,
+            maxLines = 1,
+            modifier = Modifier.basicMarquee(initialDelayMillis = 2_000),
+        )
+        Text(
+            player.error ?: listOfNotNull(now?.artist, now?.album.takeUnless { small }).joinToString(" — "),
+            fontSize = if (small) 15.sp else 18.sp,
+            color = if (player.error != null) NovaColors.AppleMusicRed else Color.White.copy(alpha = 0.6f),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+/**
+ * Apple Music's star: a small translucent circle (an IconButton would grow to 48dp and stick out
+ * past the scrubber's edge).
+ */
+@Composable
+private fun FavoriteButton(favorite: Boolean, onClick: () -> Unit) {
+    val label = if (favorite) "Remove from Favorites" else "Add to Favorites"
+    Box(
+        Modifier
+            .padding(start = 12.dp)
+            .size(32.dp)
+            .clip(CircleShape)
+            .background(Color.White.copy(alpha = 0.15f))
+            .clickable(onClickLabel = label, role = Role.Button, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        NovaIcon(
+            if (favorite) R.drawable.ic_star else R.drawable.ic_star_outline,
+            contentDescription = label,
+            tint = Color.White,
+            modifier = Modifier.size(18.dp),
+        )
     }
 }
 
@@ -405,74 +469,120 @@ private fun LyricsPane(player: MusicPlayerState, actions: AudioActions) {
     LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
         itemsIndexed(lyrics.lines) { index, line ->
             val time = line.timeMs
+            val current = index == active || !lyrics.synced
+            // Apple Music's lyrics: big, bold, left-aligned; the lines around the sung one dim
+            // and soften so the eye stays on it.
+            val alpha by animateFloatAsState(if (current) 1f else 0.32f, tween(300), label = "lyricAlpha")
             Text(
                 line.text.ifEmpty { "♪" },
-                fontSize = 26.sp,
-                lineHeight = 32.sp,
+                fontSize = 28.sp,
+                lineHeight = 34.sp,
                 fontWeight = FontWeight.Bold,
-                color = if (index == active || !lyrics.synced) Color.White else Color.White.copy(alpha = 0.35f),
+                letterSpacing = (-0.4).sp,
+                color = Color.White.copy(alpha = alpha),
                 modifier = Modifier
                     .fillMaxWidth()
+                    .clip(RoundedCornerShape(10.dp))
                     .clickable(enabled = lyrics.synced && time != null) { if (time != null) actions.seekTo(time) }
+                    .padding(vertical = 10.dp)
+                    .then(if (current) Modifier else Modifier.blur(1.5.dp)),
+            )
+        }
+    }
+}
+
+/**
+ * Apple Music's queue: "Playing Next" with square shuffle and repeat toggles beside it, then the
+ * songs to come (tap one to play it), and Stop at the end.
+ */
+@Composable
+private fun QueuePane(player: MusicPlayerState, actions: AudioActions, upNext: List<SongEntity>) {
+    LazyColumn(Modifier.fillMaxSize()) {
+        item(key = "header") {
+            Row(Modifier.padding(bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Playing Next", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    if (player.queueSize > 0) {
+                        Text(
+                            "Song ${player.queueIndex + 1} of ${player.queueSize}",
+                            fontSize = 13.sp,
+                            color = Color.White.copy(alpha = 0.6f),
+                        )
+                    }
+                }
+                SquareToggle(R.drawable.ic_shuffle, "Shuffle", on = player.shuffle, onClick = actions::toggleShuffle)
+                Spacer(Modifier.width(8.dp))
+                SquareToggle(
+                    if (player.repeat == RepeatMode.ONE) R.drawable.ic_repeat_one else R.drawable.ic_repeat,
+                    when (player.repeat) {
+                        RepeatMode.OFF -> "Repeat"
+                        RepeatMode.ALL -> "Repeat all"
+                        RepeatMode.ONE -> "Repeat one"
+                    },
+                    on = player.repeat != RepeatMode.OFF,
+                    onClick = actions::cycleRepeat,
+                )
+            }
+        }
+        if (upNext.isEmpty()) {
+            item(key = "empty") {
+                Text(
+                    "Nothing queued after this song.",
+                    fontSize = 15.sp,
+                    color = Color.White.copy(alpha = 0.6f),
+                    modifier = Modifier.padding(vertical = 16.dp),
+                )
+            }
+        }
+        itemsIndexed(upNext, key = { index, song -> "$index:${song.id}" }) { index, song ->
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable { actions.skipAhead(index + 1) }
+                    .padding(vertical = 7.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Cover(MusicLibrary.artUri(song), size = 44, corner = 6)
+                Column(Modifier.weight(1f).padding(start = 12.dp)) {
+                    Text(song.title, fontSize = 16.sp, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(
+                        song.artist ?: song.albumArtist ?: "Unknown artist",
+                        fontSize = 13.sp,
+                        color = Color.White.copy(alpha = 0.6f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        }
+        item(key = "stop") {
+            Text(
+                "Stop Playing",
+                color = NovaColors.AppleMusicRed,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier
+                    .padding(top = 16.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable(onClick = actions::closePlayer)
                     .padding(vertical = 8.dp),
             )
         }
     }
 }
 
-/** Where the queue stands, with shuffle and repeat. */
+/** Apple Music's queue toggles: a rounded square, white with a dark glyph when on. */
 @Composable
-private fun QueuePane(player: MusicPlayerState, actions: AudioActions) {
-    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-        Text("Playing Next", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color.White)
-        if (player.queueSize > 0) {
-            Text(
-                "Song ${player.queueIndex + 1} of ${player.queueSize}",
-                fontSize = 15.sp,
-                color = Color.White.copy(alpha = 0.6f),
-                modifier = Modifier.padding(top = 4.dp),
-            )
-        }
-        Spacer(Modifier.height(20.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            TogglePill(R.drawable.ic_shuffle, "Shuffle", on = player.shuffle, onClick = actions::toggleShuffle)
-            TogglePill(
-                if (player.repeat == RepeatMode.ONE) R.drawable.ic_repeat_one else R.drawable.ic_repeat,
-                when (player.repeat) {
-                    RepeatMode.OFF -> "Repeat"
-                    RepeatMode.ALL -> "Repeat all"
-                    RepeatMode.ONE -> "Repeat one"
-                },
-                on = player.repeat != RepeatMode.OFF,
-                onClick = actions::cycleRepeat,
-            )
-        }
-        Text(
-            "Stop and close player",
-            color = NovaColors.AppleMusicRed,
-            fontWeight = FontWeight.SemiBold,
-            modifier = Modifier
-                .padding(top = 24.dp)
-                .clip(RoundedCornerShape(8.dp))
-                .clickable(onClick = actions::closePlayer)
-                .padding(8.dp),
-        )
-    }
-}
-
-@Composable
-private fun TogglePill(@DrawableRes icon: Int, label: String, on: Boolean, onClick: () -> Unit) {
-    Row(
+private fun SquareToggle(@DrawableRes icon: Int, label: String, on: Boolean, onClick: () -> Unit) {
+    Box(
         Modifier
-            .clip(RoundedCornerShape(percent = 50))
+            .size(width = 44.dp, height = 34.dp)
+            .clip(RoundedCornerShape(10.dp))
             .background(if (on) Color.White.copy(alpha = 0.9f) else Color.White.copy(alpha = 0.15f))
-            .clickable(role = Role.Switch, onClick = onClick)
-            .padding(horizontal = 18.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
+            .clickable(onClickLabel = label, role = Role.Switch, onClick = onClick),
+        contentAlignment = Alignment.Center,
     ) {
-        val tint = if (on) Color.Black else Color.White
-        NovaIcon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(20.dp))
-        Text(label, color = tint, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(start = 8.dp))
+        NovaIcon(icon, contentDescription = label, tint = if (on) Color.Black else Color.White, modifier = Modifier.size(18.dp))
     }
 }
 

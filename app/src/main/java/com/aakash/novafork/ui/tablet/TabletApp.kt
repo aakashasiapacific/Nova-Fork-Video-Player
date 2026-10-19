@@ -44,6 +44,7 @@ import com.aakash.novafork.ui.audio.MiniPlayerBar
 import com.aakash.novafork.ui.audio.MiniPlayerHeight
 import com.aakash.novafork.ui.audio.NowPlayingHost
 import com.aakash.novafork.ui.audio.rememberMusicShell
+import com.aakash.novafork.ui.audio.rememberUpNext
 import com.aakash.novafork.ui.common.LocalBottomBarSpace
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.AppUiState
@@ -126,6 +127,7 @@ fun TabletApp(state: AppUiState, actions: AppActions, layout: DeviceLayout, modi
                         player = player,
                         actions = viewModel,
                         favorite = player.nowPlaying?.songId in favorites,
+                        upNext = rememberUpNext(viewModel, player),
                         onDismiss = { nowPlayingOpen = false },
                     )
                 }

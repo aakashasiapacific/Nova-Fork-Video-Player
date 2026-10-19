@@ -277,3 +277,33 @@ details gave it away. Decisions:
 - Also swept: the spinner is iOS's spoked one; filter chips are capsules with no checkmark; tabs
   inside sheets and dialogs are iOS segmented controls; checkboxes became switches or
   selection circles; radio buttons became a trailing checkmark.
+
+## 10. Apple Music, more precisely (overnight, 2026-10-19; build 57)
+
+The owner asked for Apple Music to be copied more precisely, with less clutter. Built:
+- **Song and track rows:**
+  - "…" (and a long press) opens Apple Music's song menu: Play Next, Play Last, Add to a
+    Playlist…, Favorite / Undo Favorite, Go to Album, Go to Artist, and Remove from Playlist on a
+    playlist.
+  - This replaces the "+" and "×" buttons that sat on every row.
+  - A favorite song shows a small star by its "…".
+- **The playing song:** four red bars that bounce while it plays and rest while it is paused.
+  In lists they sit over the cover.
+- **Album and playlist pages:** a red "…" circle beside "‹ Back" with Play Next and Play Last.
+  A playlist's Delete moved into that menu.
+- **Album details line:** Apple's caps style ("ROCK · 1975").
+- **Library:** the refresh button became a "…" menu (Rescan Library). Scanning shows a small
+  spinner with "Updating library…" instead of a progress bar.
+- **Now Playing:**
+  - The blurred cover behind the screen turns slowly.
+  - Long titles scroll.
+  - The transport buttons are sized like Apple's.
+  - The lyrics button uses the quote-bubble glyph, filled when lyrics are open.
+- **Lyrics:** 28sp bold, left-aligned. The lines around the sung one dim and soften.
+- **Queue:**
+  - "Playing Next" with square Shuffle and Repeat toggles, then the real list of songs to come
+    (tap one to jump to it), and Stop Playing at the end.
+  - While lyrics or the queue are open, a small header keeps the cover, title and star at the
+    top.
+- **Player:** `MusicPlayer.enqueue` / `PlayQueue.insert` (Play Next, Play Last) and
+  `MusicPlayerState.upNext`.

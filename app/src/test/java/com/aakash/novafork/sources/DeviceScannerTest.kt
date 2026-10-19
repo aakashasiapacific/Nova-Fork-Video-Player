@@ -97,12 +97,13 @@ class DeviceScannerTest {
         val dcim = requireNotNull(UiMappers.browseDir(index, device.id, "DCIM", ScanState()))
         assertEquals(listOf("Camera" to 2, "Screen recordings" to 1), dcim.folders.map { it.name to it.videoCount })
         val camera = requireNotNull(UiMappers.browseDir(index, device.id, "DCIM/Camera", ScanState()))
-        assertEquals(setOf("20240601_101500", "VID_20240604_090000"), camera.videos.map { it.title }.toSet())
+        // Camera and WhatsApp names read as the day they were shot (see friendlyVideoTitle).
+        assertEquals(setOf("Video · 1 Jun 2024", "Video · 4 Jun 2024"), camera.videos.map { it.title }.toSet())
         assertTrue(camera.videos.all { it.kind == MediaKind.VIDEO })
         val whatsApp = requireNotNull(
             UiMappers.browseDir(index, device.id, "Android/media/com.whatsapp/WhatsApp/Media/WhatsApp Video", ScanState()),
         )
-        assertEquals(listOf("VID-20240603-WA0001"), whatsApp.videos.map { it.title })
+        assertEquals(listOf("Video · 3 Jun 2024"), whatsApp.videos.map { it.title })
 
         val library = UiMappers.library(index, LibraryFilter.VIDEOS, LibrarySort.RECENT)
         assertEquals(4, library.items.size)

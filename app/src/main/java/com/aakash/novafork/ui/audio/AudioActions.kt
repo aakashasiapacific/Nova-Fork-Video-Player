@@ -26,4 +26,10 @@ interface AudioActions {
 
     /** Apple Music's star: adds the song to Favorites, or takes it out. */
     fun toggleFavorite(songId: Long)
+
+    /** Apple Music's Play Next ([next]) / Play Last: queues [songs] without stopping this one. */
+    fun enqueue(songs: List<SongEntity>, next: Boolean) = Unit
+
+    /** Plays the song [ahead] places after the current one in Now Playing's queue. */
+    fun skipAhead(ahead: Int) = Unit
 }

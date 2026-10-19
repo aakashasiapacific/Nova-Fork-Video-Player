@@ -5,21 +5,31 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.DrawableRes
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.StartOffset
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -35,11 +45,11 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -55,6 +65,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -73,9 +86,12 @@ import com.aakash.novafork.data.music.MusicLibrary
 import com.aakash.novafork.data.music.MusicLibraryData
 import com.aakash.novafork.data.music.MusicScanState
 import com.aakash.novafork.music.MusicPlayerState
+import com.aakash.novafork.ui.common.IosSpinner
 import com.aakash.novafork.ui.common.LocalBottomBarSpace
 import com.aakash.novafork.ui.common.NovaAlertDialog
+import com.aakash.novafork.ui.common.NovaDropdownMenu
 import com.aakash.novafork.ui.common.NovaIcon
+import com.aakash.novafork.ui.common.NovaMenuItem
 import com.aakash.novafork.ui.theme.AudioTheme
 import com.aakash.novafork.ui.theme.NovaColors
 
@@ -166,6 +182,8 @@ fun AudioContent(
         onBack = ::back,
         onOpen = ::open,
         onAdd = { addingSong = it },
+        favorites = favorites.toSet(),
+        isPlaying = player.isPlaying,
     )
     AnimatedContent(
         targetState = page,
@@ -221,6 +239,10 @@ private class PageContext(
     val onBack: () -> Unit,
     val onOpen: (String) -> Unit,
     val onAdd: (SongEntity) -> Unit,
+    /** Starred songs: a small star in their rows, Favorite or Unfavorite in their menus. */
+    val favorites: Set<Long> = emptySet(),
+    /** The playing song's bars move only while it plays. */
+    val isPlaying: Boolean = false,
 )
 
 private fun pageTitle(page: String, library: MusicLibraryData): String = when {
@@ -272,12 +294,27 @@ private fun LibraryHome(
         row("title") {
             Row(Modifier.padding(top = 20.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text("Library", fontSize = 34.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                IconButton(onClick = ctx.actions::rescan, enabled = !scan.scanning) {
-                    NovaIcon(R.drawable.ic_refresh, contentDescription = "Rescan music", tint = NovaColors.AppleMusicRed)
+                MoreButton("Library options") { close ->
+                    NovaMenuItem(
+                        text = { Text("Rescan Library") },
+                        leadingIcon = { NovaIcon(R.drawable.ic_refresh, contentDescription = null) },
+                        enabled = !scan.scanning,
+                        onClick = {
+                            close()
+                            ctx.actions.rescan()
+                        },
+                    )
                 }
             }
         }
-        if (scan.scanning) row("scanning") { LinearProgressIndicator(Modifier.fillMaxWidth().padding(vertical = 4.dp)) }
+        if (scan.scanning) {
+            row("scanning") {
+                Row(Modifier.padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    IosSpinner(Modifier.size(16.dp))
+                    Text("Updating library…", fontSize = 13.sp, color = Color.White.copy(alpha = 0.55f), modifier = Modifier.padding(start = 8.dp))
+                }
+            }
+        }
         scan.error?.let { error -> row("error") { Text(error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) } }
         if (!hasAccess) row("access") { AccessCard(onRequestAccess) }
         // Apple Music's Library, cut down to what the owner uses: playlists, favorites, albums.
@@ -362,15 +399,7 @@ private fun FavoritesPage(songs: List<SongEntity>, ctx: PageContext) {
         if (songs.isNotEmpty()) row("play") { PlayShuffle(songs, ctx.actions) }
         songs.forEachIndexed { index, song ->
             row("f:${song.id}") {
-                SongRow(
-                    song = song,
-                    playing = song.id == ctx.nowPlayingId,
-                    onClick = { ctx.actions.play(songs, index, false) },
-                    trailingIcon = R.drawable.ic_star,
-                    trailingLabel = "Remove from Favorites",
-                    onTrailing = { ctx.actions.toggleFavorite(song.id) },
-                    trailingTint = NovaColors.AppleMusicRed,
-                )
+                SongRow(song = song, ctx = ctx, onClick = { ctx.actions.play(songs, index, false) })
             }
         }
     }
@@ -390,7 +419,7 @@ private fun SongsPage(title: String, songs: List<SongEntity>, ctx: PageContext) 
 @Composable
 private fun AlbumPage(album: Album, ctx: PageContext) {
     AudioPage {
-        row("back") { BackRow(ctx) }
+        row("back") { BackRow(ctx) { close -> QueueItems(album.songs, ctx, close) } }
         row("cover") {
             Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
                 Box(
@@ -418,21 +447,24 @@ private fun AlbumPage(album: Album, ctx: PageContext) {
                     modifier = Modifier.clickable { ctx.onOpen(ARTIST + album.artistKey) },
                 )
                 val genre = album.songs.firstNotNullOfOrNull { it.genre }
-                val details = listOfNotNull(genre, album.year?.toString()).joinToString(" · ")
+                // Apple Music's caps line: "ROCK · 1975".
+                val details = listOfNotNull(genre, album.year?.toString()).joinToString(" · ").uppercase()
                 if (details.isNotEmpty()) {
-                    Text(details, fontSize = 13.sp, color = Color.White.copy(alpha = 0.55f), modifier = Modifier.padding(top = 4.dp))
+                    Text(
+                        details,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        letterSpacing = 0.2.sp,
+                        color = Color.White.copy(alpha = 0.55f),
+                        modifier = Modifier.padding(top = 6.dp),
+                    )
                 }
             }
         }
         row("play") { PlayShuffle(album.songs, ctx.actions) }
         album.songs.forEachIndexed { index, song ->
             row("t:${song.id}") {
-                TrackRow(
-                    song = song,
-                    playing = song.id == ctx.nowPlayingId,
-                    onClick = { ctx.actions.play(album.songs, index, false) },
-                    onAdd = { ctx.onAdd(song) },
-                )
+                TrackRow(song = song, ctx = ctx, onClick = { ctx.actions.play(album.songs, index, false) })
             }
         }
         row("footer") { Footer(album.songs) }
@@ -463,7 +495,20 @@ private fun ArtistPage(artist: Artist, ctx: PageContext) {
 @Composable
 private fun PlaylistPage(playlist: OpenPlaylist, ctx: PageContext) {
     AudioPage {
-        row("back") { BackRow(ctx) }
+        row("back") {
+            BackRow(ctx) { close ->
+                QueueItems(playlist.songs, ctx, close)
+                NovaMenuItem(
+                    text = { Text("Delete Playlist") },
+                    destructive = true,
+                    leadingIcon = { NovaIcon(R.drawable.ic_delete, contentDescription = null) },
+                    onClick = {
+                        close()
+                        ctx.actions.deletePlaylist(playlist.id)
+                    },
+                )
+            }
+        }
         row("cover") {
             Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
                 Box(
@@ -489,17 +534,10 @@ private fun PlaylistPage(playlist: OpenPlaylist, ctx: PageContext) {
             row("s:${song.id}") {
                 SongRow(
                     song = song,
-                    playing = song.id == ctx.nowPlayingId,
+                    ctx = ctx,
                     onClick = { ctx.actions.play(playlist.songs, index, false) },
-                    trailingIcon = R.drawable.ic_close,
-                    trailingLabel = "Remove from playlist",
-                    onTrailing = { ctx.actions.removeFromPlaylist(song) },
+                    onRemove = { ctx.actions.removeFromPlaylist(song) },
                 )
-            }
-        }
-        row("delete") {
-            TextButton(onClick = { ctx.actions.deletePlaylist(playlist.id) }, modifier = Modifier.padding(top = 16.dp)) {
-                Text("Delete Playlist", color = NovaColors.AppleMusicRed)
             }
         }
     }
@@ -532,26 +570,77 @@ private fun LazyGridScope.header(title: String, ctx: PageContext) {
     }
 }
 
+/** "‹ Library" in red; with [menu], Apple Music's red "…" circle on the right. */
 @Composable
-private fun BackRow(ctx: PageContext) {
-    Row(
-        Modifier
-            .padding(top = 8.dp)
-            .clip(RoundedCornerShape(8.dp))
-            .clickable(onClickLabel = "Back", onClick = ctx.onBack)
-            .padding(vertical = 8.dp, horizontal = 2.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        NovaIcon(R.drawable.ic_arrow_back, contentDescription = null, tint = NovaColors.AppleMusicRed, modifier = Modifier.size(20.dp))
-        Text(
-            ctx.backLabel,
-            color = NovaColors.AppleMusicRed,
-            fontSize = 17.sp,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(start = 6.dp),
-        )
+private fun BackRow(ctx: PageContext, menu: (@Composable ColumnScope.(close: () -> Unit) -> Unit)? = null) {
+    Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            Modifier
+                .weight(1f, fill = false)
+                .clip(RoundedCornerShape(8.dp))
+                .clickable(onClickLabel = "Back", onClick = ctx.onBack)
+                .padding(vertical = 8.dp, horizontal = 2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            NovaIcon(R.drawable.ic_arrow_back, contentDescription = null, tint = NovaColors.AppleMusicRed, modifier = Modifier.size(20.dp))
+            Text(
+                ctx.backLabel,
+                color = NovaColors.AppleMusicRed,
+                fontSize = 17.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(start = 6.dp),
+            )
+        }
+        if (menu != null) {
+            Spacer(Modifier.weight(1f))
+            MoreButton("More", content = menu)
+        }
     }
+}
+
+/** Apple Music's "…": a red ellipsis on a grey circle that opens a menu. */
+@Composable
+private fun MoreButton(label: String, content: @Composable ColumnScope.(close: () -> Unit) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    Box {
+        Box(
+            Modifier
+                .size(30.dp)
+                .clip(CircleShape)
+                .background(Color(0xFF1C1C1E))
+                .clickable(onClickLabel = label, role = Role.Button) { open = true },
+            contentAlignment = Alignment.Center,
+        ) {
+            NovaIcon(R.drawable.ic_more_vert, contentDescription = label, tint = NovaColors.AppleMusicRed, modifier = Modifier.size(18.dp))
+        }
+        NovaDropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            content { open = false }
+        }
+    }
+}
+
+/** Play Next and Play Last for a list of songs (an album, a playlist). */
+@Composable
+private fun QueueItems(songs: List<SongEntity>, ctx: PageContext, close: () -> Unit) {
+    NovaMenuItem(
+        text = { Text("Play Next") },
+        leadingIcon = { NovaIcon(R.drawable.ic_play_next, contentDescription = null) },
+        enabled = songs.isNotEmpty(),
+        onClick = {
+            close()
+            ctx.actions.enqueue(songs, next = true)
+        },
+    )
+    NovaMenuItem(
+        text = { Text("Play Last") },
+        leadingIcon = { NovaIcon(R.drawable.ic_play_last, contentDescription = null) },
+        enabled = songs.isNotEmpty(),
+        onClick = {
+            close()
+            ctx.actions.enqueue(songs, next = false)
+        },
+    )
 }
 
 @Composable
@@ -626,84 +715,230 @@ private fun GreyPill(@DrawableRes icon: Int, label: String, modifier: Modifier, 
 
 private fun LazyGridScope.songRows(songs: List<SongEntity>, ctx: PageContext) {
     itemsIndexed(songs, key = { _, song -> "song:${song.id}" }, span = { _, _ -> GridItemSpan(maxLineSpan) }) { index, song ->
-        SongRow(
-            song = song,
-            playing = song.id == ctx.nowPlayingId,
-            onClick = { ctx.actions.play(songs, index, false) },
-            trailingIcon = R.drawable.ic_playlist_add,
-            trailingLabel = "Add to a playlist",
-            onTrailing = { ctx.onAdd(song) },
-        )
+        SongRow(song = song, ctx = ctx, onClick = { ctx.actions.play(songs, index, false) })
     }
 }
 
-/** A song with its cover; the playing one in red. */
+/**
+ * A song with its cover, as in Apple Music's lists: the playing one in red with moving bars over
+ * its cover, a small star when it is a favorite, and "…" (or a long press) for its menu.
+ * [onRemove] adds Remove from Playlist to the menu.
+ */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun SongRow(
-    song: SongEntity,
-    playing: Boolean,
-    onClick: () -> Unit,
-    @DrawableRes trailingIcon: Int,
-    trailingLabel: String,
-    onTrailing: () -> Unit,
-    trailingTint: Color = Color.White.copy(alpha = 0.55f),
-) {
-    Column(Modifier.clickable(onClick = onClick)) {
-        Row(Modifier.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Cover(MusicLibrary.artUri(song), size = 48, corner = 6)
-            Column(
-                Modifier
-                    .weight(1f)
-                    .padding(start = 12.dp),
-            ) {
+private fun SongRow(song: SongEntity, ctx: PageContext, onClick: () -> Unit, onRemove: (() -> Unit)? = null) {
+    val playing = song.id == ctx.nowPlayingId
+    var menuOpen by remember { mutableStateOf(false) }
+    val haptics = LocalHapticFeedback.current
+    Box {
+        Column(
+            Modifier.combinedClickable(
+                onClick = onClick,
+                onLongClickLabel = "More",
+                onLongClick = {
+                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                    menuOpen = true
+                },
+            ),
+        ) {
+            Row(Modifier.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Box(contentAlignment = Alignment.Center) {
+                    Cover(MusicLibrary.artUri(song), size = 48, corner = 6)
+                    if (playing) {
+                        Box(
+                            Modifier
+                                .size(48.dp)
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(Color.Black.copy(alpha = 0.45f)),
+                        )
+                        PlayingBars(ctx.isPlaying, color = Color.White)
+                    }
+                }
+                Column(
+                    Modifier
+                        .weight(1f)
+                        .padding(start = 12.dp),
+                ) {
+                    Text(
+                        song.title,
+                        fontSize = 16.sp,
+                        color = if (playing) NovaColors.AppleMusicRed else Color.White,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        song.artist ?: song.albumArtist ?: "Unknown artist",
+                        fontSize = 13.sp,
+                        color = Color.White.copy(alpha = 0.55f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                FavoriteStar(song.id in ctx.favorites)
+                RowMoreButton { menuOpen = true }
+            }
+            HorizontalDivider(Modifier.padding(start = 60.dp), thickness = 0.5.dp, color = Color.White.copy(alpha = 0.12f))
+        }
+        SongMenu(song, ctx, expanded = menuOpen, onDismiss = { menuOpen = false }, showAlbum = true, onRemove = onRemove)
+    }
+}
+
+/** An album's track: its number (moving bars while playing), title, star, "…". */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun TrackRow(song: SongEntity, ctx: PageContext, onClick: () -> Unit) {
+    val playing = song.id == ctx.nowPlayingId
+    var menuOpen by remember { mutableStateOf(false) }
+    val haptics = LocalHapticFeedback.current
+    Box {
+        Column(
+            Modifier.combinedClickable(
+                onClick = onClick,
+                onLongClickLabel = "More",
+                onLongClick = {
+                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                    menuOpen = true
+                },
+            ),
+        ) {
+            Row(Modifier.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.width(32.dp)) {
+                    if (playing) {
+                        PlayingBars(ctx.isPlaying, color = NovaColors.AppleMusicRed)
+                    } else {
+                        Text(song.trackNumber?.toString() ?: "", fontSize = 16.sp, color = Color.White.copy(alpha = 0.55f))
+                    }
+                }
                 Text(
                     song.title,
                     fontSize = 16.sp,
                     color = if (playing) NovaColors.AppleMusicRed else Color.White,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
                 )
-                Text(
-                    song.artist ?: song.albumArtist ?: "Unknown artist",
-                    fontSize = 13.sp,
-                    color = Color.White.copy(alpha = 0.55f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                FavoriteStar(song.id in ctx.favorites)
+                RowMoreButton { menuOpen = true }
             }
-            IconButton(onClick = onTrailing) {
-                NovaIcon(trailingIcon, contentDescription = trailingLabel, tint = trailingTint)
-            }
+            HorizontalDivider(Modifier.padding(start = 32.dp), thickness = 0.5.dp, color = Color.White.copy(alpha = 0.12f))
         }
-        HorizontalDivider(Modifier.padding(start = 60.dp), thickness = 0.5.dp, color = Color.White.copy(alpha = 0.12f))
+        SongMenu(song, ctx, expanded = menuOpen, onDismiss = { menuOpen = false }, showAlbum = false)
     }
 }
 
-/** An album's track: its number (or red bars while playing), title, add. */
+/** Apple Music's small star beside a favorite song. */
 @Composable
-private fun TrackRow(song: SongEntity, playing: Boolean, onClick: () -> Unit, onAdd: () -> Unit) {
-    Column(Modifier.clickable(onClick = onClick)) {
-        Row(Modifier.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.width(32.dp)) {
-                if (playing) {
-                    NovaIcon(R.drawable.ic_volume_up, contentDescription = "Playing", tint = NovaColors.AppleMusicRed, modifier = Modifier.size(18.dp))
-                } else {
-                    Text(song.trackNumber?.toString() ?: "", fontSize = 16.sp, color = Color.White.copy(alpha = 0.55f))
-                }
-            }
-            Text(
-                song.title,
-                fontSize = 16.sp,
-                color = if (playing) NovaColors.AppleMusicRed else Color.White,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f),
+private fun FavoriteStar(favorite: Boolean) {
+    if (favorite) {
+        NovaIcon(
+            R.drawable.ic_star,
+            contentDescription = "Favorite",
+            tint = Color.White.copy(alpha = 0.55f),
+            modifier = Modifier.padding(start = 8.dp).size(13.dp),
+        )
+    }
+}
+
+@Composable
+private fun RowMoreButton(onClick: () -> Unit) {
+    IconButton(onClick = onClick) {
+        NovaIcon(R.drawable.ic_more_vert, contentDescription = "More", tint = Color.White, modifier = Modifier.size(20.dp))
+    }
+}
+
+/** A song's menu, as Apple Music's: queue it, add it to a playlist, star it, go to its album or artist. */
+@Composable
+private fun SongMenu(
+    song: SongEntity,
+    ctx: PageContext,
+    expanded: Boolean,
+    onDismiss: () -> Unit,
+    showAlbum: Boolean,
+    onRemove: (() -> Unit)? = null,
+) {
+    val favorite = song.id in ctx.favorites
+    NovaDropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
+        QueueItems(listOf(song), ctx, onDismiss)
+        NovaMenuItem(
+            text = { Text("Add to a Playlist…") },
+            leadingIcon = { NovaIcon(R.drawable.ic_playlist_add, contentDescription = null) },
+            onClick = {
+                onDismiss()
+                ctx.onAdd(song)
+            },
+        )
+        NovaMenuItem(
+            text = { Text(if (favorite) "Undo Favorite" else "Favorite") },
+            leadingIcon = { NovaIcon(if (favorite) R.drawable.ic_star_slash else R.drawable.ic_star_outline, contentDescription = null) },
+            onClick = {
+                onDismiss()
+                ctx.actions.toggleFavorite(song.id)
+            },
+        )
+        if (showAlbum) {
+            NovaMenuItem(
+                text = { Text("Go to Album") },
+                leadingIcon = { NovaIcon(R.drawable.ic_album, contentDescription = null) },
+                onClick = {
+                    onDismiss()
+                    ctx.onOpen(ALBUM + song.albumKey)
+                },
             )
-            IconButton(onClick = onAdd) {
-                NovaIcon(R.drawable.ic_playlist_add, contentDescription = "Add to a playlist", tint = Color.White.copy(alpha = 0.55f))
-            }
         }
-        HorizontalDivider(Modifier.padding(start = 32.dp), thickness = 0.5.dp, color = Color.White.copy(alpha = 0.12f))
+        NovaMenuItem(
+            text = { Text("Go to Artist") },
+            leadingIcon = { NovaIcon(R.drawable.ic_artist, contentDescription = null) },
+            onClick = {
+                onDismiss()
+                ctx.onOpen(ARTIST + song.artistKey)
+            },
+        )
+        if (onRemove != null) {
+            NovaMenuItem(
+                text = { Text("Remove from Playlist") },
+                destructive = true,
+                leadingIcon = { NovaIcon(R.drawable.ic_delete, contentDescription = null) },
+                onClick = {
+                    onDismiss()
+                    onRemove()
+                },
+            )
+        }
+    }
+}
+
+/**
+ * Apple Music's "now playing" bars: four thin bars that bounce while the song plays and rest
+ * low while it is paused.
+ */
+@Composable
+internal fun PlayingBars(playing: Boolean, color: Color, modifier: Modifier = Modifier) {
+    val transition = rememberInfiniteTransition(label = "bars")
+    val phases = listOf(0, 180, 90, 270)
+    Row(
+        modifier.height(14.dp),
+        horizontalArrangement = Arrangement.spacedBy(2.dp),
+        verticalAlignment = Alignment.Bottom,
+    ) {
+        phases.forEachIndexed { index, phase ->
+            val bounce by transition.animateFloat(
+                initialValue = 0.25f,
+                targetValue = 1f,
+                animationSpec = infiniteRepeatable(
+                    tween(durationMillis = 420 + index * 70, easing = FastOutSlowInEasing),
+                    repeatMode = RepeatMode.Reverse,
+                    initialStartOffset = StartOffset(phase),
+                ),
+                label = "bar$index",
+            )
+            Box(
+                Modifier
+                    .width(3.dp)
+                    .fillMaxHeight(if (playing) bounce else 0.25f)
+                    .clip(RoundedCornerShape(1.dp))
+                    .background(color),
+            )
+        }
     }
 }
 

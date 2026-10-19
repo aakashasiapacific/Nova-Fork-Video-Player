@@ -95,6 +95,31 @@ internal class PlayQueue(private val random: Random = Random.Default) {
     }
 
     /**
+     * Queues [newIds] right after the playing item ([next], Apple Music's Play Next) or after
+     * everything else (Play Last). The playing item keeps its place.
+     */
+    fun insert(newIds: List<Long>, next: Boolean) {
+        if (newIds.isEmpty()) return
+        val first = ids.size
+        ids = ids + newIds
+        val added = newIds.indices.map { first + it }
+        if (order.isEmpty()) {
+            order = added
+            position = 0
+            return
+        }
+        order = if (next) {
+            order.subList(0, position + 1) + added + order.subList(position + 1, order.size)
+        } else {
+            order + added
+        }
+    }
+
+    /** The ids queued after the playing item, in play order (at most [limit]). */
+    fun upNext(limit: Int): List<Long> =
+        if (order.isEmpty()) emptyList() else order.drop(position + 1).take(limit).map { ids[it] }
+
+    /**
      * Drops [gone] videos (no longer in the library), except the playing one, which shows its
      * own error when it can't be opened.
      */

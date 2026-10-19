@@ -83,6 +83,7 @@ import com.aakash.novafork.ui.audio.MiniPlayerBar
 import com.aakash.novafork.ui.audio.MiniPlayerHeight
 import com.aakash.novafork.ui.audio.NowPlayingHost
 import com.aakash.novafork.ui.audio.rememberMusicShell
+import com.aakash.novafork.ui.audio.rememberUpNext
 import com.aakash.novafork.ui.common.GlassCircle
 import com.aakash.novafork.ui.common.LocalBottomBarSpace
 import com.aakash.novafork.ui.common.NovaIcon
@@ -203,6 +204,7 @@ fun PhoneApp(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
                 player = musicState,
                 actions = viewModel,
                 favorite = musicState.nowPlaying?.songId in favorites,
+                upNext = rememberUpNext(viewModel, musicState),
                 onDismiss = { nowPlayingOpen = false },
             )
         }
