@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
 import com.aakash.novafork.core.format.Formats
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
+import com.aakash.novafork.ui.common.IosColors
 import com.aakash.novafork.ui.common.IosProgressBar
 import com.aakash.novafork.ui.common.LocalBottomBarSpace
 import com.aakash.novafork.ui.common.NovaIcon
@@ -228,22 +229,38 @@ private fun FromShowCard(showTitle: String, onClick: () -> Unit, modifier: Modif
     }
 }
 
+/**
+ * The facts about the file, laid out like the Information section at the bottom of an Apple TV
+ * page: no card, a small white heading over each grey value, the short ones two to a line.
+ */
 @Composable
 private fun FileInfo(details: VideoDetailsUi, modifier: Modifier = Modifier) {
-    Column(modifier.fillMaxWidth()) {
-        SectionHeader(title = "File", modifier = Modifier.padding(bottom = 10.dp))
-        Surface(
-            shape = RoundedCornerShape(LocalNovaDimens.current.cardRadius),
-            color = MaterialTheme.colorScheme.surfaceContainerLow,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                if (details.fileName.isNotBlank()) InfoRow("Name", details.fileName)
-                if (details.location.isNotBlank()) InfoRow("Location", details.location)
-                details.sizeLabel?.takeIf { it.isNotBlank() }?.let { InfoRow("Size", it) }
-                details.resolutionLabel?.takeIf { it.isNotBlank() }?.let { InfoRow("Video", it) }
-                if (details.sourceLabel.isNotBlank()) InfoRow("Source", details.sourceLabel)
+    val wide = listOfNotNull(
+        details.fileName.takeIf { it.isNotBlank() }?.let { "File" to it },
+        details.location.takeIf { it.isNotBlank() }?.let { "Location" to it },
+    )
+    val short = listOfNotNull(
+        details.sizeLabel?.takeIf { it.isNotBlank() }?.let { "Size" to it },
+        details.resolutionLabel?.takeIf { it.isNotBlank() }?.let { "Video" to it },
+        details.sourceLabel.takeIf { it.isNotBlank() }?.let { "Source" to it },
+    )
+    if (wide.isEmpty() && short.isEmpty()) return
+    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        SectionHeader(title = "Information")
+        wide.forEach { (label, value) -> Fact(label, value) }
+        short.chunked(2).forEach { pair ->
+            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                pair.forEach { (label, value) -> Fact(label, value, Modifier.weight(1f)) }
+                if (pair.size == 1) Spacer(Modifier.weight(1f))
             }
         }
+    }
+}
+
+@Composable
+private fun Fact(label: String, value: String, modifier: Modifier = Modifier) {
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(label, style = MaterialTheme.typography.titleSmall)
+        Text(value, style = MaterialTheme.typography.bodyMedium, color = IosColors.SecondaryLabel)
     }
 }

@@ -453,3 +453,4 @@ The owner asked for Apple Music to be copied more precisely, with less clutter. 
 - **Source tiles (build 86):** Add Network Source and the iPad's Browse show each kind of source in the coloured tile it gets in Preferences, under grey capital section headers, as iOS Settings does.
 - **Fewer buttons in Preferences (build 87):** folders and network sources lose their pencil and bin; one "…" menu holds Edit and Remove (in red), and tapping a network source still edits it.
 - **Permission row (build 88):** All files access says only Allowed / Not allowed with a blue Allow; its explanation moves under the group in grey, as iOS Settings does.
+- **Information (build 89):** the file facts at the bottom of a phone video page drop their card for the Apple TV Information layout — a small white heading over each grey value, short ones two to a line.
