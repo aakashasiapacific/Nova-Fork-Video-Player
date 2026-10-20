@@ -28,7 +28,6 @@ import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
 import com.aakash.novafork.ui.model.PlayerActions
 import com.aakash.novafork.ui.model.PlayerUiState
-import com.aakash.novafork.ui.model.RepeatMode
 
 private val CenterButtonSize = 52.dp
 private val CenterIconSize = 32.dp
@@ -134,7 +133,15 @@ private fun PhoneTopBar(
                 if (state.queue.size > 1) {
                     add(PlayerMenuItem(R.drawable.ic_playlist_play, "Queue") { onOpenSheet(PlayerSheet.QUEUE) })
                 }
-                add(PlayerMenuItem(R.drawable.ic_volume_up, "Play in background", actions::playInBackground))
+                add(PlayerMenuItem(R.drawable.ic_volume_up, "Play in Background", actions::playInBackground))
+                // Moved here from the bottom row, which keeps only lock, speed and picture-in-picture
+                // as iOS's player keeps its bar short.
+                add(PlayerMenuItem(R.drawable.ic_aspect_ratio, "Aspect Ratio: ${state.aspect.label}", actions::cycleAspect))
+                add(PlayerMenuItem(state.repeatMode.iconRes(), state.repeatMode.label, actions::cycleRepeat))
+                if (state.canShuffle) {
+                    add(PlayerMenuItem(R.drawable.ic_shuffle, if (state.shuffle) "Shuffle On" else "Shuffle Off", actions::toggleShuffle))
+                }
+                add(PlayerMenuItem(R.drawable.ic_screen_rotation, "Rotate", actions::rotate))
             },
         )
     }
@@ -225,28 +232,8 @@ private fun PhoneBottomBar(
         )
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             PlayerIconButton(icon = R.drawable.ic_lock, contentDescription = "Lock screen", onClick = actions::toggleLock)
-            if (state.canShuffle) {
-                PlayerToggleButton(
-                    icon = R.drawable.ic_shuffle,
-                    contentDescription = "Shuffle",
-                    checked = state.shuffle,
-                    onClick = actions::toggleShuffle,
-                )
-            }
-            PlayerToggleButton(
-                icon = state.repeatMode.iconRes(),
-                contentDescription = state.repeatMode.label,
-                checked = state.repeatMode != RepeatMode.OFF,
-                onClick = actions::cycleRepeat,
-            )
             Spacer(Modifier.weight(1f))
-            PlayerIconButton(
-                icon = R.drawable.ic_aspect_ratio,
-                contentDescription = "Aspect ratio: ${state.aspect.label}",
-                onClick = actions::cycleAspect,
-            )
             SpeedButton(rate = state.rate, onClick = { onOpenPanel(PlayerPanel.SPEED) })
-            PlayerIconButton(icon = R.drawable.ic_screen_rotation, contentDescription = "Rotate", onClick = actions::rotate)
             if (state.canEnterPictureInPicture) {
                 PlayerIconButton(
                     icon = R.drawable.ic_picture_in_picture_alt,

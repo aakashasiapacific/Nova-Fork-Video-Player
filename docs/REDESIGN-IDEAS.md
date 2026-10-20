@@ -372,3 +372,6 @@ The owner asked for Apple Music to be copied more precisely, with less clutter. 
 - **Sources page (build 66):** an inset-grouped list like Preferences. Grey caps headers, each
   section one rounded card with hairlines, and the same coloured icon tiles. "New Playlist…" is
   in Title Case everywhere.
+- **Phone player (build 67):** the bottom row keeps only Lock, Speed and picture-in-picture, as
+  iOS's player keeps its bar short. Aspect Ratio, Repeat, Shuffle and Rotate moved into the "…"
+  menu, each showing its current state.
