@@ -13,6 +13,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -146,11 +147,13 @@ internal fun NovaTabCapsule(selected: TopDestination, onSelect: (TopDestination)
 /** One of the shrunken bar's round glass buttons. */
 @Composable
 internal fun GlassCircle(onClick: () -> Unit, description: String, size: Dp, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+    val press = remember { MutableInteractionSource() }
     Box(
         modifier
+            .pressScale(press, pressed = 0.9f)
             .size(size)
             .glass(CircleShape)
-            .clickable(onClickLabel = description, role = Role.Button, onClick = onClick)
+            .clickable(interactionSource = press, indication = LocalIndication.current, onClickLabel = description, role = Role.Button, onClick = onClick)
             .semantics { contentDescription = description },
         contentAlignment = Alignment.Center,
     ) { content() }

@@ -7,6 +7,7 @@ import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
@@ -22,6 +23,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
+import androidx.compose.foundation.interaction.InteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -718,5 +721,16 @@ fun CollapsedTitleBar(visible: Boolean, title: String, modifier: Modifier = Modi
             )
             Box(Modifier.fillMaxWidth().height(Hairline).background(IosColors.Separator))
         }
+    }
+}
+
+/** iOS 26's press: the button shrinks a little while held and springs back on release. */
+@Composable
+fun Modifier.pressScale(source: InteractionSource, pressed: Float = 0.94f): Modifier {
+    val down by source.collectIsPressedAsState()
+    val scale by animateFloatAsState(if (down) pressed else 1f, spring(dampingRatio = 0.6f, stiffness = 700f), label = "pressScale")
+    return graphicsLayer {
+        scaleX = scale
+        scaleY = scale
     }
 }

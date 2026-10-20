@@ -11,6 +11,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -75,6 +76,7 @@ import com.aakash.novafork.ui.common.HeroVideoPreview
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.PosterArt
 import com.aakash.novafork.ui.common.RatingPill
+import com.aakash.novafork.ui.common.pressScale
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.Artwork
 import com.aakash.novafork.ui.model.HeroTarget
@@ -477,9 +479,11 @@ private fun HeroActions(
     fillPlay: Boolean = false,
 ) {
     Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        val playPress = remember { MutableInteractionSource() }
         Button(
             onClick = play,
-            modifier = (if (fillPlay) Modifier.weight(1f) else Modifier.widthIn(min = 160.dp, max = 240.dp)).height(50.dp),
+            interactionSource = playPress,
+            modifier = (if (fillPlay) Modifier.weight(1f) else Modifier.widthIn(min = 160.dp, max = 240.dp)).height(50.dp).pressScale(playPress),
             colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black),
             contentPadding = PaddingValues(horizontal = 24.dp),
         ) {
@@ -508,9 +512,11 @@ private fun HeroActions(
 
 @Composable
 private fun RoundHeroButton(@DrawableRes icon: Int, description: String, onClick: () -> Unit) {
+    val press = remember { MutableInteractionSource() }
     IconButton(
         onClick = onClick,
-        modifier = Modifier.size(50.dp),
+        interactionSource = press,
+        modifier = Modifier.size(50.dp).pressScale(press, pressed = 0.9f),
         colors = IconButtonDefaults.iconButtonColors(
             containerColor = Color.White.copy(alpha = 0.18f),
             contentColor = Color.White,
