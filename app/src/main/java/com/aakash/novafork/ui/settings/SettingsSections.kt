@@ -2,6 +2,7 @@ package com.aakash.novafork.ui.settings
 
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -42,7 +43,9 @@ import com.aakash.novafork.data.TmdbHost
 import com.aakash.novafork.data.db.SourceType
 import com.aakash.novafork.ui.common.IosSpinner
 import com.aakash.novafork.ui.common.NovaAlertDialog
+import com.aakash.novafork.ui.common.NovaDropdownMenu
 import com.aakash.novafork.ui.common.NovaIcon
+import com.aakash.novafork.ui.common.NovaMenuItem
 import com.aakash.novafork.ui.common.NovaTextField
 import com.aakash.novafork.ui.common.sourceTypeIcon
 import com.aakash.novafork.ui.model.AppActions
@@ -235,10 +238,34 @@ private fun SourceRow(shape: Shape, source: SourceUi, onEdit: (() -> Unit)?, onR
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        if (onEdit != null) {
-            IconButton(onClick = onEdit) { NovaIcon(R.drawable.ic_edit, contentDescription = "Edit ${source.name}") }
+        // One "…" menu instead of a pencil and a bin on every row, as iOS keeps a list's actions.
+        var menuOpen by remember { mutableStateOf(false) }
+        Box {
+            IconButton(onClick = { menuOpen = true }) {
+                NovaIcon(R.drawable.ic_more_vert, contentDescription = "Options for ${source.name}")
+            }
+            NovaDropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                if (onEdit != null) {
+                    NovaMenuItem(
+                        text = { Text("Edit") },
+                        leadingIcon = { NovaIcon(R.drawable.ic_edit, contentDescription = null) },
+                        onClick = {
+                            menuOpen = false
+                            onEdit()
+                        },
+                    )
+                }
+                NovaMenuItem(
+                    text = { Text("Remove") },
+                    destructive = true,
+                    leadingIcon = { NovaIcon(R.drawable.ic_delete, contentDescription = null) },
+                    onClick = {
+                        menuOpen = false
+                        onRemove()
+                    },
+                )
+            }
         }
-        IconButton(onClick = onRemove) { NovaIcon(R.drawable.ic_delete, contentDescription = "Remove ${source.name}") }
     }
 }
 

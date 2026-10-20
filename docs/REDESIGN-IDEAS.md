@@ -451,3 +451,4 @@ The owner asked for Apple Music to be copied more precisely, with less clutter. 
 - **Empty states (build 84):** iOS's "content unavailable" look — a large grey symbol on its own (no tinted circle), a bold title and grey text.
 - **Playlists (build 85):** as in Apple Music, a playlist with four or more albums shows their covers in a 2×2 grid, ends with "N songs, M minutes", and an empty one says how to add songs.
 - **Source tiles (build 86):** Add Network Source and the iPad's Browse show each kind of source in the coloured tile it gets in Preferences, under grey capital section headers, as iOS Settings does.
+- **Fewer buttons in Preferences (build 87):** folders and network sources lose their pencil and bin; one "…" menu holds Edit and Remove (in red), and tapping a network source still edits it.
