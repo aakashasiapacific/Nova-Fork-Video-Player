@@ -126,7 +126,7 @@ fun SectionHeader(
             text = title,
             style = MaterialTheme.typography.titleLarge,
             modifier = Modifier.weight(1f),
-            maxLines = 1,
+            maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
         if (actionLabel != null && onAction != null) {
@@ -193,7 +193,7 @@ fun ScanBanner(scan: ScanUi, modifier: Modifier = Modifier) {
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
-                maxLines = 1,
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
         }

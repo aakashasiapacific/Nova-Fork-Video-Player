@@ -174,7 +174,7 @@ private fun PlaySection(details: VideoDetailsUi, actions: AppActions, modifier: 
         ) {
             NovaIcon(R.drawable.ic_play_arrow, contentDescription = null, modifier = Modifier.size(24.dp))
             Spacer(Modifier.width(ButtonDefaults.IconSpacing))
-            Text(details.playLabel, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(details.playLabel, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
         }
         val progress = details.progress
         if (progress != null && progress > 0f) {
@@ -221,7 +221,7 @@ private fun FromShowCard(showTitle: String, onClick: () -> Unit, modifier: Modif
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text("From", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text(showTitle, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(showTitle, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
             }
             NovaIcon(R.drawable.ic_chevron_right, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
         }

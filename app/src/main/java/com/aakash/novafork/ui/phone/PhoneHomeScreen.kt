@@ -198,14 +198,15 @@ private fun HomeFeed(home: HomeUi, scan: ScanUi, permission: PermissionUi, actio
             }
             if (home.continueWatching.isNotEmpty()) {
                 item(key = "continue", contentType = "landscapeRow") {
-                    HomeSection(title = "Continue Watching") {
+                    // Right under the hero's dots (owner: no empty band before it).
+                    HomeSection(title = "Continue Watching", topPadding = 4.dp) {
                         LandscapeRow(home.continueWatching, actions)
                     }
                 }
             }
             if (home.watchlist.isNotEmpty()) {
                 item(key = "watchlist", contentType = "landscapeRow") {
-                    HomeSection(title = "Watchlist") {
+                    HomeSection(title = "Watchlist", topPadding = if (home.continueWatching.isEmpty()) 4.dp else null) {
                         WatchlistRow(home.watchlist, actions)
                     }
                 }
@@ -263,10 +264,12 @@ private fun HeroStatusBar(hero: HeroUi?, active: Boolean) {
 private fun HomeSection(
     title: String,
     onSeeAll: (() -> Unit)? = null,
+    /** Space above the title; null = the usual gap between sections. */
+    topPadding: Dp? = null,
     content: @Composable () -> Unit,
 ) {
     val dims = LocalNovaDimens.current
-    Column(Modifier.fillMaxWidth().padding(top = dims.sectionSpacing)) {
+    Column(Modifier.fillMaxWidth().padding(top = topPadding ?: dims.sectionSpacing)) {
         SectionHeader(
             title = title,
             modifier = Modifier

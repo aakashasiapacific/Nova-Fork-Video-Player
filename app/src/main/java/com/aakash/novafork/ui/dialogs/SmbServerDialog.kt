@@ -206,9 +206,9 @@ internal fun FormField(
         value = value,
         onValueChange = onValueChange,
         modifier = modifier,
-        label = { Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+        label = { Text(label, maxLines = 2, overflow = TextOverflow.Ellipsis) },
         placeholder = if (placeholder != null) {
-            { Text(placeholder, maxLines = 1) }
+            { Text(placeholder, maxLines = 2) }
         } else {
             null
         },

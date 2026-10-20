@@ -224,7 +224,7 @@ private fun ResultBadge(text: String, color: Color, @DrawableRes icon: Int? = nu
             horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             if (icon != null) Icon(painter = painterResource(icon), contentDescription = null, modifier = Modifier.size(14.dp))
-            Text(text = text, style = MaterialTheme.typography.labelMedium, maxLines = 1)
+            Text(text = text, style = MaterialTheme.typography.labelMedium, maxLines = 2)
         }
     }
 }

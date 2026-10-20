@@ -221,7 +221,7 @@ internal fun TabletPlayButton(label: String, onClick: () -> Unit, modifier: Modi
     ) {
         NovaIcon(R.drawable.ic_play_arrow, contentDescription = null, modifier = Modifier.size(22.dp))
         Spacer(Modifier.width(ButtonDefaults.IconSpacing))
-        Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(label, maxLines = 2, overflow = TextOverflow.Ellipsis)
     }
 }
 
@@ -230,7 +230,7 @@ internal fun TabletPlayButton(label: String, onClick: () -> Unit, modifier: Modi
 internal fun ButtonLabel(@DrawableRes icon: Int, text: String) {
     NovaIcon(icon, contentDescription = null, modifier = Modifier.size(ButtonDefaults.IconSize))
     Spacer(Modifier.width(ButtonDefaults.IconSpacing))
-    Text(text, maxLines = 1)
+    Text(text, maxLines = 2)
 }
 
 /** Round back button that stays readable over artwork. */
@@ -261,7 +261,7 @@ internal fun TabletTag(text: String, modifier: Modifier = Modifier) {
             text = text,
             style = MaterialTheme.typography.labelLarge,
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-            maxLines = 1,
+            maxLines = 2,
         )
     }
 }
@@ -273,7 +273,7 @@ internal fun ImageLabel(text: String, modifier: Modifier = Modifier, emphasized:
         text = text,
         style = MaterialTheme.typography.labelMedium,
         color = if (emphasized) MaterialTheme.colorScheme.onPrimary else Color.White,
-        maxLines = 1,
+        maxLines = 2,
         modifier = modifier
             .clip(RoundedCornerShape(6.dp))
             .background(if (emphasized) MaterialTheme.colorScheme.primary else Color.Black.copy(alpha = 0.6f))
@@ -369,7 +369,7 @@ internal fun TabletPosterCard(
         Text(
             text = title,
             style = MaterialTheme.typography.titleSmall,
-            maxLines = 1,
+            maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
         if (!subtitle.isNullOrBlank()) {
@@ -377,7 +377,7 @@ internal fun TabletPosterCard(
                 text = subtitle,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
         }
@@ -523,7 +523,7 @@ internal fun TabletLandscapeCard(
                     text = card.primaryLine(),
                     style = MaterialTheme.typography.titleMedium,
                     color = Color.White,
-                    maxLines = 1,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
                 val secondary = metaLine(card.secondaryLine(), card.remainingLabel())
@@ -532,7 +532,7 @@ internal fun TabletLandscapeCard(
                         text = secondary,
                         style = MaterialTheme.typography.bodySmall,
                         color = Color.White.copy(alpha = 0.78f),
-                        maxLines = 1,
+                        maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
@@ -603,7 +603,7 @@ internal fun TabletStillCard(
         Text(
             text = title,
             style = MaterialTheme.typography.titleSmall,
-            maxLines = 1,
+            maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
         if (!subtitle.isNullOrBlank()) {
@@ -611,7 +611,7 @@ internal fun TabletStillCard(
                 text = subtitle,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
         }
@@ -631,7 +631,7 @@ internal fun TabletStillCard(
                 text = footnote,
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
+                maxLines = 2,
             )
         }
     }

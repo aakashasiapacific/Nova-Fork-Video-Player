@@ -713,7 +713,7 @@ private fun BackRow(ctx: PageContext, menu: (@Composable ColumnScope.(close: () 
                 ctx.backLabel,
                 color = NovaColors.AppleMusicRed,
                 fontSize = 17.sp,
-                maxLines = 1,
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.padding(start = 6.dp),
             )
@@ -805,11 +805,11 @@ private fun AlbumTile(album: Album, modifier: Modifier = Modifier, onClick: () -
         Text(
             album.title,
             fontSize = 14.sp,
-            maxLines = 1,
+            maxLines = 2,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.padding(top = 6.dp),
         )
-        Text(album.artist, fontSize = 13.sp, color = Color.White.copy(alpha = 0.55f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(album.artist, fontSize = 13.sp, color = Color.White.copy(alpha = 0.55f), maxLines = 2, overflow = TextOverflow.Ellipsis)
     }
 }
 
@@ -888,14 +888,14 @@ private fun SongRow(song: SongEntity, ctx: PageContext, onClick: () -> Unit, onR
                         song.title,
                         fontSize = 16.sp,
                         color = if (playing) NovaColors.AppleMusicRed else Color.White,
-                        maxLines = 1,
+                        maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                     )
                     Text(
                         song.artist ?: song.albumArtist ?: "Unknown artist",
                         fontSize = 13.sp,
                         color = Color.White.copy(alpha = 0.55f),
-                        maxLines = 1,
+                        maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
@@ -938,7 +938,7 @@ private fun TrackRow(song: SongEntity, ctx: PageContext, onClick: () -> Unit) {
                     song.title,
                     fontSize = 16.sp,
                     color = if (playing) NovaColors.AppleMusicRed else Color.White,
-                    maxLines = 1,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f),
                 )
@@ -1096,7 +1096,7 @@ private fun ListRow(
                 Spacer(Modifier.width(14.dp))
             }
             Column(Modifier.weight(1f)) {
-                Text(title, fontSize = 17.sp, color = titleColor, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(title, fontSize = 17.sp, color = titleColor, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 if (subtitle != null) Text(subtitle, fontSize = 13.sp, color = Color.White.copy(alpha = 0.55f))
             }
             if (chevron) NovaIcon(R.drawable.ic_chevron_right, contentDescription = null, tint = Color.White.copy(alpha = 0.3f))
@@ -1190,7 +1190,7 @@ internal fun AddToPlaylistDialog(
                 fontSize = 13.sp,
                 color = Color.White.copy(alpha = 0.55f),
                 textAlign = TextAlign.Center,
-                maxLines = 1,
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
             )

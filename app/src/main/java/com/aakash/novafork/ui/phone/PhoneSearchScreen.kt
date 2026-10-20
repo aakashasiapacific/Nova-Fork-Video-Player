@@ -164,7 +164,7 @@ private fun SearchField(
                     "Movies, music and more",
                     style = MaterialTheme.typography.bodyLarge,
                     color = Color.White.copy(alpha = 0.45f),
-                    maxLines = 1,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
             }

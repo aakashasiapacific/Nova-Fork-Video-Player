@@ -78,7 +78,7 @@ internal fun AddToPlaylistSheet(dialog: DialogUi.AddToPlaylist, playlists: List<
                     text = dialog.label,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
@@ -98,7 +98,7 @@ internal fun AddToPlaylistSheet(dialog: DialogUi.AddToPlaylist, playlists: List<
                 ListItem(
                     modifier = Modifier.clickable { actions.addVideosToPlaylist(playlist.id, dialog.videoIds) },
                     leadingContent = { PlaylistThumb(artwork = playlist.artwork) },
-                    headlineContent = { Text(playlist.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    headlineContent = { Text(playlist.name, maxLines = 2, overflow = TextOverflow.Ellipsis) },
                     supportingContent = { Text(playlistCountLabel(playlist.itemCount)) },
                     colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                 )

@@ -236,13 +236,13 @@ private fun SourceRow(source: SourceUi, actions: AppActions) {
     ListItem(
         modifier = Modifier.clickable { actions.openSource(source.id) },
         leadingContent = { RowIcon(source.type.iconRes()) },
-        headlineContent = { Text(source.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+        headlineContent = { Text(source.name, maxLines = 2, overflow = TextOverflow.Ellipsis) },
         supportingContent = {
             Column {
                 if (source.detail.isNotBlank()) {
-                    Text(source.detail, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(source.detail, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 }
-                Text(countLabel(source.videoCount, "video"), maxLines = 1)
+                Text(countLabel(source.videoCount, "video"), maxLines = 2)
                 val error = source.error
                 if (!error.isNullOrBlank()) {
                     Text(
@@ -306,9 +306,9 @@ private fun StreamRow(stream: VideoCardUi, onClick: () -> Unit, onLongClick: () 
     ListItem(
         modifier = Modifier.combinedClickable(onClick = onClick, onLongClick = onLongClick),
         leadingContent = { RowIcon(R.drawable.ic_live_tv) },
-        headlineContent = { Text(stream.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+        headlineContent = { Text(stream.title, maxLines = 2, overflow = TextOverflow.Ellipsis) },
         supportingContent = if (!subtitle.isNullOrBlank()) {
-            { Text(subtitle, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+            { Text(subtitle, maxLines = 2, overflow = TextOverflow.Ellipsis) }
         } else {
             null
         },
@@ -325,8 +325,8 @@ private fun PlaylistRow(playlist: PlaylistUi, onClick: () -> Unit) {
     ListItem(
         modifier = Modifier.clickable(onClick = onClick),
         leadingContent = { RowIcon(R.drawable.ic_playlist_play) },
-        headlineContent = { Text(playlist.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-        supportingContent = { Text(playlistCountLabel(playlist.itemCount), maxLines = 1) },
+        headlineContent = { Text(playlist.name, maxLines = 2, overflow = TextOverflow.Ellipsis) },
+        supportingContent = { Text(playlistCountLabel(playlist.itemCount), maxLines = 2) },
         trailingContent = {
             NovaIcon(R.drawable.ic_chevron_right, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
         },

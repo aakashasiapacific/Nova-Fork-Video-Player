@@ -41,6 +41,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.coerceAtMost
@@ -51,6 +52,7 @@ import com.aakash.novafork.ui.adaptive.LocalNovaDimens
 import com.aakash.novafork.ui.common.ArtImage
 import com.aakash.novafork.ui.common.ArtPlaceholder
 import com.aakash.novafork.ui.common.BackdropArt
+import com.aakash.novafork.ui.common.HeroTitle
 import com.aakash.novafork.ui.common.NovaDropdownMenu
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.PosterArt
@@ -251,18 +253,22 @@ internal fun PhoneDetailsHeader(
     maxBackdropHeight: Dp = Dp.Infinity,
 ) {
     BackdropPosterHeader(artwork = artwork, title = title, modifier = modifier, maxBackdropHeight = maxBackdropHeight) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.headlineSmall,
-            maxLines = 3,
-            overflow = TextOverflow.Ellipsis,
+        // The title's TMDB logo, as on Home's hero (owner): the same artwork on both pages.
+        HeroTitle(
+            title = title,
+            logoUrl = artwork.logoUrl,
+            textStyle = MaterialTheme.typography.headlineSmall,
+            textAlign = TextAlign.Start,
+            logoAlignment = Alignment.BottomStart,
+            maxWidthFraction = 1f,
+            logoHeight = 48.dp,
         )
         if (!originalTitle.isNullOrBlank() && originalTitle != title) {
             Text(
                 text = originalTitle,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
         }

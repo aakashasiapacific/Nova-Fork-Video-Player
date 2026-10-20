@@ -418,3 +418,16 @@ The owner asked for Apple Music to be copied more precisely, with less clutter. 
 - **Swipe to delete (build 73):** iOS's swipe left on playlist rows, for videos and for songs.
   It uncovers a red Remove button; a long swipe removes at once (`SwipeToDelete`).
 - **Add to Playlist sheet (videos):** a centred title, as iOS sheets have.
+
+## 18. Owner's notes on build 73 (2026-10-20; build 74)
+
+1. **No empty band under the hero:** the dots sit 4dp above its bottom (was 16), and the first
+   section after it, Continue Watching or the Watchlist, starts 4dp below rather than a whole
+   section gap.
+2. **No sentences cut off mid-way:** titles, meta lines, subtitles and captions wrap to a second
+   line before they end in "…". That covers cards, posters, the hero, details pages, rows,
+   dialogs, the queue and tablet panes. One line is kept only where a second can't fit: tab and
+   button labels, nav bar titles, player chrome, the mini player, and Now Playing's scrolling
+   title.
+3. **Details pages show the title's TMDB logo,** as Home's hero does. Plain text is used only
+   when a title has no logo.

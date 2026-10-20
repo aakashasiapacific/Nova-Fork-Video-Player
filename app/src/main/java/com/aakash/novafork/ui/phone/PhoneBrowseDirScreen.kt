@@ -215,7 +215,7 @@ private fun FolderRow(folder: FolderUi, onClick: () -> Unit) {
                 NovaIcon(R.drawable.ic_folder, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
             }
         },
-        headlineContent = { Text(folder.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+        headlineContent = { Text(folder.name, maxLines = 2, overflow = TextOverflow.Ellipsis) },
         supportingContent = { Text(folder.note ?: countLabel(folder.videoCount, "video")) },
         trailingContent = {
             NovaIcon(R.drawable.ic_chevron_right, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)

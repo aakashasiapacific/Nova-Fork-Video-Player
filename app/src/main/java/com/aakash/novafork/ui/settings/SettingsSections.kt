@@ -210,14 +210,14 @@ private fun SourceRow(shape: Shape, source: SourceUi, onEdit: (() -> Unit)?, onR
     RowSurface(shape = shape, onClick = onEdit) {
         RowIcon(sourceTypeIcon(source.type))
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(source.name, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(source.name, style = MaterialTheme.typography.bodyLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
             // A folder picked at the top of a volume is usually named like its path.
             if (!source.detail.equals(source.name, ignoreCase = true)) {
                 Text(
                     text = source.detail,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
             }

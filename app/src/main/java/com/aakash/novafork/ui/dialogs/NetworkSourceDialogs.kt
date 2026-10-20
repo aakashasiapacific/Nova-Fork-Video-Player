@@ -129,7 +129,7 @@ private fun KindRow(kind: SourceKind, onClick: () -> Unit) {
             TypeBadge(kind.type)
             Spacer(Modifier.width(14.dp))
             Column(Modifier.weight(1f)) {
-                Text(kind.title, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(kind.title, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 Text(
                     text = kind.body,
                     style = MaterialTheme.typography.bodySmall,
@@ -413,7 +413,7 @@ private fun LibraryChoice(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     IosCheckCircle(checked = on, modifier = Modifier.padding(10.dp))
-                    Text(library.name, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(library.name, style = MaterialTheme.typography.bodyLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 }
             }
         }
@@ -532,12 +532,12 @@ private fun PlexServerRow(server: PlexServerUi, onClick: () -> Unit) {
             NovaIcon(sourceTypeIcon(SourceType.PLEX), contentDescription = null, tint = MaterialTheme.colorScheme.primary)
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
-                Text(server.name, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(server.name, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 Text(
                     text = server.detail,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
@@ -654,7 +654,7 @@ private fun UpnpServerRow(server: UpnpServerUi, onClick: () -> Unit) {
             Text(
                 text = server.name,
                 style = MaterialTheme.typography.titleSmall,
-                maxLines = 1,
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
             )

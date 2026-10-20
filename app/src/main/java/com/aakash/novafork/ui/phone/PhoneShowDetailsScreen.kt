@@ -101,7 +101,7 @@ fun PhoneShowDetailsScreen(
                         Text(
                             text = details.playLabel,
                             style = MaterialTheme.typography.titleSmall,
-                            maxLines = 1,
+                            maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
                         )
                     }
@@ -118,7 +118,7 @@ fun PhoneShowDetailsScreen(
                             text = metaLine(nextUp.code, nextUp.title),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
+                            maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.padding(top = 8.dp),
                         )
@@ -145,7 +145,7 @@ fun PhoneShowDetailsScreen(
                                     .padding(vertical = 6.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                Text(season?.title ?: "Episodes", style = MaterialTheme.typography.titleLarge, maxLines = 1)
+                                Text(season?.title ?: "Episodes", style = MaterialTheme.typography.titleLarge, maxLines = 2)
                                 NovaIcon(
                                     R.drawable.ic_expand_more,
                                     contentDescription = null,

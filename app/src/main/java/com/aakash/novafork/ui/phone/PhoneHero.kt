@@ -91,7 +91,7 @@ internal const val HERO_PREVIEW_DWELL_MS = 30_000L
 internal const val HERO_PREVIEW_DELAY_MS = 2_500L
 
 /** The dot row and the mute button sit this far above the hero's bottom edge. */
-private val HeroDotsBottom = 16.dp
+private val HeroDotsBottom = 4.dp
 private val HeroContentBottom = 52.dp
 private val DotsRowHeight = 44.dp
 
@@ -279,7 +279,7 @@ private fun PhoneHeroPage(hero: HeroUi, preview: Boolean, muted: Boolean, action
                             text = meta,
                             style = MaterialTheme.typography.bodyMedium,
                             color = Color.White.copy(alpha = 0.72f),
-                            maxLines = 1,
+                            maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
                         )
                     }
@@ -352,7 +352,7 @@ private fun DetailsStyleHeroPage(
                     text = meta,
                     style = MaterialTheme.typography.bodyMedium,
                     color = Color.White.copy(alpha = 0.72f),
-                    maxLines = 1,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.padding(top = 4.dp),
                 )
@@ -373,7 +373,7 @@ private fun DetailsStyleHeroPage(
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold,
                             color = Color.White,
-                            maxLines = 1,
+                            maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
                         )
                     }
@@ -409,7 +409,7 @@ private fun FrameHeroPage(hero: HeroUi, openTarget: () -> Unit, play: () -> Unit
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold,
             color = Color.White,
-            maxLines = 1,
+            maxLines = 2,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.padding(start = dims.gutter, end = dims.gutter, top = 4.dp),
         )
@@ -419,7 +419,7 @@ private fun FrameHeroPage(hero: HeroUi, openTarget: () -> Unit, play: () -> Unit
                 text = meta,
                 style = MaterialTheme.typography.bodyMedium,
                 color = Color.White.copy(alpha = 0.72f),
-                maxLines = 1,
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.padding(start = dims.gutter, end = dims.gutter, top = 2.dp),
             )

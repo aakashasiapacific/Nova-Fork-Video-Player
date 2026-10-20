@@ -312,13 +312,13 @@ private fun SourceRow(source: SourceUi, selected: Boolean, actions: AppActions) 
             RowIcon(sourceTypeIcon(source.type))
             Spacer(Modifier.width(14.dp))
             Column(Modifier.weight(1f)) {
-                Text(source.name, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(source.name, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 if (source.detail.isNotBlank()) {
                     Text(
                         text = source.detail,
                         style = MaterialTheme.typography.bodySmall,
                         color = LocalContentColor.current.copy(alpha = 0.7f),
-                        maxLines = 1,
+                        maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
@@ -394,14 +394,14 @@ private fun StreamRow(stream: VideoCardUi, onClick: () -> Unit, onLongClick: () 
         RowIcon(R.drawable.ic_live_tv)
         Spacer(Modifier.width(14.dp))
         Column(Modifier.weight(1f)) {
-            Text(stream.title, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(stream.title, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
             val subtitle = stream.subtitle
             if (!subtitle.isNullOrBlank()) {
                 Text(
                     text = subtitle,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
@@ -433,7 +433,7 @@ private fun PlaylistRow(playlist: PlaylistUi, selected: Boolean, onClick: () -> 
             Text(
                 text = playlist.name,
                 style = MaterialTheme.typography.titleSmall,
-                maxLines = 1,
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
             )
@@ -557,7 +557,7 @@ private fun ActionTile(
                 NovaIcon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
             }
             Spacer(Modifier.height(16.dp))
-            Text(title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(title, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
             Spacer(Modifier.height(4.dp))
             Text(
                 text = body,
@@ -638,7 +638,7 @@ private fun BrowseDirHeader(dir: BrowseDirUi, actions: AppActions, modifier: Mod
             Text(
                 text = dir.title,
                 style = MaterialTheme.typography.headlineMedium,
-                maxLines = 1,
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
             )
@@ -784,12 +784,12 @@ private fun FolderTile(folder: FolderUi, onClick: () -> Unit) {
             }
             Spacer(Modifier.width(14.dp))
             Column(Modifier.weight(1f)) {
-                Text(folder.name, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(folder.name, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 Text(
                     text = folder.note ?: metaLine(countLabel(folder.videoCount, "video")),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
+                    maxLines = 2,
                 )
             }
             NovaIcon(

@@ -206,7 +206,7 @@ private fun QueueRow(position: Int, item: QueueItemUi, playing: Boolean, onClick
                     text = subtitle,
                     style = MaterialTheme.typography.bodySmall,
                     color = LocalContentColor.current.copy(alpha = 0.7f),
-                    maxLines = 1,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
@@ -312,7 +312,7 @@ private fun CastRow(
                 text = label,
                 style = MaterialTheme.typography.bodyLarge,
                 color = tint,
-                maxLines = 1,
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
             if (detail != null) {
@@ -383,7 +383,7 @@ internal fun CastingPlaceholder(deviceName: String, title: String, compact: Bool
                             text = title,
                             style = MaterialTheme.typography.bodyMedium,
                             color = Color.White.copy(alpha = 0.7f),
-                            maxLines = 1,
+                            maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
                         )
                     }
