@@ -389,3 +389,13 @@ The owner asked for Apple Music to be copied more precisely, with less clutter. 
   - The turning background is drawn from a 32px copy of the cover, which upscaled looks blurred.
     It used to be a full-screen blur redrawn every frame, which made the drag stutter.
   - The mini player's sideways swipe tracks the finger the same way.
+
+## 16. Swipe between tabs; the shrunk bar's other section (owner, 2026-10-20; build 70)
+
+- **Swiping between tabs:** a sideways swipe on a tab's own page moves to the next or previous
+  tab (Video → Audio → Preferences → Search).
+  - The page follows the finger a little, and the new tab slides in from that side.
+  - Rows and the hero that scroll sideways keep their own swipes.
+  - This replaces build 37's "no page swipes" decision.
+- **Shrunk bar:** its left circle opens the other section, never the one being looked at. Audio
+  shows Video, Video shows Audio, and Preferences and Search show Video.

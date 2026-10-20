@@ -4,6 +4,7 @@ import androidx.annotation.DrawableRes
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
@@ -12,6 +13,8 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -51,8 +54,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
@@ -97,6 +102,7 @@ import com.aakash.novafork.ui.model.TopDestination
 import com.aakash.novafork.ui.model.top
 import com.aakash.novafork.ui.settings.SettingsScreen
 import com.aakash.novafork.ui.theme.NovaColors
+import kotlinx.coroutines.launch
 
 /**
  * Phone UI: a floating tab bar over one full-screen page per route. Dialogs, snackbars and system
@@ -151,6 +157,14 @@ fun PhoneApp(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
     var nowPlayingOpen by rememberSaveable { mutableStateOf(false) }
     val barSpace = TabBarHeight + BarTopMargin + BarBottomMargin + navBar +
         (if (miniAboveBar) MiniPlayerHeight + MiniPlayerGap else 0.dp)
+    // Swiping sideways on a tab's own page moves to the next or previous tab (owner). Anything
+    // that scrolls sideways itself (the hero, poster rows, sliders) takes the swipe first, so
+    // this only sees swipes on the rest of the page. The page follows the finger a little.
+    val tabs = TopDestination.entries
+    val atRoot = !state.canGoBack
+    var tabSwipe by remember { mutableFloatStateOf(0f) }
+    val swipeTabPx = with(LocalDensity.current) { 90.dp.toPx() }
+    val swipeScope = rememberCoroutineScope()
     Box(modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         CompositionLocalProvider(LocalBottomBarSpace provides barSpace) {
             // Keyed by route, so state updates within a page recompose it in place, while a route
@@ -160,8 +174,43 @@ fun PhoneApp(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
                 modifier = Modifier
                     .fillMaxSize()
                     .nestedScroll(barScroll)
+                    .pointerInput(top, atRoot) {
+                        if (!atRoot) return@pointerInput
+                        detectHorizontalDragGestures(
+                            onDragEnd = {
+                                val index = tabs.indexOf(top)
+                                val target = when {
+                                    tabSwipe < -swipeTabPx -> tabs.getOrNull(index + 1)
+                                    tabSwipe > swipeTabPx -> tabs.getOrNull(index - 1)
+                                    else -> null
+                                }
+                                if (target != null) {
+                                    tabSwipe = 0f
+                                    actions.selectTab(target)
+                                } else {
+                                    swipeScope.launch { animate(tabSwipe, 0f, animationSpec = spring(dampingRatio = 0.8f)) { value, _ -> tabSwipe = value } }
+                                }
+                            },
+                            onDragCancel = { tabSwipe = 0f },
+                        ) { change, amount ->
+                            change.consume()
+                            tabSwipe += amount
+                        }
+                    }
+                    .graphicsLayer { translationX = tabSwipe * 0.3f }
                     .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)),
-                transitionSpec = { fadeIn(tween(durationMillis = 220, delayMillis = 40)) togetherWith fadeOut(tween(durationMillis = 140)) },
+                transitionSpec = {
+                    val from = tabs.indexOf(initialState.route.top)
+                    val to = tabs.indexOf(targetState.route.top)
+                    if (from != to) {
+                        // A tab change slides in from the side it lies on, as a swipe would bring it.
+                        val direction = if (to > from) 1 else -1
+                        (slideInHorizontally(tween(280)) { it * direction / 4 } + fadeIn(tween(220))) togetherWith
+                            (slideOutHorizontally(tween(280)) { -it * direction / 4 } + fadeOut(tween(160)))
+                    } else {
+                        fadeIn(tween(durationMillis = 220, delayMillis = 40)) togetherWith fadeOut(tween(durationMillis = 140))
+                    }
+                },
                 contentKey = { it.route },
                 label = "phoneRoute",
             ) { pageState ->
@@ -173,7 +222,6 @@ fun PhoneApp(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
         PhoneNavigationBar(
             selected = top,
             collapsed = barCollapsed,
-            onExpand = { barCollapsed = false },
             onSelect = actions::selectTab,
             modifier = Modifier.align(Alignment.BottomCenter),
             miniPlayer = if (music != null && miniInBar) {
@@ -285,14 +333,14 @@ private fun PhonePage(state: AppUiState, actions: AppActions) {
  * iOS 26's floating tab bar, as in the owner's recording: a dark-grey glass capsule held off the
  * screen edges, with a lighter grey pill behind the selected tab, whose icon and label take the
  * tab's colour. A finger dragged along it moves the pill, and the tab under the finger opens when
- * it lifts. While a page scrolls down it shrinks to two circles, the current tab on the left and
- * Search on the right; scrolling back up, or tapping the left circle, brings back the full bar.
+ * it lifts. While a page scrolls down it shrinks to two circles: the other section on the left
+ * (Video or Audio, never the one shown) and Search on the right; scrolling back up brings back
+ * the full bar.
  */
 @Composable
 private fun PhoneNavigationBar(
     selected: TopDestination,
     collapsed: Boolean,
-    onExpand: () -> Unit,
     onSelect: (TopDestination) -> Unit,
     modifier: Modifier = Modifier,
     /** The mini player for the shrunk bar's middle, sized by the modifier it gets; null = none. */
@@ -314,10 +362,12 @@ private fun PhoneNavigationBar(
             label = "tabBarCollapse",
         ) { small ->
             if (small) {
-                // The current tab (tap: the full bar), the mini player when there is one, Search.
+                // The other section (owner: never the one already shown): Video on Audio, Audio on
+                // Video, Video elsewhere; then the mini player when there is one, then Search.
+                val other = if (selected == TopDestination.VIDEO) TopDestination.AUDIO else TopDestination.VIDEO
                 Row(Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
-                    GlassCircle(onClick = onExpand, description = "Show tabs", size = TabBarHeight) {
-                        NovaIcon(selected.tabIconRes(), contentDescription = null, tint = selected.activeColor(), modifier = Modifier.size(24.dp))
+                    GlassCircle(onClick = { onSelect(other) }, description = other.label, size = TabBarHeight) {
+                        NovaIcon(other.tabIconRes(), contentDescription = null, tint = Color.White, modifier = Modifier.size(24.dp))
                     }
                     if (miniPlayer != null) {
                         miniPlayer(
