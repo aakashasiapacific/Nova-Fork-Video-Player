@@ -77,8 +77,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
@@ -647,6 +649,10 @@ fun SwipeToDelete(
     val revealPx = with(LocalDensity.current) { 88.dp.toPx() }
     val scope = rememberCoroutineScope()
     val state = rememberDraggableState { delta -> offset = (offset + delta).coerceIn(-width, 0f) }
+    // As on iOS, a tick when the swipe passes the point where letting go deletes the row.
+    val haptics = LocalHapticFeedback.current
+    val armed = width > 0f && offset < -width * FullSwipe
+    LaunchedEffect(armed) { if (armed) haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove) }
     fun settle(target: Float, then: () -> Unit = {}) {
         scope.launch {
             animate(offset, target, animationSpec = spring(dampingRatio = 0.85f, stiffness = 600f)) { value, _ -> offset = value }
@@ -686,7 +692,7 @@ fun SwipeToDelete(
                     orientation = Orientation.Horizontal,
                     onDragStopped = { velocity ->
                         when {
-                            offset < -width * 0.6f -> settle(-width) {
+                            offset < -width * FullSwipe -> settle(-width) {
                                 onDelete()
                                 offset = 0f
                             }
@@ -698,6 +704,9 @@ fun SwipeToDelete(
         ) { content() }
     }
 }
+
+/** How far along its width a row must be swiped for letting go to delete it. */
+private const val FullSwipe = 0.6f
 
 /**
  * iOS's collapsed large title: once a page's big title has scrolled away, the title shows small
