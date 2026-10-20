@@ -436,3 +436,4 @@ The owner asked for Apple Music to be copied more precisely, with less clutter. 
   - A search is remembered on the keyboard's Search key, or when you leave Search with results
     on screen.
   - Eight are kept, newest first and without repeats. They stay on the device.
+- **Tablet search (build 76):** the same Recent Searches list as the phone.

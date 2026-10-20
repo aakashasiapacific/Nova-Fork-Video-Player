@@ -39,6 +39,7 @@ import com.aakash.novafork.R
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
 import com.aakash.novafork.ui.common.EmptyState
 import com.aakash.novafork.ui.common.NovaIcon
+import com.aakash.novafork.ui.phone.RecentSearches
 import com.aakash.novafork.ui.common.NovaTextField
 import com.aakash.novafork.ui.common.musicSearchResults
 import com.aakash.novafork.ui.model.AppActions
@@ -105,11 +106,27 @@ internal fun TabletSearchScreen(
                 },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                keyboardActions = KeyboardActions(onSearch = { keyboard?.hide() }),
+                keyboardActions = KeyboardActions(
+                    onSearch = {
+                        actions.rememberSearch(query)
+                        keyboard?.hide()
+                    },
+                ),
             )
         }
         val results = search.results
         when {
+            query.isBlank() && search.recent.isNotEmpty() -> RecentSearches(
+                recent = search.recent,
+                onPick = { picked ->
+                    query = picked
+                    actions.search(picked)
+                    actions.rememberSearch(picked)
+                    keyboard?.hide()
+                },
+                onClear = actions::clearRecentSearches,
+                bottomSpace = 24.dp,
+            )
             query.isBlank() -> SearchMessage {
                 EmptyState(
                     icon = R.drawable.ic_search,

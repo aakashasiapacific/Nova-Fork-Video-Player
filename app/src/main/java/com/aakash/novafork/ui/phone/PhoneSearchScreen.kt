@@ -227,7 +227,7 @@ private val SearchFieldHeight = 52.dp
 
 /** iOS's recent searches: a header with Clear, then each search, tap to run it again. */
 @Composable
-private fun RecentSearches(recent: List<String>, onPick: (String) -> Unit, onClear: () -> Unit, bottomSpace: Dp) {
+internal fun RecentSearches(recent: List<String>, onPick: (String) -> Unit, onClear: () -> Unit, bottomSpace: Dp) {
     val dims = LocalNovaDimens.current
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
