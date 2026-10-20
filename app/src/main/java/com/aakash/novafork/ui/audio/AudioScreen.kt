@@ -21,6 +21,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -62,8 +63,10 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -72,7 +75,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
@@ -215,9 +221,31 @@ fun AudioContent(
         favorites = favorites.toSet(),
         isPlaying = player.isPlaying,
     )
+    // On a page opened over Library a swipe right goes back, as on iOS (and is not taken for a
+    // tab change).
+    var backSwipe by remember { mutableFloatStateOf(0f) }
+    val backPx = with(LocalDensity.current) { 90.dp.toPx() }
+    val canGoBack = stack.isNotEmpty() || openPlaylist != null
+    // The gesture outlives recompositions; this keeps it calling back() for the stack as it is now.
+    val currentBack by rememberUpdatedState { back() }
     AnimatedContent(
         targetState = page,
-        modifier = modifier.fillMaxSize(),
+        modifier = modifier
+            .fillMaxSize()
+            .pointerInput(canGoBack) {
+                if (!canGoBack) return@pointerInput
+                detectHorizontalDragGestures(
+                    onDragEnd = {
+                        if (backSwipe > backPx) currentBack()
+                        backSwipe = 0f
+                    },
+                    onDragCancel = { backSwipe = 0f },
+                ) { change, amount ->
+                    change.consume()
+                    backSwipe = (backSwipe + amount).coerceAtLeast(0f)
+                }
+            }
+            .graphicsLayer { translationX = backSwipe * 0.6f },
         transitionSpec = {
             val forward = targetState != HOME && (initialState == HOME || targetState.length >= initialState.length)
             (slideInHorizontally(tween(260)) { if (forward) it / 4 else -it / 4 } + fadeIn(tween(220))) togetherWith

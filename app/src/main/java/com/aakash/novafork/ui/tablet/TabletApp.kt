@@ -85,7 +85,7 @@ fun TabletApp(state: AppUiState, actions: AppActions, layout: DeviceLayout, modi
                         targetState = state,
                         modifier = Modifier
                             .fillMaxSize()
-                            .swipeBetweenTabs(state.route.top, enabled = !state.canGoBack, onSelect = actions::selectTab)
+                            .swipeBetweenTabs(state.route.top, enabled = !state.canGoBack, onSelect = actions::selectTab, onBack = actions::back)
                             .windowInsetsPadding(
                                 WindowInsets.systemBars.union(WindowInsets.displayCutout).only(WindowInsetsSides.Horizontal),
                             ),

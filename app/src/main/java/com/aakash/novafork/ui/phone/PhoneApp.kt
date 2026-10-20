@@ -167,7 +167,7 @@ fun PhoneApp(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
                 modifier = Modifier
                     .fillMaxSize()
                     .nestedScroll(barScroll)
-                    .swipeBetweenTabs(top, enabled = !state.canGoBack, onSelect = actions::selectTab)
+                    .swipeBetweenTabs(top, enabled = !state.canGoBack, onSelect = actions::selectTab, onBack = actions::back)
                     .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)),
                 transitionSpec = {
                     tabSlide(

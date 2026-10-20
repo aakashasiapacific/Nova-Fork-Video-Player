@@ -201,28 +201,39 @@ internal fun TopDestination.tabIconRes(): Int = when (this) {
 /**
  * Swiping sideways on a tab's own page moves to the next or previous tab (owner). Anything that
  * scrolls sideways itself (the hero, poster rows, sliders) takes the swipe first, so this only
- * sees swipes on the rest of the page; the page follows the finger a little. Off when [enabled]
- * is false (pages opened from a tab, where back is the gesture that matters).
+ * sees swipes on the rest of the page; the page follows the finger a little. On a page opened
+ * from a tab ([enabled] false) a swipe right goes back instead, as on iOS, when [onBack] is set.
  */
 @Composable
-internal fun Modifier.swipeBetweenTabs(top: TopDestination, enabled: Boolean, onSelect: (TopDestination) -> Unit): Modifier {
+internal fun Modifier.swipeBetweenTabs(
+    top: TopDestination,
+    enabled: Boolean,
+    onSelect: (TopDestination) -> Unit,
+    onBack: (() -> Unit)? = null,
+): Modifier {
     val tabs = TopDestination.entries
     var offset by remember { mutableFloatStateOf(0f) }
     val thresholdPx = with(LocalDensity.current) { 90.dp.toPx() }
     val scope = rememberCoroutineScope()
     val select by rememberUpdatedState(onSelect)
+    val back by rememberUpdatedState(onBack)
     return this
-        .pointerInput(top, enabled) {
-            if (!enabled) return@pointerInput
+        .pointerInput(top, enabled, onBack != null) {
+            if (!enabled && back == null) return@pointerInput
             detectHorizontalDragGestures(
                 onDragEnd = {
                     val index = tabs.indexOf(top)
+                    val goBack = !enabled && offset > thresholdPx
                     val target = when {
+                        !enabled -> null
                         offset < -thresholdPx -> tabs.getOrNull(index + 1)
                         offset > thresholdPx -> tabs.getOrNull(index - 1)
                         else -> null
                     }
-                    if (target != null) {
+                    if (goBack) {
+                        offset = 0f
+                        back?.invoke()
+                    } else if (target != null) {
                         offset = 0f
                         select(target)
                     } else {
@@ -232,10 +243,11 @@ internal fun Modifier.swipeBetweenTabs(top: TopDestination, enabled: Boolean, on
                 onDragCancel = { offset = 0f },
             ) { change, amount ->
                 change.consume()
-                offset += amount
+                // Going back only follows a swipe to the right.
+                offset = if (enabled) offset + amount else (offset + amount).coerceAtLeast(0f)
             }
         }
-        .graphicsLayer { translationX = offset * 0.3f }
+        .graphicsLayer { translationX = offset * if (enabled) 0.3f else 0.6f }
 }
 
 /** A tab change slides in from the side the new tab lies on; anything else crossfades. */

@@ -437,3 +437,8 @@ The owner asked for Apple Music to be copied more precisely, with less clutter. 
     on screen.
   - Eight are kept, newest first and without repeats. They stay on the device.
 - **Tablet search (build 76):** the same Recent Searches list as the phone.
+- **Swipe right to go back (build 77):** iOS's back gesture.
+  - On a page opened from a tab (details, sources, playlists, folders) a right swipe goes back,
+    and the page follows the finger.
+  - In Audio, an album, artist or playlist page swipes back to the Library instead of changing
+    tab.
