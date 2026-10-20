@@ -445,3 +445,4 @@ The owner asked for Apple Music to be copied more precisely, with less clutter. 
 - **Haptics (build 78):** a light tick, as iOS gives, on a tab change (tapped, dragged along the bar or swiped), a settings switch, and a mini-player skip.
 - **Touch feedback (build 79):** iOS-style instead of ripples. A tapped row, card or item lights up evenly and fades back (`IosTouch`). Material buttons keep a faint ripple, as they cannot take another effect.
 - **Collapsing large titles (build 80):** in Preferences and every Audio page, once the big title scrolls away it shows small and centred in a dark bar at the top, as on iOS (`CollapsedTitleBar`).
+- **Context menus lift (build 81):** a poster, card or song row grows slightly while its "…" menu is open, as iOS lifts the item a menu is for.

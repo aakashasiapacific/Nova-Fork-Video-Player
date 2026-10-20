@@ -9,8 +9,10 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.StartOffset
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -896,9 +898,14 @@ private fun SongRow(song: SongEntity, ctx: PageContext, onClick: () -> Unit, onR
     val playing = song.id == ctx.nowPlayingId
     var menuOpen by remember { mutableStateOf(false) }
     val haptics = LocalHapticFeedback.current
+    // iOS lifts the row its context menu is for.
+    val lift by animateFloatAsState(if (menuOpen) 1.03f else 1f, spring(dampingRatio = 0.6f, stiffness = 500f), label = "rowLift")
     Box {
         Column(
-            Modifier.combinedClickable(
+            Modifier.graphicsLayer {
+                scaleX = lift
+                scaleY = lift
+            }.combinedClickable(
                 onClick = onClick,
                 onLongClickLabel = "More",
                 onLongClick = {
@@ -956,9 +963,14 @@ private fun TrackRow(song: SongEntity, ctx: PageContext, onClick: () -> Unit) {
     val playing = song.id == ctx.nowPlayingId
     var menuOpen by remember { mutableStateOf(false) }
     val haptics = LocalHapticFeedback.current
+    // iOS lifts the row its context menu is for.
+    val lift by animateFloatAsState(if (menuOpen) 1.03f else 1f, spring(dampingRatio = 0.6f, stiffness = 500f), label = "rowLift")
     Box {
         Column(
-            Modifier.combinedClickable(
+            Modifier.graphicsLayer {
+                scaleX = lift
+                scaleY = lift
+            }.combinedClickable(
                 onClick = onClick,
                 onLongClickLabel = "More",
                 onLongClick = {
