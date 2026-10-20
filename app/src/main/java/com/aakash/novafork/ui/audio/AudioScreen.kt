@@ -105,6 +105,7 @@ import com.aakash.novafork.ui.common.NovaDropdownMenu
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.NovaMenuItem
 import com.aakash.novafork.ui.common.NovaTextField
+import com.aakash.novafork.ui.common.SwipeToDelete
 import com.aakash.novafork.ui.theme.AudioTheme
 import com.aakash.novafork.ui.theme.NovaColors
 
@@ -654,12 +655,15 @@ private fun PlaylistPage(playlist: OpenPlaylist, ctx: PageContext) {
         if (playlist.songs.isNotEmpty()) row("play") { PlayShuffle(playlist.songs, ctx.actions) }
         playlist.songs.forEachIndexed { index, song ->
             row("s:${song.id}") {
-                SongRow(
-                    song = song,
-                    ctx = ctx,
-                    onClick = { ctx.actions.play(playlist.songs, index, false) },
-                    onRemove = { ctx.actions.removeFromPlaylist(song) },
-                )
+                // As in Apple Music, a swipe left takes it out of the playlist too.
+                SwipeToDelete(onDelete = { ctx.actions.removeFromPlaylist(song) }, label = "Remove") {
+                    SongRow(
+                        song = song,
+                        ctx = ctx,
+                        onClick = { ctx.actions.play(playlist.songs, index, false) },
+                        onRemove = { ctx.actions.removeFromPlaylist(song) },
+                    )
+                }
             }
         }
     }

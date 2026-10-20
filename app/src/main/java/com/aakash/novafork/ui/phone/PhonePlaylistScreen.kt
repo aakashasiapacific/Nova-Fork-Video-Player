@@ -24,6 +24,7 @@ import com.aakash.novafork.ui.common.LocalBottomBarSpace
 import com.aakash.novafork.ui.common.NovaDropdownMenu
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.NovaMenuItem
+import com.aakash.novafork.ui.common.SwipeToDelete
 import com.aakash.novafork.ui.common.VideoMenuBox
 import com.aakash.novafork.ui.dialogs.playlistCountLabel
 import com.aakash.novafork.ui.model.AppActions
@@ -102,16 +103,19 @@ private fun PlaylistContent(playlist: PlaylistDetailsUi, actions: AppActions) {
                     )
                 },
             ) { openMenu ->
-                PhoneVideoRow(
-                    card = video,
-                    onClick = { actions.playQueue(ids, startIndex = index) },
-                    onLongClick = openMenu,
-                    trailing = {
-                        IconButton(onClick = openMenu) {
-                            NovaIcon(R.drawable.ic_more_vert, contentDescription = "More")
-                        }
-                    },
-                )
+                // As in iOS, a swipe left removes it too.
+                SwipeToDelete(onDelete = { actions.removeFromPlaylist(playlist.id, video.id) }, label = "Remove") {
+                    PhoneVideoRow(
+                        card = video,
+                        onClick = { actions.playQueue(ids, startIndex = index) },
+                        onLongClick = openMenu,
+                        trailing = {
+                            IconButton(onClick = openMenu) {
+                                NovaIcon(R.drawable.ic_more_vert, contentDescription = "More")
+                            }
+                        },
+                    )
+                }
             }
         }
     }

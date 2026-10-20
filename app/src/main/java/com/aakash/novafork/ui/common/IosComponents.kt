@@ -4,6 +4,7 @@ import androidx.annotation.DrawableRes
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -18,6 +19,9 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -54,17 +58,23 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
@@ -79,6 +89,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import com.aakash.novafork.R
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 /** iOS dark-mode system colours the iOS-style controls below are drawn with. */
 object IosColors {
@@ -611,5 +622,75 @@ fun IosProgressBar(
                 )
             }
         }
+    }
+}
+
+/**
+ * iOS's swipe to delete: swiping a row left uncovers a red Delete button; letting go past most of
+ * the row deletes at once. A tap on Delete deletes; a swipe back or a short swipe hides it.
+ * [background] fills the row so the red stays behind it.
+ */
+@Composable
+fun SwipeToDelete(
+    onDelete: () -> Unit,
+    modifier: Modifier = Modifier,
+    label: String = "Delete",
+    background: Color = MaterialTheme.colorScheme.background,
+    content: @Composable () -> Unit,
+) {
+    var offset by remember { mutableFloatStateOf(0f) }
+    var width by remember { mutableFloatStateOf(0f) }
+    val revealPx = with(LocalDensity.current) { 88.dp.toPx() }
+    val scope = rememberCoroutineScope()
+    val state = rememberDraggableState { delta -> offset = (offset + delta).coerceIn(-width, 0f) }
+    fun settle(target: Float, then: () -> Unit = {}) {
+        scope.launch {
+            animate(offset, target, animationSpec = spring(dampingRatio = 0.85f, stiffness = 600f)) { value, _ -> offset = value }
+            then()
+        }
+    }
+    Box(
+        modifier
+            .onSizeChanged { width = it.width.toFloat() }
+            .clipToBounds(),
+    ) {
+        Box(
+            Modifier
+                .matchParentSize()
+                .background(IosColors.Red)
+                .clickable(enabled = offset < 0f, onClickLabel = label, role = Role.Button) {
+                    settle(-width) {
+                        onDelete()
+                        offset = 0f
+                    }
+                },
+            contentAlignment = Alignment.CenterEnd,
+        ) {
+            Text(
+                label,
+                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
+                color = Color.White,
+                modifier = Modifier.padding(end = 20.dp),
+            )
+        }
+        Box(
+            Modifier
+                .graphicsLayer { translationX = offset }
+                .background(background)
+                .draggable(
+                    state = state,
+                    orientation = Orientation.Horizontal,
+                    onDragStopped = { velocity ->
+                        when {
+                            offset < -width * 0.6f -> settle(-width) {
+                                onDelete()
+                                offset = 0f
+                            }
+                            offset < -revealPx / 2 || velocity < -1_500f -> settle(-revealPx)
+                            else -> settle(0f)
+                        }
+                    },
+                ),
+        ) { content() }
     }
 }

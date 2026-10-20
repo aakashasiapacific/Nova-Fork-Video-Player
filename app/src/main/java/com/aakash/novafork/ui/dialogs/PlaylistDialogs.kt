@@ -65,12 +65,18 @@ internal fun AddToPlaylistSheet(dialog: DialogUi.AddToPlaylist, playlists: List<
         shape = IosSheetShape,
         dragHandle = { IosGrabber() },
     ) {
-        Column(Modifier.padding(start = 24.dp, end = 24.dp, bottom = 8.dp)) {
-            Text("Add to Playlist", style = MaterialTheme.typography.titleLarge)
+        // Centred like an iOS sheet's title, with what is being added under it.
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .padding(start = 24.dp, end = 24.dp, bottom = 8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text("Add to Playlist", style = MaterialTheme.typography.titleMedium)
             if (dialog.label.isNotBlank()) {
                 Text(
                     text = dialog.label,
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,

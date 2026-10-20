@@ -415,3 +415,6 @@ The owner asked for Apple Music to be copied more precisely, with less clutter. 
 - **Now Playing "…":** Apple Music's circle beside the star, with Add to a Playlist… (the Apple
   Music sheet), Go to Album and Go to Artist. The last two close Now Playing, switch to the Audio
   tab and open that page (`MusicViewModel.requestPage`).
+- **Swipe to delete (build 73):** iOS's swipe left on playlist rows, for videos and for songs.
+  It uncovers a red Remove button; a long swipe removes at once (`SwipeToDelete`).
+- **Add to Playlist sheet (videos):** a centred title, as iOS sheets have.
