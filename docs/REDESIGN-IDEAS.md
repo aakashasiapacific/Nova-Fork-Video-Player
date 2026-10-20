@@ -431,3 +431,8 @@ The owner asked for Apple Music to be copied more precisely, with less clutter. 
    title.
 3. **Details pages show the title's TMDB logo,** as Home's hero does. Plain text is used only
    when a title has no logo.
+- **Recent searches (build 75):** with the field empty, Search lists the latest searches under
+  "Recent Searches" with Clear, as on iOS. Tap one to run it again.
+  - A search is remembered on the keyboard's Search key, or when you leave Search with results
+    on screen.
+  - Eight are kept, newest first and without repeats. They stay on the device.

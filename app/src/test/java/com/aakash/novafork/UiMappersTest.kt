@@ -39,6 +39,7 @@ import com.aakash.novafork.ui.RemoteListing
 import com.aakash.novafork.ui.UiMappers
 import com.aakash.novafork.ui.common.deviceAccessNotice
 import com.aakash.novafork.ui.frameSourceOf
+import com.aakash.novafork.ui.model.withRecentSearch
 import com.aakash.novafork.ui.model.Crumb
 import com.aakash.novafork.ui.model.FolderUi
 import com.aakash.novafork.ui.model.HeroTarget
@@ -788,4 +789,12 @@ class UiMappersTest {
         positionMs = positionMs,
         lastPlayedAt = lastPlayedAt,
     )
+
+    @Test
+    fun recentSearchesPutTheNewestFirstWithoutRepeats() {
+        val recent = listOf("dune", "Queen", "beatles")
+        assertEquals(listOf("queen", "dune", "beatles"), withRecentSearch(recent, " queen "))
+        assertEquals(recent, withRecentSearch(recent, "   "))
+        assertEquals(listOf("new", "dune"), withRecentSearch(recent, "new", max = 2))
+    }
 }

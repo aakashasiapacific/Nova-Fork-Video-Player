@@ -1,7 +1,10 @@
 package com.aakash.novafork.ui.phone
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
@@ -13,6 +16,8 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
@@ -21,12 +26,15 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -40,10 +48,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
 import com.aakash.novafork.ui.common.EmptyState
+import com.aakash.novafork.ui.common.Hairline
+import com.aakash.novafork.ui.common.IosColors
 import com.aakash.novafork.ui.common.LocalBottomBarSpace
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.glass
@@ -65,6 +76,15 @@ fun PhoneSearchScreen(
         mutableStateOf(TextFieldValue(search.query, TextRange(search.query.length)))
     }
     val focusRequester = remember { FocusRequester() }
+    // Leaving Search with results on screen keeps the query in the recent searches, as iOS does
+    // once a search has been used.
+    val latest by rememberUpdatedState(field.text to !search.isEmpty)
+    DisposableEffect(Unit) {
+        onDispose {
+            val (text, hadResults) = latest
+            if (hadResults) actions.rememberSearch(text)
+        }
+    }
     val keyboard = LocalSoftwareKeyboardController.current
     LaunchedEffect(focusRequester) {
         // Coming back to existing results should not pop the keyboard over them.
@@ -91,6 +111,17 @@ fun PhoneSearchScreen(
             // Lists end above the field.
             CompositionLocalProvider(LocalBottomBarSpace provides listSpace) {
                 when {
+                    field.text.isBlank() && search.recent.isNotEmpty() -> RecentSearches(
+                        recent = search.recent,
+                        onPick = { picked ->
+                            field = TextFieldValue(picked, TextRange(picked.length))
+                            actions.search(picked)
+                            actions.rememberSearch(picked)
+                            keyboard?.hide()
+                        },
+                        onClear = actions::clearRecentSearches,
+                        bottomSpace = listSpace,
+                    )
                     field.text.isBlank() -> CenteredScrollable(Modifier.padding(bottom = listSpace)) {
                         EmptyState(
                             icon = R.drawable.ic_search,
@@ -125,7 +156,10 @@ fun PhoneSearchScreen(
                 actions.search("")
                 focusRequester.requestFocus()
             },
-            onSearch = { keyboard?.hide() },
+            onSearch = {
+                actions.rememberSearch(field.text)
+                keyboard?.hide()
+            },
             focusRequester = focusRequester,
             modifier = Modifier
                 .align(Alignment.BottomCenter)
@@ -190,3 +224,36 @@ private fun SearchField(
 }
 
 private val SearchFieldHeight = 52.dp
+
+/** iOS's recent searches: a header with Clear, then each search, tap to run it again. */
+@Composable
+private fun RecentSearches(recent: List<String>, onPick: (String) -> Unit, onClear: () -> Unit, bottomSpace: Dp) {
+    val dims = LocalNovaDimens.current
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(start = dims.gutter, end = dims.gutter, top = 8.dp, bottom = bottomSpace),
+    ) {
+        item(key = "header") {
+            Row(Modifier.fillMaxWidth().padding(bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text("Recent Searches", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+                TextButton(onClick = onClear) { Text("Clear") }
+            }
+        }
+        items(recent, key = { it }) { query ->
+            Column(Modifier.clickable { onPick(query) }) {
+                Row(Modifier.padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    NovaIcon(R.drawable.ic_search, contentDescription = null, tint = IosColors.SecondaryLabel, modifier = Modifier.size(18.dp))
+                    Text(
+                        query,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(start = 12.dp),
+                    )
+                }
+                Box(Modifier.fillMaxWidth().height(Hairline).background(IosColors.Separator))
+            }
+        }
+    }
+}

@@ -46,6 +46,7 @@ import com.aakash.novafork.ui.model.AppUiState
 import com.aakash.novafork.ui.model.BackupUi
 import com.aakash.novafork.ui.model.BrowseDirUi
 import com.aakash.novafork.ui.model.DialogUi
+import com.aakash.novafork.ui.model.withRecentSearch
 import com.aakash.novafork.ui.model.IdentifyResultUi
 import com.aakash.novafork.ui.model.KeyStatus
 import com.aakash.novafork.ui.model.LibraryFilter
@@ -123,13 +124,18 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
         val crashReport: String? = null,
         /** Folders of network sources (other than SMB) listed live, most recently updated last. */
         val listings: Map<ListingKey, RemoteListing> = emptyMap(),
+        val recentSearches: List<String> = emptyList(),
     )
+
+    /** Search's recent searches, kept across launches (they never leave the device). */
+    private val searchPrefs = app.getSharedPreferences("search_history", android.content.Context.MODE_PRIVATE)
 
     private val local = MutableStateFlow(
         LocalState(
             permission = currentPermission(),
             allFilesAccess = StoragePermissions.hasAllFilesAccess(app),
             crashReport = CrashReporter.pending(app),
+            recentSearches = searchPrefs.getString(KEY_RECENT_SEARCHES, null)?.split('\n')?.filter { it.isNotBlank() }.orEmpty(),
         ),
     )
 
@@ -315,7 +321,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
             showDetails = showKey?.let { UiMappers.showDetails(index, it) },
             previewKey = previewKey,
             playlist = openPlaylist?.let { UiMappers.playlistDetails(index, it.id, it.name, lists.openVideoIds) },
-            search = searchMemo[Triple(index, user.query, music)],
+            search = searchMemo[Triple(index, user.query, music)].copy(recent = user.recentSearches),
             settings = SettingsUi(
                 settings = settings,
                 hasBuiltInKey = settingsStore.hasBuiltInTmdbKey,
@@ -410,6 +416,17 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
 
     override fun search(query: String) {
         local.update { it.copy(query = query) }
+    }
+
+    override fun rememberSearch(query: String) {
+        val recent = withRecentSearch(local.value.recentSearches, query)
+        local.update { it.copy(recentSearches = recent) }
+        searchPrefs.edit().putString(KEY_RECENT_SEARCHES, recent.joinToString("\n")).apply()
+    }
+
+    override fun clearRecentSearches() {
+        local.update { it.copy(recentSearches = emptyList()) }
+        searchPrefs.edit().remove(KEY_RECENT_SEARCHES).apply()
     }
 
     override fun changeArtwork(videoId: Long) {
@@ -1532,6 +1549,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
     }
 
     private companion object {
+        const val KEY_RECENT_SEARCHES = "recent"
         val TRAILING_YEAR = Regex("""\s*\(?(19|20)\d{2}\)?$""")
 
         /** Live folder listings kept for going back without listing again. */

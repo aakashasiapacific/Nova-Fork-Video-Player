@@ -297,6 +297,11 @@ interface AppActions {
     fun setLibrarySort(sort: LibrarySort)
     fun search(query: String)
 
+    /** Keeps [query] in Search's recent searches (the keyboard's Search key, a result opened). */
+    fun rememberSearch(query: String) {}
+
+    fun clearRecentSearches() {}
+
     /** Opens the library (under the Video tab) showing [filter]. */
     fun openLibrary(filter: LibraryFilter) {
         navigate(Route.Library)

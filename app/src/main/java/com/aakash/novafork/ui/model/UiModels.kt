@@ -360,6 +360,8 @@ data class SearchUi(
     val songs: List<MusicResultUi> = emptyList(),
     val albums: List<MusicResultUi> = emptyList(),
     val artists: List<MusicResultUi> = emptyList(),
+    /** Searches the user ran, newest first, shown while the field is empty. */
+    val recent: List<String> = emptyList(),
 ) {
     val hasMusic: Boolean get() = songs.isNotEmpty() || albums.isNotEmpty() || artists.isNotEmpty()
     val isEmpty: Boolean get() = results.isEmpty() && !hasMusic
@@ -429,3 +431,10 @@ data class IdentifyResultUi(
     val overview: String? = null,
     val posterUrl: String? = null,
 )
+
+/** Recent searches: [query] first, no repeats (ignoring case), at most [max]. */
+internal fun withRecentSearch(recent: List<String>, query: String, max: Int = 8): List<String> {
+    val q = query.trim()
+    if (q.isEmpty()) return recent
+    return (listOf(q) + recent.filterNot { it.equals(q, ignoreCase = true) }).take(max)
+}
