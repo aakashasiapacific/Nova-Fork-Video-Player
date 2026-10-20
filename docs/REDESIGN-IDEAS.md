@@ -449,3 +449,4 @@ The owner asked for Apple Music to be copied more precisely, with less clutter. 
 - **Press squish (build 82):** the hero Play pill, the star and +, and the round glass buttons (back, Search, the shrunk bar's circles) shrink a little while held, as iOS 26 buttons do (`Modifier.pressScale`).
 - **Library list (build 83):** the Library links at the end of Home take the look of the Library list in Apple's TV and Music apps: blue icons, grey chevrons and hairlines inset to the labels.
 - **Empty states (build 84):** iOS's "content unavailable" look — a large grey symbol on its own (no tinted circle), a bold title and grey text.
+- **Playlists (build 85):** as in Apple Music, a playlist with four or more albums shows their covers in a 2×2 grid, ends with "N songs, M minutes", and an empty one says how to add songs.

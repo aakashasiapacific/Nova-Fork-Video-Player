@@ -685,17 +685,16 @@ private fun PlaylistPage(playlist: OpenPlaylist, ctx: PageContext) {
                         .shadow(18.dp, RoundedCornerShape(10.dp))
                         .clip(RoundedCornerShape(10.dp)),
                 ) {
-                    Cover(playlist.songs.firstOrNull()?.let(MusicLibrary::artUri), size = 0, corner = 10, modifier = Modifier.fillMaxSize())
+                    PlaylistArtwork(playlist.songs)
                 }
                 Text(playlist.name, fontSize = 22.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 18.dp))
-                Text(
-                    if (playlist.songs.size == 1) "1 song" else "${playlist.songs.size} songs",
-                    fontSize = 13.sp,
-                    color = Color.White.copy(alpha = 0.55f),
-                )
             }
         }
-        if (playlist.songs.isNotEmpty()) row("play") { PlayShuffle(playlist.songs, ctx.actions) }
+        if (playlist.songs.isEmpty()) {
+            row("empty") { Hint("This playlist is empty. Use “Add to a Playlist…” in a song's menu or in Now Playing.") }
+        } else {
+            row("play") { PlayShuffle(playlist.songs, ctx.actions) }
+        }
         playlist.songs.forEachIndexed { index, song ->
             row("s:${song.id}") {
                 // As in Apple Music, a swipe left takes it out of the playlist too.
@@ -706,6 +705,30 @@ private fun PlaylistPage(playlist: OpenPlaylist, ctx: PageContext) {
                         onClick = { ctx.actions.play(playlist.songs, index, false) },
                         onRemove = { ctx.actions.removeFromPlaylist(song) },
                     )
+                }
+            }
+        }
+        // As on an album, Apple Music ends a playlist with its length.
+        if (playlist.songs.isNotEmpty()) row("footer") { Footer(playlist.songs) }
+    }
+}
+
+/**
+ * A playlist's artwork as Apple Music draws it: the covers of its first four albums in a 2×2
+ * grid, or the first song's cover while it holds fewer than four albums.
+ */
+@Composable
+private fun PlaylistArtwork(songs: List<SongEntity>) {
+    val albums = songs.distinctBy { it.albumKey }
+    if (albums.size < 4) {
+        Cover(songs.firstOrNull()?.let(MusicLibrary::artUri), size = 0, corner = 10, modifier = Modifier.fillMaxSize())
+        return
+    }
+    Column(Modifier.fillMaxSize()) {
+        albums.take(4).chunked(2).forEach { pair ->
+            Row(Modifier.weight(1f)) {
+                pair.forEach { song ->
+                    Cover(MusicLibrary.artUri(song), size = 0, corner = 0, modifier = Modifier.weight(1f).fillMaxHeight())
                 }
             }
         }
