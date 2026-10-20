@@ -19,7 +19,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -152,13 +151,10 @@ fun EmptyState(
             .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Surface(shape = CircleShape, color = MaterialTheme.colorScheme.surfaceContainerHigh, modifier = Modifier.size(72.dp)) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(painterResource(icon), contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(34.dp))
-            }
-        }
-        Spacer(Modifier.height(16.dp))
-        Text(title, style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center)
+        // iOS's "content unavailable" look: a large grey symbol on its own, a bold title, grey text.
+        Icon(painterResource(icon), contentDescription = null, tint = IosColors.SecondaryLabel, modifier = Modifier.size(56.dp))
+        Spacer(Modifier.height(14.dp))
+        Text(title, style = MaterialTheme.typography.headlineSmall, textAlign = TextAlign.Center)
         Spacer(Modifier.height(8.dp))
         Text(
             body,

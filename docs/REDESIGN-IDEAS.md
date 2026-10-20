@@ -448,3 +448,4 @@ The owner asked for Apple Music to be copied more precisely, with less clutter. 
 - **Context menus lift (build 81):** a poster, card or song row grows slightly while its "…" menu is open, as iOS lifts the item a menu is for.
 - **Press squish (build 82):** the hero Play pill, the star and +, and the round glass buttons (back, Search, the shrunk bar's circles) shrink a little while held, as iOS 26 buttons do (`Modifier.pressScale`).
 - **Library list (build 83):** the Library links at the end of Home take the look of the Library list in Apple's TV and Music apps: blue icons, grey chevrons and hairlines inset to the labels.
+- **Empty states (build 84):** iOS's "content unavailable" look — a large grey symbol on its own (no tinted circle), a bold title and grey text.
