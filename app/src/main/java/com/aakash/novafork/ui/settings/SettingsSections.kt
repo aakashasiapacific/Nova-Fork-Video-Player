@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -113,6 +112,8 @@ private fun libraryGroups(state: SettingsUi, actions: AppActions): List<Settings
                     )
                 },
             ),
+            // iOS Settings explains a permission under its group, not inside the row.
+            footer = "All files access lets subtitles and posters next to device videos load. Android hides those files from apps without it.",
         ),
         SettingsGroup(
             key = "folders",
@@ -192,17 +193,12 @@ private fun AllFilesAccessRow(shape: Shape, granted: Boolean, canRequest: Boolea
                 style = MaterialTheme.typography.labelLarge,
                 color = if (granted) NovaColors.Mint else MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Text(
-                text = "Lets subtitles and posters next to device videos load. Android hides those files from apps without it.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
         }
         if (canRequest) {
             if (granted) {
                 TextButton(onClick = onRequest) { Text("Manage") }
             } else {
-                FilledTonalButton(onClick = onRequest) { Text("Allow") }
+                TextButton(onClick = onRequest) { Text("Allow") }
             }
         }
     }
