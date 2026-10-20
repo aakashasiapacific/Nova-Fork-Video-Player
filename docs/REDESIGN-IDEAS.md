@@ -443,3 +443,4 @@ The owner asked for Apple Music to be copied more precisely, with less clutter. 
   - In Audio, an album, artist or playlist page swipes back to the Library instead of changing
     tab.
 - **Haptics (build 78):** a light tick, as iOS gives, on a tab change (tapped, dragged along the bar or swiped), a settings switch, and a mini-player skip.
+- **Touch feedback (build 79):** iOS-style instead of ripples. A tapped row, card or item lights up evenly and fades back (`IosTouch`). Material buttons keep a faint ripple, as they cannot take another effect.

@@ -125,17 +125,13 @@ val NovaTypography = Typography(
 @Composable
 @Suppress("UNUSED_PARAMETER")
 fun NovaTheme(themeMode: ThemeMode = ThemeMode.DARK, content: @Composable () -> Unit) {
-    MaterialTheme(
-        colorScheme = DarkScheme,
-        typography = NovaTypography,
-        content = content,
-    )
+    MaterialTheme(colorScheme = DarkScheme, typography = NovaTypography) { IosTouch(content) }
 }
 
 /** The player always uses the dark scheme. */
 @Composable
 fun NovaPlayerTheme(content: @Composable () -> Unit) {
-    MaterialTheme(colorScheme = DarkScheme, typography = NovaTypography, content = content)
+    MaterialTheme(colorScheme = DarkScheme, typography = NovaTypography) { IosTouch(content) }
 }
 
 /** The Audio tab's look: the app's theme with Apple Music red as its accent. */
@@ -150,6 +146,5 @@ fun AudioTheme(content: @Composable () -> Unit) {
             onPrimaryContainer = Color(0xFFFFD9DE),
         ),
         typography = MaterialTheme.typography,
-        content = content,
-    )
+    ) { IosTouch(content) }
 }
