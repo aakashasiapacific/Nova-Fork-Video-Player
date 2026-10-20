@@ -267,6 +267,7 @@ may not ship on Android) by a one-off script: the 56-unit SVG path sits in a 60-
 names its source glyph and carries the MIT notice. Keep the `ic_` names when swapping a glyph.
 
 `ic_add ic_arrow_back ic_aspect_ratio ic_audiotrack ic_brightness_6 ic_cast_connected ic_check ic_chevron_up_down
+ic_tab_video ic_tab_audio ic_tab_settings (the tab bar's outline glyphs)
 ic_cast ic_check_circle ic_chevron_right ic_close ic_cloud ic_computer ic_create_new_folder ic_dark_mode
 ic_delete ic_dns ic_done_all ic_edit ic_error ic_expand_more ic_filter_list ic_folder
 ic_folder_open ic_folder_special ic_forward_10 ic_fullscreen ic_fullscreen_exit ic_grid_view ic_hd

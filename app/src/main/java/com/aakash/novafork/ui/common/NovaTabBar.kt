@@ -180,8 +180,8 @@ private fun TabIcon(tab: TopDestination, active: Boolean, tint: Color) {
 
 @DrawableRes
 internal fun TopDestination.tabIconRes(): Int = when (this) {
-    TopDestination.VIDEO -> R.drawable.ic_tv
-    TopDestination.AUDIO -> R.drawable.ic_music_notes
-    TopDestination.SETTINGS -> R.drawable.ic_person
+    TopDestination.VIDEO -> R.drawable.ic_tab_video
+    TopDestination.AUDIO -> R.drawable.ic_tab_audio
+    TopDestination.SETTINGS -> R.drawable.ic_tab_settings
     TopDestination.SEARCH -> R.drawable.ic_search
 }

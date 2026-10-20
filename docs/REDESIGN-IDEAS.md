@@ -399,3 +399,6 @@ The owner asked for Apple Music to be copied more precisely, with less clutter. 
   - This replaces build 37's "no page swipes" decision.
 - **Shrunk bar:** its left circle opens the other section, never the one being looked at. Audio
   shows Video, Video shows Audio, and Preferences and Search show Video.
+- **Tab icons (owner's pick from six options, build 71):** iOS-style outlines. Video is a TV,
+  Audio a note with a list, Preferences a gear and Search a magnifier
+  (`ic_tab_video` / `ic_tab_audio` / `ic_tab_settings`).
