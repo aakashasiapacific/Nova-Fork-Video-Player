@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -36,6 +38,8 @@ import com.aakash.novafork.data.db.SourceType
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
 import com.aakash.novafork.ui.common.DeviceAccessCard
 import com.aakash.novafork.ui.common.DeviceAccessNotice
+import com.aakash.novafork.ui.common.Hairline
+import com.aakash.novafork.ui.common.IosColors
 import com.aakash.novafork.ui.common.IosSpinner
 import com.aakash.novafork.ui.common.LocalBottomBarSpace
 import com.aakash.novafork.ui.common.NovaDropdownMenu
@@ -52,6 +56,8 @@ import com.aakash.novafork.ui.model.PlaylistUi
 import com.aakash.novafork.ui.model.ScanUi
 import com.aakash.novafork.ui.model.SourceUi
 import com.aakash.novafork.ui.model.VideoCardUi
+import com.aakash.novafork.ui.settings.IconTile
+import com.aakash.novafork.ui.settings.tileColor
 
 @Composable
 fun PhoneBrowseScreen(
@@ -111,9 +117,18 @@ private fun LazyListScope.browseItems(
     deviceNotice: DeviceAccessNotice?,
     actions: AppActions,
 ) {
+    // iOS's inset-grouped list, as in Preferences: each section one rounded card.
     if (device.isNotEmpty() || !permission.granted) {
-        sectionHeader("device", "On this device")
-        items(device, key = { "src:${it.id}" }) { source -> SourceRow(source, actions) }
+        cardSection(
+            "device",
+            "On this device",
+            device.map { source -> "src:${source.id}" to @Composable { SourceRow(source, actions) } } +
+                if (deviceNotice == null && !permission.granted) {
+                    listOf("allowDevice" to @Composable { ActionRow(R.drawable.ic_phone_android, "Allow Access to Videos", actions::requestPermission) })
+                } else {
+                    emptyList()
+                },
+        )
         if (deviceNotice != null) {
             // Missing access hides camera videos, downloads and screen recordings: say so, with the fix.
             item(key = "deviceAccess") {
@@ -122,75 +137,97 @@ private fun LazyListScope.browseItems(
                     notice = deviceNotice,
                     onAllow = actions::requestPermission,
                     onOpenSettings = actions::openAppSettings,
-                    modifier = Modifier.padding(horizontal = dims.gutter, vertical = 4.dp),
+                    modifier = Modifier.padding(horizontal = dims.gutter, vertical = 8.dp),
                 )
-            }
-        } else if (!permission.granted) {
-            item(key = "allowDevice") {
-                ActionRow(R.drawable.ic_phone_android, "Allow Access to Videos", actions::requestPermission)
             }
         }
     }
 
-    sectionHeader("folders", "Folders")
-    items(folders, key = { "src:${it.id}" }) { source -> SourceRow(source, actions) }
-    item(key = "addFolder") {
-        ActionRow(R.drawable.ic_create_new_folder, "Add Folder", actions::addFolder)
-    }
-
-    sectionHeader("network", "Network")
-    items(network, key = { "src:${it.id}" }) { source -> SourceRow(source, actions) }
-    item(key = "addNetwork") {
-        ActionRow(R.drawable.ic_add, "Add Network Source", actions::addNetworkSource)
-    }
-
-    sectionHeader("streams", "Streams")
-    items(browse.streams, key = { "stream:${it.id}" }) { stream ->
-        StreamRow(
-            stream = stream,
-            onClick = { actions.play(stream.id) },
-            onLongClick = { actions.openVideo(stream.id) },
-        )
-    }
-    item(key = "addStream") {
-        ActionRow(R.drawable.ic_add, "Add Stream") { actions.showDialog(DialogUi.AddStream) }
-    }
-    item(key = "openUrl") {
-        ActionRow(R.drawable.ic_link, "Open Network Stream") { actions.showDialog(DialogUi.OpenUrl) }
-    }
-
-    sectionHeader("playlists", "Playlists")
-    items(browse.playlists, key = { "playlist:${it.id}" }) { playlist ->
-        PlaylistRow(playlist = playlist, onClick = { actions.openPlaylist(playlist.id) })
-    }
-    item(key = "newPlaylist") {
-        ActionRow(R.drawable.ic_playlist_add, "New playlist") { actions.showDialog(DialogUi.NewPlaylist()) }
-    }
+    cardSection(
+        "folders",
+        "Folders",
+        folders.map { source -> "src:${source.id}" to @Composable { SourceRow(source, actions) } } +
+            ("addFolder" to @Composable { ActionRow(R.drawable.ic_create_new_folder, "Add Folder", actions::addFolder) }),
+    )
+    cardSection(
+        "network",
+        "Network",
+        network.map { source -> "src:${source.id}" to @Composable { SourceRow(source, actions) } } +
+            ("addNetwork" to @Composable { ActionRow(R.drawable.ic_add, "Add Network Source", actions::addNetworkSource) }),
+    )
+    cardSection(
+        "streams",
+        "Streams",
+        browse.streams.map { stream ->
+            "stream:${stream.id}" to @Composable {
+                StreamRow(stream = stream, onClick = { actions.play(stream.id) }, onLongClick = { actions.openVideo(stream.id) })
+            }
+        } + listOf(
+            "addStream" to @Composable { ActionRow(R.drawable.ic_add, "Add Stream") { actions.showDialog(DialogUi.AddStream) } },
+            "openUrl" to @Composable { ActionRow(R.drawable.ic_link, "Open Network Stream") { actions.showDialog(DialogUi.OpenUrl) } },
+        ),
+    )
+    cardSection(
+        "playlists",
+        "Playlists",
+        browse.playlists.map { playlist ->
+            "playlist:${playlist.id}" to @Composable { PlaylistRow(playlist = playlist, onClick = { actions.openPlaylist(playlist.id) }) }
+        } + ("newPlaylist" to @Composable { ActionRow(R.drawable.ic_playlist_add, "New Playlist…") { actions.showDialog(DialogUi.NewPlaylist()) } }),
+    )
 }
 
-private fun LazyListScope.sectionHeader(key: String, title: String) {
+/** A grey caps header and its [rows] in one rounded card, split by hairlines under the text. */
+private fun LazyListScope.cardSection(key: String, title: String, rows: List<Pair<String, @Composable () -> Unit>>) {
     item(key = "header:$key") {
         val dims = LocalNovaDimens.current
         Text(
-            text = title,
-            style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(start = dims.gutter, end = dims.gutter, top = 24.dp, bottom = 4.dp),
+            text = title.uppercase(),
+            style = MaterialTheme.typography.bodySmall,
+            color = IosColors.SecondaryLabel,
+            modifier = Modifier.padding(start = dims.gutter + 16.dp, end = dims.gutter, top = 24.dp, bottom = 7.dp),
         )
+    }
+    rows.forEachIndexed { index, (rowKey, content) ->
+        item(key = rowKey) {
+            val dims = LocalNovaDimens.current
+            val first = index == 0
+            val last = index == rows.lastIndex
+            val shape = RoundedCornerShape(
+                topStart = if (first) CardCorner else 0.dp,
+                topEnd = if (first) CardCorner else 0.dp,
+                bottomStart = if (last) CardCorner else 0.dp,
+                bottomEnd = if (last) CardCorner else 0.dp,
+            )
+            Column(
+                Modifier
+                    .padding(horizontal = dims.gutter)
+                    .clip(shape)
+                    .background(IosColors.GroupedCard),
+            ) {
+                if (!first) {
+                    Box(
+                        Modifier
+                            .padding(start = SeparatorInset)
+                            .fillMaxWidth()
+                            .height(Hairline)
+                            .background(IosColors.Separator),
+                    )
+                }
+                content()
+            }
+        }
     }
 }
 
+private val CardCorner = 20.dp
+
+/** Separators start under the text, past the 16dp edge, the 29dp tile and its 14dp gap. */
+private val SeparatorInset = 16.dp + 29.dp + 14.dp
+
+/** iOS Settings' coloured tile, shared with Preferences. */
 @Composable
-private fun RowIcon(@DrawableRes icon: Int, tint: Color = MaterialTheme.colorScheme.primary) {
-    Box(
-        Modifier
-            .size(40.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainerHigh),
-        contentAlignment = Alignment.Center,
-    ) {
-        NovaIcon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(22.dp))
-    }
+private fun RowIcon(@DrawableRes icon: Int) {
+    IconTile(icon, tileColor(icon))
 }
 
 @Composable
@@ -259,6 +296,7 @@ private fun SourceRow(source: SourceUi, actions: AppActions) {
             }
         },
         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+        tonalElevation = 0.dp,
     )
 }
 
@@ -278,6 +316,7 @@ private fun StreamRow(stream: VideoCardUi, onClick: () -> Unit, onLongClick: () 
             NovaIcon(R.drawable.ic_play_arrow, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
         },
         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+        tonalElevation = 0.dp,
     )
 }
 
@@ -292,6 +331,7 @@ private fun PlaylistRow(playlist: PlaylistUi, onClick: () -> Unit) {
             NovaIcon(R.drawable.ic_chevron_right, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
         },
         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+        tonalElevation = 0.dp,
     )
 }
 
@@ -300,7 +340,8 @@ private fun ActionRow(@DrawableRes icon: Int, label: String, onClick: () -> Unit
     ListItem(
         modifier = Modifier.clickable(onClick = onClick),
         leadingContent = { RowIcon(icon) },
-        headlineContent = { Text(label, color = MaterialTheme.colorScheme.primary) },
+        headlineContent = { Text(label, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.primary) },
         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+        tonalElevation = 0.dp,
     )
 }

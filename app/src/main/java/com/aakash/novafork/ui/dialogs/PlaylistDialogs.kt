@@ -84,7 +84,7 @@ internal fun AddToPlaylistSheet(dialog: DialogUi.AddToPlaylist, playlists: List<
                     leadingContent = {
                         PlaylistThumb(artwork = null, icon = R.drawable.ic_add)
                     },
-                    headlineContent = { Text("New playlist", color = MaterialTheme.colorScheme.primary) },
+                    headlineContent = { Text("New Playlist…", color = MaterialTheme.colorScheme.primary) },
                     colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                 )
             }

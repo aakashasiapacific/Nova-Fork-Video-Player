@@ -65,7 +65,7 @@ fun NovaDialogs(dialog: DialogUi?, actions: AppActions, playlists: List<Playlist
         )
         is DialogUi.AddToPlaylist -> AddToPlaylistSheet(dialog = dialog, playlists = playlists, actions = actions)
         is DialogUi.NewPlaylist -> PlaylistNameDialog(
-            title = "New playlist",
+            title = "New Playlist",
             confirmLabel = "Create",
             initialName = "",
             onConfirm = { name -> actions.createPlaylist(name, dialog.videoIds) },

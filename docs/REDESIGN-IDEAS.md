@@ -369,3 +369,6 @@ The owner asked for Apple Music to be copied more precisely, with less clutter. 
   held.
 - **Folder path (Browse):** written as the Files app writes it, with folders above in blue and
   the current one in white, replacing Material chips.
+- **Sources page (build 66):** an inset-grouped list like Preferences. Grey caps headers, each
+  section one rounded card with hairlines, and the same coloured icon tiles. "New Playlist…" is
+  in Title Case everywhere.

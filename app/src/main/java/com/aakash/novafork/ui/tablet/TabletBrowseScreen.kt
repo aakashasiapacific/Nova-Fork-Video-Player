@@ -265,7 +265,7 @@ private fun SourcesPane(
                 )
             }
             item(key = "newPlaylist", contentType = "action") {
-                ActionRow(R.drawable.ic_playlist_add, "New playlist") { actions.showDialog(DialogUi.NewPlaylist()) }
+                ActionRow(R.drawable.ic_playlist_add, "New Playlist…") { actions.showDialog(DialogUi.NewPlaylist()) }
             }
         }
     }
