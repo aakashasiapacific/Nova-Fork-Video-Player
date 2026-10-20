@@ -86,6 +86,8 @@ import com.aakash.novafork.ui.model.Route
 import com.aakash.novafork.ui.model.ScanUi
 import com.aakash.novafork.ui.model.SourceUi
 import com.aakash.novafork.ui.model.VideoCardUi
+import com.aakash.novafork.ui.settings.IconTile
+import com.aakash.novafork.ui.settings.tileColor
 
 private val PaneGutter = 28.dp
 
@@ -283,16 +285,9 @@ private fun LazyListScope.sectionHeader(key: String, title: String) {
 }
 
 @Composable
-private fun RowIcon(@DrawableRes icon: Int, tint: Color = MaterialTheme.colorScheme.primary) {
-    Box(
-        Modifier
-            .size(40.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainerHighest),
-        contentAlignment = Alignment.Center,
-    ) {
-        NovaIcon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(22.dp))
-    }
+private fun RowIcon(@DrawableRes icon: Int) {
+    // The coloured tiles of Preferences and the phone's Browse, as iPad Settings draws them.
+    IconTile(icon, tileColor(icon), size = 36.dp)
 }
 
 @Composable

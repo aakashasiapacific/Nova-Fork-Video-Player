@@ -1,9 +1,7 @@
 package com.aakash.novafork.ui.dialogs
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
@@ -50,6 +48,7 @@ import com.aakash.novafork.R
 import com.aakash.novafork.data.db.SourceType
 import com.aakash.novafork.ui.NetworkForms
 import com.aakash.novafork.ui.common.IosCheckCircle
+import com.aakash.novafork.ui.common.IosColors
 import com.aakash.novafork.ui.common.IosSpinner
 import com.aakash.novafork.ui.common.NovaAlertDialog
 import com.aakash.novafork.ui.common.NovaIcon
@@ -62,6 +61,8 @@ import com.aakash.novafork.ui.model.PlexServerUi
 import com.aakash.novafork.ui.model.PlexSignInUi
 import com.aakash.novafork.ui.model.ServerLibraryUi
 import com.aakash.novafork.ui.model.UpnpServerUi
+import com.aakash.novafork.ui.settings.IconTile
+import com.aakash.novafork.ui.settings.tileColor
 
 /** One kind of server the "Add Network Source" picker offers. */
 private class SourceKind(val type: SourceType, val title: String, val body: String)
@@ -107,10 +108,11 @@ internal fun AddSourceDialog(actions: AppActions) {
 @Composable
 private fun KindHeader(title: String) {
     Text(
-        text = title,
-        style = MaterialTheme.typography.labelLarge,
-        color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.padding(start = 8.dp, top = 4.dp, bottom = 4.dp),
+        // iOS's grouped-list header: small grey capitals.
+        text = title.uppercase(),
+        style = MaterialTheme.typography.labelMedium,
+        color = IosColors.SecondaryLabel,
+        modifier = Modifier.padding(start = 8.dp, top = 8.dp, bottom = 4.dp),
     )
 }
 
@@ -144,15 +146,9 @@ private fun KindRow(kind: SourceKind, onClick: () -> Unit) {
 
 @Composable
 private fun TypeBadge(type: SourceType) {
-    Box(
-        Modifier
-            .size(40.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainerHighest),
-        contentAlignment = Alignment.Center,
-    ) {
-        NovaIcon(sourceTypeIcon(type), contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
-    }
+    // The same coloured tile the source gets in Preferences and Browse once it is added.
+    val icon = sourceTypeIcon(type)
+    IconTile(icon, tileColor(icon), size = 36.dp)
 }
 
 /**
