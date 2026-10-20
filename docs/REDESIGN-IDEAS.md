@@ -456,3 +456,4 @@ The owner asked for Apple Music to be copied more precisely, with less clutter. 
 - **Information (build 89):** the file facts at the bottom of a phone video page drop their card for the Apple TV Information layout — a small white heading over each grey value, short ones two to a line.
 - **Volume (build 90):** Now Playing has Apple Music's volume slider under the controls — the phone's media volume between a quiet and a loud speaker, following the volume keys.
 - **iPad video page (build 91):** only Play (and Start Over) stay as buttons; Identify, Change Artwork, Mark as Watched and Add to Playlist move into one round "…", as on the Apple TV app's iPad pages. Preferences' "Not allowed" drops to the regular grey subtitle style.
+- **Time left (build 92):** the video player's scrubber shows "−time left" on the right by default, as the iOS player does; a tap still switches to the full length.

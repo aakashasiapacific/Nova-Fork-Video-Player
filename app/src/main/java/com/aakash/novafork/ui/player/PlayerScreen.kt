@@ -83,7 +83,8 @@ private fun PlayerChrome(state: PlayerUiState, actions: PlayerActions, layout: D
     var controlsRequested by rememberSaveable { mutableStateOf(true) }
     var panel by rememberSaveable { mutableStateOf<PlayerPanel?>(null) }
     var sheet by rememberSaveable { mutableStateOf<PlayerSheet?>(null) }
-    var showRemaining by rememberSaveable { mutableStateOf(false) }
+    // Time left, as the iOS player shows it; a tap on it switches to the full length.
+    var showRemaining by rememberSaveable { mutableStateOf(true) }
     var touching by remember { mutableStateOf(false) }
     var unlockHintRequests by remember { mutableIntStateOf(0) }
     var unlockHintVisible by remember { mutableStateOf(false) }
