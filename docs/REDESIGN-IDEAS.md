@@ -442,3 +442,4 @@ The owner asked for Apple Music to be copied more precisely, with less clutter. 
     and the page follows the finger.
   - In Audio, an album, artist or playlist page swipes back to the Library instead of changing
     tab.
+- **Haptics (build 78):** a light tick, as iOS gives, on a tab change (tapped, dragged along the bar or swiped), a settings switch, and a mini-player skip.

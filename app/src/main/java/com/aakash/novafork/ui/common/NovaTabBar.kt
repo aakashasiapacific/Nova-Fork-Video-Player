@@ -48,8 +48,10 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -70,7 +72,13 @@ import kotlinx.coroutines.launch
 @Composable
 internal fun NovaTabCapsule(selected: TopDestination, onSelect: (TopDestination) -> Unit, modifier: Modifier = Modifier) {
     val tabs = TopDestination.entries
-    val currentOnSelect by rememberUpdatedState(onSelect)
+    // A light tick on every tab change, as iOS's tab bar gives.
+    val haptics = LocalHapticFeedback.current
+    val selectWithTick: (TopDestination) -> Unit = { tab ->
+        if (tab != selected) haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+        onSelect(tab)
+    }
+    val currentOnSelect by rememberUpdatedState(selectWithTick)
     var dragX by remember { mutableStateOf<Float?>(null) }
     BoxWithConstraints(
         modifier
@@ -112,7 +120,7 @@ internal fun NovaTabCapsule(selected: TopDestination, onSelect: (TopDestination)
                         .fillMaxHeight()
                         .selectable(
                             selected = tab == selected,
-                            onClick = { onSelect(tab) },
+                            onClick = { selectWithTick(tab) },
                             role = Role.Tab,
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null,
@@ -217,6 +225,7 @@ internal fun Modifier.swipeBetweenTabs(
     val scope = rememberCoroutineScope()
     val select by rememberUpdatedState(onSelect)
     val back by rememberUpdatedState(onBack)
+    val haptics = LocalHapticFeedback.current
     return this
         .pointerInput(top, enabled, onBack != null) {
             if (!enabled && back == null) return@pointerInput
@@ -235,6 +244,7 @@ internal fun Modifier.swipeBetweenTabs(
                         back?.invoke()
                     } else if (target != null) {
                         offset = 0f
+                        haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                         select(target)
                     } else {
                         scope.launch { animate(offset, 0f, animationSpec = spring(dampingRatio = 0.8f)) { value, _ -> offset = value } }

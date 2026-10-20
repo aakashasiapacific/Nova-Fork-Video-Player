@@ -70,11 +70,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -247,6 +249,7 @@ fun MiniPlayerBar(
     var swipe by remember { mutableFloatStateOf(0f) }
     val skipPx = with(LocalDensity.current) { 64.dp.toPx() }
     val swipeState = rememberDraggableState { delta -> swipe = (swipe + delta).coerceIn(-skipPx * 1.6f, skipPx * 1.6f) }
+    val haptics = LocalHapticFeedback.current
     Row(
         modifier
             .fillMaxWidth()
@@ -258,8 +261,14 @@ fun MiniPlayerBar(
                 orientation = Orientation.Horizontal,
                 onDragStopped = { velocity ->
                     when {
-                        swipe < -skipPx && player.hasNext -> actions.next()
-                        swipe > skipPx -> actions.previous()
+                        swipe < -skipPx && player.hasNext -> {
+                            haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            actions.next()
+                        }
+                        swipe > skipPx -> {
+                            haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            actions.previous()
+                        }
                     }
                     animate(swipe, 0f, velocity, spring(dampingRatio = 0.7f, stiffness = 500f)) { value, _ -> swipe = value }
                 },
