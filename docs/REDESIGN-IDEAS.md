@@ -454,3 +454,4 @@ The owner asked for Apple Music to be copied more precisely, with less clutter. 
 - **Fewer buttons in Preferences (build 87):** folders and network sources lose their pencil and bin; one "…" menu holds Edit and Remove (in red), and tapping a network source still edits it.
 - **Permission row (build 88):** All files access says only Allowed / Not allowed with a blue Allow; its explanation moves under the group in grey, as iOS Settings does.
 - **Information (build 89):** the file facts at the bottom of a phone video page drop their card for the Apple TV Information layout — a small white heading over each grey value, short ones two to a line.
+- **Volume (build 90):** Now Playing has Apple Music's volume slider under the controls — the phone's media volume between a quiet and a loud speaker, following the volume keys.

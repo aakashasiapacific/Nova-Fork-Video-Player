@@ -1,5 +1,10 @@
 package com.aakash.novafork.ui.audio
 
+import android.database.ContentObserver
+import android.media.AudioManager
+import android.os.Handler
+import android.os.Looper
+import android.provider.Settings
 import androidx.activity.compose.BackHandler
 import androidx.annotation.DrawableRes
 import androidx.compose.animation.AnimatedContent
@@ -55,6 +60,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -78,6 +84,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
@@ -470,7 +478,9 @@ fun NowPlayingScreen(
                 )
                 BigControl(R.drawable.ic_skip_next, "Next", size = 40, enabled = player.hasNext, onClick = actions::next)
             }
-            Spacer(Modifier.height(14.dp))
+            Spacer(Modifier.height(10.dp))
+            VolumeSlider()
+            Spacer(Modifier.height(6.dp))
             Row(
                 Modifier
                     .fillMaxWidth()
@@ -743,6 +753,50 @@ private fun Scrubber(player: MusicPlayerState, actions: AudioActions) {
         val shownMs = (fraction * duration).toLong()
         Text(formatTime(shownMs), fontSize = 12.sp, color = Color.White.copy(alpha = 0.6f), modifier = Modifier.weight(1f))
         Text("-" + formatTime((player.durationMs - shownMs).coerceAtLeast(0)), fontSize = 12.sp, color = Color.White.copy(alpha = 0.6f))
+    }
+}
+
+/**
+ * Apple Music's volume slider under the controls: the phone's media volume between a quiet and
+ * a loud speaker. It follows the volume keys too, as the system settings report each change.
+ */
+@Composable
+private fun VolumeSlider() {
+    val context = LocalContext.current
+    val audio = remember(context) { context.getSystemService(AudioManager::class.java) }
+    val max = remember(audio) { (audio?.getStreamMaxVolume(AudioManager.STREAM_MUSIC) ?: 1).coerceAtLeast(1) }
+    val read = { (audio?.getStreamVolume(AudioManager.STREAM_MUSIC) ?: 0).toFloat() / max }
+    var level by remember { mutableFloatStateOf(read()) }
+    var dragging by remember { mutableStateOf<Float?>(null) }
+    DisposableEffect(context) {
+        val observer = object : ContentObserver(Handler(Looper.getMainLooper())) {
+            override fun onChange(selfChange: Boolean) {
+                level = read()
+            }
+        }
+        context.contentResolver.registerContentObserver(Settings.System.CONTENT_URI, true, observer)
+        onDispose { context.contentResolver.unregisterContentObserver(observer) }
+    }
+    val dim = Color.White.copy(alpha = 0.6f)
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        NovaIcon(R.drawable.ic_volume_down, contentDescription = null, tint = dim, modifier = Modifier.size(14.dp))
+        ThinSlider(
+            value = dragging ?: level,
+            onChange = { value ->
+                dragging = value
+                // Do Not Disturb can refuse a change; the slider then springs back to the real level.
+                runCatching { audio?.setStreamVolume(AudioManager.STREAM_MUSIC, (value * max).roundToInt(), 0) }
+            },
+            onChangeFinished = {
+                dragging = null
+                level = read()
+            },
+            modifier = Modifier
+                .weight(1f)
+                .padding(horizontal = 10.dp)
+                .semantics { contentDescription = "Volume" },
+        )
+        NovaIcon(R.drawable.ic_volume_up, contentDescription = null, tint = dim, modifier = Modifier.size(18.dp))
     }
 }
 
