@@ -1,12 +1,12 @@
 package com.aakash.novafork.ui.audio
 
-import android.os.Build
 import androidx.activity.compose.BackHandler
 import androidx.annotation.DrawableRes
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
@@ -23,9 +23,11 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -57,7 +59,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
@@ -70,6 +71,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
@@ -81,6 +83,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.aakash.novafork.R
 import com.aakash.novafork.data.db.SongEntity
 import com.aakash.novafork.data.music.MusicLibrary
@@ -91,7 +94,6 @@ import com.aakash.novafork.ui.model.RepeatMode
 import com.aakash.novafork.ui.theme.NovaColors
 import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 
 /**
  * The real app turns this on (MainActivity): the music mini player and Now Playing then live in
@@ -163,40 +165,35 @@ fun MiniPlayerBar(
     val now = player.nowPlaying
     // As in Apple Music, a sideways swipe on the mini player skips: left for the next song,
     // right for the one before. The song slides with the finger and springs back.
-    val scope = rememberCoroutineScope()
-    val swipe = remember { Animatable(0f) }
+    var swipe by remember { mutableFloatStateOf(0f) }
     val skipPx = with(LocalDensity.current) { 64.dp.toPx() }
+    val swipeState = rememberDraggableState { delta -> swipe = (swipe + delta).coerceIn(-skipPx * 1.6f, skipPx * 1.6f) }
     Row(
         modifier
             .fillMaxWidth()
             .height(MiniPlayerHeight)
             .glass(RoundedCornerShape(percent = 50))
             .clickable(onClickLabel = "Open Now Playing", onClick = onOpen)
-            .pointerInput(player.hasNext) {
-                detectHorizontalDragGestures(
-                    onDragEnd = {
-                        val moved = swipe.value
-                        when {
-                            moved < -skipPx && player.hasNext -> actions.next()
-                            moved > skipPx -> actions.previous()
-                        }
-                        scope.launch { swipe.animateTo(0f, spring(dampingRatio = 0.7f)) }
-                    },
-                    onDragCancel = { scope.launch { swipe.animateTo(0f, spring()) } },
-                ) { change, amount ->
-                    change.consume()
-                    scope.launch { swipe.snapTo((swipe.value + amount).coerceIn(-skipPx * 1.6f, skipPx * 1.6f)) }
-                }
-            }
+            .draggable(
+                state = swipeState,
+                orientation = Orientation.Horizontal,
+                onDragStopped = { velocity ->
+                    when {
+                        swipe < -skipPx && player.hasNext -> actions.next()
+                        swipe > skipPx -> actions.previous()
+                    }
+                    animate(swipe, 0f, velocity, spring(dampingRatio = 0.7f, stiffness = 500f)) { value, _ -> swipe = value }
+                },
+            )
             .padding(start = 10.dp, end = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Cover(now?.artUri, size = 42, corner = 8, modifier = Modifier.offset { IntOffset((swipe.value * 0.5f).roundToInt(), 0) })
+        Cover(now?.artUri, size = 42, corner = 8, modifier = Modifier.offset { IntOffset((swipe * 0.5f).roundToInt(), 0) })
         Column(
             Modifier
                 .weight(1f)
-                .offset { IntOffset(swipe.value.roundToInt(), 0) }
-                .graphicsLayer { alpha = 1f - (kotlin.math.abs(swipe.value) / (skipPx * 2.2f)).coerceIn(0f, 0.7f) }
+                .offset { IntOffset(swipe.roundToInt(), 0) }
+                .graphicsLayer { alpha = 1f - (kotlin.math.abs(swipe) / (skipPx * 2.2f)).coerceIn(0f, 0.7f) }
                 .padding(horizontal = 12.dp),
         ) {
             Text(
@@ -256,31 +253,45 @@ fun NowPlayingScreen(
     BackHandler(onBack = onDismiss)
     val now = player.nowPlaying
     var pane by rememberSaveable { mutableStateOf(NowPlayingPane.ART) }
-    val scope = rememberCoroutineScope()
-    val dragY = remember { Animatable(0f) }
-    val dismissPx = with(LocalDensity.current) { 140.dp.toPx() }
+    // Pulled down with the finger, frame by frame, without a coroutine per move; let go past a
+    // third of the way down or with a flick and it carries on off screen from where it is, else
+    // it springs back. Its top corners round as it leaves, like an iOS sheet.
+    val density = LocalDensity.current
+    val dismissPx = with(density) { 140.dp.toPx() }
+    val flingPx = with(density) { 900.dp.toPx() }
+    var dragY by remember { mutableFloatStateOf(0f) }
+    var heightPx by remember { mutableFloatStateOf(0f) }
+    val dragState = rememberDraggableState { delta -> dragY = (dragY + delta).coerceAtLeast(0f) }
     Box(
         modifier
             .fillMaxSize()
-            .offset { IntOffset(0, dragY.value.roundToInt().coerceAtLeast(0)) }
+            .onSizeChanged { heightPx = it.height.toFloat() }
+            .graphicsLayer {
+                translationY = dragY
+                val corner = (dragY / dismissPx).coerceIn(0f, 1f) * 28.dp.toPx()
+                shape = RoundedCornerShape(topStart = corner, topEnd = corner)
+                clip = dragY > 0f
+            }
             .background(Color.Black)
             // Drag down anywhere to close (lyrics scroll and the sliders keep their own drags).
-            .pointerInput(Unit) {
-                detectVerticalDragGestures(
-                    onDragEnd = {
-                        scope.launch {
-                            if (dragY.value > dismissPx) onDismiss() else dragY.animateTo(0f, spring())
+            .draggable(
+                state = dragState,
+                orientation = Orientation.Vertical,
+                onDragStopped = { velocity ->
+                    if (dragY > dismissPx || velocity > flingPx) {
+                        animate(dragY, heightPx.coerceAtLeast(dragY), velocity, tween(220, easing = FastOutLinearInEasing)) { value, _ ->
+                            dragY = value
                         }
-                    },
-                    onDragCancel = { scope.launch { dragY.animateTo(0f, spring()) } },
-                ) { change, amount ->
-                    change.consume()
-                    scope.launch { dragY.snapTo((dragY.value + amount).coerceAtLeast(0f)) }
-                }
-            },
+                        onDismiss()
+                    } else {
+                        animate(dragY, 0f, velocity, spring(dampingRatio = 0.8f, stiffness = 500f)) { value, _ -> dragY = value }
+                    }
+                },
+            ),
     ) {
-        // Apple Music's living background: the cover, blurred to colour and slowly turning.
-        // Android before 12 can't blur, so there the cover sits under a darker veil instead.
+        // Apple Music's living background: the cover in colour, slowly turning. It is drawn from a
+        // 32px copy of the cover, which upscaled is as soft as a blur and costs nothing per frame
+        // (a real blur redrawn while the screen turns and is dragged made the drag stutter).
         val drift = rememberInfiniteTransition(label = "drift")
         val turn by drift.animateFloat(
             initialValue = 0f,
@@ -288,9 +299,12 @@ fun NowPlayingScreen(
             animationSpec = infiniteRepeatable(tween(durationMillis = 90_000, easing = LinearEasing)),
             label = "driftTurn",
         )
-        val canBlur = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+        val context = LocalContext.current
+        val tinyCover = remember(now?.artUri) {
+            now?.artUri?.let { ImageRequest.Builder(context).data(it).size(BACKDROP_PX).build() }
+        }
         AsyncImage(
-            model = now?.artUri,
+            model = tinyCover,
             contentDescription = null,
             contentScale = ContentScale.Crop,
             modifier = Modifier
@@ -299,13 +313,12 @@ fun NowPlayingScreen(
                     scaleX = 1.8f
                     scaleY = 1.8f
                     rotationZ = turn
-                }
-                .blur(90.dp),
+                },
         )
         Box(
             Modifier
                 .fillMaxSize()
-                .background(Color.Black.copy(alpha = if (canBlur) 0.45f else 0.78f)),
+                .background(Color.Black.copy(alpha = 0.5f)),
         )
         Column(
             Modifier
@@ -743,6 +756,9 @@ internal fun Cover(uri: String?, size: Int, corner: Int = 8, round: Boolean = fa
         }
     }
 }
+
+/** The size the Now Playing background is drawn from: small enough to look blurred when upscaled. */
+private const val BACKDROP_PX = 32
 
 internal fun formatTime(ms: Long): String {
     val totalSeconds = (ms / 1000).coerceAtLeast(0)

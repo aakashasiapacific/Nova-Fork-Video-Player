@@ -381,3 +381,11 @@ The owner asked for Apple Music to be copied more precisely, with less clutter. 
 - **Hero, camera and saved videos:** the sharp frame is centred in the room under the status bar.
   It used to hang at the top with an empty blurred band below it.
 - **Now Playing:** no grabber line at the top. Dragging down anywhere still closes it.
+- **Smoother Now Playing drag (build 69):**
+  - The screen follows the finger frame by frame.
+  - It closes when let go past 140dp or with a quick flick, and carries on off screen from where
+    it was.
+  - It rounds its top corners as it is pulled.
+  - The turning background is drawn from a 32px copy of the cover, which upscaled looks blurred.
+    It used to be a full-screen blur redrawn every frame, which made the drag stutter.
+  - The mini player's sideways swipe tracks the finger the same way.
