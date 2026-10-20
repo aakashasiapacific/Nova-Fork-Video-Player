@@ -36,6 +36,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.selection.selectable
@@ -692,5 +693,30 @@ fun SwipeToDelete(
                     },
                 ),
         ) { content() }
+    }
+}
+
+/**
+ * iOS's collapsed large title: once a page's big title has scrolled away, the title shows small
+ * and centred in a dark bar under the status bar, fading in and out.
+ */
+@Composable
+fun CollapsedTitleBar(visible: Boolean, title: String, modifier: Modifier = Modifier) {
+    AnimatedVisibility(visible = visible, modifier = modifier, enter = fadeIn(tween(160)), exit = fadeOut(tween(160))) {
+        Column(Modifier.fillMaxWidth().background(Color.Black.copy(alpha = 0.92f))) {
+            Text(
+                title,
+                style = MaterialTheme.typography.titleMedium,
+                color = Color.White,
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .statusBarsPadding()
+                    .padding(horizontal = 56.dp, vertical = 12.dp),
+            )
+            Box(Modifier.fillMaxWidth().height(Hairline).background(IosColors.Separator))
+        }
     }
 }

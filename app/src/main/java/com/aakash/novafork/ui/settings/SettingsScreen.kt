@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -25,6 +26,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
@@ -38,6 +40,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.aakash.novafork.ui.adaptive.DeviceLayout
+import com.aakash.novafork.ui.common.CollapsedTitleBar
 import com.aakash.novafork.ui.common.IosColors
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.SettingsUi
@@ -71,31 +74,38 @@ private fun PhoneSettings(state: SettingsUi, actions: AppActions, modifier: Modi
     val sections = remember(state, actions) {
         SettingsSection.entries.map { section -> section to settingsGroups(section, state, actions) }
     }
-    LazyColumn(
-        // imePadding keeps the TMDB key field above the keyboard: the window does not resize edge-to-edge.
-        modifier = modifier
-            .fillMaxSize()
-            .imePadding(),
-        contentPadding = contentPadding.extend(horizontal = PhoneMargin, top = 8.dp, bottom = 16.dp),
-    ) {
-        item(key = "title") {
-            Text(
-                text = "Preferences",
-                style = MaterialTheme.typography.headlineLarge,
-                modifier = Modifier.padding(start = 4.dp, top = 16.dp, bottom = 4.dp),
-            )
-        }
-        for ((section, groups) in sections) {
-            groups.forEachIndexed { index, group ->
-                item(key = "${section.name}/${group.key}") {
-                    SettingsGroupBlock(
-                        group = group,
-                        title = if (index == 0) section.title else group.title,
-                        modifier = Modifier.padding(top = if (index == 0 || group.title != null) 8.dp else GroupGap),
-                    )
+    // iOS's large title: "Preferences" scrolls away and comes back small in a bar at the top.
+    val listState = rememberLazyListState()
+    val collapsed by remember { derivedStateOf { listState.firstVisibleItemIndex > 0 } }
+    Box(modifier.fillMaxSize()) {
+        LazyColumn(
+            // imePadding keeps the TMDB key field above the keyboard: the window does not resize edge-to-edge.
+            modifier = Modifier
+                .fillMaxSize()
+                .imePadding(),
+            state = listState,
+            contentPadding = contentPadding.extend(horizontal = PhoneMargin, top = 8.dp, bottom = 16.dp),
+        ) {
+            item(key = "title") {
+                Text(
+                    text = "Preferences",
+                    style = MaterialTheme.typography.headlineLarge,
+                    modifier = Modifier.padding(start = 4.dp, top = 16.dp, bottom = 4.dp),
+                )
+            }
+            for ((section, groups) in sections) {
+                groups.forEachIndexed { index, group ->
+                    item(key = "${section.name}/${group.key}") {
+                        SettingsGroupBlock(
+                            group = group,
+                            title = if (index == 0) section.title else group.title,
+                            modifier = Modifier.padding(top = if (index == 0 || group.title != null) 8.dp else GroupGap),
+                        )
+                    }
                 }
             }
         }
+        CollapsedTitleBar(visible = collapsed, title = "Preferences")
     }
 }
 

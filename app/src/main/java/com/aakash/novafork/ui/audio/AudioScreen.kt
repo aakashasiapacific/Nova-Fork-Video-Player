@@ -45,6 +45,7 @@ import androidx.compose.foundation.lazy.grid.LazyGridScope
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -62,6 +63,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -101,6 +103,7 @@ import com.aakash.novafork.data.music.MusicLibrary
 import com.aakash.novafork.data.music.MusicLibraryData
 import com.aakash.novafork.data.music.MusicScanState
 import com.aakash.novafork.music.MusicPlayerState
+import com.aakash.novafork.ui.common.CollapsedTitleBar
 import com.aakash.novafork.ui.common.IosColors
 import com.aakash.novafork.ui.common.IosGrabber
 import com.aakash.novafork.ui.common.IosSheetShape
@@ -322,19 +325,29 @@ private fun pageTitle(page: String, library: MusicLibraryData): String = when {
 // Pages
 // ---------------------------------------------------------------------------------------------
 
-/** Every page is one grid (2 columns of covers; rows span both), padded for the floating bars. */
+/**
+ * Every page is one grid (2 columns of covers; rows span both), padded for the floating bars.
+ * Once its big title has scrolled away, [title] shows small and centred in a bar at the top, as
+ * iOS's large titles collapse.
+ */
 @Composable
-private fun AudioPage(content: LazyGridScope.() -> Unit) {
-    LazyVerticalGrid(
-        columns = GridCells.Fixed(2),
-        modifier = Modifier
-            .fillMaxSize()
-            .statusBarsPadding(),
-        contentPadding = PaddingValues(start = Gutter, end = Gutter, bottom = 24.dp + LocalBottomBarSpace.current),
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
-        verticalArrangement = Arrangement.spacedBy(0.dp),
-        content = content,
-    )
+private fun AudioPage(title: String?, content: LazyGridScope.() -> Unit) {
+    val gridState = rememberLazyGridState()
+    val collapsed by remember { derivedStateOf { gridState.firstVisibleItemIndex > 1 } }
+    Box(Modifier.fillMaxSize()) {
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(2),
+            state = gridState,
+            modifier = Modifier
+                .fillMaxSize()
+                .statusBarsPadding(),
+            contentPadding = PaddingValues(start = Gutter, end = Gutter, bottom = 24.dp + LocalBottomBarSpace.current),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalArrangement = Arrangement.spacedBy(0.dp),
+            content = content,
+        )
+        if (title != null) CollapsedTitleBar(visible = collapsed, title = title)
+    }
 }
 
 private fun LazyGridScope.row(key: Any? = null, content: @Composable () -> Unit) {
@@ -349,7 +362,7 @@ private fun LibraryHome(
     onRequestAccess: () -> Unit,
     ctx: PageContext,
 ) {
-    AudioPage {
+    AudioPage("Library") {
         row("title") {
             Row(Modifier.padding(top = 20.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text("Library", fontSize = 34.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
@@ -394,7 +407,7 @@ private fun LibraryHome(
 
 @Composable
 private fun PlaylistsPage(playlists: List<MusicPlaylistRow>, ctx: PageContext) {
-    AudioPage {
+    AudioPage("Playlists") {
         header("Playlists", ctx)
         // Apple Music's first row: a red "+" tile and New Playlist….
         row("new") {
@@ -442,7 +455,7 @@ private fun PlaylistsPage(playlists: List<MusicPlaylistRow>, ctx: PageContext) {
 
 @Composable
 private fun ArtistsPage(artists: List<Artist>, ctx: PageContext) {
-    AudioPage {
+    AudioPage("Artists") {
         header("Artists", ctx)
         artists.forEach { artist ->
             row("a:${artist.key}") {
@@ -458,7 +471,7 @@ private fun ArtistsPage(artists: List<Artist>, ctx: PageContext) {
 
 @Composable
 private fun AlbumsPage(title: String, albums: List<Album>, ctx: PageContext) {
-    AudioPage {
+    AudioPage(title) {
         header(title, ctx)
         items(albums, key = { it.key }) { album -> AlbumTile(album) { ctx.onOpen(ALBUM + album.key) } }
     }
@@ -466,7 +479,7 @@ private fun AlbumsPage(title: String, albums: List<Album>, ctx: PageContext) {
 
 @Composable
 private fun GenresPage(ctx: PageContext) {
-    AudioPage {
+    AudioPage("Genres") {
         header("Genres", ctx)
         ctx.library.genres.forEach { genre ->
             row("g:${genre.name}") {
@@ -483,7 +496,7 @@ private fun GenresPage(ctx: PageContext) {
 /** Starred songs, most recently starred first; the red star takes one out. */
 @Composable
 private fun FavoritesPage(songs: List<SongEntity>, ctx: PageContext) {
-    AudioPage {
+    AudioPage("Favorites") {
         header("Favorites", ctx)
         if (songs.isEmpty()) row("empty") { Hint("No favorites yet. Tap the star in Now Playing to add a song.") }
         if (songs.isNotEmpty()) row("play") { PlayShuffle(songs, ctx.actions) }
@@ -498,7 +511,7 @@ private fun FavoritesPage(songs: List<SongEntity>, ctx: PageContext) {
 /** Songs, a genre: big title, Play and Shuffle, then the songs with their covers. */
 @Composable
 private fun SongsPage(title: String, songs: List<SongEntity>, ctx: PageContext) {
-    AudioPage {
+    AudioPage(title) {
         header(title, ctx)
         if (songs.isNotEmpty()) row("play") { PlayShuffle(songs, ctx.actions) }
         songRows(songs, ctx)
@@ -508,7 +521,7 @@ private fun SongsPage(title: String, songs: List<SongEntity>, ctx: PageContext) 
 /** Apple Music's album page: big cover, title, red artist, details, Play/Shuffle and the tracks. */
 @Composable
 private fun AlbumPage(album: Album, ctx: PageContext) {
-    AudioPage {
+    AudioPage(album.title) {
         row("back") { BackRow(ctx) { close -> QueueItems(album.songs, ctx, close) } }
         row("cover") {
             Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -625,7 +638,7 @@ private fun ArtistHero(artist: Artist, ctx: PageContext) {
 /** An artist: their picture with Play, their albums in a row, then their top songs. */
 @Composable
 private fun ArtistPage(artist: Artist, ctx: PageContext) {
-    AudioPage {
+    AudioPage(artist.name) {
         row("back") { BackRow(ctx) { close -> QueueItems(artist.songs, ctx, close) } }
         row("hero") { ArtistHero(artist, ctx) }
         if (artist.albums.isNotEmpty()) {
@@ -645,7 +658,7 @@ private fun ArtistPage(artist: Artist, ctx: PageContext) {
 
 @Composable
 private fun PlaylistPage(playlist: OpenPlaylist, ctx: PageContext) {
-    AudioPage {
+    AudioPage(playlist.name) {
         row("back") {
             BackRow(ctx) { close ->
                 QueueItems(playlist.songs, ctx, close)
@@ -699,7 +712,7 @@ private fun PlaylistPage(playlist: OpenPlaylist, ctx: PageContext) {
 
 @Composable
 private fun Missing(ctx: PageContext) {
-    AudioPage {
+    AudioPage(null) {
         row("back") { BackRow(ctx) }
         row("hint") { Hint("This is no longer in your library.") }
     }
