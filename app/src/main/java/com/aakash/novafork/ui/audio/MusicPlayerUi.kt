@@ -314,20 +314,8 @@ fun NowPlayingScreen(
                 .navigationBarsPadding()
                 .padding(horizontal = 28.dp),
         ) {
-            // The grabber: a hint; the whole sheet drags down to close, as in Apple Music.
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .height(28.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                Box(
-                    Modifier
-                        .size(width = 40.dp, height = 5.dp)
-                        .clip(CircleShape)
-                        .background(Color.White.copy(alpha = 0.4f)),
-                )
-            }
+            // No grabber line (owner): the whole screen still drags down to close.
+            Spacer(Modifier.height(16.dp))
             if (pane != NowPlayingPane.ART) {
                 // Lyrics and the queue keep the song in a small header, as in Apple Music.
                 Row(Modifier.padding(top = 8.dp, bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {

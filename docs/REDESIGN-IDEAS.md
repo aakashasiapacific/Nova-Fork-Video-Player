@@ -375,3 +375,9 @@ The owner asked for Apple Music to be copied more precisely, with less clutter. 
 - **Phone player (build 67):** the bottom row keeps only Lock, Speed and picture-in-picture, as
   iOS's player keeps its bar short. Aspect Ratio, Repeat, Shuffle and Rotate moved into the "…"
   menu, each showing its current state.
+
+## 15. Owner's notes on build 67 (2026-10-20; build 68)
+
+- **Hero, camera and saved videos:** the sharp frame is centred in the room under the status bar.
+  It used to hang at the top with an empty blurred band below it.
+- **Now Playing:** no grabber line at the top. Dragging down anywhere still closes it.

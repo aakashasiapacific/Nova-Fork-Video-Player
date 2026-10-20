@@ -177,25 +177,33 @@ internal fun FramePicture(artwork: Artwork, modifier: Modifier = Modifier) {
                 .fillMaxSize()
                 .background(Color.Black.copy(alpha = 0.45f)),
         )
-        // The sharp frame, as large as fits under the status bar, never wider than the page.
+        // The sharp frame, as large as fits under the status bar, never wider than the page, and
+        // centred in the room below the status bar (a wide frame would otherwise hang at the top
+        // over an empty band).
         val aspect = (artwork.frameAspect ?: (16f / 9f)).coerceIn(0.4f, 2.4f)
         val room = height - statusBar - 24.dp
         val frameWidth = minOf(room * aspect, maxWidth - 40.dp)
         Box(
             Modifier
-                .padding(top = statusBar + 12.dp)
-                .width(frameWidth)
-                .height(frameWidth / aspect)
-                .shadow(16.dp, shape)
-                .clip(shape),
+                .fillMaxSize()
+                .padding(top = statusBar),
+            contentAlignment = Alignment.Center,
         ) {
-            ArtImage(
-                candidates = candidates,
-                contentDescription = null,
-                modifier = Modifier.fillMaxSize(),
-                frameSource = artwork.frameSource,
+            Box(
+                Modifier
+                    .width(frameWidth)
+                    .height(frameWidth / aspect)
+                    .shadow(16.dp, shape)
+                    .clip(shape),
             ) {
-                ArtPlaceholder(seed = artwork.seed, title = null, modifier = Modifier.fillMaxSize())
+                ArtImage(
+                    candidates = candidates,
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
+                    frameSource = artwork.frameSource,
+                ) {
+                    ArtPlaceholder(seed = artwork.seed, title = null, modifier = Modifier.fillMaxSize())
+                }
             }
         }
         StatusBarShade(statusBar)
