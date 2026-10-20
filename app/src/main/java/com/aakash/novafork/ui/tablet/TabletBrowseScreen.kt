@@ -34,8 +34,6 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -68,6 +66,7 @@ import com.aakash.novafork.ui.common.IosSpinner
 import com.aakash.novafork.ui.common.NovaDropdownMenu
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.NovaMenuItem
+import com.aakash.novafork.ui.common.PathCrumb
 import com.aakash.novafork.ui.common.ScanBanner
 import com.aakash.novafork.ui.common.VideoMenuBox
 import com.aakash.novafork.ui.common.deviceAccessNotice
@@ -675,29 +674,12 @@ private fun BrowseDirHeader(dir: BrowseDirUi, actions: AppActions, modifier: Mod
                                 .size(18.dp),
                         )
                     }
-                    if (index == dir.crumbs.lastIndex) {
-                        Text(
-                            text = crumb.label,
-                            style = MaterialTheme.typography.labelLarge,
-                            modifier = Modifier.padding(horizontal = 8.dp),
-                        )
-                    } else {
-                        AssistChip(
-                            onClick = { actions.navigate(Route.BrowseDir(dir.sourceId, crumb.path)) },
-                            label = { Text(crumb.label) },
-                            leadingIcon = if (index == 0) {
-                                {
-                                    NovaIcon(
-                                        sourceTypeIcon(dir.sourceType),
-                                        contentDescription = null,
-                                        modifier = Modifier.size(AssistChipDefaults.IconSize),
-                                    )
-                                }
-                            } else {
-                                null
-                            },
-                        )
-                    }
+                    PathCrumb(
+                        label = crumb.label,
+                        current = index == dir.crumbs.lastIndex,
+                        onClick = { actions.navigate(Route.BrowseDir(dir.sourceId, crumb.path)) },
+                        icon = if (index == 0) sourceTypeIcon(dir.sourceType) else null,
+                    )
                 }
             }
         }

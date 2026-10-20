@@ -142,6 +142,9 @@ interface WatchlistDao {
 
     @Query("SELECT COUNT(*) FROM watchlist WHERE itemKey = :itemKey")
     suspend fun count(itemKey: String): Int
+
+    @Query("SELECT * FROM watchlist")
+    suspend fun all(): List<WatchlistEntity>
 }
 
 @Dao
@@ -158,6 +161,9 @@ interface FavoriteSongDao {
 
     @Query("SELECT COUNT(*) FROM song_favorites WHERE songId = :songId")
     suspend fun count(songId: Long): Int
+
+    @Query("SELECT * FROM song_favorites")
+    suspend fun all(): List<FavoriteSongEntity>
 }
 
 @Dao
@@ -171,4 +177,7 @@ interface VideoFavoriteDao {
 
     @Query("DELETE FROM video_favorites WHERE itemKey = :itemKey")
     suspend fun remove(itemKey: String)
+
+    @Query("SELECT * FROM video_favorites")
+    suspend fun all(): List<VideoFavoriteEntity>
 }

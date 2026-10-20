@@ -1447,6 +1447,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
             plural(summary.sources, "source", "sources"),
             plural(summary.videos, "video with history", "videos with history"),
             summary.songs.takeIf { it > 0 }?.let { plural(it, "song with plays", "songs with plays") },
+            summary.saved.takeIf { it > 0 }?.let { plural(it, "watchlist or favorites entry", "watchlist and favorites entries") },
             plural(summary.playlists, "playlist", "playlists"),
         ).joinToString(", ")
         return if (summary.includesSecrets) {
@@ -1463,6 +1464,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
             if (report.applied.videos > 0) add("history of ${plural(report.applied.videos, "video", "videos")}")
             if (report.applied.matches > 0) add(plural(report.applied.matches, "match", "matches"))
             if (report.applied.songs > 0) add("plays of ${plural(report.applied.songs, "song", "songs")}")
+            if (report.applied.saved > 0) add("your watchlist and favorites")
             if (report.playlistsCreated > 0 || report.applied.playlistItems > 0) add("playlists")
         }
         val sentences = ArrayList<String>()
@@ -1491,6 +1493,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
         matches = matches,
         playlists = playlists,
         songs = songs,
+        saved = saved,
     )
 
     /** "wt" truncates what a provider hands back; not every provider knows it, "w" is the fallback. */

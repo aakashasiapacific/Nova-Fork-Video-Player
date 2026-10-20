@@ -17,8 +17,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ListItem
@@ -42,6 +40,7 @@ import com.aakash.novafork.ui.common.DeviceStorageEmptyState
 import com.aakash.novafork.ui.common.EmptyState
 import com.aakash.novafork.ui.common.LocalBottomBarSpace
 import com.aakash.novafork.ui.common.NovaIcon
+import com.aakash.novafork.ui.common.PathCrumb
 import com.aakash.novafork.ui.common.VideoMenuBox
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.BrowseDirUi
@@ -190,22 +189,11 @@ private fun Breadcrumbs(dir: BrowseDirUi, actions: AppActions) {
                             .size(18.dp),
                     )
                 }
-                AssistChip(
-                    onClick = { if (!isCurrent) actions.navigate(Route.BrowseDir(dir.sourceId, crumb.path)) },
-                    label = { Text(crumb.label, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                    leadingIcon = if (index == 0) {
-                        { NovaIcon(dir.sourceType.iconRes(), contentDescription = null, modifier = Modifier.size(AssistChipDefaults.IconSize)) }
-                    } else {
-                        null
-                    },
-                    colors = if (isCurrent) {
-                        AssistChipDefaults.assistChipColors(
-                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                            labelColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                        )
-                    } else {
-                        AssistChipDefaults.assistChipColors()
-                    },
+                PathCrumb(
+                    label = crumb.label,
+                    current = isCurrent,
+                    onClick = { actions.navigate(Route.BrowseDir(dir.sourceId, crumb.path)) },
+                    icon = if (index == 0) dir.sourceType.iconRes() else null,
                 )
             }
         }

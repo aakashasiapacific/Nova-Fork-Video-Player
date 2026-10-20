@@ -355,3 +355,17 @@ The owner asked for Apple Music to be copied more precisely, with less clutter. 
   medium weight.
 - **Buttons (build 64):** the remaining button labels are in Title Case too ("Allow Access to
   Videos", "Add a Network Source", "Test Connection", "Try Again", "Back Up").
+
+## 14. The open items (2026-10-20; build 65)
+
+- **Backups carry the watchlist, video favorites and starred songs** (optional fields, so older
+  backups still read).
+  - Shows are saved by their library key, which is the same on every device, and come back at
+    once.
+  - Movies and videos travel as references to their files, and starred songs as references to
+    theirs. They wait in the pending restore until a scan finds them, like playback history.
+  - A second restore adds nothing twice, and the dates come along.
+- **Video seek bar:** iOS's. No knob; a white bar on a translucent track that swells while it is
+  held.
+- **Folder path (Browse):** written as the Files app writes it, with folders above in blue and
+  the current one in white, replacing Material chips.

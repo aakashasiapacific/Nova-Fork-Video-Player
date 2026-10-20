@@ -8,11 +8,14 @@ import com.aakash.novafork.core.tmdb.TmdbException
 import com.aakash.novafork.data.IdentifyType
 import com.aakash.novafork.data.LibraryRepository
 import com.aakash.novafork.data.TmdbSearchResult
+import com.aakash.novafork.data.db.FavoriteSongEntity
 import com.aakash.novafork.data.db.MatchState
 import com.aakash.novafork.data.db.NovaDatabase
 import com.aakash.novafork.data.db.PlaylistSongEntity
 import com.aakash.novafork.data.db.SQL_CHUNK
 import com.aakash.novafork.data.db.VideoEntity
+import com.aakash.novafork.data.db.VideoFavoriteEntity
+import com.aakash.novafork.data.db.WatchlistEntity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -39,6 +42,14 @@ internal data class PendingPlaylistItem(val playlist: String, val video: BackupV
 @Serializable
 internal data class PendingSongPlaylistItem(val playlist: String, val song: BackupSongRef)
 
+/** Which list a [PendingSavedVideo] goes to. */
+internal const val WATCHLIST = "watchlist"
+internal const val FAVORITES = "favorites"
+
+/** A movie or video on the watchlist ([list] = [WATCHLIST]) or starred ([FAVORITES]), waiting for its file. */
+@Serializable
+internal data class PendingSavedVideo(val list: String, val video: BackupVideoRef, val addedAt: Long = 0)
+
 @Serializable
 internal data class PendingRestoreData(
     /** The latest restore that added entries (epoch ms); everything left goes [MAX_AGE_MS] after it. */
@@ -48,12 +59,15 @@ internal data class PendingRestoreData(
     val playlistItems: List<PendingPlaylistItem> = emptyList(),
     val songs: List<BackupSongState> = emptyList(),
     val songPlaylistItems: List<PendingSongPlaylistItem> = emptyList(),
+    val savedVideos: List<PendingSavedVideo> = emptyList(),
+    val songFavorites: List<BackupSongFavorite> = emptyList(),
 ) {
     fun isEmpty(): Boolean =
-        videos.isEmpty() && matches.isEmpty() && playlistItems.isEmpty() && songs.isEmpty() && songPlaylistItems.isEmpty()
+        videos.isEmpty() && matches.isEmpty() && playlistItems.isEmpty() && songs.isEmpty() && songPlaylistItems.isEmpty() &&
+            savedVideos.isEmpty() && songFavorites.isEmpty()
 
     fun counts(): RestoreCounts =
-        RestoreCounts(videos.size, matches.size, playlistItems.size + songPlaylistItems.size, songs.size)
+        RestoreCounts(videos.size, matches.size, playlistItems.size + songPlaylistItems.size, songs.size, savedVideos.size + songFavorites.size)
 }
 
 /**
@@ -75,6 +89,9 @@ internal class PendingRestore(
     private val playlistDao = database.playlistDao()
     private val songDao = database.songDao()
     private val playlistSongDao = database.playlistSongDao()
+    private val watchlistDao = database.watchlistDao()
+    private val videoFavoriteDao = database.videoFavoriteDao()
+    private val favoriteSongDao = database.favoriteSongDao()
 
     /** Cheap check before a pass: false when nothing waits. Call off the main thread. */
     fun exists(): Boolean = file.exists()
@@ -90,6 +107,8 @@ internal class PendingRestore(
         playlistItems: List<PendingPlaylistItem>,
         songs: List<BackupSongState> = emptyList(),
         songPlaylistItems: List<PendingSongPlaylistItem> = emptyList(),
+        savedVideos: List<PendingSavedVideo> = emptyList(),
+        songFavorites: List<BackupSongFavorite> = emptyList(),
     ) {
         withContext(Dispatchers.IO) {
             fileLock.withLock {
@@ -105,6 +124,8 @@ internal class PendingRestore(
                         playlistItems = (old?.playlistItems.orEmpty() + playlistItems).distinct(),
                         songs = old?.songs.orEmpty().filter { it.song !in newSongs } + songs,
                         songPlaylistItems = (old?.songPlaylistItems.orEmpty() + songPlaylistItems).distinct(),
+                        savedVideos = (old?.savedVideos.orEmpty() + savedVideos).distinctBy { it.list to it.video },
+                        songFavorites = (old?.songFavorites.orEmpty() + songFavorites).distinctBy { it.song },
                     ),
                 )
             }
@@ -176,12 +197,37 @@ internal class PendingRestore(
 
         val songPass = applySongs(data)
 
+        // Watchlist and favorites: the key names this device's id for the video.
+        var savedApplied = 0
+        val savedLeft = ArrayList<PendingSavedVideo>()
+        if (data.savedVideos.isNotEmpty()) {
+            database.withTransaction {
+                for (item in data.savedVideos) {
+                    val id = matcher.match(item.video)
+                    if (id == null) {
+                        savedLeft += item
+                        continue
+                    }
+                    val addedAt = item.addedAt.takeIf { it > 0 } ?: clock()
+                    // Both lists keep an entry that is already there (and its date).
+                    if (item.list == WATCHLIST) {
+                        watchlistDao.add(WatchlistEntity("v:$id", addedAt))
+                    } else {
+                        videoFavoriteDao.add(VideoFavoriteEntity("v:$id", addedAt))
+                    }
+                    savedApplied++
+                }
+            }
+        }
+
         val ready = data.matches.mapNotNull { match -> matcher.match(match.video)?.let { match to it } }
         val left = data.copy(
             videos = missing,
             playlistItems = itemsLeft,
             songs = songPass.songsLeft,
             songPlaylistItems = songPass.itemsLeft,
+            savedVideos = savedLeft,
+            songFavorites = songPass.favoritesLeft,
         )
         save(left)
         return LocalPass(
@@ -190,6 +236,7 @@ internal class PendingRestore(
                     videos = found.size,
                     playlistItems = itemsApplied + songPass.itemsApplied,
                     songs = songPass.songsApplied,
+                    saved = savedApplied + songPass.favoritesApplied,
                 ),
                 waiting = left.counts(),
                 matchesReady = ready.size,
@@ -203,11 +250,15 @@ internal class PendingRestore(
         val songsLeft: List<BackupSongState>,
         val itemsApplied: Int,
         val itemsLeft: List<PendingSongPlaylistItem>,
+        val favoritesApplied: Int = 0,
+        val favoritesLeft: List<BackupSongFavorite> = emptyList(),
     )
 
-    /** Song plays and the songs of playlists; called with [fileLock] held. */
+    /** Song plays, the songs of playlists and starred songs; called with [fileLock] held. */
     private suspend fun applySongs(data: PendingRestoreData): SongPass {
-        if (data.songs.isEmpty() && data.songPlaylistItems.isEmpty()) return SongPass(0, emptyList(), 0, emptyList())
+        if (data.songs.isEmpty() && data.songPlaylistItems.isEmpty() && data.songFavorites.isEmpty()) {
+            return SongPass(0, emptyList(), 0, emptyList())
+        }
         val matcher = SongMatcher(songDao.identities(), sourceDao.all())
         val found = ArrayList<Pair<BackupSongState, Long>>()
         val missing = ArrayList<BackupSongState>()
@@ -217,7 +268,18 @@ internal class PendingRestore(
         }
         var itemsApplied = 0
         val itemsLeft = ArrayList<PendingSongPlaylistItem>()
+        var favoritesApplied = 0
+        val favoritesLeft = ArrayList<BackupSongFavorite>()
         database.withTransaction {
+            for (favorite in data.songFavorites) {
+                val id = matcher.match(favorite.song)
+                if (id == null) {
+                    favoritesLeft += favorite
+                } else {
+                    favoriteSongDao.add(FavoriteSongEntity(songId = id, addedAt = favorite.addedAt.takeIf { it > 0 } ?: clock()))
+                    favoritesApplied++
+                }
+            }
             if (found.isNotEmpty()) {
                 val current = found.map { it.second }.distinct().chunked(SQL_CHUNK)
                     .flatMap { songDao.byIds(it) }
@@ -261,7 +323,7 @@ internal class PendingRestore(
                 }
             }
         }
-        return SongPass(found.size, missing, itemsApplied, itemsLeft)
+        return SongPass(found.size, missing, itemsApplied, itemsLeft, favoritesApplied, favoritesLeft)
     }
 
     private suspend fun applyStates(found: List<Pair<BackupVideoState, Long>>) {

@@ -7,6 +7,7 @@ import com.aakash.novafork.core.audio.MusicKeys
 import com.aakash.novafork.data.PrefsSettingsStore
 import com.aakash.novafork.data.RepositoryFixture
 import com.aakash.novafork.data.Settings
+import com.aakash.novafork.data.db.FavoriteSongEntity
 import com.aakash.novafork.data.db.PlaylistEntity
 import com.aakash.novafork.data.db.PlaylistSongEntity
 import com.aakash.novafork.data.db.SongEntity
@@ -26,7 +27,7 @@ import org.robolectric.annotation.Config
 import java.io.ByteArrayOutputStream
 import java.io.File
 
-/** Song plays and playlists of songs carried from one library ("device A") to another ("device B"). */
+/** Song plays, starred songs and playlists of songs carried from one library ("device A") to another ("device B"). */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class)
 class MusicBackupTest {
@@ -81,6 +82,7 @@ class MusicBackupTest {
         val aSongs = songs(a, aFolder, "One.flac", "Two.flac", "Three.flac")
         a.database.songDao().markPlayed(aSongs.getValue("Two.flac"), 5_000L)
         a.database.songDao().markPlayed(aSongs.getValue("Two.flac"), 6_000L)
+        a.database.favoriteSongDao().add(FavoriteSongEntity(songId = aSongs.getValue("One.flac"), addedAt = 7_000L))
         val mix = a.database.playlistDao().insert(PlaylistEntity(name = "Mix", createdAt = 1L, updatedAt = 1L))
         a.database.playlistSongDao().insertItems(
             listOf(
@@ -98,18 +100,22 @@ class MusicBackupTest {
         val bFolder = folder(b)
         val restorer = manager(b)
         val report = restorer.restore(backup)
-        assertEquals(RestoreCounts(playlistItems = 2, songs = 1), report.waiting)
+        assertEquals(RestoreCounts(playlistItems = 2, songs = 1, saved = 1), report.waiting)
         assertEquals(1, report.playlistsCreated)
 
         // The music scan finds the songs; the waiting entries go to them.
         val bSongs = songs(b, bFolder, "Three.flac", "One.flac", "Two.flac")
         val applied = restorer.applyPending()
-        assertEquals(RestoreCounts(playlistItems = 2, songs = 1), applied.applied)
+        assertEquals(RestoreCounts(playlistItems = 2, songs = 1, saved = 1), applied.applied)
         assertEquals(RestoreCounts(), restorer.waiting())
 
         val two = requireNotNull(b.database.songDao().byId(bSongs.getValue("Two.flac")))
         assertEquals(2, two.playCount)
         assertEquals(6_000L, two.lastPlayedAt)
+        // The star follows its song, with its date.
+        val star = b.database.favoriteSongDao().all().single()
+        assertEquals(bSongs.getValue("One.flac"), star.songId)
+        assertEquals(7_000L, star.addedAt)
         val bMix = b.database.playlistSongDao().observePlaylists().first().single { it.name == "Mix" }
         assertEquals(listOf("Three", "One"), b.database.playlistSongDao().shownSongs(bMix.id).map { it.title })
         // A playlist of songs only stays the Audio tab's.

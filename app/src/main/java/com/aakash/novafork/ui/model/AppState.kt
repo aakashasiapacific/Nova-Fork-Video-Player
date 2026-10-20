@@ -236,6 +236,8 @@ data class RestorePreviewUi(
     val playlists: Int,
     /** Songs with plays. */
     val songs: Int = 0,
+    /** Watchlist and favorites entries. */
+    val saved: Int = 0,
 )
 
 private val IdleBackupState: StateFlow<BackupUi> = MutableStateFlow(BackupUi())

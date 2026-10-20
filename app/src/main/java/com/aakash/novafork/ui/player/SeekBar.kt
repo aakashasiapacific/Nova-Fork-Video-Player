@@ -151,9 +151,15 @@ private fun SeekSlider(
     val dragged by interactionSource.collectIsDraggedAsState()
     val pressed by interactionSource.collectIsPressedAsState()
     val active = dragged || pressed
-    val thumbSize by animateDpAsState(if (active) 20.dp else 14.dp, label = "seekThumb")
-    val trackHeight = if (large) 6.dp else 4.dp
-    val activeColor = MaterialTheme.colorScheme.primary
+    // iOS's video scrubber: no knob, a thin white bar on a translucent track that swells while
+    // it is held, so the finger never hides where it is.
+    val trackHeight by animateDpAsState(
+        targetValue = when {
+            active -> if (large) 14.dp else 12.dp
+            else -> if (large) 7.dp else 6.dp
+        },
+        label = "seekTrack",
+    )
 
     Slider(
         value = fraction,
@@ -162,24 +168,14 @@ private fun SeekSlider(
         enabled = enabled,
         onValueChangeFinished = onValueChangeFinished,
         interactionSource = interactionSource,
-        // Fixed-size slot: the thumb grows inside it so the track never changes length mid-drag.
-        thumb = {
-            Box(Modifier.size(20.dp), contentAlignment = Alignment.Center) {
-                if (enabled) {
-                    Box(
-                        Modifier
-                            .size(thumbSize)
-                            .background(Color.White, CircleShape),
-                    )
-                }
-            }
-        },
+        // An empty, zero-width thumb: the bar alone shows the position, as on iOS.
+        thumb = { Box(Modifier.size(width = 0.dp, height = 24.dp)) },
         track = { sliderState ->
             val range = sliderState.valueRange
             val span = range.endInclusive - range.start
             val progress = if (span > 0f) ((sliderState.value - range.start) / span).coerceIn(0f, 1f) else 0f
-            val filled = if (enabled) activeColor else Color.White.copy(alpha = 0.38f)
-            val rest = Color.White.copy(alpha = if (enabled) 0.3f else 0.15f)
+            val filled = Color.White.copy(alpha = if (!enabled) 0.38f else if (active) 1f else 0.85f)
+            val rest = Color.White.copy(alpha = if (enabled) 0.25f else 0.15f)
             Canvas(
                 Modifier
                     .fillMaxWidth()
