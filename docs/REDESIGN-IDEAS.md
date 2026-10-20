@@ -402,3 +402,16 @@ The owner asked for Apple Music to be copied more precisely, with less clutter. 
 - **Tab icons (owner's pick from six options, build 71):** iOS-style outlines. Video is a TV,
   Audio a note with a list, Preferences a gear and Search a magnifier
   (`ic_tab_video` / `ic_tab_audio` / `ic_tab_settings`).
+
+## 17. The remaining list (2026-10-20; build 72)
+
+- **Tablet player:** the same quiet bars as the phone. Aspect Ratio, Repeat, Shuffle and Rotate
+  are in its "…" menu, so the transport row is just skip, play/pause and skip.
+- **Progress bars:** iOS's plain rounded bar (`IosProgressBar`) replaces Material's
+  LinearProgressIndicator with its gap and end dot. That covers resume progress, scans and
+  folder loading.
+- **Tablet swipes between tabs too,** through one shared `Modifier.swipeBetweenTabs`, and tab
+  changes slide in from their side (`tabSlide`).
+- **Now Playing "…":** Apple Music's circle beside the star, with Add to a Playlist… (the Apple
+  Music sheet), Go to Album and Go to Artist. The last two close Now Playing, switch to the Audio
+  tab and open that page (`MusicViewModel.requestPage`).

@@ -32,6 +32,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -88,9 +89,12 @@ import com.aakash.novafork.R
 import com.aakash.novafork.data.db.SongEntity
 import com.aakash.novafork.data.music.MusicLibrary
 import com.aakash.novafork.music.MusicPlayerState
+import com.aakash.novafork.ui.common.NovaDropdownMenu
 import com.aakash.novafork.ui.common.NovaIcon
+import com.aakash.novafork.ui.common.NovaMenuItem
 import com.aakash.novafork.ui.common.glass
 import com.aakash.novafork.ui.model.RepeatMode
+import com.aakash.novafork.ui.theme.AudioTheme
 import com.aakash.novafork.ui.theme.NovaColors
 import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
@@ -125,6 +129,7 @@ fun NowPlayingHost(
     favorite: Boolean,
     onDismiss: () -> Unit,
     upNext: List<SongEntity> = emptyList(),
+    menu: (@Composable ColumnScope.(close: () -> Unit) -> Unit)? = null,
 ) {
     LaunchedEffect(player.active) { if (!player.active && open) onDismiss() }
     AnimatedVisibility(
@@ -132,7 +137,81 @@ fun NowPlayingHost(
         enter = slideInVertically(tween(320)) { it },
         exit = slideOutVertically(tween(260)) { it },
     ) {
-        NowPlayingScreen(player = player, actions = actions, onDismiss = onDismiss, favorite = favorite, upNext = upNext)
+        NowPlayingScreen(player = player, actions = actions, onDismiss = onDismiss, favorite = favorite, upNext = upNext, menu = menu)
+    }
+}
+
+/**
+ * Now Playing for the app shell: the star, the queue, and Apple Music's "…" with Add to a
+ * Playlist…, Go to Album and Go to Artist (which close Now Playing and open the page in the Audio
+ * tab, [onShowAudio] switching to it).
+ */
+@Composable
+fun ShellNowPlaying(
+    viewModel: MusicViewModel,
+    player: MusicPlayerState,
+    open: Boolean,
+    onDismiss: () -> Unit,
+    onShowAudio: () -> Unit,
+) {
+    val favorites by viewModel.favorites.collectAsStateWithLifecycle()
+    val library by viewModel.library.collectAsStateWithLifecycle()
+    val playlists by viewModel.playlists.collectAsStateWithLifecycle()
+    val song = remember(player.nowPlaying?.songId, library) { library.songs.firstOrNull { it.id == player.nowPlaying?.songId } }
+    var adding by remember { mutableStateOf<SongEntity?>(null) }
+    NowPlayingHost(
+        open = open,
+        player = player,
+        actions = viewModel,
+        favorite = player.nowPlaying?.songId in favorites,
+        upNext = rememberUpNext(viewModel, player),
+        onDismiss = onDismiss,
+        menu = song?.let { current ->
+            { close ->
+                NovaMenuItem(
+                    text = { Text("Add to a Playlist…") },
+                    leadingIcon = { NovaIcon(R.drawable.ic_playlist_add, contentDescription = null) },
+                    onClick = {
+                        close()
+                        adding = current
+                    },
+                )
+                NovaMenuItem(
+                    text = { Text("Go to Album") },
+                    leadingIcon = { NovaIcon(R.drawable.ic_album, contentDescription = null) },
+                    onClick = {
+                        close()
+                        viewModel.requestPage(albumPage(current.albumKey))
+                        onShowAudio()
+                        onDismiss()
+                    },
+                )
+                NovaMenuItem(
+                    text = { Text("Go to Artist") },
+                    leadingIcon = { NovaIcon(R.drawable.ic_artist, contentDescription = null) },
+                    onClick = {
+                        close()
+                        viewModel.requestPage(artistPage(current.artistKey))
+                        onShowAudio()
+                        onDismiss()
+                    },
+                )
+            }
+        },
+    )
+    adding?.let { picked ->
+        AudioTheme {
+            AddToPlaylistDialog(
+                song = picked,
+                playlists = playlists,
+                library = library,
+                onPick = { id, name ->
+                    viewModel.addToPlaylist(picked, id, name)
+                    adding = null
+                },
+                onDismiss = { adding = null },
+            )
+        }
     }
 }
 
@@ -249,6 +328,8 @@ fun NowPlayingScreen(
     favorite: Boolean = false,
     /** The songs queued after this one (see [rememberUpNext]). */
     upNext: List<SongEntity> = emptyList(),
+    /** Apple Music's "…" beside the star; null = none (previews). */
+    menu: (@Composable ColumnScope.(close: () -> Unit) -> Unit)? = null,
 ) {
     BackHandler(onBack = onDismiss)
     val now = player.nowPlaying
@@ -335,6 +416,7 @@ fun NowPlayingScreen(
                     Cover(now?.artUri, size = 64, corner = 8)
                     SongTitles(player, Modifier.weight(1f).padding(start = 14.dp), small = true)
                     if (now != null) FavoriteButton(favorite) { actions.toggleFavorite(now.songId) }
+                    if (menu != null) NowPlayingMore(menu)
                 }
             }
             Box(
@@ -359,6 +441,7 @@ fun NowPlayingScreen(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     SongTitles(player, Modifier.weight(1f))
                     if (now != null) FavoriteButton(favorite) { actions.toggleFavorite(now.songId) }
+                    if (menu != null) NowPlayingMore(menu)
                 }
             }
             Spacer(Modifier.height(20.dp))
@@ -422,6 +505,28 @@ private fun SongTitles(player: MusicPlayerState, modifier: Modifier = Modifier, 
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
+    }
+}
+
+/** Apple Music's "…" beside the star: the same small translucent circle, opening [menu]. */
+@Composable
+private fun NowPlayingMore(menu: @Composable ColumnScope.(close: () -> Unit) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    Box {
+        Box(
+            Modifier
+                .padding(start = 10.dp)
+                .size(32.dp)
+                .clip(CircleShape)
+                .background(Color.White.copy(alpha = 0.15f))
+                .clickable(onClickLabel = "More", role = Role.Button) { open = true },
+            contentAlignment = Alignment.Center,
+        ) {
+            NovaIcon(R.drawable.ic_more_vert, contentDescription = "More", tint = Color.White, modifier = Modifier.size(18.dp))
+        }
+        NovaDropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            menu { open = false }
+        }
     }
 }
 

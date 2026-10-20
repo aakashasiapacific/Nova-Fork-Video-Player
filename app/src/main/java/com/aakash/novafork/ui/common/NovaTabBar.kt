@@ -1,10 +1,18 @@
 package com.aakash.novafork.ui.common
 
 import androidx.annotation.DrawableRes
+import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -27,8 +35,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -39,6 +49,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -48,6 +59,7 @@ import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
 import com.aakash.novafork.ui.model.TopDestination
 import com.aakash.novafork.ui.theme.NovaColors
+import kotlinx.coroutines.launch
 
 /**
  * The tab capsule shared by the phone's bottom dock and the tablet's top bar (iOS 26 / iPad
@@ -184,4 +196,53 @@ internal fun TopDestination.tabIconRes(): Int = when (this) {
     TopDestination.AUDIO -> R.drawable.ic_tab_audio
     TopDestination.SETTINGS -> R.drawable.ic_tab_settings
     TopDestination.SEARCH -> R.drawable.ic_search
+}
+
+/**
+ * Swiping sideways on a tab's own page moves to the next or previous tab (owner). Anything that
+ * scrolls sideways itself (the hero, poster rows, sliders) takes the swipe first, so this only
+ * sees swipes on the rest of the page; the page follows the finger a little. Off when [enabled]
+ * is false (pages opened from a tab, where back is the gesture that matters).
+ */
+@Composable
+internal fun Modifier.swipeBetweenTabs(top: TopDestination, enabled: Boolean, onSelect: (TopDestination) -> Unit): Modifier {
+    val tabs = TopDestination.entries
+    var offset by remember { mutableFloatStateOf(0f) }
+    val thresholdPx = with(LocalDensity.current) { 90.dp.toPx() }
+    val scope = rememberCoroutineScope()
+    val select by rememberUpdatedState(onSelect)
+    return this
+        .pointerInput(top, enabled) {
+            if (!enabled) return@pointerInput
+            detectHorizontalDragGestures(
+                onDragEnd = {
+                    val index = tabs.indexOf(top)
+                    val target = when {
+                        offset < -thresholdPx -> tabs.getOrNull(index + 1)
+                        offset > thresholdPx -> tabs.getOrNull(index - 1)
+                        else -> null
+                    }
+                    if (target != null) {
+                        offset = 0f
+                        select(target)
+                    } else {
+                        scope.launch { animate(offset, 0f, animationSpec = spring(dampingRatio = 0.8f)) { value, _ -> offset = value } }
+                    }
+                },
+                onDragCancel = { offset = 0f },
+            ) { change, amount ->
+                change.consume()
+                offset += amount
+            }
+        }
+        .graphicsLayer { translationX = offset * 0.3f }
+}
+
+/** A tab change slides in from the side the new tab lies on; anything else crossfades. */
+internal fun tabSlide(from: TopDestination, to: TopDestination, fade: ContentTransform): ContentTransform {
+    val tabs = TopDestination.entries
+    if (from == to) return fade
+    val direction = if (tabs.indexOf(to) > tabs.indexOf(from)) 1 else -1
+    return (slideInHorizontally(tween(280)) { it * direction / 4 } + fadeIn(tween(220))) togetherWith
+        (slideOutHorizontally(tween(280)) { -it * direction / 4 } + fadeOut(tween(160)))
 }

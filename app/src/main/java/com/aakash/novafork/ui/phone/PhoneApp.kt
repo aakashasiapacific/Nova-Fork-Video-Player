@@ -86,10 +86,11 @@ import com.aakash.novafork.ui.adaptive.DeviceLayout
 import com.aakash.novafork.ui.audio.AudioScreen
 import com.aakash.novafork.ui.audio.MiniPlayerBar
 import com.aakash.novafork.ui.audio.MiniPlayerHeight
-import com.aakash.novafork.ui.audio.NowPlayingHost
+import com.aakash.novafork.ui.audio.ShellNowPlaying
 import com.aakash.novafork.ui.audio.rememberMusicShell
-import com.aakash.novafork.ui.audio.rememberUpNext
 import com.aakash.novafork.ui.common.GlassCircle
+import com.aakash.novafork.ui.common.swipeBetweenTabs
+import com.aakash.novafork.ui.common.tabSlide
 import com.aakash.novafork.ui.common.LocalBottomBarSpace
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.NovaTabCapsule
@@ -157,14 +158,6 @@ fun PhoneApp(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
     var nowPlayingOpen by rememberSaveable { mutableStateOf(false) }
     val barSpace = TabBarHeight + BarTopMargin + BarBottomMargin + navBar +
         (if (miniAboveBar) MiniPlayerHeight + MiniPlayerGap else 0.dp)
-    // Swiping sideways on a tab's own page moves to the next or previous tab (owner). Anything
-    // that scrolls sideways itself (the hero, poster rows, sliders) takes the swipe first, so
-    // this only sees swipes on the rest of the page. The page follows the finger a little.
-    val tabs = TopDestination.entries
-    val atRoot = !state.canGoBack
-    var tabSwipe by remember { mutableFloatStateOf(0f) }
-    val swipeTabPx = with(LocalDensity.current) { 90.dp.toPx() }
-    val swipeScope = rememberCoroutineScope()
     Box(modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         CompositionLocalProvider(LocalBottomBarSpace provides barSpace) {
             // Keyed by route, so state updates within a page recompose it in place, while a route
@@ -174,42 +167,14 @@ fun PhoneApp(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
                 modifier = Modifier
                     .fillMaxSize()
                     .nestedScroll(barScroll)
-                    .pointerInput(top, atRoot) {
-                        if (!atRoot) return@pointerInput
-                        detectHorizontalDragGestures(
-                            onDragEnd = {
-                                val index = tabs.indexOf(top)
-                                val target = when {
-                                    tabSwipe < -swipeTabPx -> tabs.getOrNull(index + 1)
-                                    tabSwipe > swipeTabPx -> tabs.getOrNull(index - 1)
-                                    else -> null
-                                }
-                                if (target != null) {
-                                    tabSwipe = 0f
-                                    actions.selectTab(target)
-                                } else {
-                                    swipeScope.launch { animate(tabSwipe, 0f, animationSpec = spring(dampingRatio = 0.8f)) { value, _ -> tabSwipe = value } }
-                                }
-                            },
-                            onDragCancel = { tabSwipe = 0f },
-                        ) { change, amount ->
-                            change.consume()
-                            tabSwipe += amount
-                        }
-                    }
-                    .graphicsLayer { translationX = tabSwipe * 0.3f }
+                    .swipeBetweenTabs(top, enabled = !state.canGoBack, onSelect = actions::selectTab)
                     .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)),
                 transitionSpec = {
-                    val from = tabs.indexOf(initialState.route.top)
-                    val to = tabs.indexOf(targetState.route.top)
-                    if (from != to) {
-                        // A tab change slides in from the side it lies on, as a swipe would bring it.
-                        val direction = if (to > from) 1 else -1
-                        (slideInHorizontally(tween(280)) { it * direction / 4 } + fadeIn(tween(220))) togetherWith
-                            (slideOutHorizontally(tween(280)) { -it * direction / 4 } + fadeOut(tween(160)))
-                    } else {
-                        fadeIn(tween(durationMillis = 220, delayMillis = 40)) togetherWith fadeOut(tween(durationMillis = 140))
-                    }
+                    tabSlide(
+                        from = initialState.route.top,
+                        to = targetState.route.top,
+                        fade = fadeIn(tween(durationMillis = 220, delayMillis = 40)) togetherWith fadeOut(tween(durationMillis = 140)),
+                    )
                 },
                 contentKey = { it.route },
                 label = "phoneRoute",
@@ -246,14 +211,12 @@ fun PhoneApp(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
             ) {
                 MiniPlayerBar(player = musicState, actions = viewModel, onOpen = { nowPlayingOpen = true })
             }
-            val favorites by viewModel.favorites.collectAsStateWithLifecycle()
-            NowPlayingHost(
-                open = nowPlayingOpen,
+            ShellNowPlaying(
+                viewModel = viewModel,
                 player = musicState,
-                actions = viewModel,
-                favorite = musicState.nowPlaying?.songId in favorites,
-                upNext = rememberUpNext(viewModel, musicState),
+                open = nowPlayingOpen,
                 onDismiss = { nowPlayingOpen = false },
+                onShowAudio = { actions.selectTab(TopDestination.AUDIO) },
             )
         }
     }

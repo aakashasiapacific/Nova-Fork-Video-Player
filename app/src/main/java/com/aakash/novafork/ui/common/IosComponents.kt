@@ -564,3 +564,52 @@ fun PathCrumb(label: String, current: Boolean, onClick: () -> Unit, modifier: Mo
         )
     }
 }
+
+/**
+ * iOS's progress view in place of Material's LinearProgressIndicator (no gap, no end dot): a
+ * rounded track with a solid fill. Without [progress] a short segment glides along the track.
+ * The caller's height wins; 4dp otherwise.
+ */
+@Composable
+fun IosProgressBar(
+    modifier: Modifier = Modifier,
+    progress: (() -> Float)? = null,
+    color: Color = MaterialTheme.colorScheme.primary,
+    trackColor: Color = Color.White.copy(alpha = 0.2f),
+) {
+    val glide = if (progress == null) {
+        val transition = rememberInfiniteTransition(label = "progressGlide")
+        transition.animateFloat(
+            initialValue = -0.3f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(tween(durationMillis = 1_100, easing = LinearEasing)),
+            label = "progressGlideX",
+        )
+    } else {
+        null
+    }
+    Canvas(
+        modifier
+            .fillMaxWidth()
+            .height(4.dp),
+    ) {
+        val radius = androidx.compose.ui.geometry.CornerRadius(size.height / 2, size.height / 2)
+        drawRoundRect(color = trackColor, cornerRadius = radius)
+        if (progress != null) {
+            val width = size.width * progress().coerceIn(0f, 1f)
+            if (width > 0f) drawRoundRect(color = color, size = androidx.compose.ui.geometry.Size(width, size.height), cornerRadius = radius)
+        } else {
+            val start = (glide?.value ?: 0f) * size.width
+            val end = (start + size.width * 0.3f).coerceAtMost(size.width)
+            val left = start.coerceAtLeast(0f)
+            if (end > left) {
+                drawRoundRect(
+                    color = color,
+                    topLeft = Offset(left, 0f),
+                    size = androidx.compose.ui.geometry.Size(end - left, size.height),
+                    cornerRadius = radius,
+                )
+            }
+        }
+    }
+}

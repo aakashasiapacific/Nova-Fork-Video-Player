@@ -7,8 +7,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -17,7 +17,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -34,6 +33,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
+import com.aakash.novafork.ui.common.IosProgressBar
 import com.aakash.novafork.ui.model.ScanUi
 import com.aakash.novafork.ui.theme.NovaColors
 import java.util.Locale
@@ -183,9 +183,9 @@ fun ScanBanner(scan: ScanUi, modifier: Modifier = Modifier) {
     Column(modifier.fillMaxWidth()) {
         val p = scan.progress
         if (p == null) {
-            LinearProgressIndicator(modifier = Modifier.fillMaxWidth().height(2.dp))
+            IosProgressBar(modifier = Modifier.fillMaxWidth().height(2.dp))
         } else {
-            LinearProgressIndicator(progress = { p }, modifier = Modifier.fillMaxWidth().height(2.dp))
+            IosProgressBar(progress = { p }, modifier = Modifier.fillMaxWidth().height(2.dp))
         }
         if (!scan.label.isNullOrBlank()) {
             Text(

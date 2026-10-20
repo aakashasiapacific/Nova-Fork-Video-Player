@@ -42,10 +42,11 @@ import com.aakash.novafork.ui.adaptive.dimensFor
 import com.aakash.novafork.ui.audio.AudioScreen
 import com.aakash.novafork.ui.audio.MiniPlayerBar
 import com.aakash.novafork.ui.audio.MiniPlayerHeight
-import com.aakash.novafork.ui.audio.NowPlayingHost
+import com.aakash.novafork.ui.audio.ShellNowPlaying
 import com.aakash.novafork.ui.audio.rememberMusicShell
-import com.aakash.novafork.ui.audio.rememberUpNext
 import com.aakash.novafork.ui.common.LocalBottomBarSpace
+import com.aakash.novafork.ui.common.swipeBetweenTabs
+import com.aakash.novafork.ui.common.tabSlide
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.AppUiState
 import com.aakash.novafork.ui.model.Route
@@ -84,10 +85,17 @@ fun TabletApp(state: AppUiState, actions: AppActions, layout: DeviceLayout, modi
                         targetState = state,
                         modifier = Modifier
                             .fillMaxSize()
+                            .swipeBetweenTabs(state.route.top, enabled = !state.canGoBack, onSelect = actions::selectTab)
                             .windowInsetsPadding(
                                 WindowInsets.systemBars.union(WindowInsets.displayCutout).only(WindowInsetsSides.Horizontal),
                             ),
-                        transitionSpec = { fadeIn(tween(durationMillis = 240, delayMillis = 40)) togetherWith fadeOut(tween(durationMillis = 160)) },
+                        transitionSpec = {
+                            tabSlide(
+                                from = initialState.route.top,
+                                to = targetState.route.top,
+                                fade = fadeIn(tween(durationMillis = 240, delayMillis = 40)) togetherWith fadeOut(tween(durationMillis = 160)),
+                            )
+                        },
                         contentAlignment = Alignment.TopStart,
                         contentKey = { it.route.pageKey() },
                         label = "tabletPage",
@@ -121,14 +129,12 @@ fun TabletApp(state: AppUiState, actions: AppActions, layout: DeviceLayout, modi
                                 .widthIn(max = 520.dp),
                         )
                     }
-                    val favorites by viewModel.favorites.collectAsStateWithLifecycle()
-                    NowPlayingHost(
-                        open = nowPlayingOpen,
+                    ShellNowPlaying(
+                        viewModel = viewModel,
                         player = player,
-                        actions = viewModel,
-                        favorite = player.nowPlaying?.songId in favorites,
-                        upNext = rememberUpNext(viewModel, player),
+                        open = nowPlayingOpen,
                         onDismiss = { nowPlayingOpen = false },
+                        onShowAudio = { actions.selectTab(TopDestination.AUDIO) },
                     )
                 }
             }

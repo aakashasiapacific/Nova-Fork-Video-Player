@@ -50,6 +50,19 @@ class MusicViewModel(app: Application) : AndroidViewModel(app), AudioActions {
 
     val permission: String get() = StoragePermissions.audioPermission()
 
+    /** A page of the Audio tab asked for from elsewhere (Now Playing's Go to Album); null once shown. */
+    private val _pageRequest = MutableStateFlow<String?>(null)
+    val pageRequest: StateFlow<String?> = _pageRequest.asStateFlow()
+
+    fun requestPage(page: String) {
+        _openPlaylist.value = null
+        _pageRequest.value = page
+    }
+
+    fun pageRequestHandled() {
+        _pageRequest.value = null
+    }
+
     /** After a permission prompt and when the app comes back: rescans once access was granted. */
     fun onAccessChecked() {
         val granted = StoragePermissions.hasAudioAccess(getApplication())

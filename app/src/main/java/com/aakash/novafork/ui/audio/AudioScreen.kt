@@ -60,6 +60,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -122,6 +123,7 @@ fun AudioScreen(modifier: Modifier = Modifier, viewModel: MusicViewModel = viewM
     val hasAccess by viewModel.hasAccess.collectAsStateWithLifecycle()
     val openPlaylist by viewModel.openPlaylist.collectAsStateWithLifecycle()
     val favorites by viewModel.favorites.collectAsStateWithLifecycle()
+    val pageRequest by viewModel.pageRequest.collectAsStateWithLifecycle()
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.onAccessChecked() }
     val access = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { viewModel.onAccessChecked() }
     AudioTheme {
@@ -136,6 +138,8 @@ fun AudioScreen(modifier: Modifier = Modifier, viewModel: MusicViewModel = viewM
             onRequestAccess = { access.launch(viewModel.permission) },
             modifier = modifier,
             favorites = favorites,
+            pageRequest = pageRequest,
+            onPageRequestHandled = viewModel::pageRequestHandled,
         )
     }
 }
@@ -153,6 +157,10 @@ private const val ARTIST = "artist:"
 private const val GENRE = "genre:"
 private const val STACK_SEPARATOR = "\u0001"
 
+/** The Audio tab's page for an album or an artist, for [MusicViewModel.requestPage]. */
+internal fun albumPage(albumKey: String): String = ALBUM + albumKey
+internal fun artistPage(artistKey: String): String = ARTIST + artistKey
+
 @Composable
 fun AudioContent(
     library: MusicLibraryData,
@@ -166,9 +174,18 @@ fun AudioContent(
     modifier: Modifier = Modifier,
     /** Starred song ids, most recently starred first. */
     favorites: List<Long> = emptyList(),
+    /** A page asked for from outside the tab ([albumPage], [artistPage]); opened over Library. */
+    pageRequest: String? = null,
+    onPageRequestHandled: () -> Unit = {},
 ) {
     // The pages opened over Library, as one saveable string.
     var stackText by rememberSaveable { mutableStateOf("") }
+    LaunchedEffect(pageRequest) {
+        if (pageRequest != null) {
+            stackText = pageRequest
+            onPageRequestHandled()
+        }
+    }
     val stack = if (stackText.isEmpty()) emptyList() else stackText.split(STACK_SEPARATOR)
     fun open(page: String) {
         stackText = (stack + page).joinToString(STACK_SEPARATOR)
@@ -1138,7 +1155,7 @@ private fun NewPlaylistDialog(onCreate: (String) -> Unit, onDismiss: () -> Unit)
  * then every playlist with its cover and size.
  */
 @Composable
-private fun AddToPlaylistDialog(
+internal fun AddToPlaylistDialog(
     song: SongEntity,
     playlists: List<MusicPlaylistRow>,
     library: MusicLibraryData,

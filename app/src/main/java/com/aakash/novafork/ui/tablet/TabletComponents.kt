@@ -43,7 +43,6 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonDefaults
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -75,6 +74,7 @@ import com.aakash.novafork.core.format.Formats
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
 import com.aakash.novafork.ui.common.ArtPlaceholder
 import com.aakash.novafork.ui.common.BackdropArt
+import com.aakash.novafork.ui.common.IosProgressBar
 import com.aakash.novafork.ui.common.IosSpinner
 import com.aakash.novafork.ui.common.LandscapeArt
 import com.aakash.novafork.ui.common.NovaIcon
@@ -673,7 +673,7 @@ internal fun WatchProgress(progress: Float?, positionMs: Long, durationMs: Long?
         "${(fraction * 100).roundToInt()}% watched"
     }
     Row(modifier, verticalAlignment = Alignment.CenterVertically) {
-        LinearProgressIndicator(
+        IosProgressBar(
             progress = { fraction },
             modifier = Modifier
                 .width(240.dp)

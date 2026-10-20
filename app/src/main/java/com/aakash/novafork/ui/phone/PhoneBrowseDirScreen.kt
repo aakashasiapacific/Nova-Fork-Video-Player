@@ -18,7 +18,6 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
@@ -38,6 +37,7 @@ import com.aakash.novafork.data.db.SourceType
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
 import com.aakash.novafork.ui.common.DeviceStorageEmptyState
 import com.aakash.novafork.ui.common.EmptyState
+import com.aakash.novafork.ui.common.IosProgressBar
 import com.aakash.novafork.ui.common.LocalBottomBarSpace
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.PathCrumb
@@ -88,7 +88,7 @@ private fun BrowseDirContent(dir: BrowseDirUi, permission: PermissionUi, actions
         Breadcrumbs(dir = dir, actions = actions)
     }
     if (dir.isLoading && !isEmpty) {
-        LinearProgressIndicator(Modifier.fillMaxWidth())
+        IosProgressBar(Modifier.fillMaxWidth())
     }
     when {
         isEmpty && dir.isLoading -> LoadingBox()
