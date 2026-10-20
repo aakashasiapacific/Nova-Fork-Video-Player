@@ -24,14 +24,22 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
 import com.aakash.novafork.ui.adaptive.DeviceLayout
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
+import com.aakash.novafork.ui.common.GlassCircle
+import com.aakash.novafork.ui.common.NovaDropdownMenu
 import com.aakash.novafork.ui.common.NovaIcon
+import com.aakash.novafork.ui.common.NovaMenuItem
 import com.aakash.novafork.ui.common.RatingPill
 import com.aakash.novafork.ui.common.metaLine
 import com.aakash.novafork.ui.model.AppActions
@@ -159,23 +167,53 @@ private fun VideoBody(details: VideoDetailsUi, actions: AppActions) {
                     ButtonLabel(R.drawable.ic_restart_alt, "Start Over")
                 }
             }
-            if (!isStream) {
-                FilledTonalButton(onClick = { actions.identify(details.id) }, modifier = Modifier.height(48.dp)) {
-                    ButtonLabel(R.drawable.ic_search, "Identify")
+            // The rest waits in one round "…", as on the Apple TV app's iPad pages.
+            var menuOpen by remember { mutableStateOf(false) }
+            Box {
+                GlassCircle(onClick = { menuOpen = true }, description = "More options", size = 48.dp) {
+                    NovaIcon(R.drawable.ic_more_vert, contentDescription = null, tint = Color.White)
                 }
-                FilledTonalButton(onClick = { actions.setWatched(details.id, !details.watched) }, modifier = Modifier.height(48.dp)) {
-                    if (details.watched) {
-                        ButtonLabel(R.drawable.ic_visibility_off, "Mark as Unwatched")
-                    } else {
-                        ButtonLabel(R.drawable.ic_check, "Mark as Watched")
+                NovaDropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                    if (!isStream) {
+                        NovaMenuItem(
+                            text = { Text("Identify…") },
+                            leadingIcon = { NovaIcon(R.drawable.ic_search, contentDescription = null) },
+                            onClick = {
+                                menuOpen = false
+                                actions.identify(details.id)
+                            },
+                        )
+                        NovaMenuItem(
+                            text = { Text("Change Artwork…") },
+                            leadingIcon = { NovaIcon(R.drawable.ic_image, contentDescription = null) },
+                            onClick = {
+                                menuOpen = false
+                                actions.changeArtwork(details.id)
+                            },
+                        )
+                        NovaMenuItem(
+                            text = { Text(if (details.watched) "Mark as Unwatched" else "Mark as Watched") },
+                            leadingIcon = {
+                                NovaIcon(
+                                    if (details.watched) R.drawable.ic_visibility_off else R.drawable.ic_check_circle,
+                                    contentDescription = null,
+                                )
+                            },
+                            onClick = {
+                                menuOpen = false
+                                actions.setWatched(details.id, !details.watched)
+                            },
+                        )
                     }
+                    NovaMenuItem(
+                        text = { Text("Add to Playlist") },
+                        leadingIcon = { NovaIcon(R.drawable.ic_playlist_add, contentDescription = null) },
+                        onClick = {
+                            menuOpen = false
+                            actions.addToPlaylist(listOf(details.id), details.title)
+                        },
+                    )
                 }
-            }
-            FilledTonalButton(
-                onClick = { actions.addToPlaylist(listOf(details.id), details.title) },
-                modifier = Modifier.height(48.dp),
-            ) {
-                ButtonLabel(R.drawable.ic_playlist_add, "Add to Playlist")
             }
         }
         WatchProgress(progress = details.progress, positionMs = details.positionMs, durationMs = details.durationMs)

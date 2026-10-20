@@ -190,7 +190,7 @@ private fun AllFilesAccessRow(shape: Shape, granted: Boolean, canRequest: Boolea
                     canRequest -> "Not allowed"
                     else -> "Comes with access to videos"
                 },
-                style = MaterialTheme.typography.labelLarge,
+                style = MaterialTheme.typography.bodySmall,
                 color = if (granted) NovaColors.Mint else MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
