@@ -1,10 +1,13 @@
 package com.aakash.novafork.ui.common
 
 import androidx.annotation.DrawableRes
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -18,11 +21,13 @@ import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.LibraryFilter
 import com.aakash.novafork.ui.model.LibrarySort
 import com.aakash.novafork.ui.model.Route
+import com.aakash.novafork.ui.theme.NovaColors
 
 /**
  * The way into the whole library, at the end of Home (phone and tablet): Recently added (every
  * video, newest first), Watchlist, Favorites, All videos (A–Z), Movies, TV shows, then folders,
- * sources and playlists.
+ * sources and playlists. Laid out like the Library list in Apple's TV and Music apps: blue icons,
+ * grey chevrons and hairlines inset to the labels between the rows.
  */
 @Composable
 fun HomeLibraryLinks(actions: AppActions, modifier: Modifier = Modifier) {
@@ -44,28 +49,41 @@ fun HomeLibraryLinks(actions: AppActions, modifier: Modifier = Modifier) {
         }
         LibraryLink(R.drawable.ic_movie, "Movies") { actions.openLibrary(LibraryFilter.MOVIES) }
         LibraryLink(R.drawable.ic_tv, "TV Shows") { actions.openLibrary(LibraryFilter.SHOWS) }
-        LibraryLink(R.drawable.ic_folder, "Folders, sources and playlists") { actions.navigate(Route.Browse) }
+        LibraryLink(R.drawable.ic_folder, "Folders, sources and playlists", last = true) { actions.navigate(Route.Browse) }
     }
 }
 
 @Composable
-private fun LibraryLink(@DrawableRes icon: Int, label: String, onClick: () -> Unit) {
+private fun LibraryLink(@DrawableRes icon: Int, label: String, last: Boolean = false, onClick: () -> Unit) {
     val dims = LocalNovaDimens.current
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = dims.gutter, vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        NovaIcon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(
-            label,
-            style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier
-                .padding(start = 16.dp)
-                .weight(1f),
-        )
-        NovaIcon(R.drawable.ic_chevron_right, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+    Box(Modifier.fillMaxWidth().clickable(onClick = onClick)) {
+        Row(
+            Modifier.padding(horizontal = dims.gutter, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            NovaIcon(icon, contentDescription = null, tint = NovaColors.IosBlue)
+            Text(
+                label,
+                style = MaterialTheme.typography.titleMedium,
+                maxLines = 1,
+                modifier = Modifier
+                    .padding(start = LabelGap)
+                    .weight(1f),
+            )
+            NovaIcon(R.drawable.ic_chevron_right, contentDescription = null, tint = IosColors.TertiaryLabel)
+        }
+        if (!last) {
+            Box(
+                Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(start = dims.gutter + IconSize + LabelGap)
+                    .fillMaxWidth()
+                    .height(Hairline)
+                    .background(IosColors.Separator),
+            )
+        }
     }
 }
+
+private val IconSize = 24.dp
+private val LabelGap = 16.dp
