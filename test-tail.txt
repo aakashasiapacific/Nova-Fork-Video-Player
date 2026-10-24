@@ -1,0 +1,80 @@
+
+Welcome to Gradle 8.13!
+
+Here are the highlights of this release:
+ - Daemon JVM auto-provisioning
+ - Enhancements for Scala plugin and JUnit testing
+ - Improvements for build authors and plugin developers
+
+For more details see https://docs.gradle.org/8.13/release-notes.html
+
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/8.13/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+> Task :core:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :core:processResources NO-SOURCE
+> Task :app:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preDebugBuild UP-TO-DATE
+> Task :app:generateDebugBuildConfig
+> Task :app:generateDebugResValues
+> Task :app:checkDebugAarMetadata
+> Task :app:mapDebugSourceSetPaths
+> Task :app:generateDebugResources
+> Task :app:packageDebugResources
+> Task :app:mergeDebugResources
+> Task :app:createDebugCompatibleScreenManifests
+> Task :app:extractDeepLinksDebug
+> Task :app:parseDebugLocalResources
+> Task :app:processDebugMainManifest
+> Task :app:processDebugManifest
+> Task :core:compileKotlin
+> Task :core:compileJava NO-SOURCE
+> Task :app:javaPreCompileDebug
+> Task :app:processDebugManifestForPackage
+> Task :core:classes UP-TO-DATE
+> Task :core:jar
+> Task :app:preDebugUnitTestBuild UP-TO-DATE
+> Task :app:javaPreCompileDebugUnitTest
+> Task :app:mergeDebugShaders
+> Task :app:compileDebugShaders NO-SOURCE
+> Task :app:generateDebugAssets UP-TO-DATE
+> Task :app:mergeDebugAssets
+> Task :app:processDebugResources
+> Task :app:packageDebugUnitTestForUnitTest
+> Task :app:generateDebugUnitTestConfig
+> Task :app:kspDebugKotlin
+> Task :app:compileDebugKotlin
+w: file:///home/runner/work/Nova-Fork-Video-Player/Nova-Fork-Video-Player/app/src/main/java/com/aakash/novafork/player/PlayerController.kt:1526:23 Condition is always 'true'.
+
+> Task :app:compileDebugJavaWithJavac
+> Task :app:processDebugJavaRes
+> Task :app:bundleDebugClassesToRuntimeJar
+> Task :app:bundleDebugClassesToCompileJar
+> Task :app:kspDebugUnitTestKotlin
+
+> Task :app:compileDebugUnitTestKotlin
+w: file:///home/runner/work/Nova-Fork-Video-Player/Nova-Fork-Video-Player/app/src/test/java/com/aakash/novafork/FakeImages.kt:56:22 This declaration needs opt-in. Its usage should be marked with '@coil.annotation.ExperimentalCoilApi' or '@OptIn(coil.annotation.ExperimentalCoilApi::class)'
+w: file:///home/runner/work/Nova-Fork-Video-Player/Nova-Fork-Video-Player/app/src/test/java/com/aakash/novafork/FakeImages.kt:56:44 This declaration needs opt-in. Its usage should be marked with '@coil.annotation.ExperimentalCoilApi' or '@OptIn(coil.annotation.ExperimentalCoilApi::class)'
+w: file:///home/runner/work/Nova-Fork-Video-Player/Nova-Fork-Video-Player/app/src/test/java/com/aakash/novafork/FakeImages.kt:59:14 This declaration needs opt-in. Its usage should be marked with '@coil.annotation.ExperimentalCoilApi' or '@OptIn(coil.annotation.ExperimentalCoilApi::class)'
+w: file:///home/runner/work/Nova-Fork-Video-Player/Nova-Fork-Video-Player/app/src/test/java/com/aakash/novafork/FakeImages.kt:60:14 This declaration needs opt-in. Its usage should be marked with '@coil.annotation.ExperimentalCoilApi' or '@OptIn(coil.annotation.ExperimentalCoilApi::class)'
+w: file:///home/runner/work/Nova-Fork-Video-Player/Nova-Fork-Video-Player/app/src/test/java/com/aakash/novafork/FakeImages.kt:63:35 This declaration needs opt-in. Its usage should be marked with '@coil.annotation.ExperimentalCoilApi' or '@OptIn(coil.annotation.ExperimentalCoilApi::class)'
+w: file:///home/runner/work/Nova-Fork-Video-Player/Nova-Fork-Video-Player/app/src/test/java/com/aakash/novafork/FakeImages.kt:76:64 This declaration needs opt-in. Its usage should be marked with '@coil.annotation.ExperimentalCoilApi' or '@OptIn(coil.annotation.ExperimentalCoilApi::class)'
+w: file:///home/runner/work/Nova-Fork-Video-Player/Nova-Fork-Video-Player/app/src/test/java/com/aakash/novafork/FakeImages.kt:268:22 This declaration needs opt-in. Its usage should be marked with '@com.github.takahirom.roborazzi.ExperimentalRoborazziApi' or '@OptIn(com.github.takahirom.roborazzi.ExperimentalRoborazziApi::class)'
+w: file:///home/runner/work/Nova-Fork-Video-Player/Nova-Fork-Video-Player/app/src/test/java/com/aakash/novafork/sources/media/MediaServerReporterTest.kt:64:33 This declaration needs opt-in. Its usage should be marked with '@kotlinx.coroutines.ExperimentalCoroutinesApi' or '@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)'
+w: file:///home/runner/work/Nova-Fork-Video-Player/Nova-Fork-Video-Player/app/src/test/java/com/aakash/novafork/sources/media/MediaServerReporterTest.kt:74:9 This declaration needs opt-in. Its usage should be marked with '@kotlinx.coroutines.ExperimentalCoroutinesApi' or '@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)'
+w: file:///home/runner/work/Nova-Fork-Video-Player/Nova-Fork-Video-Player/app/src/test/java/com/aakash/novafork/sources/media/MediaServerReporterTest.kt:76:9 This declaration needs opt-in. Its usage should be marked with '@kotlinx.coroutines.ExperimentalCoroutinesApi' or '@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)'
+w: file:///home/runner/work/Nova-Fork-Video-Player/Nova-Fork-Video-Player/app/src/test/java/com/aakash/novafork/sources/media/MediaServerReporterTest.kt:78:9 This declaration needs opt-in. Its usage should be marked with '@kotlinx.coroutines.ExperimentalCoroutinesApi' or '@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)'
+w: file:///home/runner/work/Nova-Fork-Video-Player/Nova-Fork-Video-Player/app/src/test/java/com/aakash/novafork/sources/media/MediaServerReporterTest.kt:112:9 This declaration needs opt-in. Its usage should be marked with '@kotlinx.coroutines.ExperimentalCoroutinesApi' or '@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)'
+w: file:///home/runner/work/Nova-Fork-Video-Player/Nova-Fork-Video-Player/app/src/test/java/com/aakash/novafork/sources/media/MediaServerReporterTest.kt:125:9 This declaration needs opt-in. Its usage should be marked with '@kotlinx.coroutines.ExperimentalCoroutinesApi' or '@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)'
+w: file:///home/runner/work/Nova-Fork-Video-Player/Nova-Fork-Video-Player/app/src/test/java/com/aakash/novafork/sources/media/MediaServerReporterTest.kt:136:9 This declaration needs opt-in. Its usage should be marked with '@kotlinx.coroutines.ExperimentalCoroutinesApi' or '@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)'
+w: file:///home/runner/work/Nova-Fork-Video-Player/Nova-Fork-Video-Player/app/src/test/java/com/aakash/novafork/sources/media/MediaServerReporterTest.kt:137:9 This declaration needs opt-in. Its usage should be marked with '@kotlinx.coroutines.ExperimentalCoroutinesApi' or '@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)'
+w: file:///home/runner/work/Nova-Fork-Video-Player/Nova-Fork-Video-Player/app/src/test/java/com/aakash/novafork/sources/media/MediaServerReporterTest.kt:139:9 This declaration needs opt-in. Its usage should be marked with '@kotlinx.coroutines.ExperimentalCoroutinesApi' or '@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)'
+w: file:///home/runner/work/Nova-Fork-Video-Player/Nova-Fork-Video-Player/app/src/test/java/com/aakash/novafork/sources/media/MediaServerReporterTest.kt:140:9 This declaration needs opt-in. Its usage should be marked with '@kotlinx.coroutines.ExperimentalCoroutinesApi' or '@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)'
+
+> Task :app:compileDebugUnitTestJavaWithJavac NO-SOURCE
+> Task :app:processDebugUnitTestJavaRes
+> Task :app:testDebugUnitTest
+gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/__run-1792842616124.json
+
+BUILD SUCCESSFUL in 3m 15s
+32 actionable tasks: 32 executed

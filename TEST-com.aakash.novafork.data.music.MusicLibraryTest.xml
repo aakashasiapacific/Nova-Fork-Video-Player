@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.aakash.novafork.data.music.MusicLibraryTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-10-24T11:53:25.506Z" hostname="runnervmtai0g" time="0.059">
+  <properties/>
+  <testcase name="albumsPlayDiscThenTrackOrder" classname="com.aakash.novafork.data.music.MusicLibraryTest" time="0.015"/>
+  <testcase name="theLibraryIsSortedTheWayApplesIs" classname="com.aakash.novafork.data.music.MusicLibraryTest" time="0.015"/>
+  <testcase name="aCompilationWithoutAlbumArtistIsVariousArtists" classname="com.aakash.novafork.data.music.MusicLibraryTest" time="0.016"/>
+  <testcase name="albumArtIsTheCoverFileElseTheFirstSongsPicture" classname="com.aakash.novafork.data.music.MusicLibraryTest" time="0.013"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

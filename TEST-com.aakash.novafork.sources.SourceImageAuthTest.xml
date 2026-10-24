@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.aakash.novafork.sources.SourceImageAuthTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-10-24T11:53:27.002Z" hostname="runnervmtai0g" time="0.027">
+  <properties/>
+  <testcase name="otherSourcesNeedNothing" classname="com.aakash.novafork.sources.SourceImageAuthTest" time="0.026"/>
+  <testcase name="plexArtworkGetsTheTokenAsAHeader" classname="com.aakash.novafork.sources.SourceImageAuthTest" time="0.001"/>
+  <testcase name="webDavArtworkGetsTheLogin" classname="com.aakash.novafork.sources.SourceImageAuthTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.aakash.novafork.PhoneScreensTest" tests="17" skipped="0" failures="0" errors="0" timestamp="2026-10-24T11:52:53.305Z" hostname="runnervmtai0g" time="4.916">
+  <properties/>
+  <testcase name="smbDialog" classname="com.aakash.novafork.PhoneScreensTest" time="0.711"/>
+  <testcase name="libraryShows" classname="com.aakash.novafork.PhoneScreensTest" time="0.279"/>
+  <testcase name="browse" classname="com.aakash.novafork.PhoneScreensTest" time="0.217"/>
+  <testcase name="addSourceDialog" classname="com.aakash.novafork.PhoneScreensTest" time="0.242"/>
+  <testcase name="browseDir" classname="com.aakash.novafork.PhoneScreensTest" time="0.277"/>
+  <testcase name="search" classname="com.aakash.novafork.PhoneScreensTest" time="0.307"/>
+  <testcase name="movieDetails" classname="com.aakash.novafork.PhoneScreensTest" time="0.267"/>
+  <testcase name="home" classname="com.aakash.novafork.PhoneScreensTest" time="0.379"/>
+  <testcase name="jellyfinDialog" classname="com.aakash.novafork.PhoneScreensTest" time="0.247"/>
+  <testcase name="library" classname="com.aakash.novafork.PhoneScreensTest" time="0.283"/>
+  <testcase name="episodeDetails" classname="com.aakash.novafork.PhoneScreensTest" time="0.251"/>
+  <testcase name="browseRemote" classname="com.aakash.novafork.PhoneScreensTest" time="0.235"/>
+  <testcase name="identifyDialog" classname="com.aakash.novafork.PhoneScreensTest" time="0.305"/>
+  <testcase name="settings" classname="com.aakash.novafork.PhoneScreensTest" time="0.186"/>
+  <testcase name="playlist" classname="com.aakash.novafork.PhoneScreensTest" time="0.307"/>
+  <testcase name="showDetails" classname="com.aakash.novafork.PhoneScreensTest" time="0.261"/>
+  <testcase name="homeEmpty" classname="com.aakash.novafork.PhoneScreensTest" time="0.16"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

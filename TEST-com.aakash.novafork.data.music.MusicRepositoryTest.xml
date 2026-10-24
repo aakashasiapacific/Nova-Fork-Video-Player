@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.aakash.novafork.data.music.MusicRepositoryTest" tests="13" skipped="0" failures="0" errors="0" timestamp="2026-10-24T11:53:25.622Z" hostname="runnervmtai0g" time="0.311">
+  <properties/>
+  <testcase name="aPlaylistRowNamesTheFirstSongOfItsFirstFourAlbums" classname="com.aakash.novafork.data.music.MusicRepositoryTest" time="0.031"/>
+  <testcase name="aScanGroupsSongsIntoAlbumsAndArtists" classname="com.aakash.novafork.data.music.MusicRepositoryTest" time="0.023"/>
+  <testcase name="aSourceTurnedOffIsNotScannedAndHidden" classname="com.aakash.novafork.data.music.MusicRepositoryTest" time="0.02"/>
+  <testcase name="anUnchangedFileKeepsItsTags" classname="com.aakash.novafork.data.music.MusicRepositoryTest" time="0.025"/>
+  <testcase name="songsOfARemovedSourceGo" classname="com.aakash.novafork.data.music.MusicRepositoryTest" time="0.021"/>
+  <testcase name="lyricsComeFromTheLrcFile" classname="com.aakash.novafork.data.music.MusicRepositoryTest" time="0.028"/>
+  <testcase name="aFolderCopyOfADeviceSongIsKeptOnce" classname="com.aakash.novafork.data.music.MusicRepositoryTest" time="0.021"/>
+  <testcase name="aSourceThatFailsKeepsItsSongs" classname="com.aakash.novafork.data.music.MusicRepositoryTest" time="0.023"/>
+  <testcase name="playlistsKeepTheirOrderAndEachSongOnce" classname="com.aakash.novafork.data.music.MusicRepositoryTest" time="0.027"/>
+  <testcase name="aRescanKeepsPlayCountsAndHidesFilesThatAreGone" classname="com.aakash.novafork.data.music.MusicRepositoryTest" time="0.024"/>
+  <testcase name="theWatchlistKeepsTheFirstDate" classname="com.aakash.novafork.data.music.MusicRepositoryTest" time="0.024"/>
+  <testcase name="aRestoreIsAppliedAfterEachScan" classname="com.aakash.novafork.data.music.MusicRepositoryTest" time="0.02"/>
+  <testcase name="diagnosticsCountSongsPerSource" classname="com.aakash.novafork.data.music.MusicRepositoryTest" time="0.023"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

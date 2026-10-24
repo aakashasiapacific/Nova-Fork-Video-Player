@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.aakash.novafork.data.PlaylistsTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-10-24T11:53:23.837Z" hostname="runnervmtai0g" time="0.277">
+  <properties/>
+  <testcase name="removingAVideoClosesTheGap" classname="com.aakash.novafork.data.PlaylistsTest" time="0.045"/>
+  <testcase name="addingKeepsTheGivenOrderAndSkipsWhatIsThere" classname="com.aakash.novafork.data.PlaylistsTest" time="0.036"/>
+  <testcase name="recentlyChangedPlaylistsComeFirst" classname="com.aakash.novafork.data.PlaylistsTest" time="0.032"/>
+  <testcase name="missingFilesStayInThePlaylistButAreLeftOut" classname="com.aakash.novafork.data.PlaylistsTest" time="0.042"/>
+  <testcase name="movingAnItemShiftsTheOthers" classname="com.aakash.novafork.data.PlaylistsTest" time="0.039"/>
+  <testcase name="removingASourceTakesItsVideosOutOfPlaylists" classname="com.aakash.novafork.data.PlaylistsTest" time="0.039"/>
+  <testcase name="playlistsAreCreatedRenamedAndDeleted" classname="com.aakash.novafork.data.PlaylistsTest" time="0.043"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

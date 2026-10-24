@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.aakash.novafork.player.SubtitleDownloadRulesTest" tests="18" skipped="0" failures="0" errors="0" timestamp="2026-10-24T11:53:26.008Z" hostname="runnervmtai0g" time="0.246">
+  <properties/>
+  <testcase name="error messages" classname="com.aakash.novafork.player.SubtitleDownloadRulesTest" time="0.002"/>
+  <testcase name="file language is read after the video's own name" classname="com.aakash.novafork.player.SubtitleDownloadRulesTest" time="0.229"/>
+  <testcase name="languages label names them" classname="com.aakash.novafork.player.SubtitleDownloadRulesTest" time="0.003"/>
+  <testcase name="the languages setting wins when it names any" classname="com.aakash.novafork.player.SubtitleDownloadRulesTest" time="0.002"/>
+  <testcase name="automatic downloads need an id or the file's hash" classname="com.aakash.novafork.player.SubtitleDownloadRulesTest" time="0.001"/>
+  <testcase name="only the languages before the first one present are missing" classname="com.aakash.novafork.player.SubtitleDownloadRulesTest" time="0.0"/>
+  <testcase name="results become rows" classname="com.aakash.novafork.player.SubtitleDownloadRulesTest" time="0.001"/>
+  <testcase name="downloaded files are named by language and subtitle id" classname="com.aakash.novafork.player.SubtitleDownloadRulesTest" time="0.0"/>
+  <testcase name="without a setting the subtitle preference then the device languages are used" classname="com.aakash.novafork.player.SubtitleDownloadRulesTest" time="0.0"/>
+  <testcase name="a link is searched by what its file name says" classname="com.aakash.novafork.player.SubtitleDownloadRulesTest" time="0.006"/>
+  <testcase name="an episode is searched by its show, season and episode" classname="com.aakash.novafork.player.SubtitleDownloadRulesTest" time="0.0"/>
+  <testcase name="an unmatched video uses its parsed name" classname="com.aakash.novafork.player.SubtitleDownloadRulesTest" time="0.0"/>
+  <testcase name="a download is recognised by its stem" classname="com.aakash.novafork.player.SubtitleDownloadRulesTest" time="0.0"/>
+  <testcase name="searched by id the best one is taken, by name only one timed for the file" classname="com.aakash.novafork.player.SubtitleDownloadRulesTest" time="0.002"/>
+  <testcase name="a match of the other kind is not used" classname="com.aakash.novafork.player.SubtitleDownloadRulesTest" time="0.0"/>
+  <testcase name="a server match without a TMDB id searches by title" classname="com.aakash.novafork.player.SubtitleDownloadRulesTest" time="0.0"/>
+  <testcase name="a matched movie is searched by its TMDB id, title and year" classname="com.aakash.novafork.player.SubtitleDownloadRulesTest" time="0.0"/>
+  <testcase name="nothing known falls back to English" classname="com.aakash.novafork.player.SubtitleDownloadRulesTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

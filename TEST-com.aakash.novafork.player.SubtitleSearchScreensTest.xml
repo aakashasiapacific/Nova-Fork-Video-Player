@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.aakash.novafork.player.SubtitleSearchScreensTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-10-24T11:53:26.258Z" hostname="runnervmtai0g" time="0.598">
+  <properties/>
+  <testcase name="phoneQuotaReached" classname="com.aakash.novafork.player.SubtitleSearchScreensTest" time="0.119"/>
+  <testcase name="phoneList" classname="com.aakash.novafork.player.SubtitleSearchScreensTest" time="0.102"/>
+  <testcase name="tabletPanel" classname="com.aakash.novafork.player.SubtitleSearchScreensTest" time="0.321"/>
+  <testcase name="phoneSearching" classname="com.aakash.novafork.player.SubtitleSearchScreensTest" time="0.056"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

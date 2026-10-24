@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.aakash.novafork.sources.net.UpnpRulesTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-10-24T11:53:27.389Z" hostname="runnervmtai0g" time="0.002">
+  <properties/>
+  <testcase name="videosAreToldFromMusicAndPhotos" classname="com.aakash.novafork.sources.net.UpnpRulesTest" time="0.001"/>
+  <testcase name="fileNamesGetTheStreamExtension" classname="com.aakash.novafork.sources.net.UpnpRulesTest" time="0.0"/>
+  <testcase name="objectIdsAreReadBackFromListedContainers" classname="com.aakash.novafork.sources.net.UpnpRulesTest" time="0.0"/>
+  <testcase name="discoveredServersGiveTheirDescriptionUrl" classname="com.aakash.novafork.sources.net.UpnpRulesTest" time="0.0"/>
+  <testcase name="scansSkipMusicAndPreferTheFolderView" classname="com.aakash.novafork.sources.net.UpnpRulesTest" time="0.0"/>
+  <testcase name="browseMrlsReplaceTheSchemeAndCarryTheObjectId" classname="com.aakash.novafork.sources.net.UpnpRulesTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

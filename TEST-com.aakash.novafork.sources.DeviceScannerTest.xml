@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.aakash.novafork.sources.DeviceScannerTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-10-24T11:53:26.859Z" hostname="runnervmtai0g" time="0.137">
+  <properties/>
+  <testcase name="skipReasonsKeepCameraScreenAndMessagingFolders" classname="com.aakash.novafork.sources.DeviceScannerTest" time="0.029"/>
+  <testcase name="aMediaProviderThatRefusesAColumnStillListsEveryVideo" classname="com.aakash.novafork.sources.DeviceScannerTest" time="0.026"/>
+  <testcase name="allFilesAccessAloneIsEnoughToScan" classname="com.aakash.novafork.sources.DeviceScannerTest" time="0.018"/>
+  <testcase name="censusCountsWhatMediaStoreListsByFolder" classname="com.aakash.novafork.sources.DeviceScannerTest" time="0.017"/>
+  <testcase name="withoutAccessTheScanFailsVisibly" classname="com.aakash.novafork.sources.DeviceScannerTest" time="0.016"/>
+  <testcase name="phoneVideosWithoutPostersReachBrowseLibraryAndHome" classname="com.aakash.novafork.sources.DeviceScannerTest" time="0.031"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

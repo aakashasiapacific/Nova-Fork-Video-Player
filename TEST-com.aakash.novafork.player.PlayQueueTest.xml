@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.aakash.novafork.player.PlayQueueTest" tests="13" skipped="0" failures="0" errors="0" timestamp="2026-10-24T11:53:26.005Z" hostname="runnervmtai0g" time="0.001">
+  <properties/>
+  <testcase name="moveTo rejects positions outside the queue" classname="com.aakash.novafork.player.PlayQueueTest" time="0.0"/>
+  <testcase name="clear empties the queue" classname="com.aakash.novafork.player.PlayQueueTest" time="0.0"/>
+  <testcase name="the ends stop without wrap and go round with it" classname="com.aakash.novafork.player.PlayQueueTest" time="0.0"/>
+  <testcase name="turning shuffle on and off keeps the playing video" classname="com.aakash.novafork.player.PlayQueueTest" time="0.0"/>
+  <testcase name="start index out of range is clamped" classname="com.aakash.novafork.player.PlayQueueTest" time="0.0"/>
+  <testcase name="removing from a shuffled queue keeps the play order of the rest" classname="com.aakash.novafork.player.PlayQueueTest" time="0.0"/>
+  <testcase name="shuffled queue starts with the chosen video and keeps every video once" classname="com.aakash.novafork.player.PlayQueueTest" time="0.0"/>
+  <testcase name="an empty queue has nothing to play" classname="com.aakash.novafork.player.PlayQueueTest" time="0.0"/>
+  <testcase name="inserting into an empty queue starts it" classname="com.aakash.novafork.player.PlayQueueTest" time="0.0"/>
+  <testcase name="plays in the queued order from the start index" classname="com.aakash.novafork.player.PlayQueueTest" time="0.0"/>
+  <testcase name="play next goes right after the playing item and play last at the end" classname="com.aakash.novafork.player.PlayQueueTest" time="0.0"/>
+  <testcase name="inserted items survive shuffle on and off" classname="com.aakash.novafork.player.PlayQueueTest" time="0.0"/>
+  <testcase name="removing gone videos keeps the playing one and its place" classname="com.aakash.novafork.player.PlayQueueTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
