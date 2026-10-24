@@ -25,6 +25,11 @@ data class Artwork(
     val frameAspect: Float? = null,
     /** Seed for the placeholder colours (usually the title). */
     val seed: String = "",
+    /**
+     * Continue Watching (Apple TV's Up Next): the frame where it was left, in ms, taken from
+     * [frameSource] ahead of any other art. Null shows the usual art.
+     */
+    val frameAtMs: Long? = null,
 ) {
     /**
      * Only a frame of the video exists: no poster, backdrop or still (a camera-roll clip, a saved

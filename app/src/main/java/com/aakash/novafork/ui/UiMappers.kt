@@ -64,7 +64,15 @@ object UiMappers {
         val inProgress = continueWatching(index)
         return HomeUi(
             hero = hero(index, inProgress),
-            continueWatching = inProgress.map { it.card },
+            continueWatching = inProgress.map { video ->
+                // A file on the phone shows the moment it was left, as Apple TV's Up Next does.
+                val art = video.card.artwork
+                if (art.frameSource != null && video.video.positionMs > 0) {
+                    video.card.copy(artwork = art.copy(frameAtMs = video.video.positionMs))
+                } else {
+                    video.card
+                }
+            },
             recentlyAdded = recentlyAdded(index),
             movies = index.movies.sortedWith(TITLE_ORDER).map { it.card },
             shows = index.shows.map { it.card },

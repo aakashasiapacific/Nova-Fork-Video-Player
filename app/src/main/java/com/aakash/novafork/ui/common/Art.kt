@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import coil.request.videoFrameMillis
 import coil.request.videoFramePercent
 import com.aakash.novafork.ui.model.Artwork
 import kotlin.math.abs
@@ -48,6 +49,8 @@ fun ArtImage(
     contentScale: ContentScale = ContentScale.Crop,
     frameSource: String? = null,
     alignment: Alignment = Alignment.Center,
+    /** Grab [frameSource]'s frame at this time instead of 10% in. */
+    frameAtMs: Long? = null,
     placeholder: @Composable () -> Unit,
 ) {
     val context = LocalContext.current
@@ -63,7 +66,11 @@ fun ArtImage(
                 ImageRequest.Builder(context)
                     .data(current)
                     .crossfade(true)
-                    .apply { if (current == frameSource) videoFramePercent(0.1) }
+                    .apply {
+                        if (current == frameSource) {
+                            if (frameAtMs != null) videoFrameMillis(frameAtMs) else videoFramePercent(0.1)
+                        }
+                    }
                     .build()
             }
             AsyncImage(
@@ -109,12 +116,20 @@ fun LandscapeArt(
     modifier: Modifier = Modifier,
     showTitleOnPlaceholder: Boolean = false,
 ) {
-    val candidates = remember(artwork) { listOfNotNull(artwork.stillUrl, artwork.backdropUrl, artwork.frameSource) }
+    val candidates = remember(artwork) {
+        // Where it was left first, when that frame is asked for (Continue Watching).
+        if (artwork.frameAtMs != null) {
+            listOfNotNull(artwork.frameSource, artwork.stillUrl, artwork.backdropUrl)
+        } else {
+            listOfNotNull(artwork.stillUrl, artwork.backdropUrl, artwork.frameSource)
+        }
+    }
     ArtImage(
         candidates = candidates,
         contentDescription = title,
         modifier = modifier,
         frameSource = artwork.frameSource,
+        frameAtMs = artwork.frameAtMs,
     ) {
         ArtPlaceholder(seed = artwork.seed.ifEmpty { title }, title = if (showTitleOnPlaceholder) title else null)
     }

@@ -91,6 +91,8 @@ internal fun BackdropPosterHeader(
     maxBackdropHeight: Dp = Dp.Infinity,
     /** Home's hero: the backdrop drifts in a slow zoom, so the page feels alive. */
     drift: Boolean = false,
+    /** What the backdrop fades into at its foot: the page, or clear over a tinted hero. */
+    fadeTo: Color? = null,
     info: @Composable ColumnScope.() -> Unit,
 ) {
     val dims = LocalNovaDimens.current
@@ -126,7 +128,7 @@ internal fun BackdropPosterHeader(
                         Brush.verticalGradient(
                             0f to Color.Transparent,
                             0.6f to Color.Transparent,
-                            1f to background,
+                            1f to (fadeTo ?: background),
                         ),
                     ),
             )

@@ -482,3 +482,8 @@ The owner asked for Apple Music to be copied more precisely, with less clutter. 
 - **A real sheet (build 101, owner: "the swipe down is fake"):** Now Playing is moved by one 0–1 value shared by its slide, the finger's drag and the page behind. While it is open the page behind sinks back (7% smaller, rounded, dimmed) as iOS stacks a sheet on its page; pulling Now Playing down brings that page forward in step with the finger; near the bottom Now Playing fades into the mini player, which fades back in. Let go and it springs on from the speed of the flick (`NowPlayingSheet`).
 - **Cover flight (build 102, owner):** while Now Playing opens or closes, one cover travels between the big cover and the mini player's: it rides along with the sheet as it starts down, then leaves it and shrinks into the mini player as the sheet fades (and the reverse on opening), as in Apple Music (`CoverFlight`).
 - **Cover flight fix (build 103, owner's recording):** the flying cover started loading only when a flight began, so the cover blanked and then faded in as a ghost with the placeholder note. It is now decoded ahead at one fixed size, kept composed unseen, and drawn without a crossfade.
+- **Polish batch A (build 104, owner):**
+  - Continue Watching shows a file's frame where it was left (Apple TV's Up Next), not the poster (`Artwork.frameAtMs`).
+  - Home's hero page takes a soft tint of its poster's colours, the backdrop fading into it instead of black.
+  - Lyrics as in Apple Music: the sung line bright and full size; lines further away dimmer, smaller and softer, every change gliding.
+  - Now Playing's scrubber: the times grow and brighten while held; the song's start and end give a light tick.

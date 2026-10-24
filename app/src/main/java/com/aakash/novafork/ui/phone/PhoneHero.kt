@@ -1,7 +1,9 @@
 package com.aakash.novafork.ui.phone
 
+import android.graphics.drawable.BitmapDrawable
 import androidx.annotation.DrawableRes
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateDpAsState
@@ -48,6 +50,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -61,13 +64,17 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import coil.imageLoader
+import coil.request.ImageRequest
 import com.aakash.novafork.R
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
+import com.aakash.novafork.ui.audio.coverColors
 import com.aakash.novafork.ui.common.ArtImage
 import com.aakash.novafork.ui.common.ArtPlaceholder
 import com.aakash.novafork.ui.common.BackdropArt
@@ -334,13 +341,25 @@ private fun DetailsStyleHeroPage(
         FrameHeroPage(hero = hero, openTarget = openTarget, play = play, actions = actions)
         return
     }
+    // The page behind the hero takes the poster's own colours (owner), as Now Playing takes the
+    // album's: a soft tint that fades into black above Continue Watching.
+    val tint = rememberArtTint(hero.artwork.posterUrl ?: hero.artwork.backdropUrl)
+    val shown by animateColorAsState(tint, tween(600), label = "heroTint")
     // The same header as the title's own page, so opening it keeps everything in place.
     Column(
         Modifier
             .fillMaxSize()
+            .background(
+                Brush.verticalGradient(
+                    0f to Color.Transparent,
+                    0.3f to shown.copy(alpha = 0.55f),
+                    0.75f to shown.copy(alpha = 0.3f),
+                    1f to Color.Transparent,
+                ),
+            )
             .clickable(onClickLabel = "Details", onClick = openTarget),
     ) {
-        BackdropPosterHeader(artwork = hero.artwork, title = hero.title, drift = true) {
+        BackdropPosterHeader(artwork = hero.artwork, title = hero.title, drift = true, fadeTo = Color.Transparent) {
             HeroTitle(
                 title = hero.title,
                 logoUrl = hero.artwork.logoUrl,
@@ -619,4 +638,19 @@ private fun MuteButton(muted: Boolean, onClick: () -> Unit) {
             modifier = Modifier.size(22.dp),
         )
     }
+}
+
+/** The middle colour of [url]'s picture, made richer and kept dark; clear until it is known. */
+@Composable
+private fun rememberArtTint(url: String?): Color {
+    val context = LocalContext.current
+    val tint by produceState(Color.Transparent, url) {
+        value = url?.let {
+            runCatching {
+                val request = ImageRequest.Builder(context).data(it).size(24).allowHardware(false).build()
+                (context.imageLoader.execute(request).drawable as? BitmapDrawable)?.bitmap?.let { bitmap -> coverColors(bitmap).middle }
+            }.getOrNull()
+        } ?: Color.Transparent
+    }
+    return tint
 }

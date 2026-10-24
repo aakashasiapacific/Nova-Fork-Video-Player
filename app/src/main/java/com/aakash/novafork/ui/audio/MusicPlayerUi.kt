@@ -68,6 +68,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
@@ -712,10 +713,22 @@ private fun LyricsPane(player: MusicPlayerState, actions: AudioActions) {
     LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
         itemsIndexed(lyrics.lines) { index, line ->
             val time = line.timeMs
-            val current = index == active || !lyrics.synced
-            // Apple Music's lyrics: big, bold, left-aligned; the lines around the sung one dim
-            // and soften so the eye stays on it.
-            val alpha by animateFloatAsState(if (current) 1f else 0.32f, tween(300), label = "lyricAlpha")
+            // Apple Music's lyrics: big, bold, left-aligned. The sung line is bright and full
+            // size; the further a line is from it, the dimmer, smaller and softer it gets, and
+            // each change glides rather than jumps.
+            val distance = if (lyrics.synced && active >= 0) kotlin.math.abs(index - active) else 0
+            val alpha by animateFloatAsState(
+                when (distance) {
+                    0 -> 1f
+                    1 -> 0.5f
+                    2 -> 0.34f
+                    else -> 0.24f
+                },
+                tween(450),
+                label = "lyricAlpha",
+            )
+            val scale by animateFloatAsState(if (distance == 0) 1f else 0.94f, spring(dampingRatio = 0.8f, stiffness = 250f), label = "lyricScale")
+            val blur by animateDpAsState((distance.coerceAtMost(3) * 1.4f).dp, tween(450), label = "lyricBlur")
             Text(
                 line.text.ifEmpty { "♪" },
                 fontSize = 28.sp,
@@ -725,10 +738,15 @@ private fun LyricsPane(player: MusicPlayerState, actions: AudioActions) {
                 color = Color.White.copy(alpha = alpha),
                 modifier = Modifier
                     .fillMaxWidth()
+                    .graphicsLayer {
+                        scaleX = scale
+                        scaleY = scale
+                        transformOrigin = TransformOrigin(0f, 0.5f)
+                    }
                     .clip(RoundedCornerShape(10.dp))
                     .clickable(enabled = lyrics.synced && time != null) { if (time != null) actions.seekTo(time) }
                     .padding(vertical = 10.dp)
-                    .then(if (current) Modifier else Modifier.blur(1.5.dp)),
+                    .then(if (blur > 0.dp) Modifier.blur(blur) else Modifier),
             )
         }
     }
@@ -844,10 +862,38 @@ private fun Scrubber(player: MusicPlayerState, actions: AudioActions) {
             scrubbing = null
         },
     )
+    // While held, the times grow and brighten so they can be read past the thumb, and the ends
+    // of the song give a light tick, as Apple Music's scrubber does.
+    val held = scrubbing != null
+    val grow by animateFloatAsState(if (held) 1.2f else 1f, spring(dampingRatio = 0.7f, stiffness = 400f), label = "timeGrow")
+    val timeAlpha by animateFloatAsState(if (held) 1f else 0.6f, tween(150), label = "timeAlpha")
+    val haptics = LocalHapticFeedback.current
+    val atEnd = scrubbing?.let { it <= 0f || it >= 1f } == true
+    LaunchedEffect(atEnd) { if (atEnd) haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove) }
     Row(Modifier.fillMaxWidth().padding(top = 6.dp)) {
         val shownMs = (fraction * duration).toLong()
-        Text(formatTime(shownMs), fontSize = 12.sp, color = Color.White.copy(alpha = 0.6f), modifier = Modifier.weight(1f))
-        Text("-" + formatTime((player.durationMs - shownMs).coerceAtLeast(0)), fontSize = 12.sp, color = Color.White.copy(alpha = 0.6f))
+        Text(
+            formatTime(shownMs),
+            fontSize = 12.sp,
+            color = Color.White.copy(alpha = timeAlpha),
+            modifier = Modifier
+                .weight(1f)
+                .graphicsLayer {
+                    scaleX = grow
+                    scaleY = grow
+                    transformOrigin = TransformOrigin(0f, 0f)
+                },
+        )
+        Text(
+            "-" + formatTime((player.durationMs - shownMs).coerceAtLeast(0)),
+            fontSize = 12.sp,
+            color = Color.White.copy(alpha = timeAlpha),
+            modifier = Modifier.graphicsLayer {
+                scaleX = grow
+                scaleY = grow
+                transformOrigin = TransformOrigin(1f, 0f)
+            },
+        )
     }
 }
 
