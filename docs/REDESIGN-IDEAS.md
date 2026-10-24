@@ -533,3 +533,6 @@ The owner asked for Apple Music to be copied more precisely, with less clutter. 
   - Lists fade out under the clock and battery instead of running into them (not over Home's hero, whose picture sets the status bar).
   - Long-pressing a song or album lifts it over the blurred page with a haptic knock, as videos do; albums get a menu (Play, Shuffle, Play Next, Play Last, Go to Artist, Delete Album) and songs a Delete. Deleting asks first, then on Android 11+ puts the files in the phone's bin (30 days); songs in picked folders are deleted for good.
   - Now Playing's cover lands with a small spring as the sheet finishes opening.
+- **Build 114 (owner's crash report):**
+  - Crash fix: swiping from Audio toward Video crashed the app. Audio's first page counted as a page opened over Home, so the swipe became a swipe back, and the swipe back moved the Home page (with its scrolling lists) between two places in the layout, which Compose cannot do. Swipe back is now Compose's own seekable page transition: both pages are drawn by the one page container, nothing is moved.
+  - Swiping on a tab's first page changes tab again everywhere on the page (below Home's hero too): the swipe-back listener, idle there, was swallowing the swipe. A tab's first page now always swipes between tabs; pages opened from it swipe back.
