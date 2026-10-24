@@ -18,6 +18,7 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -55,7 +56,9 @@ import androidx.compose.ui.BiasAlignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
@@ -74,7 +77,7 @@ private val TabularNumbers = TextStyle(fontFeatureSettings = "tnum")
 
 /** Centred pill for seek / label feedback; fades out after the state clears it. */
 @Composable
-internal fun FeedbackOverlay(feedback: GestureFeedback?, modifier: Modifier = Modifier) {
+internal fun FeedbackOverlay(feedback: GestureFeedback?, modifier: Modifier = Modifier, frame: ImageBitmap? = null) {
     val shown = rememberLatestNonNull(feedback)
     AnimatedVisibility(
         visible = feedback != null,
@@ -82,7 +85,25 @@ internal fun FeedbackOverlay(feedback: GestureFeedback?, modifier: Modifier = Mo
         enter = fadeIn(tween(120)),
         exit = fadeOut(tween(250)),
     ) {
-        if (shown != null) FeedbackPill(shown)
+        if (shown != null) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                // While scrubbing a file on the phone: the frame at that point, as Samsung shows.
+                if (frame != null && shown is GestureFeedback.Seek) {
+                    Image(
+                        bitmap = frame,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .padding(bottom = 10.dp)
+                            .width(200.dp)
+                            .aspectRatio(frame.width.toFloat() / frame.height.coerceAtLeast(1))
+                            .clip(RoundedCornerShape(12.dp))
+                            .border(1.dp, Color.White.copy(alpha = 0.25f), RoundedCornerShape(12.dp)),
+                    )
+                }
+                FeedbackPill(shown)
+            }
+        }
     }
 }
 

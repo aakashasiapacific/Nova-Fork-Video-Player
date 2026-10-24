@@ -196,6 +196,7 @@ private fun PlayerChrome(state: PlayerUiState, actions: PlayerActions, layout: D
             }
             FeedbackOverlay(
                 feedback = state.feedback,
+                frame = state.scrubFrame,
                 modifier = Modifier
                     .align(BiasAlignment(horizontalBias = 0f, verticalBias = feedbackBias))
                     .padding(horizontal = 24.dp),

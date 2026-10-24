@@ -1,6 +1,7 @@
 package com.aakash.novafork.ui.model
 
 import androidx.compose.runtime.Immutable
+import androidx.compose.ui.graphics.ImageBitmap
 import com.aakash.novafork.data.AspectMode
 
 /** One audio or subtitle track as libVLC reports it. id -1 = "Disable". */
@@ -114,6 +115,8 @@ data class PlayerUiState(
     /** False where the system ignores orientation requests (Android 16+ on screens ≥ 600dp). */
     val canRotate: Boolean = true,
     val feedback: GestureFeedback? = null,
+    /** While the seek bar is dragged: the video's frame at that point (files on the phone only). */
+    val scrubFrame: ImageBitmap? = null,
     /**
      * The media volume 0–1 while the player's own (iOS-style) volume indicator shows, after a
      * volume key; null while it is hidden. The system's volume panel stays away in the player.

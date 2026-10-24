@@ -16,6 +16,7 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.LocalOverscrollConfiguration
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -89,10 +90,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.aakash.novafork.R
 import com.aakash.novafork.ui.adaptive.DeviceLayout
 import com.aakash.novafork.ui.audio.AudioScreen
-import com.aakash.novafork.ui.audio.MiniPlayerBar
-import com.aakash.novafork.ui.audio.MiniPlayerHeight
 import com.aakash.novafork.ui.audio.CoverFlight
 import com.aakash.novafork.ui.audio.LocalNowPlayingSheet
+import com.aakash.novafork.ui.audio.MiniPlayerBar
+import com.aakash.novafork.ui.audio.MiniPlayerHeight
 import com.aakash.novafork.ui.audio.NowPlayingSheet
 import com.aakash.novafork.ui.audio.ShellNowPlaying
 import com.aakash.novafork.ui.audio.rememberMusicShell
@@ -101,6 +102,7 @@ import com.aakash.novafork.ui.common.LocalBottomBarSpace
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.NovaTabCapsule
 import com.aakash.novafork.ui.common.activeColor
+import com.aakash.novafork.ui.common.iosOverscroll
 import com.aakash.novafork.ui.common.swipeBetweenTabs
 import com.aakash.novafork.ui.common.tabIconRes
 import com.aakash.novafork.ui.common.tabSlide
@@ -185,7 +187,8 @@ fun PhoneApp(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
                     }
                 },
         ) {
-            CompositionLocalProvider(LocalBottomBarSpace provides barSpace) {
+            // Android's stretch is off: the pages bounce as iOS lists do (iosOverscroll).
+            CompositionLocalProvider(LocalBottomBarSpace provides barSpace, LocalOverscrollConfiguration provides null) {
                 // Keyed by route, so state updates within a page recompose it in place, while a route
                 // change crossfades and the outgoing page keeps showing the state it was built with.
                 AnimatedContent(
@@ -233,7 +236,15 @@ fun PhoneApp(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
                     label = "phoneRoute",
                 ) { pageState ->
                     pageStates.SaveableStateProvider(pageState.route.toString()) {
-                        PhonePage(state = pageState, actions = actions)
+                        // iOS's edge bounce on every page; a movie or show page also closes
+                        // when pulled down from its top, shrinking back toward its poster.
+                        Box(
+                            Modifier
+                                .fillMaxSize()
+                                .iosOverscroll(onPullClose = if (pageState.route.isTitlePage()) actions::back else null),
+                        ) {
+                            PhonePage(state = pageState, actions = actions)
+                        }
                     }
                 }
             }

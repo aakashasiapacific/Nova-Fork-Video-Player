@@ -487,3 +487,7 @@ The owner asked for Apple Music to be copied more precisely, with less clutter. 
   - Home's hero page takes a soft tint of its poster's colours, the backdrop fading into it instead of black.
   - Lyrics as in Apple Music: the sung line bright and full size; lines further away dimmer, smaller and softer, every change gliding.
   - Now Playing's scrubber: the times grow and brighten while held; the song's start and end give a light tick.
+- **Polish batch B (build 105, owner):**
+  - iOS edge bounce on every phone page instead of Android's stretch: past an end a list follows the finger with growing resistance and springs back; a fling into an end overshoots a little (`iosOverscroll`).
+  - A movie or show page pulled down from its top shrinks toward its poster and closes when let go far enough, the zoom back finishing it.
+  - Scrubbing a file on the phone shows the frame at that point above the time, as Samsung's player does (read with one MediaMetadataRetriever, the latest request winning).

@@ -12,8 +12,10 @@ import android.os.Looper
 import android.os.ParcelFileDescriptor
 import android.os.SystemClock
 import android.provider.OpenableColumns
+import android.provider.Settings as SystemSettings
 import android.util.Log
 import android.view.KeyEvent
+import androidx.compose.ui.graphics.asImageBitmap
 import com.aakash.novafork.AppGraph
 import com.aakash.novafork.CrashReporter
 import com.aakash.novafork.core.library.VideoFiles
@@ -55,13 +57,14 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import org.videolan.libvlc.MediaPlayer
 import org.videolan.libvlc.RendererItem
 import org.videolan.libvlc.interfaces.IMedia
 import org.videolan.libvlc.util.VLCVideoLayout
-import android.provider.Settings as SystemSettings
 
 /** The decoded picture as it is displayed: sample aspect ratio and rotation already applied. */
 data class VideoSize(val width: Int, val height: Int) {
@@ -212,6 +215,12 @@ class PlayerController(
     private var pendingSeekMs: Long? = null
     private var resumeBannerPending = false
     private var userRotated = false
+
+    /** Frames for the scrub bubble: the open retriever, for which uri, and the latest request. */
+    private var frameRetriever: MediaMetadataRetriever? = null
+    private var frameRetrieverUri: String? = null
+    private var frameJob: Job? = null
+    private val frameLock = Mutex()
 
     /** The current video's shape read from its file before playback, for turning the screen early. */
     private var fileShape: VideoSize? = null
@@ -1046,6 +1055,13 @@ class PlayerController(
         if (released) return
         saveProgress()
         released = true
+        frameJob?.cancel()
+        // Not while a read still runs; the retriever then goes with the process.
+        if (frameLock.tryLock()) {
+            frameRetriever?.let { retriever -> runCatching { retriever.release() } }
+            frameRetriever = null
+            frameLock.unlock()
+        }
         openJob?.cancel()
         subtitleJob?.cancel()
         subtitleSearchJob?.cancel()
@@ -1139,10 +1155,48 @@ class PlayerController(
         val feedback = GestureFeedback.Seek(target, target - start, current.durationMs)
         if (commit) {
             scrubStartMs = null
+            frameJob?.cancel()
+            _state.update { it.copy(scrubFrame = null) }
             seekInternal(target)
             showFeedback(feedback, GESTURE_FEEDBACK_MS)
         } else {
             showFeedback(feedback, hideAfterMs = null)
+            previewFrame(target)
+        }
+    }
+
+    /**
+     * The frame at [positionMs] for the scrub bubble, as Samsung's player shows one: read from a
+     * file on the phone (not a stream) with one retriever kept open while scrubbing, the latest
+     * request winning.
+     */
+    private fun previewFrame(positionMs: Long) {
+        val playing = nowPlaying ?: return
+        if (playing.kind != UriKind.CONTENT && playing.kind != UriKind.FILE) return
+        frameJob?.cancel()
+        frameJob = scope.launch {
+            delay(FRAME_PREVIEW_DELAY_MS)
+            val frame = withContext(Dispatchers.IO) {
+                // One read at a time: a cancelled read may still be running when the next starts.
+                frameLock.withLock {
+                    runCatching {
+                        val retriever = frameRetriever?.takeIf { frameRetrieverUri == playing.uri } ?: MediaMetadataRetriever().also { opened ->
+                            frameRetriever?.let { old -> runCatching { old.release() } }
+                            val parsed = Uri.parse(playing.uri)
+                            if (parsed.scheme == "file") opened.setDataSource(parsed.path) else opened.setDataSource(appContext, parsed)
+                            frameRetriever = opened
+                            frameRetrieverUri = playing.uri
+                        }
+                        val micros = positionMs * 1000
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+                            retriever.getScaledFrameAtTime(micros, MediaMetadataRetriever.OPTION_CLOSEST_SYNC, FRAME_PREVIEW_PX, FRAME_PREVIEW_PX)
+                        } else {
+                            retriever.getFrameAtTime(micros, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+                        }
+                    }.getOrNull()?.asImageBitmap()
+                }
+            }
+            if (frame != null && scrubStartMs != null) _state.update { it.copy(scrubFrame = frame) }
         }
     }
 
@@ -2468,6 +2522,12 @@ class PlayerController(
 
         /** libvlc_video_orient_t values 4–7 swap width and height. */
         val TRANSPOSED_ORIENTATIONS = 4..7
+
+        /** How long a scrub rests before its frame is read, so a fast drag reads few. */
+        const val FRAME_PREVIEW_DELAY_MS = 60L
+
+        /** The scrub bubble frame's longest side, in pixels. */
+        const val FRAME_PREVIEW_PX = 320
 
         /** Android 16 (API 36) ignores orientation requests of apps targeting it on screens this wide. */
         const val ORIENTATION_IGNORED_SDK = 36
