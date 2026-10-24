@@ -507,3 +507,7 @@ The owner asked for Apple Music to be copied more precisely, with less clutter. 
   - A soft haptic knock as a poster's menu opens.
   - Android 12+: a plain black launch screen that fades into Home.
   - Continue Watching cards' menu: "Remove from Continue Watching" (forgets where it was left).
+- **Build 109 (owner):**
+  - Crash fix: the library pages (All Videos, Recently Added, …) and Recently Deleted crashed on the owner's Android 16 phone since the frosted glass (build 106). Haze, the backdrop-blur library, was the one part that ran only on a phone (it is off under the tests), so it came out; the glass is the tinted one again.
+  - The classic iOS tab bar instead of the floating capsule: docked full width along the bottom, dark and see-through with a hairline on top, icons over names, the selected one coloured; it no longer shrinks on scroll. The mini player docks just above it whenever there is a queue, playing or paused.
+  - Home's hero tint now comes from the foot of the backdrop, not the poster, and is strongest where the backdrop fades out, so the picture flows into it.

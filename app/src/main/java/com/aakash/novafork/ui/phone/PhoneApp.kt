@@ -1,6 +1,5 @@
 package com.aakash.novafork.ui.phone
 
-import android.os.Build
 import androidx.annotation.DrawableRes
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
@@ -77,12 +76,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -99,12 +100,11 @@ import com.aakash.novafork.ui.audio.MiniPlayerHeight
 import com.aakash.novafork.ui.audio.NowPlayingSheet
 import com.aakash.novafork.ui.audio.ShellNowPlaying
 import com.aakash.novafork.ui.audio.rememberMusicShell
-import com.aakash.novafork.ui.common.GlassCircle
+import com.aakash.novafork.ui.common.Hairline
+import com.aakash.novafork.ui.common.IosColors
 import com.aakash.novafork.ui.common.LocalBottomBarSpace
-import com.aakash.novafork.ui.common.LocalGlassHaze
 import com.aakash.novafork.ui.common.LocalMenuFocus
 import com.aakash.novafork.ui.common.NovaIcon
-import com.aakash.novafork.ui.common.NovaTabCapsule
 import com.aakash.novafork.ui.common.activeColor
 import com.aakash.novafork.ui.common.iosOverscroll
 import com.aakash.novafork.ui.common.swipeBetweenTabs
@@ -117,12 +117,10 @@ import com.aakash.novafork.ui.model.TopDestination
 import com.aakash.novafork.ui.model.top
 import com.aakash.novafork.ui.settings.SettingsScreen
 import com.aakash.novafork.ui.theme.NovaColors
-import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.haze
 import kotlinx.coroutines.launch
 
 /**
- * Phone UI: a floating tab bar over one full-screen page per route. Dialogs, snackbars and system
+ * Phone UI: a docked iOS tab bar over one full-screen page per route. Dialogs, snackbars and system
  * back are handled by the app shell around this.
  */
 @Composable
@@ -131,63 +129,30 @@ fun PhoneApp(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
     // (and other saveable state) for when the user comes back.
     val pageStates = rememberSaveableStateHolder()
     val top = state.route.top
-    // The tab bar shrinks while a page scrolls down and comes back when it scrolls up, reaches
-    // its end or the tab changes.
-    var barCollapsed by remember { mutableStateOf(false) }
-    val collapseThreshold = with(LocalDensity.current) { BarCollapseScroll.toPx() }
-    val barScroll = remember {
-        object : NestedScrollConnection {
-            var travel = 0f
-            override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
-                // The end of the page: nothing below to make room for, so the full bar comes back.
-                if (available.y < 0f) {
-                    barCollapsed = false
-                    travel = 0f
-                    return Offset.Zero
-                }
-                val dy = consumed.y
-                if (dy == 0f) return Offset.Zero
-                travel = if (travel * dy < 0) dy else travel + dy
-                if (travel < -collapseThreshold) barCollapsed = true
-                if (travel > collapseThreshold) barCollapsed = false
-                return Offset.Zero
-            }
-        }
-    }
-    // The bar floats over the page (no strip reserved for it): pages run on behind it and pad
-    // their lists by LocalBottomBarSpace.
+    // The docked bar lies over the page's foot: pages run on behind it and pad their lists by
+    // LocalBottomBarSpace.
     val navBar = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     // Music (the real app only): the mini player floats just above the tab bar on every tab,
     // and opens Now Playing over everything.
     val music = rememberMusicShell()
     val player = music?.second
-    // The mini player, as in Apple Music on iOS 26: while a song plays it floats above the full
-    // bar, and sits between the current tab and Search when the bar is shrunk. A paused song
-    // only shows in the shrunk bar (which shrinks to show it); a queue brought back after the
-    // app was closed only on the Audio tab.
+    // The mini player, as in Apple Music: docked just above the tab bar whenever there is a
+    // queue, playing or paused; a queue brought back after the app was closed only on the Audio tab.
     val hasQueue = player != null && player.active && (!player.restored || top == TopDestination.AUDIO)
-    val playing = player?.playRequested == true
-    LaunchedEffect(top) { barCollapsed = hasQueue && !playing }
-    LaunchedEffect(hasQueue, playing) { if (hasQueue && !playing) barCollapsed = true }
-    val miniAboveBar = hasQueue && playing && !barCollapsed
-    val miniInBar = hasQueue && barCollapsed
+    val miniAboveBar = hasQueue
     var nowPlayingOpen by rememberSaveable { mutableStateOf(false) }
     val nowPlayingSheet = remember { NowPlayingSheet() }
-    val barSpace = TabBarHeight + BarTopMargin + BarBottomMargin + navBar +
-        (if (miniAboveBar) MiniPlayerHeight + MiniPlayerGap else 0.dp)
+    val barSpace = TabBarHeight + navBar +
+        (if (miniAboveBar) MiniPlayerHeight + MiniPlayerGap * 2 else 0.dp)
     // Where the last touch went down, as a fraction of the screen: a page opened from a poster
     // grows out of it and shrinks back into it (iOS 18's zoom transition).
     var tapOrigin by remember { mutableStateOf(TransformOrigin.Center) }
     val zoomOrigins = remember { mutableMapOf<Route, TransformOrigin>() }
-    // The pages are the blur source of the glass over them (not under Robolectric, whose
-    // graphics have no RenderEffect).
-    val glassHaze = remember { HazeState() }.takeIf { Build.FINGERPRINT != "robolectric" }
     // While a poster's menu is open the whole shell blurs and dims behind it (iOS).
     val menuFocus = remember { mutableStateOf(0) }
     val menuDim by animateFloatAsState(if (menuFocus.value > 0) 1f else 0f, tween(220), label = "menuDim")
     CompositionLocalProvider(
         LocalNowPlayingSheet provides nowPlayingSheet,
-        LocalGlassHaze provides glassHaze,
         LocalMenuFocus provides menuFocus,
     ) {
         Box(
@@ -231,8 +196,6 @@ fun PhoneApp(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
                             val open = nowPlayingSheet.openFraction
                             if (open > 0f) drawRect(Color.Black.copy(alpha = 0.4f * open))
                         }
-                        .then(if (glassHaze != null) Modifier.haze(glassHaze) else Modifier)
-                        .nestedScroll(barScroll)
                         .swipeBetweenTabs(top, enabled = !state.canGoBack, onSelect = actions::selectTab, onBack = actions::back)
                         .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)),
                     transitionSpec = {
@@ -272,23 +235,8 @@ fun PhoneApp(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
             }
             PhoneNavigationBar(
                 selected = top,
-                collapsed = barCollapsed,
                 onSelect = actions::selectTab,
                 modifier = Modifier.align(Alignment.BottomCenter),
-                miniPlayer = if (music != null && miniInBar) {
-                    { miniModifier ->
-                        MiniPlayerBar(
-                            player = music.second,
-                            actions = music.first,
-                            onOpen = { nowPlayingOpen = true },
-                            // It fades back in as Now Playing comes down into it.
-                            modifier = miniModifier.graphicsLayer { alpha = 1f - nowPlayingSheet.openFraction },
-                            compact = true,
-                        )
-                    }
-                } else {
-                    null
-                },
             )
             if (music != null) {
                 val (viewModel, musicState) = music
@@ -297,9 +245,9 @@ fun PhoneApp(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .padding(
-                            start = BarSideMargin,
-                            end = BarSideMargin,
-                            bottom = navBar + BarBottomMargin + TabBarHeight + MiniPlayerGap,
+                            start = MiniPlayerGap,
+                            end = MiniPlayerGap,
+                            bottom = navBar + TabBarHeight + MiniPlayerGap,
                         ),
                     enter = fadeIn(tween(200)) + scaleIn(tween(240), initialScale = 0.9f),
                     exit = fadeOut(tween(140)),
@@ -308,6 +256,7 @@ fun PhoneApp(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
                         player = musicState,
                         actions = viewModel,
                         onOpen = { nowPlayingOpen = true },
+                        // It fades back in as Now Playing comes down into it.
                         modifier = Modifier.graphicsLayer { alpha = 1f - nowPlayingSheet.openFraction },
                     )
                 }
@@ -396,75 +345,65 @@ private fun PhonePage(state: AppUiState, actions: AppActions) {
 }
 
 /**
- * iOS 26's floating tab bar, as in the owner's recording: a dark-grey glass capsule held off the
- * screen edges, with a lighter grey pill behind the selected tab, whose icon and label take the
- * tab's colour. A finger dragged along it moves the pill, and the tab under the finger opens when
- * it lifts. While a page scrolls down it shrinks to two circles: the other section on the left
- * (Video or Audio, never the one shown) and Search on the right; scrolling back up brings back
- * the full bar.
+ * The classic iOS tab bar (owner: the floating capsule was not appealing): docked full width along
+ * the bottom edge over the page's foot, dark and see-through with a hairline on top, each tab an
+ * icon over its name, the selected one in its colour (Video and Preferences blue, Audio red).
  */
 @Composable
 private fun PhoneNavigationBar(
     selected: TopDestination,
-    collapsed: Boolean,
     onSelect: (TopDestination) -> Unit,
     modifier: Modifier = Modifier,
-    /** The mini player for the shrunk bar's middle, sized by the modifier it gets; null = none. */
-    miniPlayer: (@Composable (Modifier) -> Unit)? = null,
 ) {
-    Box(
+    val haptics = LocalHapticFeedback.current
+    Column(
         modifier
             .fillMaxWidth()
-            .navigationBarsPadding()
-            .padding(start = BarSideMargin, end = BarSideMargin, top = BarTopMargin, bottom = BarBottomMargin)
-            .height(TabBarHeight),
+            .background(DockColor),
     ) {
-        AnimatedContent(
-            targetState = collapsed,
-            transitionSpec = {
-                (fadeIn(tween(200)) + scaleIn(tween(240), initialScale = 0.9f)) togetherWith
-                    (fadeOut(tween(120)) + scaleOut(tween(160), targetScale = 0.9f))
-            },
-            label = "tabBarCollapse",
-        ) { small ->
-            if (small) {
-                // The other section (owner: never the one already shown): Video on Audio, Audio on
-                // Video, Video elsewhere; then the mini player when there is one, then Search.
-                val other = if (selected == TopDestination.VIDEO) TopDestination.AUDIO else TopDestination.VIDEO
-                Row(Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
-                    GlassCircle(onClick = { onSelect(other) }, description = other.label, size = TabBarHeight) {
-                        NovaIcon(other.tabIconRes(), contentDescription = null, tint = Color.White, modifier = Modifier.size(24.dp))
-                    }
-                    if (miniPlayer != null) {
-                        miniPlayer(
-                            Modifier
-                                .weight(1f)
-                                .padding(horizontal = 8.dp)
-                                .height(TabBarHeight),
-                        )
-                    } else {
-                        Spacer(Modifier.weight(1f))
-                    }
-                    if (selected != TopDestination.SEARCH) {
-                        GlassCircle(onClick = { onSelect(TopDestination.SEARCH) }, description = TopDestination.SEARCH.label, size = TabBarHeight) {
-                            NovaIcon(TopDestination.SEARCH.tabIconRes(), contentDescription = null, tint = Color.White, modifier = Modifier.size(24.dp))
-                        }
-                    }
+        Box(Modifier.fillMaxWidth().height(Hairline).background(IosColors.Separator))
+        Row(Modifier.fillMaxWidth().height(TabBarHeight)) {
+            TopDestination.entries.forEach { tab ->
+                val active = tab == selected
+                val tint = if (active) tab.activeColor() else IosColors.SecondaryLabel
+                Column(
+                    Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .selectable(
+                            selected = active,
+                            onClick = {
+                                if (!active) haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                onSelect(tab)
+                            },
+                            role = Role.Tab,
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                        ),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                ) {
+                    NovaIcon(tab.tabIconRes(), contentDescription = null, tint = tint, modifier = Modifier.size(25.dp))
+                    Text(
+                        tab.label,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Medium,
+                        color = tint,
+                        maxLines = 1,
+                        modifier = Modifier.padding(top = 2.dp),
+                    )
                 }
-            } else {
-                NovaTabCapsule(selected = selected, onSelect = onSelect, modifier = Modifier.fillMaxSize())
             }
         }
+        Spacer(Modifier.navigationBarsPadding())
     }
 }
 
-private val TabBarHeight = 64.dp
-private val BarCollapseScroll = 32.dp
-private val BarSideMargin = 20.dp
-private val BarTopMargin = 6.dp
-private val BarBottomMargin = 10.dp
-private val MiniPlayerGap = 10.dp
+private val TabBarHeight = 52.dp
+private val MiniPlayerGap = 8.dp
 
+/** iOS's dark tab bar material: near-black and a little see-through. */
+private val DockColor = Color(0xF2121214)
 
 /** A movie, episode or show page: the pages that zoom out of the poster that opened them. */
 private fun Route.isTitlePage(): Boolean = this is Route.VideoDetails || this is Route.ShowDetails

@@ -136,8 +136,6 @@ dependencies {
     implementation("androidx.compose.animation:animation")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-core")
-    // Backdrop blur for the glass tab bar and buttons (1.1.0: built with Kotlin 2.0.21 and Compose 1.7, as this app).
-    implementation("dev.chrisbanes.haze:haze:1.1.0")
 
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.activity:activity-compose:1.9.3")

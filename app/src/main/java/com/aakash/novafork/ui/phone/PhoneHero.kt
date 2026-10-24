@@ -341,9 +341,10 @@ private fun DetailsStyleHeroPage(
         FrameHeroPage(hero = hero, openTarget = openTarget, play = play, actions = actions)
         return
     }
-    // The page behind the hero takes the poster's own colours (owner), as Now Playing takes the
-    // album's: a soft tint that fades into black above Continue Watching.
-    val tint = rememberArtTint(hero.artwork.posterUrl ?: hero.artwork.backdropUrl)
+    // The page behind the hero carries on the backdrop's own colour (owner: the poster's clashed
+    // with the backdrop): the shade of the backdrop's foot, fading into black above Continue
+    // Watching, so the picture flows into it.
+    val tint = rememberArtTint(hero.artwork.backdropUrl ?: hero.artwork.stillUrl ?: hero.artwork.posterUrl)
     val shown by animateColorAsState(tint, tween(600), label = "heroTint")
     // The same header as the title's own page, so opening it keeps everything in place.
     Column(
@@ -351,9 +352,10 @@ private fun DetailsStyleHeroPage(
             .fillMaxSize()
             .background(
                 Brush.verticalGradient(
-                    0f to Color.Transparent,
-                    0.3f to shown.copy(alpha = 0.55f),
-                    0.75f to shown.copy(alpha = 0.3f),
+                    // Strongest where the backdrop fades out, so the two meet without a seam.
+                    0f to shown.copy(alpha = 0.85f),
+                    0.4f to shown.copy(alpha = 0.7f),
+                    0.8f to shown.copy(alpha = 0.3f),
                     1f to Color.Transparent,
                 ),
             )
@@ -640,7 +642,7 @@ private fun MuteButton(muted: Boolean, onClick: () -> Unit) {
     }
 }
 
-/** The middle colour of [url]'s picture, made richer and kept dark; clear until it is known. */
+/** The colour of the bottom of [url]'s picture, made richer and kept dark; clear until it is known. */
 @Composable
 private fun rememberArtTint(url: String?): Color {
     val context = LocalContext.current
@@ -648,7 +650,7 @@ private fun rememberArtTint(url: String?): Color {
         value = url?.let {
             runCatching {
                 val request = ImageRequest.Builder(context).data(it).size(24).allowHardware(false).build()
-                (context.imageLoader.execute(request).drawable as? BitmapDrawable)?.bitmap?.let { bitmap -> coverColors(bitmap).middle }
+                (context.imageLoader.execute(request).drawable as? BitmapDrawable)?.bitmap?.let { bitmap -> coverColors(bitmap).bottom }
             }.getOrNull()
         } ?: Color.Transparent
     }
