@@ -10,13 +10,9 @@ import androidx.annotation.DrawableRes
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutLinearInEasing
-import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -94,7 +90,6 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
-import coil.request.ImageRequest
 import com.aakash.novafork.R
 import com.aakash.novafork.data.db.SongEntity
 import com.aakash.novafork.data.music.MusicLibrary
@@ -387,37 +382,7 @@ fun NowPlayingScreen(
                 },
             ),
     ) {
-        // Apple Music's living background: the cover in colour, slowly turning. It is drawn from a
-        // 32px copy of the cover, which upscaled is as soft as a blur and costs nothing per frame
-        // (a real blur redrawn while the screen turns and is dragged made the drag stutter).
-        val drift = rememberInfiniteTransition(label = "drift")
-        val turn by drift.animateFloat(
-            initialValue = 0f,
-            targetValue = 360f,
-            animationSpec = infiniteRepeatable(tween(durationMillis = 90_000, easing = LinearEasing)),
-            label = "driftTurn",
-        )
-        val context = LocalContext.current
-        val tinyCover = remember(now?.artUri) {
-            now?.artUri?.let { ImageRequest.Builder(context).data(it).size(BACKDROP_PX).build() }
-        }
-        AsyncImage(
-            model = tinyCover,
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier
-                .fillMaxSize()
-                .graphicsLayer {
-                    scaleX = 1.8f
-                    scaleY = 1.8f
-                    rotationZ = turn
-                },
-        )
-        Box(
-            Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.5f)),
-        )
+        CoverGradient(now?.artUri)
         Column(
             Modifier
                 .fillMaxSize()
@@ -493,6 +458,13 @@ fun NowPlayingScreen(
                     active = pane == NowPlayingPane.LYRICS,
                     enabled = player.lyrics != null,
                 ) { pane = if (pane == NowPlayingPane.LYRICS) NowPlayingPane.ART else NowPlayingPane.LYRICS }
+                // Where Apple Music has AirPlay: the system's picker of speakers and headphones.
+                val context = LocalContext.current
+                PaneButton(
+                    icon = R.drawable.ic_audio_output,
+                    label = "Play On",
+                    active = false,
+                ) { openAudioOutputPicker(context) }
                 PaneButton(
                     icon = R.drawable.ic_view_list,
                     label = "Queue",
@@ -917,7 +889,8 @@ internal fun Cover(uri: String?, size: Int, corner: Int = 8, round: Boolean = fa
             R.drawable.ic_music_notes,
             contentDescription = null,
             tint = Color.White.copy(alpha = 0.4f),
-            modifier = Modifier.size(if (size > 0) (size * 0.4f).dp else 40.dp),
+            // Without a set size (a cell of a cover grid, a big cover) the note takes 40% of the box.
+            modifier = if (size > 0) Modifier.size((size * 0.4f).dp) else Modifier.fillMaxSize(0.4f),
         )
         if (uri != null) {
             AsyncImage(model = uri, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
@@ -925,8 +898,6 @@ internal fun Cover(uri: String?, size: Int, corner: Int = 8, round: Boolean = fa
     }
 }
 
-/** The size the Now Playing background is drawn from: small enough to look blurred when upscaled. */
-private const val BACKDROP_PX = 32
 
 internal fun formatTime(ms: Long): String {
     val totalSeconds = (ms / 1000).coerceAtLeast(0)

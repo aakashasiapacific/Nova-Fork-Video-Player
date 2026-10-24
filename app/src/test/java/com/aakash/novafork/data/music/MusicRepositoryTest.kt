@@ -190,6 +190,28 @@ class MusicRepositoryTest {
     }
 
     @Test
+    fun aPlaylistRowNamesTheFirstSongOfItsFirstFourAlbums() = runTest {
+        val deviceId = addSource(SourceType.DEVICE)
+        device.songs[deviceId] = listOf(
+            song("a1.mp3", title = "A1", album = "A"),
+            song("a2.mp3", title = "A2", album = "A"),
+            song("b1.mp3", title = "B1", album = "B"),
+            song("c1.mp3", title = "C1", album = "C"),
+            song("d1.mp3", title = "D1", album = "D"),
+            song("e1.mp3", title = "E1", album = "E"),
+        )
+        repository.rescan()
+        val byTitle = repository.observeLibrary().first().songs.associateBy { it.title }
+        val playlistId = repository.createPlaylist("Mix")
+        repository.addToPlaylist(playlistId, listOf("A2", "A1", "B1", "C1", "D1", "E1").map { byTitle.getValue(it).id })
+
+        val ids = repository.observePlaylists().first().single().coverSongIds.orEmpty()
+            .split(',').map { it.toLong() }
+
+        assertEquals(listOf("A2", "B1", "C1", "D1"), ids.map { id -> byTitle.values.single { it.id == id }.title }.sorted())
+    }
+
+    @Test
     fun theWatchlistKeepsTheFirstDate() = runTest {
         repository.addToWatchlist("v:7")
         time = 2_000L

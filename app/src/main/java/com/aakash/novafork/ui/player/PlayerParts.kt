@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -34,6 +35,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
@@ -344,4 +346,30 @@ internal fun <T : Any> rememberLatestNonNull(value: T?): T? {
 
 private class LatestHolder<T : Any> {
     var value: T? = null
+}
+
+/**
+ * The title as the iOS player shows it: bottom left, just above the scrubber, in bold with its
+ * details small and grey beneath.
+ */
+@Composable
+internal fun PlayerTitle(state: PlayerUiState, modifier: Modifier = Modifier, large: Boolean = false) {
+    Column(modifier) {
+        Text(
+            text = state.title,
+            style = if (large) MaterialTheme.typography.titleLarge else MaterialTheme.typography.titleMedium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        val subtitle = state.subtitle
+        if (!subtitle.isNullOrBlank()) {
+            Text(
+                text = subtitle,
+                style = if (large) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.bodySmall,
+                color = Color.White.copy(alpha = 0.72f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
 }

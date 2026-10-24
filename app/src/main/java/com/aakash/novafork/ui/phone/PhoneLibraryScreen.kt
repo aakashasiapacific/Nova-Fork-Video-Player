@@ -1,15 +1,11 @@
 package com.aakash.novafork.ui.phone
 
 import androidx.annotation.DrawableRes
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
@@ -28,13 +24,11 @@ import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
 import com.aakash.novafork.ui.common.EmptyState
-import com.aakash.novafork.ui.common.LocalBottomBarSpace
-import com.aakash.novafork.ui.common.NovaChip
+import com.aakash.novafork.ui.common.IosSegmentedControl
 import com.aakash.novafork.ui.common.NovaDropdownMenu
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.NovaMenuItem
 import com.aakash.novafork.ui.common.ScanBanner
-import com.aakash.novafork.ui.common.VideoMenuBox
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.LibraryFilter
 import com.aakash.novafork.ui.model.LibraryItemUi
@@ -135,21 +129,16 @@ private fun SortMenu(current: LibrarySort, onSelect: (LibrarySort) -> Unit) {
 @Composable
 private fun FilterChipsRow(library: LibraryUi, onSelect: (LibraryFilter) -> Unit) {
     val dims = LocalNovaDimens.current
-    LazyRow(
-        modifier = Modifier.fillMaxWidth(),
-        contentPadding = PaddingValues(horizontal = dims.gutter, vertical = 4.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        items(LibraryFilter.entries.filter { it.isChip }, key = { it.name }) { filter ->
-            val selected = filter == library.filter
-            val count = library.counts[filter]
-            NovaChip(
-                selected = selected,
-                onClick = { onSelect(filter) },
-                label = { Text(if (count != null) "${filter.label} · $count" else filter.label) },
-            )
-        }
-    }
+    // iOS's segmented control, as the TV app's own library filters are drawn.
+    val filters = LibraryFilter.entries.filter { it.isChip }
+    IosSegmentedControl(
+        options = filters.map { it.label },
+        selectedIndex = filters.indexOf(library.filter),
+        onSelect = { onSelect(filters[it]) },
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = dims.gutter, vertical = 4.dp),
+    )
 }
 
 @Composable

@@ -447,7 +447,13 @@ private fun PlaylistsPage(playlists: List<MusicPlaylistRow>, ctx: PageContext) {
                 ListRow(
                     title = playlist.name,
                     subtitle = if (playlist.songCount == 1) "1 song" else "${playlist.songCount} songs",
-                    art = { Cover(ctx.library.songs.firstOrNull { it.id == playlist.coverSongId }?.let(MusicLibrary::artUri), size = 56) },
+                    art = {
+                        // The same 2×2 grid of album covers as the playlist's own page, small.
+                        val ids = playlist.coverSongIds?.split(',')?.mapNotNull { it.toLongOrNull() }
+                            ?: listOfNotNull(playlist.coverSongId)
+                        val songs = ids.mapNotNull { id -> ctx.library.songs.firstOrNull { it.id == id } }
+                        Box(Modifier.size(56.dp).clip(RoundedCornerShape(6.dp))) { PlaylistArtwork(songs, corner = 6) }
+                    },
                     onClick = { ctx.actions.showPlaylist(playlist) },
                 )
             }
@@ -718,10 +724,10 @@ private fun PlaylistPage(playlist: OpenPlaylist, ctx: PageContext) {
  * grid, or the first song's cover while it holds fewer than four albums.
  */
 @Composable
-private fun PlaylistArtwork(songs: List<SongEntity>) {
+private fun PlaylistArtwork(songs: List<SongEntity>, corner: Int = 10) {
     val albums = songs.distinctBy { it.albumKey }
     if (albums.size < 4) {
-        Cover(songs.firstOrNull()?.let(MusicLibrary::artUri), size = 0, corner = 10, modifier = Modifier.fillMaxSize())
+        Cover(songs.firstOrNull()?.let(MusicLibrary::artUri), size = 0, corner = corner, modifier = Modifier.fillMaxSize())
         return
     }
     Column(Modifier.fillMaxSize()) {

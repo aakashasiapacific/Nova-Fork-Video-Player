@@ -55,7 +55,7 @@ internal fun TabletPlayerControls(
     modifier: Modifier = Modifier,
 ) {
     Box(modifier.fillMaxSize()) {
-        ControlScrims(top = 160.dp, bottom = 230.dp)
+        ControlScrims(top = 160.dp, bottom = 280.dp)
         Box(
             Modifier
                 .fillMaxSize()
@@ -108,26 +108,8 @@ private fun TabletTopBar(
             buttonSize = 56.dp,
             iconSize = 28.dp,
         )
-        Spacer(Modifier.width(12.dp))
-        Column(Modifier.weight(1f)) {
-            Text(
-                text = state.title,
-                style = MaterialTheme.typography.titleLarge,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            val subtitle = state.subtitle
-            if (!subtitle.isNullOrBlank()) {
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Color.White.copy(alpha = 0.72f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-        }
-        Spacer(Modifier.width(12.dp))
+        // The title sits above the scrubber, as on iOS.
+        Spacer(Modifier.weight(1f))
         CastButton(
             castingTo = state.castingTo,
             onClick = { onOpenSheet(PlayerSheet.CAST) },
@@ -236,6 +218,7 @@ private fun TabletBottomBar(
             .fillMaxWidth()
             .padding(start = 20.dp, end = 20.dp, bottom = 12.dp),
     ) {
+        PlayerTitle(state, Modifier.padding(start = 4.dp, end = 4.dp, bottom = 8.dp), large = true)
         PlayerSeekBar(
             state = state,
             actions = actions,

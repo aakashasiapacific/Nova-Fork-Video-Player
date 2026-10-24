@@ -33,8 +33,8 @@ private val CenterButtonSize = 52.dp
 private val CenterIconSize = 32.dp
 
 /**
- * Phone controls: compact top bar (back, title, cast, subtitles, audio, more), centre transport
- * row, seek bar and an icon row at the bottom. Track pickers open in [TrackSheet] via
+ * Phone controls: compact top bar (back, cast, subtitles, audio, more), centre transport row,
+ * then at the bottom the title, seek bar and an icon row, as iOS lays its player out. Track pickers open in [TrackSheet] via
  * [onOpenPanel]; the queue and cast devices in a sheet via [onOpenSheet].
  */
 @Composable
@@ -49,7 +49,7 @@ internal fun PhonePlayerControls(
     modifier: Modifier = Modifier,
 ) {
     Box(modifier.fillMaxSize()) {
-        ControlScrims(top = 112.dp, bottom = 168.dp)
+        ControlScrims(top = 112.dp, bottom = 210.dp)
         Box(
             Modifier
                 .fillMaxSize()
@@ -94,28 +94,8 @@ private fun PhoneTopBar(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         PlayerIconButton(icon = R.drawable.ic_arrow_back, contentDescription = "Back", onClick = actions::close)
-        Column(
-            Modifier
-                .weight(1f)
-                .padding(horizontal = 4.dp),
-        ) {
-            Text(
-                text = state.title,
-                style = MaterialTheme.typography.titleMedium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            val subtitle = state.subtitle
-            if (!subtitle.isNullOrBlank()) {
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Color.White.copy(alpha = 0.72f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-        }
+        // The title sits above the scrubber, as on iOS.
+        Spacer(Modifier.weight(1f))
         CastButton(castingTo = state.castingTo, onClick = { onOpenSheet(PlayerSheet.CAST) })
         PlayerIconButton(
             icon = if (subtitlesOn(state.subtitleTracks)) R.drawable.ic_subtitles else R.drawable.ic_subtitles_off,
@@ -221,6 +201,7 @@ private fun PhoneBottomBar(
             .fillMaxWidth()
             .padding(start = 4.dp, end = 4.dp, bottom = 4.dp),
     ) {
+        PlayerTitle(state, Modifier.padding(start = 12.dp, end = 12.dp, bottom = 6.dp))
         PlayerSeekBar(
             state = state,
             actions = actions,

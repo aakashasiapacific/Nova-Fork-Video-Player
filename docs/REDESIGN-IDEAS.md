@@ -458,3 +458,9 @@ The owner asked for Apple Music to be copied more precisely, with less clutter. 
 - **iPad video page (build 91):** only Play (and Start Over) stay as buttons; Identify, Change Artwork, Mark as Watched and Add to Playlist move into one round "…", as on the Apple TV app's iPad pages. Preferences' "Not allowed" drops to the regular grey subtitle style.
 - **Time left (build 92):** the video player's scrubber shows "−time left" on the right by default, as the iOS player does; a tap still switches to the full length.
 - **Swipe tick (build 93):** swiping a row to delete gives a light tick at the point where letting go deletes it, as iOS does.
+- **Build 94 (owner's list):**
+  - Now Playing's background is a still gradient in the cover's colours, as Apple Music paints it, crossfading between songs; the turning cover is gone (`CoverGradient`).
+  - A speaker button between Lyrics and Queue, where Apple Music has AirPlay, opens Android's output picker (phone, Bluetooth, cast devices).
+  - Playlists in the list show the same 2×2 grid of album covers as their own page.
+  - The library's All / Movies / TV Shows pills are an iOS segmented control.
+  - The video player's title sits at the bottom left above the scrubber, as on iOS.

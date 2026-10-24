@@ -81,6 +81,8 @@ data class MusicPlaylistRow(
     val songCount: Int,
     /** The first shown song, for the cover. */
     val coverSongId: Long?,
+    /** The first song of each of its first four albums, comma-separated, for a 2×2 cover grid. */
+    val coverSongIds: String? = null,
 )
 
 /**
@@ -101,7 +103,13 @@ interface PlaylistSongDao {
             "(SELECT ps.songId FROM playlist_songs ps JOIN songs s ON s.id = ps.songId " +
             "WHERE ps.playlistId = p.id AND s.present = 1 " +
             "AND s.sourceId IN (SELECT so.id FROM sources so WHERE so.enabled = 1) " +
-            "ORDER BY ps.`position`, ps.id LIMIT 1) AS coverSongId " +
+            "ORDER BY ps.`position`, ps.id LIMIT 1) AS coverSongId, " +
+            // SQLite takes a grouped row's bare column from the row MIN picked: each album's first song.
+            "(SELECT group_concat(sid) FROM (SELECT ps.songId AS sid, MIN(ps.`position`) AS pos " +
+            "FROM playlist_songs ps JOIN songs s ON s.id = ps.songId " +
+            "WHERE ps.playlistId = p.id AND s.present = 1 " +
+            "AND s.sourceId IN (SELECT so.id FROM sources so WHERE so.enabled = 1) " +
+            "GROUP BY s.albumKey ORDER BY pos LIMIT 4)) AS coverSongIds " +
             "FROM playlists p WHERE EXISTS (SELECT 1 FROM playlist_songs ps WHERE ps.playlistId = p.id) " +
             "OR NOT EXISTS (SELECT 1 FROM playlist_items i WHERE i.playlistId = p.id) " +
             "ORDER BY p.updatedAt DESC, p.id DESC",

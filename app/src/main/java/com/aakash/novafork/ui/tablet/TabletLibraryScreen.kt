@@ -1,6 +1,5 @@
 package com.aakash.novafork.ui.tablet
 
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,8 +17,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -36,7 +33,7 @@ import com.aakash.novafork.R
 import com.aakash.novafork.ui.adaptive.DeviceLayout
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
 import com.aakash.novafork.ui.common.EmptyState
-import com.aakash.novafork.ui.common.NovaChip
+import com.aakash.novafork.ui.common.IosSegmentedControl
 import com.aakash.novafork.ui.common.NovaDropdownMenu
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.NovaMenuItem
@@ -186,29 +183,16 @@ private fun LibraryHeader(library: LibraryUi, actions: AppActions, stacked: Bool
 
 @Composable
 private fun FilterChipRow(library: LibraryUi, onFilter: (LibraryFilter) -> Unit, modifier: Modifier = Modifier) {
-    Row(
-        modifier.horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        // "Videos" left the library (owner): unidentified files are in All videos' timeline.
-        LibraryFilter.entries.filter { it.isChip }.forEach { filter ->
-            val selected = filter == library.filter
-            val count = library.counts[filter]
-            NovaChip(
-                selected = selected,
-                onClick = { onFilter(filter) },
-                label = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(filter.label)
-                        if (count != null) {
-                            Spacer(Modifier.width(6.dp))
-                            Text(count.toString(), color = LocalContentColor.current.copy(alpha = 0.65f))
-                        }
-                    }
-                },
-            )
-        }
+    // iOS's segmented control; "Videos" left the library (owner): unidentified files are in All
+    // videos' timeline.
+    val filters = LibraryFilter.entries.filter { it.isChip }
+    Box(modifier) {
+        IosSegmentedControl(
+            options = filters.map { it.label },
+            selectedIndex = filters.indexOf(library.filter),
+            onSelect = { onFilter(filters[it]) },
+            modifier = Modifier.width(420.dp),
+        )
     }
 }
 
