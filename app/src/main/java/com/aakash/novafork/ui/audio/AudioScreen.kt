@@ -122,6 +122,7 @@ import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.NovaMenuItem
 import com.aakash.novafork.ui.common.NovaTextField
 import com.aakash.novafork.ui.common.OnTabReselect
+import com.aakash.novafork.ui.common.stretchWithPull
 import com.aakash.novafork.ui.theme.AudioTheme
 import com.aakash.novafork.ui.theme.NovaColors
 
@@ -395,7 +396,7 @@ private fun LibraryHome(
     AudioPage("Library") {
         row("title") {
             Row(Modifier.padding(top = 20.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("Library", fontSize = 34.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                Text("Library", fontSize = 34.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f).stretchWithPull())
                 MoreButton("Library options") { close ->
                     NovaMenuItem(
                         text = { Text("Rescan Library") },
@@ -844,7 +845,7 @@ private fun LazyGridScope.header(title: String, ctx: PageContext) {
             fontWeight = FontWeight.Bold,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(top = 4.dp, bottom = 12.dp),
+            modifier = Modifier.padding(top = 4.dp, bottom = 12.dp).stretchWithPull(),
         )
     }
 }

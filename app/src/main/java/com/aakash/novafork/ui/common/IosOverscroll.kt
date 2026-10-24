@@ -18,6 +18,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
@@ -122,6 +123,25 @@ internal fun Modifier.iosOverscroll(onPullClose: (() -> Unit)? = null, pullState
  * for headers that stretch into the gap; read it in a draw or layer block.
  */
 internal val LocalPagePull = staticCompositionLocalOf<() -> Float> { { 0f } }
+
+/**
+ * iOS's large title stretch: pulling the page down past its top makes its big title grow a
+ * little from its left edge, and it settles back with the bounce.
+ */
+@Composable
+internal fun Modifier.stretchWithPull(): Modifier {
+    val pull = LocalPagePull.current
+    return graphicsLayer {
+        val grow = 1f + (pull() / TITLE_STRETCH_PX_PER_PERCENT / 100f).coerceIn(0f, MAX_TITLE_STRETCH)
+        scaleX = grow
+        scaleY = grow
+        transformOrigin = TransformOrigin(0f, 1f)
+    }
+}
+
+/** Pulled 4 px per percent of growth, up to 12% larger. */
+private const val TITLE_STRETCH_PX_PER_PERCENT = 4f
+private const val MAX_TITLE_STRETCH = 0.12f
 
 /**
  * A grid's items fade up one after another the first time they are shown (iOS), keyed so an item

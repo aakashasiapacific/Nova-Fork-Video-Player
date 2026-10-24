@@ -122,11 +122,20 @@ object IosColors {
 val Hairline = 0.5.dp
 
 /**
- * iOS's switch: a 51×31 green pill with a white knob that slides across. [onCheckedChange] null
- * means the row around it does the toggling (as SwitchRow does) and the switch only shows state.
+ * iOS's switch: a 51×31 green pill with a white knob that slides across, with a light tick each
+ * time it flips. [onCheckedChange] null means the row around it does the toggling (as SwitchRow
+ * does) and the switch only shows state.
  */
 @Composable
 fun IosSwitch(checked: Boolean, onCheckedChange: ((Boolean) -> Unit)?, modifier: Modifier = Modifier, enabled: Boolean = true) {
+    val haptics = LocalHapticFeedback.current
+    var shownChecked by remember { mutableStateOf(checked) }
+    LaunchedEffect(checked) {
+        if (checked != shownChecked) {
+            shownChecked = checked
+            haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+        }
+    }
     val track by animateColorAsState(if (checked) IosColors.Green else IosColors.SwitchOff, label = "switchTrack")
     val knobX by animateDpAsState(
         targetValue = if (checked) 22.dp else 2.dp,

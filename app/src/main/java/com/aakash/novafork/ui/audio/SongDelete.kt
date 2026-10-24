@@ -11,9 +11,6 @@ import android.provider.MediaStore
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -23,10 +20,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import com.aakash.novafork.R
 import com.aakash.novafork.data.db.SongEntity
-import com.aakash.novafork.ui.common.IosColors
+import com.aakash.novafork.ui.common.IosActionSheet
 import com.aakash.novafork.ui.common.LocalHud
-import com.aakash.novafork.ui.common.NovaAlertDialog
-import com.aakash.novafork.ui.common.NovaIcon
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -111,35 +106,24 @@ internal fun SongDeleteDialog(request: SongDeleteRequest?, actions: AudioActions
 
     if (request == null) return
     val toBin = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && request.songs.all { it.uri.startsWith("content://media/") }
-    NovaAlertDialog(
-        onDismissRequest = onClose,
-        icon = { NovaIcon(R.drawable.ic_delete, contentDescription = null) },
-        title = { Text("Delete ${request.label}?") },
-        text = {
-            Text(
-                if (toBin) {
-                    "It moves to your phone's bin, where it can be restored for 30 days."
-                } else {
-                    "Songs in picked folders have no bin: the file is deleted for good."
-                },
-            )
+    // iOS asks from the bottom, in thumb reach (owner).
+    IosActionSheet(
+        title = "Delete ${request.label}?",
+        message = if (toBin) {
+            "It moves to your phone's bin, where it can be restored for 30 days."
+        } else {
+            "Songs in picked folders have no bin: the file is deleted for good."
         },
-        confirmButton = {
-            TextButton(
-                onClick = {
-                    onClose()
-                    if (toBin && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                        val uris = request.songs.map { Uri.parse(it.uri) }
-                        ask(request, MediaStore.createTrashRequest(context.contentResolver, uris, true).intentSender)
-                    } else {
-                        deleteFiles(request)
-                    }
-                },
-                colors = ButtonDefaults.textButtonColors(contentColor = IosColors.Red),
-            ) {
-                Text(if (toBin) "Delete" else "Delete for Good")
+        actionLabel = if (toBin) "Delete" else "Delete for Good",
+        onAction = {
+            onClose()
+            if (toBin && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                val uris = request.songs.map { Uri.parse(it.uri) }
+                ask(request, MediaStore.createTrashRequest(context.contentResolver, uris, true).intentSender)
+            } else {
+                deleteFiles(request)
             }
         },
-        dismissButton = { TextButton(onClick = onClose) { Text("Cancel") } },
+        onDismiss = onClose,
     )
 }

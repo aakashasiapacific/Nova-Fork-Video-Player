@@ -4,6 +4,7 @@ import androidx.annotation.DrawableRes
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.ContentTransform
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.SeekableTransitionState
@@ -487,6 +488,7 @@ private fun PhoneNavigationBar(
     modifier: Modifier = Modifier,
 ) {
     val haptics = LocalHapticFeedback.current
+    val scope = rememberCoroutineScope()
     Column(
         modifier
             .fillMaxWidth()
@@ -497,6 +499,8 @@ private fun PhoneNavigationBar(
             TopDestination.entries.forEach { tab ->
                 val active = tab == selected
                 val tint = if (active) tab.activeColor() else IosColors.SecondaryLabel
+                // iOS 17's symbol bounce: the tapped tab's icon dips and springs back.
+                val bounce = remember { Animatable(1f) }
                 Column(
                     Modifier
                         .weight(1f)
@@ -505,6 +509,10 @@ private fun PhoneNavigationBar(
                             selected = active,
                             onClick = {
                                 if (!active) haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                scope.launch {
+                                    bounce.snapTo(TabBounceFrom)
+                                    bounce.animateTo(1f, spring(dampingRatio = 0.4f, stiffness = 600f))
+                                }
                                 onSelect(tab)
                             },
                             role = Role.Tab,
@@ -514,7 +522,17 @@ private fun PhoneNavigationBar(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center,
                 ) {
-                    NovaIcon(tab.tabIconRes(), contentDescription = null, tint = tint, modifier = Modifier.size(25.dp))
+                    NovaIcon(
+                        tab.tabIconRes(),
+                        contentDescription = null,
+                        tint = tint,
+                        modifier = Modifier
+                            .size(25.dp)
+                            .graphicsLayer {
+                                scaleX = bounce.value
+                                scaleY = bounce.value
+                            },
+                    )
                     Text(
                         tab.label,
                         style = MaterialTheme.typography.labelSmall,
@@ -656,6 +674,9 @@ private val StatusFade = 14.dp
 private const val StatusFadeStrength = 0.6f
 
 private val TabBarHeight = 52.dp
+
+/** How small a tapped tab's icon dips before it springs back. */
+private const val TabBounceFrom = 0.8f
 
 /** iOS's dark tab bar material: near-black and a little see-through. */
 private val DockColor = Color(0xF2121214)

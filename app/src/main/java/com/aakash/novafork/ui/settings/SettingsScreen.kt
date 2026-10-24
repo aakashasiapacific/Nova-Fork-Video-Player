@@ -43,6 +43,7 @@ import com.aakash.novafork.ui.adaptive.DeviceLayout
 import com.aakash.novafork.ui.common.CollapsedTitleBar
 import com.aakash.novafork.ui.common.IosColors
 import com.aakash.novafork.ui.common.OnTabReselect
+import com.aakash.novafork.ui.common.stretchWithPull
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.SettingsUi
 
@@ -92,7 +93,7 @@ private fun PhoneSettings(state: SettingsUi, actions: AppActions, modifier: Modi
                 Text(
                     text = "Preferences",
                     style = MaterialTheme.typography.headlineLarge,
-                    modifier = Modifier.padding(start = 4.dp, top = 16.dp, bottom = 4.dp),
+                    modifier = Modifier.padding(start = 4.dp, top = 16.dp, bottom = 4.dp).stretchWithPull(),
                 )
             }
             for ((section, groups) in sections) {

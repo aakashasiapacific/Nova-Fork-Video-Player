@@ -65,7 +65,7 @@ fun ArtImage(
             val model = remember(current) {
                 ImageRequest.Builder(context)
                     .data(current)
-                    .crossfade(true)
+                    .crossfade(ART_FADE_MS)
                     .apply {
                         if (current == frameSource) {
                             if (frameAtMs != null) videoFrameMillis(frameAtMs) else videoFramePercent(0.1)
@@ -238,3 +238,6 @@ internal fun Modifier.shimmer(): Modifier {
         )
     }
 }
+
+/** How long a poster or backdrop takes to fade in as it arrives. */
+private const val ART_FADE_MS = 250

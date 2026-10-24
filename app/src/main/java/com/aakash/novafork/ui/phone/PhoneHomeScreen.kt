@@ -91,6 +91,7 @@ import com.aakash.novafork.ui.model.HeroUi
 import com.aakash.novafork.ui.model.HomeUi
 import com.aakash.novafork.ui.model.LibraryFilter
 import com.aakash.novafork.ui.model.LibraryItemUi
+import com.aakash.novafork.ui.model.MediaKind
 import com.aakash.novafork.ui.model.PermissionUi
 import com.aakash.novafork.ui.model.Route
 import com.aakash.novafork.ui.model.ScanUi
@@ -302,6 +303,12 @@ private fun WatchlistRow(items: List<LibraryItemUi>, actions: AppActions) {
     }
 }
 
+/** A Continue Watching card's caption. */
+private fun continueCaption(card: VideoCardUi): String? {
+    val left = remainingLabel(card) ?: return card.displaySubtitle()
+    return if (card.kind == MediaKind.EPISODE) metaLine(card.displaySubtitle(), left).ifEmpty { null } else left
+}
+
 @Composable
 private fun LandscapeRow(cards: List<VideoCardUi>, actions: AppActions) {
     val dims = LocalNovaDimens.current
@@ -331,7 +338,8 @@ private fun LandscapeRow(cards: List<VideoCardUi>, actions: AppActions) {
                     card = card,
                     onClick = { actions.play(card.id) },
                     onLongClick = openMenu,
-                    subtitle = metaLine(card.displaySubtitle(), remainingLabel(card)).ifEmpty { null },
+                    // Apple TV's caption: what is left ("42m left"); an episode keeps its "S1 · E3".
+                    subtitle = continueCaption(card),
                 )
             }
         }

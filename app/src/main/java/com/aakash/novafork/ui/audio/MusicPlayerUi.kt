@@ -11,6 +11,8 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -260,6 +262,9 @@ fun CoverFlight(artUri: String?) {
             },
     )
 }
+
+/** What the big cover shows, and where in the queue, so a skip knows which way to slide. */
+private data class CoverSlide(val artUri: String?, val songId: Long?, val index: Int)
 
 /** How long lyrics scrolled by hand stay lit and unfollowed after the finger lifts. */
 private const val LYRICS_BROWSE_MS = 3_000L
@@ -632,7 +637,10 @@ fun NowPlayingScreen(
     }
 }
 
-/** Title (scrolling when it is too long, as in Apple Music) and artist, or the player's error. */
+/**
+ * Title and artist, each scrolling sideways when too long for its line (a pause, a slow pass,
+ * a pause), as in Apple Music; or the player's error.
+ */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun SongTitles(player: MusicPlayerState, modifier: Modifier = Modifier, small: Boolean = false) {
@@ -646,12 +654,14 @@ private fun SongTitles(player: MusicPlayerState, modifier: Modifier = Modifier, 
             maxLines = 1,
             modifier = Modifier.basicMarquee(initialDelayMillis = 2_000),
         )
+        val error = player.error
         Text(
-            player.error ?: listOfNotNull(now?.artist, now?.album.takeUnless { small }).joinToString(" — "),
+            error ?: listOfNotNull(now?.artist, now?.album.takeUnless { small }).joinToString(" — "),
             fontSize = if (small) 15.sp else 18.sp,
-            color = if (player.error != null) NovaColors.AppleMusicRed else Color.White.copy(alpha = 0.6f),
+            color = if (error != null) NovaColors.AppleMusicRed else Color.White.copy(alpha = 0.6f),
             maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
+            overflow = if (error != null) TextOverflow.Ellipsis else TextOverflow.Clip,
+            modifier = if (error != null) Modifier else Modifier.basicMarquee(initialDelayMillis = 2_000),
         )
     }
 }
@@ -753,12 +763,27 @@ private fun BigCover(player: MusicPlayerState) {
             contentAlignment = Alignment.Center,
         ) {
             NovaIcon(R.drawable.ic_music_notes, contentDescription = null, tint = Color.White.copy(alpha = 0.4f), modifier = Modifier.size(side / 3))
-            AsyncImage(
-                model = player.nowPlaying?.artUri,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
+            // Skipping slides the old cover out and the new one in from the side it comes from
+            // (next from the right, previous from the left), as Apple Music does.
+            AnimatedContent(
+                targetState = CoverSlide(player.nowPlaying?.artUri, player.nowPlaying?.songId, player.queueIndex),
+                transitionSpec = {
+                    val forward = targetState.index >= initialState.index
+                    val slide = spring<IntOffset>(dampingRatio = 0.9f, stiffness = 420f)
+                    (slideInHorizontally(slide) { if (forward) it else -it } + fadeIn(tween(160))) togetherWith
+                        (slideOutHorizontally(slide) { if (forward) -it else it } + fadeOut(tween(160)))
+                },
+                contentKey = { it.songId },
                 modifier = Modifier.fillMaxSize(),
-            )
+                label = "coverSlide",
+            ) { cover ->
+                AsyncImage(
+                    model = cover.artUri,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
         }
     }
 }

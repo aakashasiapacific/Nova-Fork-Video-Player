@@ -20,7 +20,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
@@ -43,6 +42,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import com.aakash.novafork.R
+import com.aakash.novafork.ui.common.IosActionSheet
 import com.aakash.novafork.ui.common.IosColors
 import com.aakash.novafork.ui.common.IosGrabber
 import com.aakash.novafork.ui.common.IosSheetShape
@@ -185,27 +185,17 @@ internal fun PlaylistNameDialog(
 
 @Composable
 internal fun ConfirmDeleteVideoDialog(title: String, toBin: Boolean, onConfirm: () -> Unit, onDismiss: () -> Unit) {
-    NovaAlertDialog(
-        onDismissRequest = onDismiss,
-        icon = { NovaIcon(R.drawable.ic_delete, contentDescription = null) },
-        title = { Text("Delete $title?") },
-        text = {
-            Text(
-                if (toBin) {
-                    "It moves to Recently Deleted (Home › Library), where you can restore it for 30 days."
-                } else {
-                    "Videos in picked folders have no bin: the file is deleted for good."
-                },
-            )
+    // iOS asks from the bottom, in thumb reach (owner).
+    IosActionSheet(
+        title = "Delete $title?",
+        message = if (toBin) {
+            "It moves to Recently Deleted (Home › Library), where you can restore it for 30 days."
+        } else {
+            "Videos in picked folders have no bin: the file is deleted for good."
         },
-        confirmButton = {
-            TextButton(onClick = onConfirm, colors = ButtonDefaults.textButtonColors(contentColor = IosColors.Red)) {
-                Text(if (toBin) "Delete" else "Delete for Good")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
-        },
+        actionLabel = if (toBin) "Delete" else "Delete for Good",
+        onAction = onConfirm,
+        onDismiss = onDismiss,
     )
 }
 

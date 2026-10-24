@@ -546,3 +546,13 @@ The owner asked for Apple Music to be copied more precisely, with less clutter. 
   - Songs: swipe right for Play Next (blue), left for Delete (red, asks first; in a playlist it takes the song out of the playlist). A swipe starting at the left edge still goes back.
   - The app icon's long-press shortcuts: Continue the video left off most recently, and Search.
   - Pull to refresh: the spinner's spokes appear one by one as the page is pulled and turn with it, with a tick when letting go will refresh.
+- **Build 116 (owner, all in one go):**
+  - The tapped tab's icon dips and springs back (iOS 17's symbol bounce).
+  - Big titles (Audio's Library and its pages, Preferences, Search) grow a little from their left edge when the page is pulled down, and settle back.
+  - Continue Watching cards say what is left ("42m left"); an episode keeps its "S1 · E3" before it.
+  - Pictures fade in over 250 ms as they arrive instead of Coil's quick 100 ms.
+  - Now Playing: skipping slides the cover out and the next one in from the side it comes from; the artist line now scrolls when too long, as the title already did.
+  - Delete confirmations (videos and songs) rise from the bottom as iOS's action sheet: the question small and grey, a red Delete, Cancel below.
+  - Scrolling search results puts the keyboard away.
+  - Switches tick wherever they are flipped (the switch itself does it now).
+  - Not done: the grabber that bends into a chevron, since Now Playing has no grabber line by the owner's earlier choice.

@@ -31,8 +31,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -212,13 +210,10 @@ internal fun SwitchRow(
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
 ) {
-    val haptics = LocalHapticFeedback.current
+    // The switch itself ticks as it flips.
     RowSurface(
         shape = shape,
-        interaction = Modifier.toggleable(value = checked, role = Role.Switch) { on ->
-            haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-            onCheckedChange(on)
-        },
+        interaction = Modifier.toggleable(value = checked, role = Role.Switch, onValueChange = onCheckedChange),
     ) {
         RowIcon(icon)
         RowTexts(title, summary, Modifier.weight(1f))

@@ -50,8 +50,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.TextRange
@@ -72,8 +76,10 @@ import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.OnTabReselect
 import com.aakash.novafork.ui.common.glass
 import com.aakash.novafork.ui.common.musicSearchResults
+import com.aakash.novafork.ui.common.stretchWithPull
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.SearchUi
+import kotlin.math.abs
 
 @Composable
 fun PhoneSearchScreen(
@@ -113,15 +119,26 @@ fun PhoneSearchScreen(
     val imeBottom = WindowInsets.ime.asPaddingValues().calculateBottomPadding()
     val fieldBottom = maxOf(imeBottom, barSpace) + 8.dp
     val listSpace = fieldBottom + SearchFieldHeight + 8.dp
+    // Scrolling the results puts the keyboard away, so more of them show (iOS).
+    val currentKeyboard by rememberUpdatedState(keyboard)
+    val hideOnScroll = remember {
+        object : NestedScrollConnection {
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                if (source == NestedScrollSource.UserInput && abs(available.y) > 1f) currentKeyboard?.hide()
+                return Offset.Zero
+            }
+        }
+    }
     Box(modifier.fillMaxSize()) {
-        Column(Modifier.fillMaxSize()) {
+        Column(Modifier.fillMaxSize().nestedScroll(hideOnScroll)) {
             Text(
                 "Search",
                 style = MaterialTheme.typography.headlineLarge,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier
                     .statusBarsPadding()
-                    .padding(start = dims.gutter, end = dims.gutter, top = 16.dp, bottom = 8.dp),
+                    .padding(start = dims.gutter, end = dims.gutter, top = 16.dp, bottom = 8.dp)
+                    .stretchWithPull(),
             )
             val query = search.query.trim()
             // Lists end above the field; results show what was typed in bold.
