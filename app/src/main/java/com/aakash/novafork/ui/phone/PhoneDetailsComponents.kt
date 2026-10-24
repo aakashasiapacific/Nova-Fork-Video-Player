@@ -4,6 +4,7 @@ import androidx.annotation.DrawableRes
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
@@ -27,6 +28,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
@@ -34,6 +36,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -44,13 +47,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -63,7 +70,9 @@ import com.aakash.novafork.ui.adaptive.LocalNovaDimens
 import com.aakash.novafork.ui.common.ArtImage
 import com.aakash.novafork.ui.common.ArtPlaceholder
 import com.aakash.novafork.ui.common.BackdropArt
+import com.aakash.novafork.ui.common.Hairline
 import com.aakash.novafork.ui.common.HeroTitle
+import com.aakash.novafork.ui.common.IosColors
 import com.aakash.novafork.ui.common.NovaDropdownMenu
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.PosterArt
@@ -357,36 +366,89 @@ internal fun ScrimIconButton(
 
 /**
  * Back button and optional overflow menu floating over the details page. [menu] receives a
- * `close` callback for its items.
+ * `close` callback for its items. Once the page's own big [title] has scrolled away ([collapsed]
+ * going from 0 to 1), the bar turns into iOS's: dark, with a hairline and the title small in
+ * the middle.
  */
 @Composable
 internal fun PhoneDetailsTopBar(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    title: String? = null,
+    collapsed: () -> Float = { 0f },
     menu: (@Composable (close: () -> Unit) -> Unit)? = null,
 ) {
-    Row(
+    Box(
         modifier
             .fillMaxWidth()
             // Keeps the status bar icons readable over bright artwork and scrolled content.
             .background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.45f), Color.Transparent)))
+            .drawBehind {
+                val shown = collapsed()
+                if (shown > 0f) {
+                    drawRect(CollapsedBarColor.copy(alpha = CollapsedBarColor.alpha * shown))
+                    drawRect(
+                        IosColors.Separator.copy(alpha = IosColors.Separator.alpha * shown),
+                        topLeft = Offset(0f, size.height - Hairline.toPx()),
+                        size = Size(size.width, Hairline.toPx()),
+                    )
+                }
+            }
             .statusBarsPadding()
             .padding(horizontal = 8.dp, vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
     ) {
-        ScrimIconButton(R.drawable.ic_arrow_back, contentDescription = "Back", onClick = onBack)
-        Spacer(Modifier.weight(1f))
-        if (menu != null) {
-            var expanded by remember { mutableStateOf(false) }
-            Box {
-                ScrimIconButton(R.drawable.ic_more_vert, contentDescription = "More options", onClick = { expanded = true })
-                NovaDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                    menu { expanded = false }
+        if (title != null) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = Color.White,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .padding(horizontal = 56.dp)
+                    .graphicsLayer {
+                        val shown = collapsed()
+                        alpha = shown
+                        // It rises into place as it fades in, as iOS's does.
+                        translationY = (1f - shown) * 6.dp.toPx()
+                    },
+            )
+        }
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            ScrimIconButton(R.drawable.ic_arrow_back, contentDescription = "Back", onClick = onBack)
+            Spacer(Modifier.weight(1f))
+            if (menu != null) {
+                var expanded by remember { mutableStateOf(false) }
+                Box {
+                    ScrimIconButton(R.drawable.ic_more_vert, contentDescription = "More options", onClick = { expanded = true })
+                    NovaDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                        menu { expanded = false }
+                    }
                 }
             }
         }
     }
 }
+
+/**
+ * How far the details page's own title has scrolled out from under the top bar, eased: 0 while the
+ * header shows, 1 once the bar should carry the title.
+ */
+@Composable
+internal fun rememberTitleCollapse(listState: LazyListState, backdropHeight: Dp): () -> Float {
+    val thresholdPx = with(LocalDensity.current) { backdropHeight.toPx() }
+    val gone by remember(listState, thresholdPx) {
+        derivedStateOf { listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > thresholdPx }
+    }
+    val shown by animateFloatAsState(if (gone) 1f else 0f, tween(200), label = "titleCollapse")
+    return { shown }
+}
+
+/** iOS's bar material once content runs under it. */
+private val CollapsedBarColor = Color(0xF2121214)
 
 /** Shown while details for the current route are loading. */
 @Composable

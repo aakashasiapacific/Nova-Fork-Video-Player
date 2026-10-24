@@ -3,12 +3,15 @@ package com.aakash.novafork.ui.phone
 import androidx.annotation.DrawableRes
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.updateTransition
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
@@ -56,7 +59,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.movableContentOf
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -65,13 +71,18 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.TransformOrigin
@@ -82,6 +93,7 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.Role
@@ -104,6 +116,7 @@ import com.aakash.novafork.ui.common.Hairline
 import com.aakash.novafork.ui.common.IosColors
 import com.aakash.novafork.ui.common.LocalBottomBarSpace
 import com.aakash.novafork.ui.common.LocalMenuFocus
+import com.aakash.novafork.ui.common.LocalPagePull
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.activeColor
 import com.aakash.novafork.ui.common.iosOverscroll
@@ -117,6 +130,7 @@ import com.aakash.novafork.ui.model.TopDestination
 import com.aakash.novafork.ui.model.top
 import com.aakash.novafork.ui.settings.SettingsScreen
 import com.aakash.novafork.ui.theme.NovaColors
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 /**
@@ -151,6 +165,39 @@ fun PhoneApp(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
     // While a poster's menu is open the whole shell blurs and dims behind it (iOS).
     val menuFocus = remember { mutableStateOf(0) }
     val menuDim by animateFloatAsState(if (menuFocus.value > 0) 1f else 0f, tween(220), label = "menuDim")
+    val backSwipe = remember { BackSwipe() }
+    // Each page's content, movable: a page uncovered by a swipe back moves into place with its
+    // scroll position and everything else intact, instead of being built again.
+    val currentActions by rememberUpdatedState(actions)
+    val pageContents = remember { mutableMapOf<Route, @Composable (AppUiState) -> Unit>() }
+    fun pageFor(route: Route): @Composable (AppUiState) -> Unit = pageContents.getOrPut(route) {
+        movableContentOf { pageState: AppUiState ->
+            pageStates.SaveableStateProvider(route.toString()) {
+                // iOS's edge bounce on every page; a movie or show page also closes when pulled
+                // down from its top, shrinking back toward its poster.
+                val pull = remember { mutableFloatStateOf(0f) }
+                val readPull = remember { { pull.floatValue } }
+                CompositionLocalProvider(LocalPagePull provides readPull) {
+                    Box(
+                        Modifier
+                            .fillMaxSize()
+                            .iosOverscroll(
+                                onPullClose = if (route.isTitlePage()) ({ currentActions.back() }) else null,
+                                pullState = pull,
+                            ),
+                    ) {
+                        PhonePage(state = pageState, actions = currentActions)
+                    }
+                }
+            }
+        }
+    }
+    SideEffect {
+        // Only the lambdas are kept (a page's state lives in the composition); the map stays small.
+        if (pageContents.size > MaxPageContents) {
+            pageContents.keys.retainAll(setOfNotNull(state.route, state.previousRoute))
+        }
+    }
     CompositionLocalProvider(
         LocalNowPlayingSheet provides nowPlayingSheet,
         LocalMenuFocus provides menuFocus,
@@ -177,9 +224,20 @@ fun PhoneApp(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
             CompositionLocalProvider(LocalBottomBarSpace provides barSpace, LocalOverscrollConfiguration provides null) {
                 // Keyed by route, so state updates within a page recompose it in place, while a route
                 // change crossfades and the outgoing page keeps showing the state it was built with.
-                AnimatedContent(
-                    targetState = state,
-                    modifier = Modifier
+                val routeTransition = updateTransition(state, label = "phoneRoute")
+                val transitionIdle = routeTransition.currentState.route == routeTransition.targetState.route
+                val background = MaterialTheme.colorScheme.background
+                LaunchedEffect(state.route) {
+                    // Back has landed on the page that was uncovered: once the swiped-away page has
+                    // left, the swipe is over.
+                    if (backSwipe.committed && backSwipe.from != state.route) {
+                        snapshotFlow { routeTransition.currentState.route == routeTransition.targetState.route }.first { it }
+                        withFrameNanos { }
+                        backSwipe.reset()
+                    }
+                }
+                Box(
+                    Modifier
                         .fillMaxSize()
                         // Under Now Playing the page sinks back, smaller, rounded and dimmed, and
                         // comes forward again as Now Playing is pulled down (iOS's sheet stack).
@@ -196,39 +254,85 @@ fun PhoneApp(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
                             val open = nowPlayingSheet.openFraction
                             if (open > 0f) drawRect(Color.Black.copy(alpha = 0.4f * open))
                         }
-                        .swipeBetweenTabs(top, enabled = !state.canGoBack, onSelect = actions::selectTab, onBack = actions::back)
+                        .swipeBetweenTabs(top, enabled = !state.canGoBack, onSelect = actions::selectTab)
+                        .swipeBack(
+                            swipe = backSwipe,
+                            route = state.route,
+                            enabled = state.canGoBack && state.previousRoute != null && transitionIdle,
+                            onBack = actions::back,
+                        )
                         .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)),
-                    transitionSpec = {
-                        val fade = fadeIn(tween(durationMillis = 220, delayMillis = 40)) togetherWith fadeOut(tween(durationMillis = 140))
-                        val from = initialState.route
-                        val to = targetState.route
-                        when {
-                            from.top != to.top -> tabSlide(from = from.top, to = to.top, fade = fade)
-                            to.isTitlePage() && to != from -> {
-                                val origin = tapOrigin.also { zoomOrigins[to] = it }
-                                (scaleIn(spring(dampingRatio = 0.86f, stiffness = 380f), initialScale = 0.2f, transformOrigin = origin) + fadeIn(tween(160))) togetherWith
-                                    (fadeOut(tween(220)) + scaleOut(tween(300), targetScale = 0.94f))
-                            }
-                            from.isTitlePage() && !to.isTitlePage() -> {
-                                val origin = zoomOrigins[from] ?: TransformOrigin.Center
-                                (fadeIn(tween(220)) + scaleIn(tween(300), initialScale = 0.94f)) togetherWith
-                                    (scaleOut(tween(260), targetScale = 0.2f, transformOrigin = origin) + fadeOut(tween(220, delayMillis = 60)))
-                            }
-                            else -> fade
-                        }
-                    },
-                    contentKey = { it.route },
-                    label = "phoneRoute",
-                ) { pageState ->
-                    pageStates.SaveableStateProvider(pageState.route.toString()) {
-                        // iOS's edge bounce on every page; a movie or show page also closes
-                        // when pulled down from its top, shrinking back toward its poster.
+                ) {
+                    // iOS's swipe back: the page it goes back to lies underneath, a little to the
+                    // left and shaded, and slides out from under the page as it is swiped away.
+                    val previous = state.previousRoute
+                    if (previous != null && backSwipe.from == state.route && backSwipe.offset > 0f) {
                         Box(
                             Modifier
                                 .fillMaxSize()
-                                .iosOverscroll(onPullClose = if (pageState.route.isTitlePage()) actions::back else null),
+                                .graphicsLayer { translationX = -(1f - backSwipe.progress) * size.width * UnderlayLag }
+                                .background(background)
+                                .drawWithContent {
+                                    drawContent()
+                                    drawRect(Color.Black.copy(alpha = UnderlayShade * (1f - backSwipe.progress)))
+                                },
                         ) {
-                            PhonePage(state = pageState, actions = actions)
+                            pageFor(previous)(state.copy(route = previous))
+                        }
+                    }
+                    routeTransition.AnimatedContent(
+                        modifier = Modifier.fillMaxSize(),
+                        transitionSpec = {
+                            val fade = fadeIn(tween(durationMillis = 220, delayMillis = 40)) togetherWith fadeOut(tween(durationMillis = 140))
+                            val from = initialState.route
+                            val to = targetState.route
+                            when {
+                                // Swiped back: the page underneath is already in place.
+                                backSwipe.committed && from == backSwipe.from -> EnterTransition.None togetherWith ExitTransition.None
+                                from.top != to.top -> tabSlide(from = from.top, to = to.top, fade = fade)
+                                to.isTitlePage() && to != from -> {
+                                    val origin = tapOrigin.also { zoomOrigins[to] = it }
+                                    (scaleIn(spring(dampingRatio = 0.86f, stiffness = 380f), initialScale = 0.2f, transformOrigin = origin) + fadeIn(tween(160))) togetherWith
+                                        (fadeOut(tween(220)) + scaleOut(tween(300), targetScale = 0.94f))
+                                }
+                                from.isTitlePage() && !to.isTitlePage() -> {
+                                    val origin = zoomOrigins[from] ?: TransformOrigin.Center
+                                    (fadeIn(tween(220)) + scaleIn(tween(300), initialScale = 0.94f)) togetherWith
+                                        (scaleOut(tween(260), targetScale = 0.2f, transformOrigin = origin) + fadeOut(tween(220, delayMillis = 60)))
+                                }
+                                else -> fade
+                            }
+                        },
+                        contentKey = { it.route },
+                    ) { pageState ->
+                        val swiped = backSwipe.from == pageState.route
+                        Box(
+                            Modifier
+                                .fillMaxSize()
+                                .graphicsLayer { translationX = if (backSwipe.from == pageState.route) backSwipe.offset else 0f }
+                                .then(
+                                    if (swiped) {
+                                        // The page being swiped away is solid, with a soft shadow down its left edge.
+                                        Modifier
+                                            .drawBehind {
+                                                val edge = SwipeShadow.toPx()
+                                                drawRect(
+                                                    Brush.horizontalGradient(
+                                                        listOf(Color.Transparent, Color.Black.copy(alpha = 0.35f)),
+                                                        startX = -edge,
+                                                        endX = 0f,
+                                                    ),
+                                                    topLeft = Offset(-edge, 0f),
+                                                    size = Size(edge, size.height),
+                                                )
+                                            }
+                                            .background(background)
+                                    } else {
+                                        Modifier
+                                    },
+                                ),
+                        ) {
+                            pageFor(pageState.route)(pageState)
                         }
                     }
                 }
@@ -398,6 +502,95 @@ private fun PhoneNavigationBar(
         Spacer(Modifier.navigationBarsPadding())
     }
 }
+
+/**
+ * A swipe back in progress: the page being swiped away ([from]) and how far it has moved
+ * ([offset], px, of [width]); [committed] once it went far enough and back was asked for.
+ */
+@Stable
+private class BackSwipe {
+    var from by mutableStateOf<Route?>(null)
+    var offset by mutableFloatStateOf(0f)
+    var width by mutableFloatStateOf(1f)
+    var committed by mutableStateOf(false)
+
+    val progress: Float get() = (offset / width).coerceIn(0f, 1f)
+
+    fun reset() {
+        from = null
+        offset = 0f
+        committed = false
+    }
+}
+
+/**
+ * Swiping right on a page opened from a tab takes it back, as on iOS: the page follows the finger,
+ * and letting go past a third of the width (or with a flick) carries it off to the right and goes
+ * back; otherwise it springs back into place. Anything that scrolls sideways itself (poster rows,
+ * sliders) takes the swipe first.
+ */
+@Composable
+private fun Modifier.swipeBack(swipe: BackSwipe, route: Route, enabled: Boolean, onBack: () -> Unit): Modifier {
+    val scope = rememberCoroutineScope()
+    val currentRoute by rememberUpdatedState(route)
+    val back by rememberUpdatedState(onBack)
+    val ready by rememberUpdatedState(enabled)
+    return pointerInput(Unit) {
+        val tracker = VelocityTracker()
+        detectHorizontalDragGestures(
+            onDragStart = {
+                tracker.resetTracking()
+                if (ready && swipe.from == null) {
+                    swipe.from = currentRoute
+                    swipe.width = size.width.toFloat().coerceAtLeast(1f)
+                    swipe.offset = 0f
+                }
+            },
+            onDragEnd = {
+                if (swipe.from != currentRoute || swipe.committed) return@detectHorizontalDragGestures
+                val velocity = tracker.calculateVelocity().x
+                val start = swipe.offset
+                if (start > swipe.width * SwipeCommitFraction || (velocity > SwipeFlingVelocity && start > 0f)) {
+                    scope.launch {
+                        animate(start, swipe.width, velocity.coerceAtLeast(0f), spring(dampingRatio = 1f, stiffness = 700f)) { value, _ ->
+                            swipe.offset = value.coerceAtMost(swipe.width)
+                        }
+                        swipe.committed = true
+                        back()
+                    }
+                } else {
+                    scope.launch {
+                        animate(start, 0f, velocity, spring(dampingRatio = 1f, stiffness = 600f)) { value, _ ->
+                            swipe.offset = value.coerceAtLeast(0f)
+                        }
+                        if (!swipe.committed) swipe.reset()
+                    }
+                }
+            },
+            onDragCancel = {
+                if (swipe.from == currentRoute && !swipe.committed) {
+                    scope.launch {
+                        animate(swipe.offset, 0f, animationSpec = spring(dampingRatio = 1f, stiffness = 600f)) { value, _ -> swipe.offset = value }
+                        if (!swipe.committed) swipe.reset()
+                    }
+                }
+            },
+        ) { change, amount ->
+            if (swipe.from != currentRoute || swipe.committed) return@detectHorizontalDragGestures
+            change.consume()
+            tracker.addPosition(change.uptimeMillis, change.position)
+            swipe.offset = (swipe.offset + amount).coerceIn(0f, swipe.width)
+        }
+    }
+}
+
+/** How far the page underneath starts to the left (a share of the width) and how shaded. */
+private const val UnderlayLag = 0.3f
+private const val UnderlayShade = 0.35f
+private const val SwipeCommitFraction = 0.33f
+private const val SwipeFlingVelocity = 800f
+private val SwipeShadow = 14.dp
+private const val MaxPageContents = 24
 
 private val TabBarHeight = 52.dp
 private val MiniPlayerGap = 8.dp

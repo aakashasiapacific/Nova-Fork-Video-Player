@@ -24,6 +24,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
@@ -52,6 +53,8 @@ internal fun PhonePlayerControls(
     onOpenSheet: (PlayerSheet) -> Unit,
     onBottomBarHeightChanged: (Int) -> Unit,
     modifier: Modifier = Modifier,
+    /** 0 hidden to 1 shown: the bars ride in from the edges with it. */
+    shown: () -> Float = { 1f },
 ) {
     BoxWithConstraints(
         modifier
@@ -69,7 +72,9 @@ internal fun PhonePlayerControls(
                 actions = actions,
                 onOpenPanel = onOpenPanel,
                 onOpenSheet = onOpenSheet,
-                modifier = Modifier.align(Alignment.TopCenter),
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .graphicsLayer { translationY = -(1f - shown()) * ControlsSlide.toPx() },
             )
             if (state.error == null) {
                 PhoneTransportRow(state = state, actions = actions, modifier = Modifier.align(Alignment.Center))
@@ -83,11 +88,15 @@ internal fun PhonePlayerControls(
                 onOpenPanel = onOpenPanel,
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .onSizeChanged { onBottomBarHeightChanged(it.height) },
+                    .onSizeChanged { onBottomBarHeightChanged(it.height) }
+                    .graphicsLayer { translationY = (1f - shown()) * ControlsSlide.toPx() },
             )
         }
     }
 }
+
+/** How far the top and bottom bars travel as they come and go. */
+private val ControlsSlide = 36.dp
 
 @Composable
 private fun PhoneTopBar(

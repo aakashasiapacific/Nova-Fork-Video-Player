@@ -1,5 +1,14 @@
 package com.aakash.novafork.ui.phone
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -40,8 +49,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
@@ -86,6 +97,7 @@ fun PhoneSearchScreen(
         }
     }
     val keyboard = LocalSoftwareKeyboardController.current
+    val focusManager = LocalFocusManager.current
     LaunchedEffect(focusRequester) {
         // Coming back to existing results should not pop the keyboard over them.
         if (field.text.isEmpty()) focusRequester.requestFocus()
@@ -144,27 +156,58 @@ fun PhoneSearchScreen(
                 }
             }
         }
-        SearchField(
-            value = field,
-            onValueChange = { value ->
-                val changed = value.text != field.text
-                field = value
-                if (changed) actions.search(value.text)
-            },
-            onClear = {
-                field = TextFieldValue("")
-                actions.search("")
-                focusRequester.requestFocus()
-            },
-            onSearch = {
-                actions.rememberSearch(field.text)
-                keyboard?.hide()
-            },
-            focusRequester = focusRequester,
-            modifier = Modifier
+        // iOS: while the field is being typed in, "Cancel" slides in beside it and the field
+        // narrows to make room; Cancel empties it and puts the keyboard away.
+        var focused by remember { mutableStateOf(false) }
+        Row(
+            Modifier
                 .align(Alignment.BottomCenter)
+                .fillMaxWidth()
                 .padding(start = 20.dp, end = 20.dp, bottom = fieldBottom),
-        )
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            SearchField(
+                value = field,
+                onValueChange = { value ->
+                    val changed = value.text != field.text
+                    field = value
+                    if (changed) actions.search(value.text)
+                },
+                onClear = {
+                    field = TextFieldValue("")
+                    actions.search("")
+                    focusRequester.requestFocus()
+                },
+                onSearch = {
+                    actions.rememberSearch(field.text)
+                    keyboard?.hide()
+                },
+                focusRequester = focusRequester,
+                onFocusChanged = { focused = it },
+                modifier = Modifier.weight(1f),
+            )
+            AnimatedVisibility(
+                visible = focused,
+                enter = expandHorizontally(spring(dampingRatio = 0.86f, stiffness = 500f), expandFrom = Alignment.Start) +
+                    slideInHorizontally(spring(dampingRatio = 0.86f, stiffness = 500f)) { it / 2 } + fadeIn(tween(160)),
+                exit = shrinkHorizontally(tween(240), shrinkTowards = Alignment.Start) +
+                    slideOutHorizontally(tween(240)) { it / 2 } + fadeOut(tween(140)),
+            ) {
+                TextButton(
+                    onClick = {
+                        if (field.text.isNotEmpty()) {
+                            field = TextFieldValue("")
+                            actions.search("")
+                        }
+                        focusManager.clearFocus()
+                        keyboard?.hide()
+                    },
+                    modifier = Modifier.padding(start = 4.dp),
+                ) {
+                    Text("Cancel", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.primary, maxLines = 1)
+                }
+            }
+        }
     }
 }
 
@@ -177,6 +220,7 @@ private fun SearchField(
     onSearch: () -> Unit,
     focusRequester: FocusRequester,
     modifier: Modifier = Modifier,
+    onFocusChanged: (Boolean) -> Unit = {},
 ) {
     Row(
         modifier
@@ -212,7 +256,8 @@ private fun SearchField(
                 keyboardActions = KeyboardActions(onSearch = { onSearch() }),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .focusRequester(focusRequester),
+                    .focusRequester(focusRequester)
+                    .onFocusChanged { onFocusChanged(it.isFocused) },
             )
         }
         if (value.text.isNotEmpty()) {

@@ -4,6 +4,9 @@ import androidx.annotation.DrawableRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -52,6 +55,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -74,6 +81,8 @@ import com.aakash.novafork.ui.common.RatingPill
 import com.aakash.novafork.ui.common.VideoMenuBox
 import com.aakash.novafork.ui.common.WatchedBadge
 import com.aakash.novafork.ui.common.metaLine
+import com.aakash.novafork.ui.common.pressDim
+import com.aakash.novafork.ui.common.pressScale
 import com.aakash.novafork.ui.common.sourceTypeIcon
 import com.aakash.novafork.ui.common.staggeredAppear
 import com.aakash.novafork.ui.model.AppActions
@@ -155,17 +164,21 @@ private fun PosterCardLayout(
 ) {
     val dims = LocalNovaDimens.current
     val shape = RoundedCornerShape(dims.cardRadius)
+    // Apple TV's press: the card sinks in and darkens while held, no ripple.
+    val press = remember { MutableInteractionSource() }
     Column(
         modifier
+            .pressScale(press, pressed = CardPressScale)
             .clip(shape)
-            .combinedClickable(onClick = onClick, onLongClick = onLongClick),
+            .combinedClickable(interactionSource = press, indication = null, onClick = onClick, onLongClick = onLongClick),
     ) {
         Box(
             Modifier
                 .fillMaxWidth()
                 .aspectRatio(2f / 3f)
                 .clip(shape)
-                .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                .pressDim(press),
         ) {
             PosterArt(artwork = artwork, title = title, modifier = Modifier.fillMaxSize())
             RatingPill(rating, Modifier.align(Alignment.TopStart).padding(6.dp), onImage = true)
@@ -314,18 +327,21 @@ private fun WideCardLayout(
     width: Dp = LocalNovaDimens.current.landscapeCardWidth,
 ) {
     val shape = RoundedCornerShape(LocalNovaDimens.current.cardRadius)
+    val press = remember { MutableInteractionSource() }
     Column(
         modifier
             .width(width)
+            .pressScale(press, pressed = CardPressScale)
             .clip(shape)
-            .combinedClickable(onClick = onClick, onLongClick = onLongClick),
+            .combinedClickable(interactionSource = press, indication = null, onClick = onClick, onLongClick = onLongClick),
     ) {
         Box(
             Modifier
                 .fillMaxWidth()
                 .aspectRatio(16f / 9f)
                 .clip(shape)
-                .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                .pressDim(press),
         ) {
             // A card without any 16:9 picture names its title on the placeholder.
             LandscapeArt(artwork = artwork, title = artTitle, modifier = Modifier.fillMaxSize())
@@ -349,6 +365,9 @@ private fun WideCardLayout(
         Spacer(Modifier.height(4.dp))
     }
 }
+
+/** How far a poster or card sinks in while pressed. */
+private const val CardPressScale = 0.96f
 
 /** List row for a video in a folder: 16:9 thumbnail, title, subtitle, then [trailing] (a button). */
 @Composable
@@ -519,15 +538,15 @@ internal fun PhoneLibraryGrid(
     val dims = LocalNovaDimens.current
     val seen = remember { mutableSetOf<Any>() }
     LazyVerticalGrid(
-        columns = GridCells.Adaptive(dims.gridMinCell),
-        modifier = modifier.fillMaxSize(),
+        columns = GridCells.Adaptive(pinchedCell ?: dims.gridMinCell),
+        modifier = modifier.fillMaxSize().pinchColumns(state),
         state = state,
         contentPadding = PaddingValues(start = dims.gutter, end = dims.gutter, top = 8.dp, bottom = dims.sectionSpacing + LocalBottomBarSpace.current),
         horizontalArrangement = Arrangement.spacedBy(dims.rowSpacing),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         itemsIndexed(items, key = { _, item -> item.key }) { index, item ->
-            val appear = Modifier.staggeredAppear(item.key, index, seen)
+            val appear = Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null).staggeredAppear(item.key, index, seen)
             when (item) {
                 is LibraryItemUi.Video -> VideoMenuBox(
                     videoId = item.card.id,
@@ -556,8 +575,8 @@ internal fun PhoneTimelineGrid(
     val dims = LocalNovaDimens.current
     val seen = remember { mutableSetOf<Any>() }
     LazyVerticalGrid(
-        columns = GridCells.Adaptive(dims.gridMinCell),
-        modifier = modifier.fillMaxSize(),
+        columns = GridCells.Adaptive(pinchedCell ?: dims.gridMinCell),
+        modifier = modifier.fillMaxSize().pinchColumns(state),
         state = state,
         contentPadding = PaddingValues(start = dims.gutter, end = dims.gutter, top = 0.dp, bottom = dims.sectionSpacing + LocalBottomBarSpace.current),
         horizontalArrangement = Arrangement.spacedBy(dims.rowSpacing),
@@ -573,7 +592,7 @@ internal fun PhoneTimelineGrid(
                 )
             }
             itemsIndexed(month.cards, key = { _, card -> "v:" + card.id }) { index, card ->
-                val appear = Modifier.staggeredAppear("v:" + card.id, index, seen)
+                val appear = Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null).staggeredAppear("v:" + card.id, index, seen)
                 VideoMenuBox(videoId = card.id, title = card.displayTitle(), actions = actions, showDetails = false, modifier = appear) { openMenu ->
                     PhonePosterCard(card, onClick = { actions.openVideo(card.id) }, onLongClick = openMenu)
                 }
@@ -581,6 +600,67 @@ internal fun PhoneTimelineGrid(
         }
     }
 }
+
+/**
+ * The poster size picked by pinching a poster grid (All Videos, Recently Added), shared by both and
+ * kept while the app runs; null = the default size. It is a size, not a count, so turning the
+ * phone still fits as many as there is room for.
+ */
+private var pinchedCell by mutableStateOf<Dp?>(null)
+
+/**
+ * Pinching a poster grid, as in Photos: spreading two fingers makes the posters bigger (one less
+ * per row), pinching them together smaller (one more), one step per pinch and with a tick; the
+ * posters glide to their new places. One finger still scrolls as before.
+ */
+@Composable
+private fun Modifier.pinchColumns(state: LazyGridState): Modifier {
+    val dims = LocalNovaDimens.current
+    val haptics = LocalHapticFeedback.current
+    return pointerInput(state, dims) {
+        awaitEachGesture {
+            awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+            var startDistance = 0f
+            var stepped = false
+            do {
+                val event = awaitPointerEvent(PointerEventPass.Initial)
+                val fingers = event.changes.filter { it.pressed }
+                if (fingers.size >= 2) {
+                    val distance = (fingers[0].position - fingers[1].position).getDistance()
+                    if (startDistance == 0f) {
+                        startDistance = distance.coerceAtLeast(1f)
+                    } else if (!stepped) {
+                        val ratio = distance / startDistance
+                        val step = when {
+                            ratio > 1.3f -> -1
+                            ratio < 0.77f -> 1
+                            else -> 0
+                        }
+                        if (step != 0) {
+                            stepped = true
+                            val info = state.layoutInfo
+                            val columns = (info.visibleItemsInfo.maxOfOrNull { it.column } ?: -1) + 1
+                            val target = (columns + step).coerceIn(MinGridColumns, maxOf(MaxGridColumns, columns))
+                            if (columns > 0 && target != columns) {
+                                val spacing = dims.rowSpacing.toPx()
+                                val available = info.viewportSize.width - 2 * dims.gutter.toPx()
+                                // The largest cell that still fits exactly [target] in a row.
+                                val cell = (available + spacing) / target - spacing - 1f
+                                pinchedCell = cell.coerceAtLeast(1f).toDp()
+                                haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            }
+                        }
+                    }
+                    // Two fingers belong to the pinch, not to scrolling.
+                    event.changes.forEach { it.consume() }
+                }
+            } while (event.changes.any { it.pressed })
+        }
+    }
+}
+
+private const val MinGridColumns = 2
+private const val MaxGridColumns = 4
 
 // ---------------------------------------------------------------------------------------------
 // Page scaffolding

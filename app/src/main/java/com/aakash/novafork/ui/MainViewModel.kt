@@ -298,6 +298,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
         return AppUiState(
             route = route,
             canGoBack = user.backStack.size > 1,
+            previousRoute = user.backStack.getOrNull(user.backStack.size - 2),
             home = if (saved.isEmpty() && starred.isEmpty()) {
                 index.home
             } else {

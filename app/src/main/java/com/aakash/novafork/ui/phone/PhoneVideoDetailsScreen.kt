@@ -57,6 +57,7 @@ fun PhoneVideoDetailsScreen(
     BoxWithConstraints(modifier.fillMaxSize()) {
         val backdropHeight = detailsBackdropHeight(maxHeight)
         val listState = rememberLazyListState()
+        val titleCollapse = rememberTitleCollapse(listState, backdropHeight)
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             state = listState,
@@ -130,6 +131,8 @@ fun PhoneVideoDetailsScreen(
         PhoneDetailsTopBar(
             onBack = actions::back,
             modifier = Modifier.align(Alignment.TopStart),
+            title = details.title,
+            collapsed = titleCollapse,
             menu = { close ->
                 NovaMenuItem(
                     text = { Text("Identify…") },

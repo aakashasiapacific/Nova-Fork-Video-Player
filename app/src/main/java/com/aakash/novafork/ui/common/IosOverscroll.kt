@@ -8,12 +8,14 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableFloatState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
@@ -36,13 +38,15 @@ import kotlinx.coroutines.launch
  *
  * With [onPullClose] (a movie or show page), pulling down past the top also shrinks the page
  * toward its poster, and letting go far enough closes it (the zoom back takes it from there).
+ * [pullState] shares how far it is pulled (down positive) with the page (see [LocalPagePull]).
  */
 @Composable
-internal fun Modifier.iosOverscroll(onPullClose: (() -> Unit)? = null): Modifier {
+internal fun Modifier.iosOverscroll(onPullClose: (() -> Unit)? = null, pullState: MutableFloatState? = null): Modifier {
     val scope = rememberCoroutineScope()
     val closePx = with(LocalDensity.current) { 120.dp.toPx() }
     val close by rememberUpdatedState(onPullClose)
-    var pull by remember { mutableFloatStateOf(0f) }
+    val ownPull = remember { mutableFloatStateOf(0f) }
+    var pull by (pullState ?: ownPull)
     var heightPx by remember { mutableFloatStateOf(1f) }
     val connection = remember {
         object : NestedScrollConnection {
@@ -112,6 +116,12 @@ internal fun Modifier.iosOverscroll(onPullClose: (() -> Unit)? = null): Modifier
             }
         }
 }
+
+/**
+ * How far the page around is pulled past its top or bottom by [iosOverscroll] (down positive),
+ * for headers that stretch into the gap; read it in a draw or layer block.
+ */
+internal val LocalPagePull = staticCompositionLocalOf<() -> Float> { { 0f } }
 
 /**
  * A grid's items fade up one after another the first time they are shown (iOS), keyed so an item

@@ -2,7 +2,9 @@ package com.aakash.novafork.ui.player
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterExitState
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -226,6 +228,11 @@ private fun PlayerChrome(state: PlayerUiState, actions: PlayerActions, layout: D
                         onBottomBarHeightChanged = { bottomBarHeightPx = it },
                     )
                 } else {
+                    // The bars slide in from the top and bottom edges as they fade in, and back out.
+                    val shown by transition.animateFloat(
+                        transitionSpec = { tween(if (targetState == EnterExitState.Visible) 220 else 260) },
+                        label = "controlsSlide",
+                    ) { if (it == EnterExitState.Visible) 1f else 0f }
                     PhonePlayerControls(
                         state = state,
                         actions = actions,
@@ -234,6 +241,7 @@ private fun PlayerChrome(state: PlayerUiState, actions: PlayerActions, layout: D
                         onOpenPanel = openPanel,
                         onOpenSheet = openSheet,
                         onBottomBarHeightChanged = { bottomBarHeightPx = it },
+                        shown = { shown },
                     )
                 }
             }

@@ -71,6 +71,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -741,5 +742,19 @@ fun Modifier.pressScale(source: InteractionSource, pressed: Float = 0.94f): Modi
     return graphicsLayer {
         scaleX = scale
         scaleY = scale
+    }
+}
+
+/**
+ * Apple TV's poster press: while held the picture darkens a little (with [pressScale] shrinking
+ * the card), and lights up again on release.
+ */
+@Composable
+fun Modifier.pressDim(source: InteractionSource): Modifier {
+    val down by source.collectIsPressedAsState()
+    val dim by animateFloatAsState(if (down) 0.22f else 0f, tween(if (down) 90 else 220), label = "pressDim")
+    return drawWithContent {
+        drawContent()
+        if (dim > 0f) drawRect(Color.Black.copy(alpha = dim))
     }
 }

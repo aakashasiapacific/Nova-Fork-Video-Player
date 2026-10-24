@@ -2,14 +2,21 @@ package com.aakash.novafork.ui.phone
 
 import android.graphics.drawable.BitmapDrawable
 import androidx.annotation.DrawableRes
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterExitState
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -64,7 +71,11 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -81,6 +92,7 @@ import com.aakash.novafork.ui.common.BackdropArt
 import com.aakash.novafork.ui.common.HeroTitle
 import com.aakash.novafork.ui.common.HeroVideoPreview
 import com.aakash.novafork.ui.common.IosColors
+import com.aakash.novafork.ui.common.LocalHud
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.PosterArt
 import com.aakash.novafork.ui.common.RatingPill
@@ -526,15 +538,24 @@ private fun HeroActions(
                 modifier = Modifier.padding(start = 6.dp),
             )
         }
+        val hud = LocalHud.current
         RoundHeroButton(
             icon = if (hero.favorite) R.drawable.ic_star else R.drawable.ic_star_outline,
             description = if (hero.favorite) "Remove from Favorites" else "Add to Favorites",
-            onClick = { actions.toggleFavorite(hero.itemKey) },
+            onClick = {
+                if (!hero.favorite) hud?.show(R.drawable.ic_star, "Added to Favorites")
+                actions.toggleFavorite(hero.itemKey)
+            },
         )
         RoundHeroButton(
             icon = if (hero.onWatchlist) R.drawable.ic_check else R.drawable.ic_add,
             description = if (hero.onWatchlist) "Remove from Watchlist" else "Add to Watchlist",
-            onClick = { actions.toggleWatchlist(hero.itemKey) },
+            onClick = {
+                if (!hero.onWatchlist) hud?.show(R.drawable.ic_check, "Added to Watchlist")
+                actions.toggleWatchlist(hero.itemKey)
+            },
+            // "+" turns round into the tick, as Apple TV's does.
+            turn = true,
         )
         val deleteId = hero.deleteVideoId
         if (deleteId != null) {
@@ -548,19 +569,46 @@ private fun HeroActions(
     }
 }
 
+/**
+ * A round hero button that ticks under the finger. When its [icon] changes (star filled, "+" to
+ * tick) the new glyph pops in with a little overshoot; with [turn] it also turns a quarter round.
+ */
 @Composable
-private fun RoundHeroButton(@DrawableRes icon: Int, description: String, onClick: () -> Unit, tint: Color = Color.White) {
+private fun RoundHeroButton(
+    @DrawableRes icon: Int,
+    description: String,
+    onClick: () -> Unit,
+    tint: Color = Color.White,
+    turn: Boolean = false,
+) {
     val press = remember { MutableInteractionSource() }
+    val haptics = LocalHapticFeedback.current
     IconButton(
-        onClick = onClick,
+        onClick = {
+            haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+            onClick()
+        },
         interactionSource = press,
-        modifier = Modifier.size(50.dp).pressScale(press, pressed = 0.9f),
+        modifier = Modifier.size(50.dp).pressScale(press, pressed = 0.9f).semantics { contentDescription = description },
         colors = IconButtonDefaults.iconButtonColors(
             containerColor = Color.White.copy(alpha = 0.18f),
             contentColor = tint,
         ),
     ) {
-        NovaIcon(icon, contentDescription = description)
+        AnimatedContent(
+            targetState = icon,
+            transitionSpec = {
+                (scaleIn(spring(dampingRatio = 0.42f, stiffness = 520f), initialScale = 0.3f) + fadeIn(tween(90))) togetherWith
+                    (scaleOut(tween(120), targetScale = 0.3f) + fadeOut(tween(90)))
+            },
+            label = "heroButtonIcon",
+        ) { shownIcon ->
+            val angle by transition.animateFloat(
+                transitionSpec = { spring(dampingRatio = 0.6f, stiffness = 420f) },
+                label = "heroButtonTurn",
+            ) { if (turn && it != EnterExitState.Visible) -90f else 0f }
+            NovaIcon(shownIcon, contentDescription = null, modifier = Modifier.graphicsLayer { rotationZ = angle })
+        }
     }
 }
 

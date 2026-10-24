@@ -13,6 +13,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
@@ -21,7 +22,10 @@ import com.aakash.novafork.ui.adaptive.LocalDeviceLayout
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
 import com.aakash.novafork.ui.adaptive.dimensFor
 import com.aakash.novafork.ui.adaptive.rememberDeviceLayout
+import com.aakash.novafork.ui.common.HudState
+import com.aakash.novafork.ui.common.IosHudHost
 import com.aakash.novafork.ui.common.IosToastHost
+import com.aakash.novafork.ui.common.LocalHud
 import com.aakash.novafork.ui.common.NovaAlertDialog
 import com.aakash.novafork.ui.dialogs.NovaDialogs
 import com.aakash.novafork.ui.model.AppActions
@@ -39,9 +43,11 @@ fun NovaRoot(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
     val settings = state.settings.settings
     NovaTheme(settings.themeMode) {
         val layout = rememberDeviceLayout(settings.layoutMode)
+        val hud = remember { HudState() }
         CompositionLocalProvider(
             LocalDeviceLayout provides layout,
             LocalNovaDimens provides dimensFor(layout),
+            LocalHud provides hud,
         ) {
             Surface(modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                 Box(Modifier.fillMaxSize()) {
@@ -58,6 +64,7 @@ fun NovaRoot(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
                             .statusBarsPadding()
                             .padding(top = 8.dp, start = 16.dp, end = 16.dp),
                     )
+                    IosHudHost(hud, Modifier.align(Alignment.Center))
                 }
                 NovaDialogs(dialog = state.dialog, actions = actions, playlists = state.browse.playlists)
                 state.crashReport?.let { report -> CrashReportDialog(report, actions) }

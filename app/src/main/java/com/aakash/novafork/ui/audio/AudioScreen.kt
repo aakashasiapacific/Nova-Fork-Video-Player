@@ -44,6 +44,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyGridScope
+import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.itemsIndexed
@@ -64,6 +65,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -73,6 +75,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -81,6 +84,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
@@ -113,6 +117,7 @@ import com.aakash.novafork.ui.common.IosGrabber
 import com.aakash.novafork.ui.common.IosSheetShape
 import com.aakash.novafork.ui.common.IosSpinner
 import com.aakash.novafork.ui.common.LocalBottomBarSpace
+import com.aakash.novafork.ui.common.LocalPagePull
 import com.aakash.novafork.ui.common.NovaAlertDialog
 import com.aakash.novafork.ui.common.NovaDropdownMenu
 import com.aakash.novafork.ui.common.NovaIcon
@@ -170,6 +175,9 @@ private const val ALBUM = "album:"
 private const val ARTIST = "artist:"
 private const val GENRE = "genre:"
 private const val STACK_SEPARATOR = "\u0001"
+
+/** The artist page's header row, which its picture's drift is measured by. */
+private const val ARTIST_HERO_KEY = "hero"
 
 /** The Audio tab's page for an album or an artist, for [MusicViewModel.requestPage]. */
 internal fun albumPage(albumKey: String): String = ALBUM + albumKey
@@ -339,20 +347,25 @@ private fun AudioPage(title: String?, content: LazyGridScope.() -> Unit) {
     val gridState = rememberLazyGridState()
     val collapsed by remember { derivedStateOf { gridState.firstVisibleItemIndex > 1 } }
     Box(Modifier.fillMaxSize()) {
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(2),
-            state = gridState,
-            modifier = Modifier
-                .fillMaxSize()
-                .statusBarsPadding(),
-            contentPadding = PaddingValues(start = Gutter, end = Gutter, bottom = 24.dp + LocalBottomBarSpace.current),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            verticalArrangement = Arrangement.spacedBy(0.dp),
-            content = content,
-        )
+        CompositionLocalProvider(LocalPageGrid provides gridState) {
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(2),
+                state = gridState,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .statusBarsPadding(),
+                contentPadding = PaddingValues(start = Gutter, end = Gutter, bottom = 24.dp + LocalBottomBarSpace.current),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                verticalArrangement = Arrangement.spacedBy(0.dp),
+                content = content,
+            )
+        }
         if (title != null) CollapsedTitleBar(visible = collapsed, title = title)
     }
 }
+
+/** The grid of the page being shown, for headers that move with its scrolling. */
+private val LocalPageGrid = staticCompositionLocalOf<LazyGridState?> { null }
 
 private fun LazyGridScope.row(key: Any? = null, content: @Composable () -> Unit) {
     item(key = key, span = { GridItemSpan(maxLineSpan) }) { content() }
@@ -613,18 +626,44 @@ private fun AlbumPage(album: Album, ctx: PageContext) {
 
 /**
  * Apple Music's artist header: a big picture (their newest cover, as there are no artist photos)
- * fading into black, the name over it, and the round red Play button.
+ * fading into black, the name over it, and the round red Play button. As the page scrolls the
+ * picture drifts at half speed inside its frame, and pulling the page down past its top makes the
+ * whole header grow into the gap.
  */
 @Composable
 private fun ArtistHero(artist: Artist, ctx: PageContext) {
+    val grid = LocalPageGrid.current
+    val pull = LocalPagePull.current
     Box(
         Modifier
             .fillMaxWidth()
             .padding(top = 4.dp, bottom = 8.dp)
             .aspectRatio(1.15f)
+            .graphicsLayer {
+                val grow = 1f + (pull() / size.height).coerceIn(0f, 1f) * 0.5f
+                scaleX = grow
+                scaleY = grow
+                transformOrigin = TransformOrigin(0.5f, 1f)
+            }
             .clip(RoundedCornerShape(14.dp)),
     ) {
-        Cover(artist.albums.firstOrNull()?.artUri, size = 0, corner = 0, modifier = Modifier.fillMaxSize())
+        Cover(
+            artist.albums.firstOrNull()?.artUri,
+            size = 0,
+            corner = 0,
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer {
+                    // Once the header's top goes up under the top edge, the picture lags half
+                    // of the way (so its own top edge is never in sight).
+                    val hero = grid?.layoutInfo?.visibleItemsInfo?.firstOrNull { it.key == ARTIST_HERO_KEY }
+                    val under = if (hero == null) 0f else (-hero.offset.y).toFloat().coerceAtLeast(0f)
+                    translationY = under * 0.5f
+                    // A little larger, so the drift never shows an edge.
+                    scaleX = 1.08f
+                    scaleY = 1.08f
+                },
+        )
         Box(
             Modifier
                 .fillMaxSize()
@@ -665,7 +704,7 @@ private fun ArtistHero(artist: Artist, ctx: PageContext) {
 private fun ArtistPage(artist: Artist, ctx: PageContext) {
     AudioPage(artist.name) {
         row("back") { BackRow(ctx) { close -> QueueItems(artist.songs, ctx, close) } }
-        row("hero") { ArtistHero(artist, ctx) }
+        row(ARTIST_HERO_KEY) { ArtistHero(artist, ctx) }
         if (artist.albums.isNotEmpty()) {
             row("albumsTitle") { SectionTitle("Albums") }
             row("albums") {

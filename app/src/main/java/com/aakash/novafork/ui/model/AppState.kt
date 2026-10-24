@@ -257,6 +257,8 @@ data class AppUiState(
     /** The tab the current page was opened from (details opened from Library keep Library highlighted). */
     val tab: TopDestination = TopDestination.VIDEO,
     val canGoBack: Boolean = false,
+    /** The page back would return to (drawn under the current one while it is swiped away). */
+    val previousRoute: Route? = null,
     val home: HomeUi = HomeUi(),
     val library: LibraryUi = LibraryUi(),
     val browse: BrowseUi = BrowseUi(),

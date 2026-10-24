@@ -512,3 +512,13 @@ The owner asked for Apple Music to be copied more precisely, with less clutter. 
   - The classic iOS tab bar instead of the floating capsule: docked full width along the bottom, dark and see-through with a hairline on top, icons over names, the selected one coloured; it no longer shrinks on scroll. The mini player docks just above it whenever there is a queue, playing or paused.
   - Home's hero tint now comes from the foot of the backdrop, not the poster, and is strongest where the backdrop fades out, so the picture flows into it.
 - **Build 110:** over the tinted hero the backdrop ended in a hard line (its fade went to clear, which is no fade); the picture itself is now masked out at its foot, so it melts into the tint.
+- **Build 111 (owner, all in one go):**
+  - Swiping right on a page goes back as on iOS: the page follows the finger and the page it came from lies underneath, a little to the left and shaded, sliding out as it is uncovered (scroll position and all); let go past a third or flick to go back, otherwise it springs back.
+  - A movie or show page's title appears small in the middle of its top bar once the big title has scrolled away, and the bar turns dark with a hairline.
+  - Posters and cards sink in and darken a little while pressed (no ripple), as Apple TV's tiles do.
+  - Pinch All Videos or Recently Added to change the poster size (2 to 4 a row, one step per pinch, with a tick); the posters glide to their new places.
+  - The hero's "+" turns round into a tick and the star pops as it fills; adding shows iOS's HUD ("Added to Watchlist", "Added to Favorites") in the middle of the screen.
+  - The player's top and bottom bars slide in from the edges as they appear and back out as they hide.
+  - The artist page's picture drifts at half speed as the page scrolls and grows into the gap when the page is pulled down.
+  - Search: "Cancel" slides in beside the field while typing (the field narrows for it); it empties the field and puts the keyboard away.
+  - Album track lists already show moving bars in place of the playing song's number.
