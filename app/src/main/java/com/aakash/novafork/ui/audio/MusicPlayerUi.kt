@@ -3,8 +3,7 @@ package com.aakash.novafork.ui.audio
 import androidx.activity.compose.BackHandler
 import androidx.annotation.DrawableRes
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.FastOutLinearInEasing
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
@@ -12,8 +11,6 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -51,11 +48,15 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
@@ -95,6 +96,7 @@ import com.aakash.novafork.ui.theme.AudioTheme
 import com.aakash.novafork.ui.theme.NovaColors
 import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 /**
  * The real app turns this on (MainActivity): the music mini player and Now Playing then live in
@@ -127,15 +129,53 @@ fun NowPlayingHost(
     onDismiss: () -> Unit,
     upNext: List<SongEntity> = emptyList(),
     menu: (@Composable ColumnScope.(close: () -> Unit) -> Unit)? = null,
+    sheet: NowPlayingSheet? = null,
 ) {
     LaunchedEffect(player.active) { if (!player.active && open) onDismiss() }
-    AnimatedVisibility(
-        visible = open && player.active,
-        enter = slideInVertically(tween(320)) { it },
-        exit = slideOutVertically(tween(260)) { it },
-    ) {
-        NowPlayingScreen(player = player, actions = actions, onDismiss = onDismiss, favorite = favorite, upNext = upNext, menu = menu)
+    // One number, 0 closed to 1 open, moves everything: the sheet's place, the finger's drag on
+    // it, and (through [sheet]) the page behind being pushed back, as an iOS sheet does.
+    val visible = open && player.active
+    val progress = remember { Animatable(0f) }
+    var drag by remember { mutableFloatStateOf(0f) }
+    val scope = rememberCoroutineScope()
+    LaunchedEffect(visible) {
+        progress.animateTo(
+            if (visible) 1f else 0f,
+            if (visible) spring(dampingRatio = 0.86f, stiffness = 300f) else spring(dampingRatio = 1f, stiffness = 380f),
+        )
     }
+    val fraction = (progress.value - drag).coerceIn(0f, 1f)
+    SideEffect { sheet?.openFraction = fraction }
+    DisposableEffect(sheet) { onDispose { sheet?.openFraction = 0f } }
+    if (fraction > 0f || visible) {
+        NowPlayingScreen(
+            player = player,
+            actions = actions,
+            onDismiss = onDismiss,
+            favorite = favorite,
+            upNext = upNext,
+            menu = menu,
+            progress = fraction,
+            onDragBy = { delta -> drag = (drag + delta).coerceIn(0f, progress.value) },
+            onRelease = { velocity, dismiss ->
+                scope.launch {
+                    progress.snapTo(fraction)
+                    drag = 0f
+                    if (dismiss) {
+                        onDismiss()
+                    } else {
+                        progress.animateTo(1f, spring(dampingRatio = 0.8f, stiffness = 500f), initialVelocity = -velocity)
+                    }
+                }
+            },
+        )
+    }
+}
+
+/** How far Now Playing is open, 0 (closed) to 1 (open); the shell pushes its page back with it. */
+@Stable
+class NowPlayingSheet {
+    var openFraction by mutableFloatStateOf(0f)
 }
 
 /**
@@ -150,6 +190,7 @@ fun ShellNowPlaying(
     open: Boolean,
     onDismiss: () -> Unit,
     onShowAudio: () -> Unit,
+    sheet: NowPlayingSheet? = null,
 ) {
     val favorites by viewModel.favorites.collectAsStateWithLifecycle()
     val library by viewModel.library.collectAsStateWithLifecycle()
@@ -163,6 +204,7 @@ fun ShellNowPlaying(
         favorite = player.nowPlaying?.songId in favorites,
         upNext = rememberUpNext(viewModel, player),
         onDismiss = onDismiss,
+        sheet = sheet,
         menu = song?.let { current ->
             { close ->
                 NovaMenuItem(
@@ -334,28 +376,35 @@ fun NowPlayingScreen(
     upNext: List<SongEntity> = emptyList(),
     /** Apple Music's "…" beside the star; null = none (previews). */
     menu: (@Composable ColumnScope.(close: () -> Unit) -> Unit)? = null,
+    /** How far it is open, 0 to 1 ([NowPlayingHost] moves it); 1 stands still. */
+    progress: Float = 1f,
+    /** The finger pulled it down by this part of the screen's height. */
+    onDragBy: (Float) -> Unit = {},
+    /** The finger let go, moving down at this many screen heights a second; close it or not. */
+    onRelease: (velocity: Float, dismiss: Boolean) -> Unit = { _, dismiss -> if (dismiss) onDismiss() },
 ) {
     BackHandler(onBack = onDismiss)
     val now = player.nowPlaying
     var pane by rememberSaveable { mutableStateOf(NowPlayingPane.ART) }
-    // Pulled down with the finger, frame by frame, without a coroutine per move; let go past a
-    // third of the way down or with a flick and it carries on off screen from where it is, else
-    // it springs back. Its top corners round as it leaves, like an iOS sheet.
+    // Pulled down with the finger, frame by frame; let go past 140dp or with a flick and it
+    // closes, else it springs back ([NowPlayingHost] runs both). Its top corners round as it
+    // leaves, like an iOS sheet, and near the bottom it fades into the mini player.
     val density = LocalDensity.current
     val dismissPx = with(density) { 140.dp.toPx() }
     val flingPx = with(density) { 900.dp.toPx() }
-    var dragY by remember { mutableFloatStateOf(0f) }
     var heightPx by remember { mutableFloatStateOf(0f) }
-    val dragState = rememberDraggableState { delta -> dragY = (dragY + delta).coerceAtLeast(0f) }
+    val offsetPx = (1f - progress) * heightPx
+    val dragState = rememberDraggableState { delta -> if (heightPx > 0f) onDragBy(delta / heightPx) }
     Box(
         modifier
             .fillMaxSize()
             .onSizeChanged { heightPx = it.height.toFloat() }
             .graphicsLayer {
-                translationY = dragY
-                val corner = (dragY / dismissPx).coerceIn(0f, 1f) * 28.dp.toPx()
+                translationY = offsetPx
+                alpha = (progress / 0.3f).coerceIn(0f, 1f)
+                val corner = (offsetPx / dismissPx).coerceIn(0f, 1f) * 28.dp.toPx()
                 shape = RoundedCornerShape(topStart = corner, topEnd = corner)
-                clip = dragY > 0f
+                clip = offsetPx > 0f
             }
             .background(Color.Black)
             // Drag down anywhere to close (lyrics scroll and the sliders keep their own drags).
@@ -363,14 +412,8 @@ fun NowPlayingScreen(
                 state = dragState,
                 orientation = Orientation.Vertical,
                 onDragStopped = { velocity ->
-                    if (dragY > dismissPx || velocity > flingPx) {
-                        animate(dragY, heightPx.coerceAtLeast(dragY), velocity, tween(220, easing = FastOutLinearInEasing)) { value, _ ->
-                            dragY = value
-                        }
-                        onDismiss()
-                    } else {
-                        animate(dragY, 0f, velocity, spring(dampingRatio = 0.8f, stiffness = 500f)) { value, _ -> dragY = value }
-                    }
+                    val dismiss = offsetPx > dismissPx || velocity > flingPx
+                    onRelease(if (heightPx > 0f) velocity / heightPx else 0f, dismiss)
                 },
             ),
     ) {

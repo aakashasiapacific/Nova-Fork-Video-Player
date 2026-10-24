@@ -67,6 +67,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -90,6 +91,7 @@ import com.aakash.novafork.ui.adaptive.DeviceLayout
 import com.aakash.novafork.ui.audio.AudioScreen
 import com.aakash.novafork.ui.audio.MiniPlayerBar
 import com.aakash.novafork.ui.audio.MiniPlayerHeight
+import com.aakash.novafork.ui.audio.NowPlayingSheet
 import com.aakash.novafork.ui.audio.ShellNowPlaying
 import com.aakash.novafork.ui.audio.rememberMusicShell
 import com.aakash.novafork.ui.common.GlassCircle
@@ -160,6 +162,7 @@ fun PhoneApp(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
     val miniAboveBar = hasQueue && playing && !barCollapsed
     val miniInBar = hasQueue && barCollapsed
     var nowPlayingOpen by rememberSaveable { mutableStateOf(false) }
+    val nowPlayingSheet = remember { NowPlayingSheet() }
     val barSpace = TabBarHeight + BarTopMargin + BarBottomMargin + navBar +
         (if (miniAboveBar) MiniPlayerHeight + MiniPlayerGap else 0.dp)
     // Where the last touch went down, as a fraction of the screen: a page opened from a poster
@@ -186,6 +189,21 @@ fun PhoneApp(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
                 targetState = state,
                 modifier = Modifier
                     .fillMaxSize()
+                    // Under Now Playing the page sinks back, smaller, rounded and dimmed, and
+                    // comes forward again as Now Playing is pulled down (iOS's sheet stack).
+                    .graphicsLayer {
+                        val open = nowPlayingSheet.openFraction
+                        val scale = 1f - 0.07f * open
+                        scaleX = scale
+                        scaleY = scale
+                        shape = RoundedCornerShape(16.dp.toPx() * open)
+                        clip = open > 0f
+                    }
+                    .drawWithContent {
+                        drawContent()
+                        val open = nowPlayingSheet.openFraction
+                        if (open > 0f) drawRect(Color.Black.copy(alpha = 0.4f * open))
+                    }
                     .nestedScroll(barScroll)
                     .swipeBetweenTabs(top, enabled = !state.canGoBack, onSelect = actions::selectTab, onBack = actions::back)
                     .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)),
@@ -222,7 +240,16 @@ fun PhoneApp(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
             onSelect = actions::selectTab,
             modifier = Modifier.align(Alignment.BottomCenter),
             miniPlayer = if (music != null && miniInBar) {
-                { miniModifier -> MiniPlayerBar(player = music.second, actions = music.first, onOpen = { nowPlayingOpen = true }, modifier = miniModifier, compact = true) }
+                { miniModifier ->
+                    MiniPlayerBar(
+                        player = music.second,
+                        actions = music.first,
+                        onOpen = { nowPlayingOpen = true },
+                        // It fades back in as Now Playing comes down into it.
+                        modifier = miniModifier.graphicsLayer { alpha = 1f - nowPlayingSheet.openFraction },
+                        compact = true,
+                    )
+                }
             } else {
                 null
             },
@@ -241,7 +268,12 @@ fun PhoneApp(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
                 enter = fadeIn(tween(200)) + scaleIn(tween(240), initialScale = 0.9f),
                 exit = fadeOut(tween(140)),
             ) {
-                MiniPlayerBar(player = musicState, actions = viewModel, onOpen = { nowPlayingOpen = true })
+                MiniPlayerBar(
+                    player = musicState,
+                    actions = viewModel,
+                    onOpen = { nowPlayingOpen = true },
+                    modifier = Modifier.graphicsLayer { alpha = 1f - nowPlayingSheet.openFraction },
+                )
             }
             ShellNowPlaying(
                 viewModel = viewModel,
@@ -249,6 +281,7 @@ fun PhoneApp(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
                 open = nowPlayingOpen,
                 onDismiss = { nowPlayingOpen = false },
                 onShowAudio = { actions.selectTab(TopDestination.AUDIO) },
+                sheet = nowPlayingSheet,
             )
         }
     }

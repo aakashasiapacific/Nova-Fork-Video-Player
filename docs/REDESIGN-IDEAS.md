@@ -479,3 +479,4 @@ The owner asked for Apple Music to be copied more precisely, with less clutter. 
   4. A soft light sweeps across pictures while they load, instead of flat grey boxes.
   5. Home's hero backdrop drifts in a slow zoom.
   6. A double tap shows Samsung's side bubble: three chevrons lighting up in turn and "10 seconds".
+- **A real sheet (build 101, owner: "the swipe down is fake"):** Now Playing is moved by one 0–1 value shared by its slide, the finger's drag and the page behind. While it is open the page behind sinks back (7% smaller, rounded, dimmed) as iOS stacks a sheet on its page; pulling Now Playing down brings that page forward in step with the finger; near the bottom Now Playing fades into the mini player, which fades back in. Let go and it springs on from the speed of the flick (`NowPlayingSheet`).
