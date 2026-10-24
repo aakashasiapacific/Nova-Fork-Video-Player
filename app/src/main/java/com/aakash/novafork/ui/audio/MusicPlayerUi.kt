@@ -96,7 +96,7 @@ import com.aakash.novafork.music.MusicPlayerState
 import com.aakash.novafork.ui.common.NovaDropdownMenu
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.NovaMenuItem
-import com.aakash.novafork.ui.common.glass
+import com.aakash.novafork.ui.common.frostedGlass
 import com.aakash.novafork.ui.model.RepeatMode
 import com.aakash.novafork.ui.theme.AudioTheme
 import com.aakash.novafork.ui.theme.NovaColors
@@ -359,7 +359,7 @@ fun MiniPlayerBar(
         modifier
             .fillMaxWidth()
             .height(MiniPlayerHeight)
-            .glass(RoundedCornerShape(percent = 50))
+            .frostedGlass(RoundedCornerShape(percent = 50))
             .clickable(onClickLabel = "Open Now Playing", onClick = onOpen)
             .draggable(
                 state = swipeState,

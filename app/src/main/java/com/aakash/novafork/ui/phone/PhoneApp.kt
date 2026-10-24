@@ -1,5 +1,6 @@
 package com.aakash.novafork.ui.phone
 
+import android.os.Build
 import androidx.annotation.DrawableRes
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
@@ -67,6 +68,7 @@ import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.shadow
@@ -99,6 +101,8 @@ import com.aakash.novafork.ui.audio.ShellNowPlaying
 import com.aakash.novafork.ui.audio.rememberMusicShell
 import com.aakash.novafork.ui.common.GlassCircle
 import com.aakash.novafork.ui.common.LocalBottomBarSpace
+import com.aakash.novafork.ui.common.LocalGlassHaze
+import com.aakash.novafork.ui.common.LocalMenuFocus
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.NovaTabCapsule
 import com.aakash.novafork.ui.common.activeColor
@@ -113,6 +117,8 @@ import com.aakash.novafork.ui.model.TopDestination
 import com.aakash.novafork.ui.model.top
 import com.aakash.novafork.ui.settings.SettingsScreen
 import com.aakash.novafork.ui.theme.NovaColors
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.haze
 import kotlinx.coroutines.launch
 
 /**
@@ -173,11 +179,26 @@ fun PhoneApp(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
     // grows out of it and shrinks back into it (iOS 18's zoom transition).
     var tapOrigin by remember { mutableStateOf(TransformOrigin.Center) }
     val zoomOrigins = remember { mutableMapOf<Route, TransformOrigin>() }
-    CompositionLocalProvider(LocalNowPlayingSheet provides nowPlayingSheet) {
+    // The pages are the blur source of the glass over them (not under Robolectric, whose
+    // graphics have no RenderEffect).
+    val glassHaze = remember { HazeState() }.takeIf { Build.FINGERPRINT != "robolectric" }
+    // While a poster's menu is open the whole shell blurs and dims behind it (iOS).
+    val menuFocus = remember { mutableStateOf(0) }
+    val menuDim by animateFloatAsState(if (menuFocus.value > 0) 1f else 0f, tween(220), label = "menuDim")
+    CompositionLocalProvider(
+        LocalNowPlayingSheet provides nowPlayingSheet,
+        LocalGlassHaze provides glassHaze,
+        LocalMenuFocus provides menuFocus,
+    ) {
         Box(
             modifier
                 .fillMaxSize()
                 .background(MaterialTheme.colorScheme.background)
+                .then(if (menuDim > 0f) Modifier.blur((16f * menuDim).dp) else Modifier)
+                .drawWithContent {
+                    drawContent()
+                    if (menuDim > 0f) drawRect(Color.Black.copy(alpha = 0.3f * menuDim))
+                }
                 .pointerInput(Unit) {
                     awaitEachGesture {
                         val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
@@ -210,6 +231,7 @@ fun PhoneApp(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
                             val open = nowPlayingSheet.openFraction
                             if (open > 0f) drawRect(Color.Black.copy(alpha = 0.4f * open))
                         }
+                        .then(if (glassHaze != null) Modifier.haze(glassHaze) else Modifier)
                         .nestedScroll(barScroll)
                         .swipeBetweenTabs(top, enabled = !state.canGoBack, onSelect = actions::selectTab, onBack = actions::back)
                         .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)),

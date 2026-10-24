@@ -491,3 +491,6 @@ The owner asked for Apple Music to be copied more precisely, with less clutter. 
   - iOS edge bounce on every phone page instead of Android's stretch: past an end a list follows the finger with growing resistance and springs back; a fling into an end overshoots a little (`iosOverscroll`).
   - A movie or show page pulled down from its top shrinks toward its poster and closes when let go far enough, the zoom back finishing it.
   - Scrubbing a file on the phone shows the frame at that point above the time, as Samsung's player does (read with one MediaMetadataRetriever, the latest request winning).
+- **Polish batch C (build 106, owner):**
+  - Real frosted glass: the tab bar, the round glass buttons and the mini player blur what scrolls under them (Haze 1.1.0, Android 12 and later; a dark tint as before on older phones) (`frostedGlass`).
+  - Long-press on a poster as iOS: the whole screen blurs and dims while a sharp copy of the card floats over it, a little larger, with its menu below (`LocalMenuFocus`).

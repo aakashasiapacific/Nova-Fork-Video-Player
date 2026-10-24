@@ -42,6 +42,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -62,6 +63,10 @@ import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
 import com.aakash.novafork.ui.model.TopDestination
 import com.aakash.novafork.ui.theme.NovaColors
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.HazeStyle
+import dev.chrisbanes.haze.HazeTint
+import dev.chrisbanes.haze.hazeChild
 import kotlinx.coroutines.launch
 
 /**
@@ -83,7 +88,7 @@ internal fun NovaTabCapsule(selected: TopDestination, onSelect: (TopDestination)
     var dragX by remember { mutableStateOf<Float?>(null) }
     BoxWithConstraints(
         modifier
-            .glass(RoundedCornerShape(percent = 50))
+            .frostedGlass(RoundedCornerShape(percent = 50))
             .padding(PillInset)
             .pointerInput(tabs.size) {
                 fun tabAt(x: Float): TopDestination = tabs[(x / size.width * tabs.size).toInt().coerceIn(0, tabs.lastIndex)]
@@ -152,7 +157,7 @@ internal fun GlassCircle(onClick: () -> Unit, description: String, size: Dp, mod
         modifier
             .pressScale(press, pressed = 0.9f)
             .size(size)
-            .glass(CircleShape)
+            .frostedGlass(CircleShape)
             .clickable(interactionSource = press, indication = LocalIndication.current, onClickLabel = description, role = Role.Button, onClick = onClick)
             .semantics { contentDescription = description },
         contentAlignment = Alignment.Center,
@@ -165,6 +170,32 @@ internal fun Modifier.glass(shape: Shape): Modifier = this
     .clip(shape)
     .background(GlassColor)
     .border(0.5.dp, Color.White.copy(alpha = 0.10f), shape)
+
+/**
+ * iOS's real glass over the pages (owner): what scrolls underneath shows through blurred, under a
+ * dark tint, where the shell gives a blur source ([LocalGlassHaze], Android 12 and later); the
+ * plain [glass] elsewhere and on older phones.
+ */
+@Composable
+internal fun Modifier.frostedGlass(shape: Shape): Modifier {
+    val haze = LocalGlassHaze.current ?: return glass(shape)
+    return this
+        .shadow(elevation = 12.dp, shape = shape, ambientColor = Color.Black, spotColor = Color.Black)
+        .clip(shape)
+        .hazeChild(haze, FrostedStyle)
+        .border(0.5.dp, Color.White.copy(alpha = 0.10f), shape)
+}
+
+/** The shell's pages as a blur source for [frostedGlass]; null where nothing is blurred. */
+val LocalGlassHaze = staticCompositionLocalOf<HazeState?> { null }
+
+private val FrostedStyle = HazeStyle(
+    backgroundColor = Color.Black,
+    tint = HazeTint(Color(0xA61C1C1E)),
+    blurRadius = 24.dp,
+    noiseFactor = 0.04f,
+    fallbackTint = HazeTint(Color(0xF21C1C1E)),
+)
 
 private val PillInset = 5.dp
 private val GlassColor = Color(0xF21C1C1E)
