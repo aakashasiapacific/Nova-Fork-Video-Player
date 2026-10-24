@@ -87,6 +87,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.aakash.novafork.R
 import com.aakash.novafork.data.db.SongEntity
 import com.aakash.novafork.data.music.MusicLibrary
@@ -210,27 +211,39 @@ val LocalNowPlayingSheet = staticCompositionLocalOf<NowPlayingSheet?> { null }
 @Composable
 fun CoverFlight(artUri: String?) {
     val sheet = LocalNowPlayingSheet.current ?: return
-    if (!sheet.flying) return
-    val big = sheet.bigCover ?: return
-    val mini = sheet.miniCover ?: return
-    val open = sheet.openFraction
-    val t = FastOutSlowInEasing.transform(((0.55f - open) / 0.55f).coerceIn(0f, 1f))
-    fun mix(a: Float, b: Float) = a + (b - a) * t
-    val bigTop = big.top + (1f - open) * sheet.heightPx
-    val left = mix(big.left, mini.left)
-    val top = mix(bigTop, mini.top)
+    if (artUri == null) return
+    val context = LocalContext.current
+    // Loaded ahead at one fixed size and kept composed (unseen while nothing flies), so a flight
+    // starts with the picture already there: no blank frame, no fade, no placeholder note.
+    val request = remember(artUri) {
+        ImageRequest.Builder(context).data(artUri).size(FLIGHT_PX).crossfade(false).build()
+    }
+    val big = sheet.bigCover
+    val mini = sheet.miniCover
+    val flying = sheet.flying && big != null && mini != null
     val density = LocalDensity.current
-    val width = with(density) { mix(big.width, mini.width).toDp() }
-    val height = with(density) { mix(big.height, mini.height).toDp() }
-    Cover(
-        artUri,
-        size = 0,
-        corner = mix(12f, 8f).roundToInt(),
-        modifier = Modifier
+    val modifier = if (flying) {
+        val open = sheet.openFraction
+        val t = FastOutSlowInEasing.transform(((0.55f - open) / 0.55f).coerceIn(0f, 1f))
+        fun mix(a: Float, b: Float) = a + (b - a) * t
+        val bigTop = big!!.top + (1f - open) * sheet.heightPx
+        val left = mix(big.left, mini!!.left)
+        val top = mix(bigTop, mini.top)
+        val corner = with(density) { mix(12f, 8f).dp }
+        Modifier
             .offset { IntOffset(left.roundToInt(), top.roundToInt()) }
-            .size(width, height),
-    )
+            .size(with(density) { mix(big.width, mini.width).toDp() }, with(density) { mix(big.height, mini.height).toDp() })
+            .clip(RoundedCornerShape(corner))
+    } else {
+        Modifier
+            .size(64.dp)
+            .graphicsLayer { alpha = 0f }
+    }
+    AsyncImage(model = request, contentDescription = null, contentScale = ContentScale.Crop, modifier = modifier)
 }
+
+/** The size the flying cover is decoded at, sharp enough for the big cover. */
+private const val FLIGHT_PX = 720
 
 /**
  * Now Playing for the app shell: the star, the queue, and Apple Music's "…" with Add to a
