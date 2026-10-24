@@ -85,7 +85,13 @@ fun NovaDialogs(dialog: DialogUi?, actions: AppActions, playlists: List<Playlist
         )
         is DialogUi.ConfirmDeleteVideo -> ConfirmDeleteVideoDialog(
             title = dialog.title,
+            toBin = dialog.toBin,
             onConfirm = { actions.confirmDeleteVideo(dialog.videoId) },
+            onDismiss = actions::dismissDialog,
+        )
+        is DialogUi.RecentlyDeleted -> RecentlyDeletedDialog(
+            items = dialog.items,
+            onRestore = actions::restoreVideo,
             onDismiss = actions::dismissDialog,
         )
         is DialogUi.LibraryDiagnostics -> LibraryDiagnosticsDialog(dialog = dialog, actions = actions)

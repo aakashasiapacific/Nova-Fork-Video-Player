@@ -1,5 +1,6 @@
 package com.aakash.novafork.ui.common
 
+import android.os.Build
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -26,7 +27,7 @@ import com.aakash.novafork.ui.theme.NovaColors
 /**
  * The way into the whole library, at the end of Home (phone and tablet): Recently added (every
  * video, newest first), Watchlist, Favorites, All videos (A–Z), Movies, TV shows, then folders,
- * sources and playlists. Laid out like the Library list in Apple's TV and Music apps: blue icons,
+ * sources and playlists, and Recently Deleted. Laid out like the Library list in Apple's TV and Music apps: blue icons,
  * grey chevrons and hairlines inset to the labels between the rows.
  */
 @Composable
@@ -49,7 +50,10 @@ fun HomeLibraryLinks(actions: AppActions, modifier: Modifier = Modifier) {
         }
         LibraryLink(R.drawable.ic_movie, "Movies") { actions.openLibrary(LibraryFilter.MOVIES) }
         LibraryLink(R.drawable.ic_tv, "TV Shows") { actions.openLibrary(LibraryFilter.SHOWS) }
-        LibraryLink(R.drawable.ic_folder, "Folders, sources and playlists", last = true) { actions.navigate(Route.Browse) }
+        val hasBin = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R
+        LibraryLink(R.drawable.ic_folder, "Folders, sources and playlists", last = !hasBin) { actions.navigate(Route.Browse) }
+        // Android's bin (Android 11 and later): deleted videos wait here 30 days, as in Photos.
+        if (hasBin) LibraryLink(R.drawable.ic_delete, "Recently Deleted", last = true) { actions.showRecentlyDeleted() }
     }
 }
 

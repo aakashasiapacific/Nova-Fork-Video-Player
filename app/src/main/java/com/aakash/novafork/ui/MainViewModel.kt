@@ -578,8 +578,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
         return DeleteTarget(uri, mediaStore = uri.startsWith("content://media/"), title = title)
     }
 
-    /** The file is gone: the video leaves the library and its page closes. */
-    fun onVideoDeleted(videoId: Long, title: String) {
+    /** The file is gone (or in the bin): the video leaves the library and its page closes. */
+    fun onVideoDeleted(videoId: Long, title: String, toBin: Boolean) {
         launchSafely("Couldn't update the library") {
             library.forgetDeletedVideo(videoId)
             local.update { state ->
@@ -587,10 +587,16 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
                 state.copy(
                     backStack = stack.ifEmpty { listOf(Route.Home) },
                     dialog = state.dialog.takeUnless { it is DialogUi.ConfirmDeleteVideo },
-                    message = "Deleted $title",
+                    message = if (toBin) "Moved $title to Recently Deleted" else "Deleted $title",
                 )
             }
         }
+    }
+
+    /** A video came back from the bin: device storage is scanned so it shows again. */
+    fun onVideoRestored() {
+        showMessage("Restored. It shows again once the library updates.")
+        refresh()
     }
 
     override fun consumeMessage() {

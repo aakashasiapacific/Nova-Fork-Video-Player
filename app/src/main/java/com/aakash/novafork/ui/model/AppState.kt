@@ -200,8 +200,14 @@ sealed interface DialogUi {
 
     data class ConfirmDeletePlaylist(val playlistId: Long, val name: String) : DialogUi
 
-    /** Deleting a video's file from a picked folder (device videos get Android's own prompt). */
-    data class ConfirmDeleteVideo(val videoId: Long, val title: String) : DialogUi
+    /**
+     * Asked before any video goes: into Android's bin ([toBin], Android 11 and later, restorable
+     * for 30 days from Recently Deleted) or, where there is no bin (a picked folder), for good.
+     */
+    data class ConfirmDeleteVideo(val videoId: Long, val title: String, val toBin: Boolean) : DialogUi
+
+    /** Videos in Android's bin, restorable until they expire; [items] is null while loading. */
+    data class RecentlyDeleted(val items: List<TrashedVideoUi>? = null) : DialogUi
 
     /**
      * Settings › About › Library diagnostics: a plain-text report to copy or share; [report] is
@@ -401,13 +407,16 @@ interface AppActions {
 
     fun deletePlaylist(playlistId: Long) {}
 
-    /**
-     * Deletes a video's file from the phone: Android's own prompt for device storage, ours
-     * ([DialogUi.ConfirmDeleteVideo]) for a picked folder, then [confirmDeleteVideo].
-     */
+    /** Asks first ([DialogUi.ConfirmDeleteVideo]); [confirmDeleteVideo] then bins or deletes it. */
     fun deleteVideo(videoId: Long) {}
 
     fun confirmDeleteVideo(videoId: Long) {}
+
+    /** Lists the videos in Android's bin ([DialogUi.RecentlyDeleted]). */
+    fun showRecentlyDeleted() {}
+
+    /** Takes a video out of Android's bin, back into the library. */
+    fun restoreVideo(uri: String) {}
 
     fun removeFromPlaylist(playlistId: Long, videoId: Long) {}
 
@@ -506,3 +515,7 @@ open class NoOpAppActions : AppActions {
     override fun shareCrashReport() {}
     override fun dismissCrashReport() {}
 }
+
+/** A video in Android's bin: its MediaStore uri, file name and days until it is gone for good. */
+@Immutable
+data class TrashedVideoUi(val uri: String, val name: String, val daysLeft: Int?)
