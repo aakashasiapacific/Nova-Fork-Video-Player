@@ -1,14 +1,5 @@
 package com.aakash.novafork.ui.phone
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.expandHorizontally
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkHorizontally
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -31,11 +22,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -49,7 +38,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
@@ -70,10 +58,13 @@ import com.aakash.novafork.ui.adaptive.LocalNovaDimens
 import com.aakash.novafork.ui.common.EmptyState
 import com.aakash.novafork.ui.common.Hairline
 import com.aakash.novafork.ui.common.IosColors
+import com.aakash.novafork.ui.common.IosIconButton
+import com.aakash.novafork.ui.common.IosTextButton
 import com.aakash.novafork.ui.common.LocalBottomBarSpace
 import com.aakash.novafork.ui.common.LocalSearchQuery
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.OnTabReselect
+import com.aakash.novafork.ui.common.SwipeToDelete
 import com.aakash.novafork.ui.common.glass
 import com.aakash.novafork.ui.common.musicSearchResults
 import com.aakash.novafork.ui.common.stretchWithPull
@@ -154,6 +145,7 @@ fun PhoneSearchScreen(
                         },
                         onClear = actions::clearRecentSearches,
                         bottomSpace = listSpace,
+                        onForget = actions::forgetSearch,
                     )
                     field.text.isBlank() -> CenteredScrollable(Modifier.padding(bottom = listSpace)) {
                         EmptyState(
@@ -177,11 +169,7 @@ fun PhoneSearchScreen(
                 }
             }
         }
-        // iOS: while the field is being typed in, "Cancel" slides in beside it and the field
-        // narrows to make room; Cancel empties it and puts the keyboard away.
-        var focused by remember { mutableStateOf(false) }
-        // Putting the keyboard away (its arrow, or back) ends typing as Cancel would, so Cancel
-        // goes with it instead of staying beside an idle field (owner).
+        // Putting the keyboard away (its arrow, or back) ends typing, so the cursor goes too.
         val keyboardUp = imeBottom > 0.dp
         var keyboardWasUp by remember { mutableStateOf(false) }
         LaunchedEffect(keyboardUp) {
@@ -192,55 +180,28 @@ fun PhoneSearchScreen(
                 focusManager.clearFocus()
             }
         }
-        Row(
-            Modifier
+        // Always full width (owner: no Cancel beside it); its ✕ clears what was typed.
+        SearchField(
+            value = field,
+            onValueChange = { value ->
+                val changed = value.text != field.text
+                field = value
+                if (changed) actions.search(value.text)
+            },
+            onClear = {
+                field = TextFieldValue("")
+                actions.search("")
+                focusRequester.requestFocus()
+            },
+            onSearch = {
+                actions.rememberSearch(field.text)
+                keyboard?.hide()
+            },
+            focusRequester = focusRequester,
+            modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .fillMaxWidth()
                 .padding(start = 20.dp, end = 20.dp, bottom = fieldBottom),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            SearchField(
-                value = field,
-                onValueChange = { value ->
-                    val changed = value.text != field.text
-                    field = value
-                    if (changed) actions.search(value.text)
-                },
-                onClear = {
-                    field = TextFieldValue("")
-                    actions.search("")
-                    focusRequester.requestFocus()
-                },
-                onSearch = {
-                    actions.rememberSearch(field.text)
-                    keyboard?.hide()
-                },
-                focusRequester = focusRequester,
-                onFocusChanged = { focused = it },
-                modifier = Modifier.weight(1f),
-            )
-            AnimatedVisibility(
-                visible = focused,
-                enter = expandHorizontally(spring(dampingRatio = 0.86f, stiffness = 500f), expandFrom = Alignment.Start) +
-                    slideInHorizontally(spring(dampingRatio = 0.86f, stiffness = 500f)) { it / 2 } + fadeIn(tween(160)),
-                exit = shrinkHorizontally(tween(240), shrinkTowards = Alignment.Start) +
-                    slideOutHorizontally(tween(240)) { it / 2 } + fadeOut(tween(140)),
-            ) {
-                TextButton(
-                    onClick = {
-                        if (field.text.isNotEmpty()) {
-                            field = TextFieldValue("")
-                            actions.search("")
-                        }
-                        focusManager.clearFocus()
-                        keyboard?.hide()
-                    },
-                    modifier = Modifier.padding(start = 4.dp),
-                ) {
-                    Text("Cancel", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.primary, maxLines = 1)
-                }
-            }
-        }
+        )
     }
 }
 
@@ -253,7 +214,6 @@ private fun SearchField(
     onSearch: () -> Unit,
     focusRequester: FocusRequester,
     modifier: Modifier = Modifier,
-    onFocusChanged: (Boolean) -> Unit = {},
 ) {
     Row(
         modifier
@@ -290,12 +250,11 @@ private fun SearchField(
                 keyboardActions = KeyboardActions(onSearch = { onSearch() }),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .focusRequester(focusRequester)
-                    .onFocusChanged { onFocusChanged(it.isFocused) },
+                    .focusRequester(focusRequester),
             )
         }
         if (value.text.isNotEmpty()) {
-            IconButton(onClick = onClear) {
+            IosIconButton(onClick = onClear) {
                 NovaIcon(R.drawable.ic_close, contentDescription = "Clear", tint = Color.White.copy(alpha = 0.6f))
             }
         }
@@ -304,9 +263,18 @@ private fun SearchField(
 
 private val SearchFieldHeight = 52.dp
 
-/** iOS's recent searches: a header with Clear, then each search, tap to run it again. */
+/**
+ * iOS's recent searches: a header with Clear, then each search, tap to run it again or swipe it
+ * left to take just that one away.
+ */
 @Composable
-internal fun RecentSearches(recent: List<String>, onPick: (String) -> Unit, onClear: () -> Unit, bottomSpace: Dp) {
+internal fun RecentSearches(
+    recent: List<String>,
+    onPick: (String) -> Unit,
+    onClear: () -> Unit,
+    bottomSpace: Dp,
+    onForget: (String) -> Unit = {},
+) {
     val dims = LocalNovaDimens.current
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -315,23 +283,25 @@ internal fun RecentSearches(recent: List<String>, onPick: (String) -> Unit, onCl
         item(key = "header") {
             Row(Modifier.fillMaxWidth().padding(bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text("Recent Searches", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
-                TextButton(onClick = onClear) { Text("Clear") }
+                IosTextButton(onClick = onClear) { Text("Clear") }
             }
         }
         items(recent, key = { it }) { query ->
-            Column(Modifier.clickable { onPick(query) }) {
-                Row(Modifier.padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    NovaIcon(R.drawable.ic_search, contentDescription = null, tint = IosColors.SecondaryLabel, modifier = Modifier.size(18.dp))
-                    Text(
-                        query,
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.primary,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(start = 12.dp),
-                    )
+            SwipeToDelete(onDelete = { onForget(query) }, label = "Remove", modifier = Modifier.animateItem()) {
+                Column(Modifier.clickable { onPick(query) }) {
+                    Row(Modifier.padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        NovaIcon(R.drawable.ic_search, contentDescription = null, tint = IosColors.SecondaryLabel, modifier = Modifier.size(18.dp))
+                        Text(
+                            query,
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.primary,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.padding(start = 12.dp),
+                        )
+                    }
+                    Box(Modifier.fillMaxWidth().height(Hairline).background(IosColors.Separator))
                 }
-                Box(Modifier.fillMaxWidth().height(Hairline).background(IosColors.Separator))
             }
         }
     }

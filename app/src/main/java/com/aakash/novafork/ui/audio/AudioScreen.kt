@@ -54,13 +54,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -109,10 +106,13 @@ import com.aakash.novafork.data.music.MusicScanState
 import com.aakash.novafork.music.MusicPlayerState
 import com.aakash.novafork.ui.common.CollapsedTitleBar
 import com.aakash.novafork.ui.common.ContextMenuLift
+import com.aakash.novafork.ui.common.IosButton
 import com.aakash.novafork.ui.common.IosColors
 import com.aakash.novafork.ui.common.IosGrabber
+import com.aakash.novafork.ui.common.IosIconButton
 import com.aakash.novafork.ui.common.IosSheetShape
 import com.aakash.novafork.ui.common.IosSpinner
+import com.aakash.novafork.ui.common.IosTextButton
 import com.aakash.novafork.ui.common.LocalBottomBarSpace
 import com.aakash.novafork.ui.common.LocalHud
 import com.aakash.novafork.ui.common.LocalPagePull
@@ -948,7 +948,13 @@ private fun AlbumTile(album: Album, ctx: PageContext, modifier: Modifier = Modif
     var menuOpen by remember { mutableStateOf(false) }
     Box(modifier) {
         ContextMenuLift(open = menuOpen) { _ ->
-            AlbumTileContent(album, onClick = onClick, onLongClick = { menuOpen = true })
+            val playing = ctx.nowPlayingId != null && album.songs.any { it.id == ctx.nowPlayingId }
+            AlbumTileContent(
+                album,
+                onClick = onClick,
+                onLongClick = { menuOpen = true },
+                playing = if (playing) ctx.isPlaying else null,
+            )
         }
         NovaDropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
             val close = { menuOpen = false }
@@ -992,7 +998,7 @@ private fun AlbumTile(album: Album, ctx: PageContext, modifier: Modifier = Modif
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun AlbumTileContent(album: Album, onClick: () -> Unit, onLongClick: () -> Unit) {
+private fun AlbumTileContent(album: Album, onClick: () -> Unit, onLongClick: () -> Unit, playing: Boolean? = null) {
     Column(
         Modifier
             .padding(bottom = 18.dp)
@@ -1005,6 +1011,21 @@ private fun AlbumTileContent(album: Album, onClick: () -> Unit, onLongClick: () 
                 .clip(RoundedCornerShape(8.dp)),
         ) {
             Cover(album.artUri, size = 0, modifier = Modifier.fillMaxSize())
+            // The album that is playing ([playing] non-null) carries the mini player's bars in
+            // its corner, dancing while it plays.
+            if (playing != null) {
+                Box(
+                    Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(8.dp)
+                        .size(28.dp)
+                        .clip(RoundedCornerShape(7.dp))
+                        .background(Color.Black.copy(alpha = 0.55f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    PlayingBars(playing = playing, color = Color.White)
+                }
+            }
         }
         Text(
             album.title,
@@ -1219,7 +1240,7 @@ private fun FavoriteStar(favorite: Boolean) {
 
 @Composable
 private fun RowMoreButton(onClick: () -> Unit) {
-    IconButton(onClick = onClick) {
+    IosIconButton(onClick = onClick) {
         NovaIcon(R.drawable.ic_more_vert, contentDescription = "More", tint = Color.White, modifier = Modifier.size(20.dp))
     }
 }
@@ -1384,7 +1405,7 @@ private fun AccessCard(onRequestAccess: () -> Unit) {
             color = Color.White.copy(alpha = 0.6f),
             modifier = Modifier.padding(top = 4.dp, bottom = 12.dp),
         )
-        Button(onClick = onRequestAccess) { Text("Allow") }
+        IosButton(onClick = onRequestAccess) { Text("Allow") }
     }
 }
 
@@ -1412,8 +1433,8 @@ private fun NewPlaylistDialog(onCreate: (String) -> Unit, onDismiss: () -> Unit)
                 modifier = Modifier.fillMaxWidth(),
             )
         },
-        confirmButton = { TextButton(onClick = { onCreate(name.trim()) }, enabled = name.isNotBlank()) { Text("Create") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        confirmButton = { IosTextButton(onClick = { onCreate(name.trim()) }, enabled = name.isNotBlank()) { Text("Create") } },
+        dismissButton = { IosTextButton(onClick = onDismiss) { Text("Cancel") } },
     )
 }
 
@@ -1468,7 +1489,7 @@ internal fun AddToPlaylistDialog(
                         keyboardActions = KeyboardActions(onDone = { if (name.isNotBlank()) onPick(null, name.trim()) }),
                         modifier = Modifier.weight(1f),
                     )
-                    TextButton(onClick = { onPick(null, name.trim()) }, enabled = name.isNotBlank()) {
+                    IosTextButton(onClick = { onPick(null, name.trim()) }, enabled = name.isNotBlank()) {
                         Text("Create", color = if (name.isNotBlank()) NovaColors.AppleMusicRed else Color.White.copy(alpha = 0.3f))
                     }
                 }

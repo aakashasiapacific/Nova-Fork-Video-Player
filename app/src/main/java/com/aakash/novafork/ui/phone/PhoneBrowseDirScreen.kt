@@ -17,7 +17,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
@@ -37,6 +36,7 @@ import com.aakash.novafork.data.db.SourceType
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
 import com.aakash.novafork.ui.common.DeviceStorageEmptyState
 import com.aakash.novafork.ui.common.EmptyState
+import com.aakash.novafork.ui.common.IosIconButton
 import com.aakash.novafork.ui.common.IosProgressBar
 import com.aakash.novafork.ui.common.LocalBottomBarSpace
 import com.aakash.novafork.ui.common.NovaIcon
@@ -64,7 +64,7 @@ fun PhoneBrowseDirScreen(
             onBack = actions::back,
             actions = {
                 if (dir != null) {
-                    IconButton(onClick = { actions.rescanSource(dir.sourceId) }, enabled = !dir.isLoading) {
+                    IosIconButton(onClick = { actions.rescanSource(dir.sourceId) }, enabled = !dir.isLoading) {
                         NovaIcon(R.drawable.ic_refresh, contentDescription = "Rescan")
                     }
                 }

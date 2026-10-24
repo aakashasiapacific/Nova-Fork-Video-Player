@@ -27,8 +27,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -59,6 +57,8 @@ import com.aakash.novafork.ui.adaptive.LocalNovaDimens
 import com.aakash.novafork.ui.common.BackdropArt
 import com.aakash.novafork.ui.common.DeviceAccessCard
 import com.aakash.novafork.ui.common.HomeLibraryLinks
+import com.aakash.novafork.ui.common.IosButton
+import com.aakash.novafork.ui.common.IosFilledTonalButton
 import com.aakash.novafork.ui.common.LandscapeArt
 import com.aakash.novafork.ui.common.LocalHeroPreviewEnabled
 import com.aakash.novafork.ui.common.RatingPill
@@ -349,23 +349,23 @@ private fun OnboardingText(scan: ScanUi, permission: PermissionUi, actions: AppA
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             if (!permission.granted || permission.partial) {
-                Button(onClick = actions::requestPermission, modifier = Modifier.fillMaxWidth().height(48.dp)) {
+                IosButton(onClick = actions::requestPermission, modifier = Modifier.fillMaxWidth().height(48.dp)) {
                     ButtonLabel(
                         R.drawable.ic_video_library,
                         if (permission.partial) "Allow Access to All Videos" else "Allow Access to Videos",
                     )
                 }
             }
-            FilledTonalButton(onClick = actions::addFolder, modifier = Modifier.fillMaxWidth().height(48.dp)) {
+            IosFilledTonalButton(onClick = actions::addFolder, modifier = Modifier.fillMaxWidth().height(48.dp)) {
                 ButtonLabel(R.drawable.ic_create_new_folder, "Add a Folder")
             }
-            FilledTonalButton(
+            IosFilledTonalButton(
                 onClick = actions::addNetworkSource,
                 modifier = Modifier.fillMaxWidth().height(48.dp),
             ) {
                 ButtonLabel(R.drawable.ic_lan, "Add a Network Source")
             }
-            FilledTonalButton(
+            IosFilledTonalButton(
                 onClick = { actions.showDialog(DialogUi.OpenUrl) },
                 modifier = Modifier.fillMaxWidth().height(48.dp),
             ) {

@@ -38,7 +38,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
@@ -74,6 +73,7 @@ import com.aakash.novafork.core.format.Formats
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
 import com.aakash.novafork.ui.common.ArtPlaceholder
 import com.aakash.novafork.ui.common.BackdropArt
+import com.aakash.novafork.ui.common.IosButton
 import com.aakash.novafork.ui.common.IosProgressBar
 import com.aakash.novafork.ui.common.IosSpinner
 import com.aakash.novafork.ui.common.LandscapeArt
@@ -213,7 +213,7 @@ private const val PULL_REFRESH_GRACE_MS = 900L
 /** Primary "Play / Resume …" button, a little taller than the default for lean-back screens. */
 @Composable
 internal fun TabletPlayButton(label: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true) {
-    Button(
+    IosButton(
         onClick = onClick,
         enabled = enabled,
         modifier = modifier.height(48.dp),

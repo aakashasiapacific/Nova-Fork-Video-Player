@@ -32,10 +32,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -70,6 +67,7 @@ import com.aakash.novafork.ui.common.BackdropArt
 import com.aakash.novafork.ui.common.DeviceAccessCard
 import com.aakash.novafork.ui.common.EmptyState
 import com.aakash.novafork.ui.common.HomeLibraryLinks
+import com.aakash.novafork.ui.common.IosFilledTonalButton
 import com.aakash.novafork.ui.common.LocalBottomBarSpace
 import com.aakash.novafork.ui.common.LocalHeroPreviewEnabled
 import com.aakash.novafork.ui.common.LocalStatusBarIcons
@@ -387,16 +385,16 @@ private fun HomeOnboarding(scan: ScanUi, permission: PermissionUi, actions: AppA
                         .fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    FilledTonalButton(onClick = actions::addFolder, modifier = Modifier.fillMaxWidth()) {
+                    IosFilledTonalButton(onClick = actions::addFolder, modifier = Modifier.fillMaxWidth()) {
                         ButtonContent(R.drawable.ic_create_new_folder, "Add a Folder")
                     }
-                    FilledTonalButton(
+                    IosFilledTonalButton(
                         onClick = actions::addNetworkSource,
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         ButtonContent(R.drawable.ic_lan, "Add a Network Source")
                     }
-                    FilledTonalButton(
+                    IosFilledTonalButton(
                         onClick = { actions.showDialog(DialogUi.OpenUrl) },
                         modifier = Modifier.fillMaxWidth(),
                     ) {

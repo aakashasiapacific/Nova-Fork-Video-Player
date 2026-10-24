@@ -47,15 +47,14 @@ import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -72,6 +71,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.contentDescription
@@ -91,8 +92,9 @@ import com.aakash.novafork.ui.common.ArtPlaceholder
 import com.aakash.novafork.ui.common.BackdropArt
 import com.aakash.novafork.ui.common.HeroTitle
 import com.aakash.novafork.ui.common.HeroVideoPreview
+import com.aakash.novafork.ui.common.IosButton
 import com.aakash.novafork.ui.common.IosColors
-import com.aakash.novafork.ui.common.LocalHud
+import com.aakash.novafork.ui.common.IosIconButton
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.PosterArt
 import com.aakash.novafork.ui.common.RatingPill
@@ -157,11 +159,19 @@ internal fun PhoneHeroPager(
     val canPreview = previewEnabled && previewAllowed && current?.previewUri != null
     val dwell = if (canPreview) HERO_PREVIEW_DWELL_MS else HERO_AUTO_ADVANCE_MS
     val timer = remember { Animatable(0f) }
-    // Restarts on every settle, so a manual swipe also resets the timer; the active dot fills with it.
-    LaunchedEffect(pagerState, dragged, settled, heroes.size, dwell) {
-        timer.snapTo(0f)
-        if (dragged || heroes.size < 2) return@LaunchedEffect
-        timer.animateTo(1f, tween(durationMillis = dwell.toInt(), easing = LinearEasing))
+    // A finger resting on the hero holds it where it is (owner); letting go carries on.
+    var held by remember { mutableStateOf(false) }
+    var timedPage by remember { mutableIntStateOf(-1) }
+    // Restarts on every settle, so a manual swipe also resets the timer; the active dot fills with
+    // it. While held it stops, and then runs on for what was left.
+    LaunchedEffect(pagerState, dragged, settled, heroes.size, dwell, held) {
+        if (timedPage != settled || dragged) {
+            timer.snapTo(0f)
+            timedPage = settled
+        }
+        if (dragged || held || heroes.size < 2) return@LaunchedEffect
+        val left = ((1f - timer.value) * dwell).toInt().coerceAtLeast(1)
+        timer.animateTo(1f, tween(durationMillis = left, easing = LinearEasing))
         pagerState.animateScrollToPage((pagerState.currentPage + 1) % heroes.size)
     }
     val targetHeight = pageHeight?.let { forPage -> heroes.getOrNull(pagerState.currentPage)?.let(forPage) } ?: height
@@ -169,7 +179,15 @@ internal fun PhoneHeroPager(
     Box(
         Modifier
             .fillMaxWidth()
-            .height(shownHeight),
+            .height(shownHeight)
+            .pointerInput(Unit) {
+                awaitPointerEventScope {
+                    while (true) {
+                        val event = awaitPointerEvent(PointerEventPass.Initial)
+                        held = event.changes.any { it.pressed }
+                    }
+                }
+            },
     ) {
         HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
             val hero = heroes.getOrNull(page)
@@ -517,7 +535,7 @@ private fun HeroActions(
 ) {
     Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         val playPress = remember { MutableInteractionSource() }
-        Button(
+        IosButton(
             onClick = play,
             interactionSource = playPress,
             modifier = when {
@@ -539,23 +557,20 @@ private fun HeroActions(
                 modifier = Modifier.padding(start = 6.dp),
             )
         }
-        val hud = LocalHud.current
+        // The buttons themselves show what was done (owner: no pop-up): Apple Music's favourite
+        // star fills white on red; the Watchlist "+" turns into a bookmark on blue (a tick would
+        // read as "watched").
         RoundHeroButton(
             icon = if (hero.favorite) R.drawable.ic_star else R.drawable.ic_star_outline,
             description = if (hero.favorite) "Remove from Favorites" else "Add to Favorites",
-            onClick = {
-                if (!hero.favorite) hud?.show(R.drawable.ic_star, "Added to Favorites")
-                actions.toggleFavorite(hero.itemKey)
-            },
+            onClick = { actions.toggleFavorite(hero.itemKey) },
+            fill = if (hero.favorite) NovaColors.AppleMusicRed else null,
         )
         RoundHeroButton(
-            icon = if (hero.onWatchlist) R.drawable.ic_check else R.drawable.ic_add,
+            icon = if (hero.onWatchlist) R.drawable.ic_bookmark_fill else R.drawable.ic_add,
             description = if (hero.onWatchlist) "Remove from Watchlist" else "Add to Watchlist",
-            onClick = {
-                if (!hero.onWatchlist) hud?.show(R.drawable.ic_check, "Added to Watchlist")
-                actions.toggleWatchlist(hero.itemKey)
-            },
-            // "+" turns round into the tick, as Apple TV's does.
+            onClick = { actions.toggleWatchlist(hero.itemKey) },
+            fill = if (hero.onWatchlist) NovaColors.IosBlue else null,
             turn = true,
         )
         val deleteId = hero.deleteVideoId
@@ -572,7 +587,8 @@ private fun HeroActions(
 
 /**
  * A round hero button that ticks under the finger. When its [icon] changes (star filled, "+" to
- * tick) the new glyph pops in with a little overshoot; with [turn] it also turns a quarter round.
+ * bookmark) the new glyph pops in with a little overshoot, with [turn] turning a quarter round
+ * as it does; [fill], when set, colours the whole button in (an "on" state).
  */
 @Composable
 private fun RoundHeroButton(
@@ -581,10 +597,12 @@ private fun RoundHeroButton(
     onClick: () -> Unit,
     tint: Color = Color.White,
     turn: Boolean = false,
+    fill: Color? = null,
 ) {
     val press = remember { MutableInteractionSource() }
     val haptics = LocalHapticFeedback.current
-    IconButton(
+    val container by animateColorAsState(fill ?: Color.White.copy(alpha = 0.18f), tween(220), label = "heroButtonFill")
+    IosIconButton(
         onClick = {
             haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
             onClick()
@@ -592,7 +610,7 @@ private fun RoundHeroButton(
         interactionSource = press,
         modifier = Modifier.size(50.dp).pressScale(press, pressed = 0.9f).semantics { contentDescription = description },
         colors = IconButtonDefaults.iconButtonColors(
-            containerColor = Color.White.copy(alpha = 0.18f),
+            containerColor = container,
             contentColor = tint,
         ),
     ) {
@@ -675,7 +693,7 @@ private fun PagerDots(count: Int, current: Int, fill: Float, modifier: Modifier 
 /** Apple TV's mute button (owner's reference): a solid dark-grey circle with a white speaker, level with the dots. */
 @Composable
 private fun MuteButton(muted: Boolean, onClick: () -> Unit) {
-    IconButton(
+    IosIconButton(
         onClick = onClick,
         modifier = Modifier.size(42.dp),
         colors = IconButtonDefaults.iconButtonColors(

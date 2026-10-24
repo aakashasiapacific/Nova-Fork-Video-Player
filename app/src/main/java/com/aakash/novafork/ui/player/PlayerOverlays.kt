@@ -18,6 +18,7 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -39,13 +40,12 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.AbsoluteRoundedCornerShape
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -55,8 +55,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.BiasAlignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
@@ -67,7 +71,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
 import com.aakash.novafork.core.format.Formats
+import com.aakash.novafork.ui.common.IosButton
 import com.aakash.novafork.ui.common.IosSpinner
+import com.aakash.novafork.ui.common.IosTextButton
 import com.aakash.novafork.ui.common.LandscapeArt
 import com.aakash.novafork.ui.model.GestureFeedback
 import com.aakash.novafork.ui.model.UpNextUi
@@ -305,7 +311,7 @@ internal fun ResumeBanner(
                     maxLines = 1,
                 )
                 Spacer(Modifier.width(4.dp))
-                TextButton(onClick = onStartOver) { Text("Start Over") }
+                IosTextButton(onClick = onStartOver) { Text("Start Over") }
                 PlayerIconButton(
                     icon = R.drawable.ic_close,
                     contentDescription = "Dismiss",
@@ -397,19 +403,49 @@ private fun UpNextContent(item: UpNextUi, onPlayNow: () -> Unit, onCancel: () ->
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                TextButton(
+                IosTextButton(
                     onClick = onCancel,
                     colors = ButtonDefaults.textButtonColors(contentColor = Color.White),
                 ) {
                     Text("Cancel")
                 }
-                Button(onClick = onPlayNow) {
-                    Icon(painterResource(R.drawable.ic_play_arrow), contentDescription = null, modifier = Modifier.size(18.dp))
+                IosButton(onClick = onPlayNow) {
+                    CountdownPlayIcon(item)
                     Spacer(Modifier.width(6.dp))
                     Text("Play Now")
                 }
             }
         }
+    }
+}
+
+/**
+ * Play Now's icon; while the next episode counts down, a ring round it fills smoothly until it
+ * starts by itself, as Apple TV's does.
+ */
+@Composable
+private fun CountdownPlayIcon(item: UpNextUi) {
+    val countdown = item.countdownSeconds
+    // The countdown's length is what it started from.
+    val total = remember(item.videoId) { (countdown ?: 0).coerceAtLeast(1) }
+    val target = if (countdown == null) 0f else ((total - countdown + 1).toFloat() / total).coerceIn(0f, 1f)
+    val progress by animateFloatAsState(target, tween(durationMillis = 1_000, easing = LinearEasing), label = "upNextRing")
+    Box(Modifier.size(22.dp), contentAlignment = Alignment.Center) {
+        if (countdown != null) {
+            val color = LocalContentColor.current
+            Canvas(Modifier.fillMaxSize()) {
+                val stroke = 2.dp.toPx()
+                val inset = stroke / 2f
+                val arcSize = Size(size.width - stroke, size.height - stroke)
+                drawArc(color.copy(alpha = 0.3f), 0f, 360f, useCenter = false, topLeft = Offset(inset, inset), size = arcSize, style = Stroke(stroke))
+                drawArc(color, -90f, 360f * progress, useCenter = false, topLeft = Offset(inset, inset), size = arcSize, style = Stroke(stroke, cap = StrokeCap.Round))
+            }
+        }
+        Icon(
+            painterResource(R.drawable.ic_play_arrow),
+            contentDescription = null,
+            modifier = Modifier.size(if (countdown != null) 11.dp else 18.dp),
+        )
     }
 }
 
@@ -447,13 +483,13 @@ internal fun ErrorCard(
             )
             Spacer(Modifier.height(20.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TextButton(
+                IosTextButton(
                     onClick = onRetry,
                     colors = ButtonDefaults.textButtonColors(contentColor = Color.White),
                 ) {
                     Text("Try Again")
                 }
-                Button(onClick = onClose) { Text("Close") }
+                IosButton(onClick = onClose) { Text("Close") }
             }
         }
     }

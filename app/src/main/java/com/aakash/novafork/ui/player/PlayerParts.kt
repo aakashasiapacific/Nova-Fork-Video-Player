@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -40,6 +39,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
 import com.aakash.novafork.core.format.Formats
+import com.aakash.novafork.ui.common.IosIconButton
 import com.aakash.novafork.ui.common.IosSpinner
 import com.aakash.novafork.ui.common.NovaDropdownMenu
 import com.aakash.novafork.ui.common.NovaMenuItem
@@ -126,7 +126,7 @@ internal fun PlayerIconButton(
     iconSize: Dp = 24.dp,
     enabled: Boolean = true,
 ) {
-    IconButton(onClick = onClick, modifier = modifier.size(buttonSize), enabled = enabled) {
+    IosIconButton(onClick = onClick, modifier = modifier.size(buttonSize), enabled = enabled) {
         Icon(painterResource(icon), contentDescription = contentDescription, modifier = Modifier.size(iconSize))
     }
 }
@@ -177,7 +177,7 @@ internal fun CastButton(
     iconSize: Dp = 24.dp,
 ) {
     val casting = castingTo != null
-    IconButton(onClick = onClick, modifier = modifier.size(buttonSize)) {
+    IosIconButton(onClick = onClick, modifier = modifier.size(buttonSize)) {
         Icon(
             painter = painterResource(if (casting) R.drawable.ic_cast_connected else R.drawable.ic_cast),
             contentDescription = if (casting) "Casting to $castingTo" else "Cast",
@@ -199,7 +199,7 @@ internal fun PlayerToggleButton(
     iconSize: Dp = 24.dp,
 ) {
     val accent = MaterialTheme.colorScheme.primary
-    IconButton(
+    IosIconButton(
         onClick = onClick,
         modifier = modifier
             .size(buttonSize)
@@ -269,7 +269,7 @@ internal fun SeekStepButton(
     modifier: Modifier = Modifier,
 ) {
     val seconds = stepMs / 1000
-    IconButton(onClick = onClick, modifier = modifier.size(buttonSize), enabled = enabled) {
+    IosIconButton(onClick = onClick, modifier = modifier.size(buttonSize), enabled = enabled) {
         SeekStepIcon(
             forward = forward,
             seconds = seconds,

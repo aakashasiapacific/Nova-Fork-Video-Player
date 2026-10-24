@@ -8,8 +8,6 @@ import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.interaction.InteractionSource
 import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.material3.LocalRippleConfiguration
-import androidx.compose.material3.RippleConfiguration
-import androidx.compose.material.ripple.RippleAlpha
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
@@ -21,22 +19,17 @@ import kotlinx.coroutines.launch
 
 /**
  * iOS's touch feedback instead of Android's ripple (owner: no "fake iOS"): whatever is pressed
- * lights up evenly at once and fades back when let go. Material's own buttons can't take a
- * custom indication, so their ripple is kept but made faint.
+ * lights up evenly at once and fades back when let go. Material's ripple is off everywhere; its
+ * buttons go through IosButtons, which fade while pressed as iOS buttons do.
  */
 @Composable
 fun IosTouch(content: @Composable () -> Unit) {
     CompositionLocalProvider(
         LocalIndication provides IosHighlight,
-        LocalRippleConfiguration provides FaintRipple,
+        LocalRippleConfiguration provides null,
         content = content,
     )
 }
-
-private val FaintRipple = RippleConfiguration(
-    color = Color.White,
-    rippleAlpha = RippleAlpha(draggedAlpha = 0.06f, focusedAlpha = 0.06f, hoveredAlpha = 0.03f, pressedAlpha = 0.08f),
-)
 
 /** The pressed highlight: a soft white wash over the pressed thing, no ripple. */
 private object IosHighlight : IndicationNodeFactory {

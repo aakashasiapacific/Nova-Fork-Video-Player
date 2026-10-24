@@ -16,13 +16,10 @@ import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -49,7 +46,10 @@ import com.aakash.novafork.data.db.SourceType
 import com.aakash.novafork.ui.NetworkForms
 import com.aakash.novafork.ui.common.IosCheckCircle
 import com.aakash.novafork.ui.common.IosColors
+import com.aakash.novafork.ui.common.IosFilledTonalButton
+import com.aakash.novafork.ui.common.IosIconButton
 import com.aakash.novafork.ui.common.IosSpinner
+import com.aakash.novafork.ui.common.IosTextButton
 import com.aakash.novafork.ui.common.NovaAlertDialog
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.NovaTextField
@@ -100,7 +100,7 @@ internal fun AddSourceDialog(actions: AppActions) {
             }
         },
         confirmButton = {
-            TextButton(onClick = actions::dismissDialog) { Text("Cancel") }
+            IosTextButton(onClick = actions::dismissDialog) { Text("Cancel") }
         },
     )
 }
@@ -269,7 +269,7 @@ internal fun NetworkServerDialog(dialog: DialogUi.NetworkServer, actions: AppAct
                 NetworkForms.cleartextWarning(connection)?.let { CleartextWarning(it) }
                 Spacer(Modifier.height(2.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    FilledTonalButton(
+                    IosFilledTonalButton(
                         onClick = {
                             checked = connection
                             actions.testNetworkSource(form)
@@ -296,7 +296,7 @@ internal fun NetworkServerDialog(dialog: DialogUi.NetworkServer, actions: AppAct
             }
         },
         confirmButton = {
-            TextButton(
+            IosTextButton(
                 onClick = {
                     checked = connection
                     actions.saveNetworkSource(form)
@@ -307,7 +307,7 @@ internal fun NetworkServerDialog(dialog: DialogUi.NetworkServer, actions: AppAct
             }
         },
         dismissButton = {
-            TextButton(onClick = actions::dismissDialog) { Text("Cancel") }
+            IosTextButton(onClick = actions::dismissDialog) { Text("Cancel") }
         },
     )
 }
@@ -449,7 +449,7 @@ private fun PlexSignInPanel(signIn: PlexSignInUi?, form: NetworkSourceForm, acti
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    FilledTonalButton(onClick = actions::startPlexSignIn) { Text("Sign In with a Code") }
+                    IosFilledTonalButton(onClick = actions::startPlexSignIn) { Text("Sign In with a Code") }
                 }
                 servers != null -> {
                     Text("Pick a server", style = MaterialTheme.typography.titleSmall)
@@ -463,11 +463,11 @@ private fun PlexSignInPanel(signIn: PlexSignInUi?, form: NetworkSourceForm, acti
                     servers.forEach { server ->
                         PlexServerRow(server = server, onClick = { actions.pickPlexServer(server.id, form) })
                     }
-                    TextButton(onClick = actions::cancelPlexSignIn) { Text("Cancel") }
+                    IosTextButton(onClick = actions::cancelPlexSignIn) { Text("Cancel") }
                 }
                 error != null -> PanelButtons {
-                    FilledTonalButton(onClick = actions::startPlexSignIn) { Text("Get a New Code") }
-                    TextButton(onClick = actions::cancelPlexSignIn) { Text("Cancel") }
+                    IosFilledTonalButton(onClick = actions::startPlexSignIn) { Text("Get a New Code") }
+                    IosTextButton(onClick = actions::cancelPlexSignIn) { Text("Cancel") }
                 }
                 else -> {
                     val link = signIn.linkUrl.substringAfter("://")
@@ -492,8 +492,8 @@ private fun PlexSignInPanel(signIn: PlexSignInUi?, form: NetworkSourceForm, acti
                         )
                     }
                     PanelButtons {
-                        FilledTonalButton(onClick = { actions.openWebPage(signIn.linkUrl) }) { Text("Open $link") }
-                        TextButton(onClick = actions::cancelPlexSignIn) { Text("Cancel") }
+                        IosFilledTonalButton(onClick = { actions.openWebPage(signIn.linkUrl) }) { Text("Open $link") }
+                        IosTextButton(onClick = actions::cancelPlexSignIn) { Text("Cancel") }
                     }
                 }
             }
@@ -578,7 +578,7 @@ private fun SecretField(value: String, onValueChange: (String) -> Unit, label: S
         visualTransformation = if (visible) VisualTransformation.None else PasswordVisualTransformation(),
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Next),
         trailingIcon = {
-            IconButton(onClick = { visible = !visible }) {
+            IosIconButton(onClick = { visible = !visible }) {
                 NovaIcon(
                     if (visible) R.drawable.ic_visibility_off else R.drawable.ic_visibility,
                     contentDescription = if (visible) "Hide ${label.lowercase()}" else "Show ${label.lowercase()}",
@@ -622,16 +622,16 @@ internal fun UpnpServersDialog(dialog: DialogUi.UpnpServers, actions: AppActions
                     )
                 }
                 // Servers that don't answer the search (another subnet, multicast blocked) are added by address.
-                TextButton(onClick = { actions.showDialog(DialogUi.NetworkServer(NetworkSourceForm(type = SourceType.UPNP))) }) {
+                IosTextButton(onClick = { actions.showDialog(DialogUi.NetworkServer(NetworkSourceForm(type = SourceType.UPNP))) }) {
                     Text("Enter an Address Instead")
                 }
             }
         },
         confirmButton = {
-            TextButton(onClick = actions::discoverUpnpServers, enabled = !dialog.searching) { Text("Search Again") }
+            IosTextButton(onClick = actions::discoverUpnpServers, enabled = !dialog.searching) { Text("Search Again") }
         },
         dismissButton = {
-            TextButton(onClick = actions::dismissDialog) { Text("Cancel") }
+            IosTextButton(onClick = actions::dismissDialog) { Text("Cancel") }
         },
     )
 }

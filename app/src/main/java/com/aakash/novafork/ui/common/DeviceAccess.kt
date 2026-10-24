@@ -10,11 +10,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.Alignment
@@ -88,8 +86,8 @@ fun DeviceAccessCard(
                 horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                TextButton(onClick = onOpenSettings) { Text("App Settings") }
-                Button(onClick = onAllow) { Text(notice.allowLabel) }
+                IosTextButton(onClick = onOpenSettings) { Text("App Settings") }
+                IosButton(onClick = onAllow) { Text(notice.allowLabel) }
             }
         }
     }

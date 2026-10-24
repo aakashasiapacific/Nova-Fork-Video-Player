@@ -16,7 +16,6 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -33,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
 import com.aakash.novafork.ui.common.IosSegmentedControl
 import com.aakash.novafork.ui.common.IosSpinner
+import com.aakash.novafork.ui.common.IosTextButton
 import com.aakash.novafork.ui.common.NovaAlertDialog
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.NovaTextField
@@ -89,7 +89,7 @@ internal fun IdentifyDialog(dialog: DialogUi.Identify, actions: AppActions) {
             }
         },
         confirmButton = {
-            TextButton(onClick = actions::dismissDialog) { Text("Cancel") }
+            IosTextButton(onClick = actions::dismissDialog) { Text("Cancel") }
         },
     )
 }

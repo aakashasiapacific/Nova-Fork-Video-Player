@@ -17,13 +17,16 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
+import androidx.compose.foundation.indication
 import androidx.compose.foundation.interaction.InteractionSource
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -276,10 +279,13 @@ fun NovaMenuItem(
     destructive: Boolean = false,
 ) {
     val tint = if (destructive) IosColors.Red else Color.White
+    // iOS's grey row highlight while pressed (the ripple is off).
+    val press = remember { MutableInteractionSource() }
     DropdownMenuItem(
         text = { ProvideTextStyle(MaterialTheme.typography.bodyLarge) { text() } },
         onClick = onClick,
-        modifier = modifier.heightIn(min = 44.dp),
+        modifier = modifier.heightIn(min = 44.dp).indication(press, LocalIndication.current),
+        interactionSource = press,
         leadingIcon = leadingIcon,
         trailingIcon = trailingIcon,
         enabled = enabled,

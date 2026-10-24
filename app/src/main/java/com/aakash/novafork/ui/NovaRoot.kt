@@ -10,7 +10,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
@@ -24,6 +23,7 @@ import com.aakash.novafork.ui.adaptive.dimensFor
 import com.aakash.novafork.ui.adaptive.rememberDeviceLayout
 import com.aakash.novafork.ui.common.HudState
 import com.aakash.novafork.ui.common.IosHudHost
+import com.aakash.novafork.ui.common.IosTextButton
 import com.aakash.novafork.ui.common.IosToastHost
 import com.aakash.novafork.ui.common.LocalHud
 import com.aakash.novafork.ui.common.NovaAlertDialog
@@ -88,7 +88,7 @@ private fun CrashReportDialog(report: String, actions: AppActions) {
                 modifier = Modifier.verticalScroll(rememberScrollState()),
             )
         },
-        confirmButton = { TextButton(onClick = actions::shareCrashReport) { Text("Share Report") } },
-        dismissButton = { TextButton(onClick = actions::dismissCrashReport) { Text("Dismiss") } },
+        confirmButton = { IosTextButton(onClick = actions::shareCrashReport) { Text("Share Report") } },
+        dismissButton = { IosTextButton(onClick = actions::dismissCrashReport) { Text("Dismiss") } },
     )
 }

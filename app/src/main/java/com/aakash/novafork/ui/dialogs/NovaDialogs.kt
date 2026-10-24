@@ -8,7 +8,6 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -22,6 +21,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import com.aakash.novafork.R
 import com.aakash.novafork.ui.InputRules
+import com.aakash.novafork.ui.common.IosTextButton
 import com.aakash.novafork.ui.common.NovaAlertDialog
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.NovaTextField
@@ -170,10 +170,10 @@ private fun StreamUrlDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = { submit() }, enabled = url.isNotBlank()) { Text(confirmLabel) }
+            IosTextButton(onClick = { submit() }, enabled = url.isNotBlank()) { Text(confirmLabel) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            IosTextButton(onClick = onDismiss) { Text("Cancel") }
         },
     )
 }
@@ -186,10 +186,10 @@ private fun ConfirmRemoveSourceDialog(source: SourceUi, onConfirm: () -> Unit, o
         title = { Text("Remove ${source.name}?") },
         text = { Text("Videos from this source leave your library. Files are not deleted.") },
         confirmButton = {
-            TextButton(onClick = onConfirm) { Text("Remove") }
+            IosTextButton(onClick = onConfirm) { Text("Remove") }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            IosTextButton(onClick = onDismiss) { Text("Cancel") }
         },
     )
 }

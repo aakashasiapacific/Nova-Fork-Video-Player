@@ -22,7 +22,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -38,6 +37,7 @@ import com.aakash.novafork.ui.common.IosColors
 import com.aakash.novafork.ui.common.IosGrabber
 import com.aakash.novafork.ui.common.IosSheetShape
 import com.aakash.novafork.ui.common.IosSpinner
+import com.aakash.novafork.ui.common.IosTextButton
 import com.aakash.novafork.ui.model.PlayerActions
 import com.aakash.novafork.ui.model.SubtitleResultUi
 import com.aakash.novafork.ui.model.SubtitleSearchUi
@@ -155,7 +155,7 @@ private fun SearchError(message: String, onRetry: () -> Unit, retryEnabled: Bool
         )
         Spacer(Modifier.width(12.dp))
         Text(text = message, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-        TextButton(onClick = onRetry, enabled = retryEnabled) { Text("Try Again") }
+        IosTextButton(onClick = onRetry, enabled = retryEnabled) { Text("Try Again") }
     }
 }
 

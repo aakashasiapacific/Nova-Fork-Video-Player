@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -20,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
 import com.aakash.novafork.ui.common.EmptyState
+import com.aakash.novafork.ui.common.IosIconButton
 import com.aakash.novafork.ui.common.LocalBottomBarSpace
 import com.aakash.novafork.ui.common.NovaDropdownMenu
 import com.aakash.novafork.ui.common.NovaIcon
@@ -110,7 +110,7 @@ private fun PlaylistContent(playlist: PlaylistDetailsUi, actions: AppActions) {
                         onClick = { actions.playQueue(ids, startIndex = index) },
                         onLongClick = openMenu,
                         trailing = {
-                            IconButton(onClick = openMenu) {
+                            IosIconButton(onClick = openMenu) {
                                 NovaIcon(R.drawable.ic_more_vert, contentDescription = "More")
                             }
                         },
@@ -126,7 +126,7 @@ private fun PlaylistContent(playlist: PlaylistDetailsUi, actions: AppActions) {
 private fun PlaylistMenu(playlist: PlaylistDetailsUi, actions: AppActions) {
     var open by remember { mutableStateOf(false) }
     Box {
-        IconButton(onClick = { open = true }) {
+        IosIconButton(onClick = { open = true }) {
             NovaIcon(R.drawable.ic_more_vert, contentDescription = "Playlist options")
         }
         NovaDropdownMenu(expanded = open, onDismissRequest = { open = false }) {

@@ -15,12 +15,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -129,7 +127,7 @@ fun SectionHeader(
             overflow = TextOverflow.Ellipsis,
         )
         if (actionLabel != null && onAction != null) {
-            TextButton(onClick = onAction) { Text(actionLabel) }
+            IosTextButton(onClick = onAction) { Text(actionLabel) }
         }
     }
 }
@@ -164,10 +162,10 @@ fun EmptyState(
         )
         if (actionLabel != null && onAction != null) {
             Spacer(Modifier.height(20.dp))
-            Button(onClick = onAction) { Text(actionLabel) }
+            IosButton(onClick = onAction) { Text(actionLabel) }
         }
         if (secondaryLabel != null && onSecondary != null) {
-            TextButton(onClick = onSecondary) { Text(secondaryLabel) }
+            IosTextButton(onClick = onSecondary) { Text(secondaryLabel) }
         }
     }
 }

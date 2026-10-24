@@ -17,12 +17,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -34,7 +32,9 @@ import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
 import com.aakash.novafork.core.format.Formats
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
+import com.aakash.novafork.ui.common.IosButton
 import com.aakash.novafork.ui.common.IosColors
+import com.aakash.novafork.ui.common.IosTextButton
 import com.aakash.novafork.ui.common.LocalBottomBarSpace
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.NovaMenuItem
@@ -185,7 +185,7 @@ private fun PlaySection(details: VideoDetailsUi, actions: AppActions, modifier: 
     Column(modifier.fillMaxWidth()) {
         // A blue Play as wide as the poster above it, and Delete in the rest of the row (owner).
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Button(
+            IosButton(
                 onClick = { actions.play(details.id) },
                 modifier = Modifier
                     .then(if (details.deletable) Modifier.width(LocalNovaDimens.current.detailPosterWidth) else Modifier.weight(1f))
@@ -237,7 +237,7 @@ private fun PlaySection(details: VideoDetailsUi, actions: AppActions, modifier: 
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.weight(1f),
                 )
-                TextButton(onClick = { actions.play(details.id, startOver = true) }) {
+                IosTextButton(onClick = { actions.play(details.id, startOver = true) }) {
                     NovaIcon(R.drawable.ic_restart_alt, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(6.dp))
                     Text("Start Over")

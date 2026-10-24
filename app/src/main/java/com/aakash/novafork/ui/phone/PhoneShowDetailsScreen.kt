@@ -21,7 +21,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -41,6 +40,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
+import com.aakash.novafork.ui.common.IosButton
 import com.aakash.novafork.ui.common.LocalBottomBarSpace
 import com.aakash.novafork.ui.common.NovaDropdownMenu
 import com.aakash.novafork.ui.common.NovaIcon
@@ -101,7 +101,7 @@ fun PhoneShowDetailsScreen(
             }
             item(key = "play") {
                 Column(Modifier.tintBand(tint, from = 0.8f, to = if (hasOverview) 0.55f else 0f).padding(start = dims.gutter, end = dims.gutter, top = 20.dp)) {
-                    Button(
+                    IosButton(
                         onClick = { if (nextUp != null) actions.play(nextUp.videoId) },
                         enabled = nextUp != null,
                         modifier = Modifier

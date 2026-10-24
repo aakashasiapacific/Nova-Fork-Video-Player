@@ -430,6 +430,16 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
         searchPrefs.edit().remove(KEY_RECENT_SEARCHES).apply()
     }
 
+    override fun forgetSearch(query: String) {
+        val recent = local.value.recentSearches - query
+        local.update { it.copy(recentSearches = recent) }
+        if (recent.isEmpty()) {
+            searchPrefs.edit().remove(KEY_RECENT_SEARCHES).apply()
+        } else {
+            searchPrefs.edit().putString(KEY_RECENT_SEARCHES, recent.joinToString("\n")).apply()
+        }
+    }
+
     override fun changeArtwork(videoId: Long) {
         launchSafely("Couldn't load artwork") {
             val row = library.video(videoId) ?: return@launchSafely

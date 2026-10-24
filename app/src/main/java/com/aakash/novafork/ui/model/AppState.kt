@@ -313,6 +313,9 @@ interface AppActions {
 
     fun clearRecentSearches() {}
 
+    /** Takes one search out of the recent searches (swiped away). */
+    fun forgetSearch(query: String) {}
+
     /** Opens the library (under the Video tab) showing [filter]. */
     fun openLibrary(filter: LibraryFilter) {
         navigate(Route.Library)

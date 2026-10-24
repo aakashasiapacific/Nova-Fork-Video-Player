@@ -17,7 +17,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -29,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.aakash.novafork.core.tmdb.TmdbClient
 import com.aakash.novafork.ui.common.IosSpinner
+import com.aakash.novafork.ui.common.IosTextButton
 import com.aakash.novafork.ui.common.NovaAlertDialog
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.DialogUi
@@ -71,9 +71,9 @@ internal fun ChangeArtworkDialog(dialog: DialogUi.ChangeArtwork, actions: AppAct
                 }
             }
         },
-        confirmButton = { TextButton(onClick = actions::dismissDialog) { Text("Done") } },
+        confirmButton = { IosTextButton(onClick = actions::dismissDialog) { Text("Done") } },
         dismissButton = if (dialog.customised) {
-            { TextButton(onClick = { actions.resetArtwork(dialog.metadataKey) }) { Text("Use TMDB's") } }
+            { IosTextButton(onClick = { actions.resetArtwork(dialog.metadataKey) }) { Text("Use TMDB's") } }
         } else {
             null
         },

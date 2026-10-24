@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -36,6 +35,7 @@ import com.aakash.novafork.BuildConfig
 import com.aakash.novafork.R
 import com.aakash.novafork.data.Settings
 import com.aakash.novafork.player.SubtitleDownloadRules
+import com.aakash.novafork.ui.common.IosIconButton
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.NovaTextField
 import com.aakash.novafork.ui.model.AppActions
@@ -226,7 +226,7 @@ private fun SubtitleLanguagesRow(shape: Shape, settings: Settings, actions: AppA
 
 @Composable
 private fun VisibilityToggle(visible: Boolean, what: String, onToggle: () -> Unit) {
-    IconButton(onClick = onToggle) {
+    IosIconButton(onClick = onToggle) {
         NovaIcon(
             if (visible) R.drawable.ic_visibility_off else R.drawable.ic_visibility,
             contentDescription = if (visible) "Hide $what" else "Show $what",

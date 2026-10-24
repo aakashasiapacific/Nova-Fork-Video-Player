@@ -25,7 +25,6 @@ import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -47,6 +46,7 @@ import com.aakash.novafork.ui.common.IosColors
 import com.aakash.novafork.ui.common.IosGrabber
 import com.aakash.novafork.ui.common.IosSheetShape
 import com.aakash.novafork.ui.common.IosSpinner
+import com.aakash.novafork.ui.common.IosTextButton
 import com.aakash.novafork.ui.common.LandscapeArt
 import com.aakash.novafork.ui.common.NovaAlertDialog
 import com.aakash.novafork.ui.common.NovaIcon
@@ -175,10 +175,10 @@ internal fun PlaylistNameDialog(
             )
         },
         confirmButton = {
-            TextButton(onClick = { onConfirm(name) }, enabled = canSave) { Text(confirmLabel) }
+            IosTextButton(onClick = { onConfirm(name) }, enabled = canSave) { Text(confirmLabel) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            IosTextButton(onClick = onDismiss) { Text("Cancel") }
         },
     )
 }
@@ -207,10 +207,10 @@ internal fun ConfirmDeletePlaylistDialog(name: String, onConfirm: () -> Unit, on
         title = { Text("Delete $name?") },
         text = { Text("The playlist goes away. Its videos stay in your library.") },
         confirmButton = {
-            TextButton(onClick = onConfirm) { Text("Delete") }
+            IosTextButton(onClick = onConfirm) { Text("Delete") }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            IosTextButton(onClick = onDismiss) { Text("Cancel") }
         },
     )
 }
@@ -241,14 +241,14 @@ internal fun RecentlyDeletedDialog(items: List<TrashedVideoUi>?, onRestore: (Str
                                     )
                                 }
                             }
-                            TextButton(onClick = { onRestore(item.uri) }) { Text("Restore") }
+                            IosTextButton(onClick = { onRestore(item.uri) }) { Text("Restore") }
                         }
                     }
                 }
             }
         },
         confirmButton = {
-            TextButton(onClick = onDismiss) { Text("Done") }
+            IosTextButton(onClick = onDismiss) { Text("Done") }
         },
     )
 }

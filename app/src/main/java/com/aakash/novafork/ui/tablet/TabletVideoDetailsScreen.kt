@@ -18,11 +18,9 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -37,6 +35,8 @@ import com.aakash.novafork.R
 import com.aakash.novafork.ui.adaptive.DeviceLayout
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
 import com.aakash.novafork.ui.common.GlassCircle
+import com.aakash.novafork.ui.common.IosFilledTonalButton
+import com.aakash.novafork.ui.common.IosTextButton
 import com.aakash.novafork.ui.common.NovaDropdownMenu
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.NovaMenuItem
@@ -163,7 +163,7 @@ private fun VideoBody(details: VideoDetailsUi, actions: AppActions) {
         ) {
             TabletPlayButton(label = details.playLabel, onClick = { actions.play(details.id) })
             if (started) {
-                FilledTonalButton(onClick = { actions.play(details.id, startOver = true) }, modifier = Modifier.height(48.dp)) {
+                IosFilledTonalButton(onClick = { actions.play(details.id, startOver = true) }, modifier = Modifier.height(48.dp)) {
                     ButtonLabel(R.drawable.ic_restart_alt, "Start Over")
                 }
             }
@@ -230,7 +230,7 @@ private fun VideoBody(details: VideoDetailsUi, actions: AppActions) {
         WatchProgress(progress = details.progress, positionMs = details.positionMs, durationMs = details.durationMs)
         val showKey = details.showKey
         if (details.kind == MediaKind.EPISODE && showKey != null && !details.showTitle.isNullOrBlank()) {
-            TextButton(onClick = { actions.openShow(showKey) }) {
+            IosTextButton(onClick = { actions.openShow(showKey) }) {
                 ButtonLabel(R.drawable.ic_tv, "From ${details.showTitle}")
                 Spacer(Modifier.width(4.dp))
                 NovaIcon(R.drawable.ic_chevron_right, contentDescription = null, modifier = Modifier.size(18.dp))

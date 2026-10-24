@@ -13,11 +13,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -40,7 +38,9 @@ import com.aakash.novafork.data.LayoutMode
 import com.aakash.novafork.data.Settings
 import com.aakash.novafork.data.TmdbHost
 import com.aakash.novafork.data.db.SourceType
+import com.aakash.novafork.ui.common.IosIconButton
 import com.aakash.novafork.ui.common.IosSpinner
+import com.aakash.novafork.ui.common.IosTextButton
 import com.aakash.novafork.ui.common.NovaAlertDialog
 import com.aakash.novafork.ui.common.NovaDropdownMenu
 import com.aakash.novafork.ui.common.NovaIcon
@@ -196,9 +196,9 @@ private fun AllFilesAccessRow(shape: Shape, granted: Boolean, canRequest: Boolea
         }
         if (canRequest) {
             if (granted) {
-                TextButton(onClick = onRequest) { Text("Manage") }
+                IosTextButton(onClick = onRequest) { Text("Manage") }
             } else {
-                TextButton(onClick = onRequest) { Text("Allow") }
+                IosTextButton(onClick = onRequest) { Text("Allow") }
             }
         }
     }
@@ -237,7 +237,7 @@ private fun SourceRow(shape: Shape, source: SourceUi, onEdit: (() -> Unit)?, onR
         // One "…" menu instead of a pencil and a bin on every row, as iOS keeps a list's actions.
         var menuOpen by remember { mutableStateOf(false) }
         Box {
-            IconButton(onClick = { menuOpen = true }) {
+            IosIconButton(onClick = { menuOpen = true }) {
                 NovaIcon(R.drawable.ic_more_vert, contentDescription = "Options for ${source.name}")
             }
             NovaDropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
@@ -380,7 +380,7 @@ private fun TmdbKeyRow(shape: Shape, state: SettingsUi, actions: AppActions) {
                     },
                 ),
                 trailingIcon = {
-                    IconButton(onClick = { visible = !visible }) {
+                    IosIconButton(onClick = { visible = !visible }) {
                         NovaIcon(
                             if (visible) R.drawable.ic_visibility_off else R.drawable.ic_visibility,
                             contentDescription = if (visible) "Hide key" else "Show key",
@@ -408,7 +408,7 @@ private fun TmdbKeyRow(shape: Shape, state: SettingsUi, actions: AppActions) {
                 if (checking) {
                     IosSpinner(Modifier.size(18.dp), strokeWidth = 2.dp)
                 }
-                TextButton(
+                IosTextButton(
                     onClick = actions::checkTmdbKey,
                     enabled = !checking && state.keyStatus != KeyStatus.MISSING,
                 ) {
@@ -464,7 +464,7 @@ private fun ClearMetadataRow(shape: Shape, onConfirm: () -> Unit) {
                 Text("Posters, backdrops and details from TMDB are removed and downloaded again. Your videos and watch history stay.")
             },
             confirmButton = {
-                TextButton(
+                IosTextButton(
                     onClick = {
                         confirming = false
                         onConfirm()
@@ -474,7 +474,7 @@ private fun ClearMetadataRow(shape: Shape, onConfirm: () -> Unit) {
                 }
             },
             dismissButton = {
-                TextButton(onClick = { confirming = false }) { Text("Cancel") }
+                IosTextButton(onClick = { confirming = false }) { Text("Cancel") }
             },
         )
     }

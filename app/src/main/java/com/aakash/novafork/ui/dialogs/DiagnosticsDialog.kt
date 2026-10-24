@@ -11,7 +11,6 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -25,6 +24,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
 import com.aakash.novafork.ui.common.IosSpinner
+import com.aakash.novafork.ui.common.IosTextButton
 import com.aakash.novafork.ui.common.NovaAlertDialog
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.model.AppActions
@@ -65,7 +65,7 @@ internal fun LibraryDiagnosticsDialog(dialog: DialogUi.LibraryDiagnostics, actio
         },
         confirmButton = {
             Row {
-                TextButton(
+                IosTextButton(
                     onClick = {
                         if (report != null) {
                             clipboard.setText(AnnotatedString(report))
@@ -74,14 +74,14 @@ internal fun LibraryDiagnosticsDialog(dialog: DialogUi.LibraryDiagnostics, actio
                     },
                     enabled = report != null,
                 ) { Text(if (copied) "Copied" else "Copy") }
-                TextButton(
+                IosTextButton(
                     onClick = { if (report != null) actions.shareText("Nova Fork library diagnostics", report) },
                     enabled = report != null,
                 ) { Text("Share") }
             }
         },
         dismissButton = {
-            TextButton(onClick = actions::dismissDialog) { Text("Close") }
+            IosTextButton(onClick = actions::dismissDialog) { Text("Close") }
         },
     )
 }

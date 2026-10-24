@@ -17,7 +17,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
@@ -40,6 +39,7 @@ import com.aakash.novafork.ui.common.DeviceAccessCard
 import com.aakash.novafork.ui.common.DeviceAccessNotice
 import com.aakash.novafork.ui.common.Hairline
 import com.aakash.novafork.ui.common.IosColors
+import com.aakash.novafork.ui.common.IosIconButton
 import com.aakash.novafork.ui.common.IosSpinner
 import com.aakash.novafork.ui.common.LocalBottomBarSpace
 import com.aakash.novafork.ui.common.NovaDropdownMenu
@@ -79,7 +79,7 @@ fun PhoneBrowseScreen(
             title = "Sources",
             onBack = actions::back,
             actions = {
-                IconButton(onClick = actions::refresh, enabled = !scan.running) {
+                IosIconButton(onClick = actions::refresh, enabled = !scan.running) {
                     NovaIcon(R.drawable.ic_refresh, contentDescription = "Rescan all")
                 }
             },
@@ -260,7 +260,7 @@ private fun SourceRow(source: SourceUi, actions: AppActions) {
                     IosSpinner(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
                 }
                 Box {
-                    IconButton(onClick = { menuOpen = true }) {
+                    IosIconButton(onClick = { menuOpen = true }) {
                         NovaIcon(R.drawable.ic_more_vert, contentDescription = "Options for ${source.name}")
                     }
                     NovaDropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {

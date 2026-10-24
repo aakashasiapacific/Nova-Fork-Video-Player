@@ -50,7 +50,6 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -101,6 +100,7 @@ import com.aakash.novafork.R
 import com.aakash.novafork.data.db.SongEntity
 import com.aakash.novafork.data.music.MusicLibrary
 import com.aakash.novafork.music.MusicPlayerState
+import com.aakash.novafork.ui.common.IosIconButton
 import com.aakash.novafork.ui.common.NovaDropdownMenu
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.NovaMenuItem
@@ -468,7 +468,7 @@ fun MiniPlayerBar(
                 )
             }
         }
-        IconButton(onClick = actions::togglePlay) {
+        IosIconButton(onClick = actions::togglePlay) {
             NovaIcon(
                 if (player.isPlaying) R.drawable.ic_pause else R.drawable.ic_play_arrow,
                 contentDescription = if (player.isPlaying) "Pause" else "Play",
@@ -477,7 +477,7 @@ fun MiniPlayerBar(
             )
         }
         if (!compact) {
-            IconButton(onClick = actions::next, enabled = player.hasNext) {
+            IosIconButton(onClick = actions::next, enabled = player.hasNext) {
                 NovaIcon(
                     R.drawable.ic_skip_next,
                     contentDescription = "Next",
@@ -1160,7 +1160,7 @@ private fun ThinSlider(
 
 @Composable
 private fun BigControl(@DrawableRes icon: Int, description: String, size: Int, enabled: Boolean = true, onClick: () -> Unit) {
-    IconButton(onClick = onClick, enabled = enabled, modifier = Modifier.size((size + 20).dp)) {
+    IosIconButton(onClick = onClick, enabled = enabled, modifier = Modifier.size((size + 20).dp)) {
         NovaIcon(
             icon,
             contentDescription = description,
@@ -1172,7 +1172,7 @@ private fun BigControl(@DrawableRes icon: Int, description: String, size: Int, e
 
 @Composable
 private fun PaneButton(@DrawableRes icon: Int, label: String, active: Boolean, enabled: Boolean = true, onClick: () -> Unit) {
-    IconButton(
+    IosIconButton(
         onClick = onClick,
         enabled = enabled,
         modifier = Modifier

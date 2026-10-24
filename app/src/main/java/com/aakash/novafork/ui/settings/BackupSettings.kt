@@ -15,7 +15,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -31,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
 import com.aakash.novafork.ui.common.IosSpinner
 import com.aakash.novafork.ui.common.IosSwitch
+import com.aakash.novafork.ui.common.IosTextButton
 import com.aakash.novafork.ui.common.NovaAlertDialog
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.RestorePreviewUi
@@ -116,8 +116,8 @@ private fun BackupDialog(onBackUp: (includeSecrets: Boolean) -> Unit, onDismiss:
                 }
             }
         },
-        confirmButton = { TextButton(onClick = { onBackUp(includeSecrets) }) { Text("Back Up") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        confirmButton = { IosTextButton(onClick = { onBackUp(includeSecrets) }) { Text("Back Up") } },
+        dismissButton = { IosTextButton(onClick = onDismiss) { Text("Cancel") } },
     )
 }
 
@@ -188,8 +188,8 @@ private fun RestoreDialog(preview: RestorePreviewUi, onRestore: () -> Unit, onCa
                 )
             }
         },
-        confirmButton = { TextButton(onClick = onRestore) { Text("Restore") } },
-        dismissButton = { TextButton(onClick = onCancel) { Text("Cancel") } },
+        confirmButton = { IosTextButton(onClick = onRestore) { Text("Restore") } },
+        dismissButton = { IosTextButton(onClick = onCancel) { Text("Cancel") } },
     )
 }
 

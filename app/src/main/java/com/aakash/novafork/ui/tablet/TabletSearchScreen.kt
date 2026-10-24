@@ -19,7 +19,6 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -38,13 +37,14 @@ import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
 import com.aakash.novafork.ui.common.EmptyState
+import com.aakash.novafork.ui.common.IosIconButton
 import com.aakash.novafork.ui.common.NovaIcon
-import com.aakash.novafork.ui.phone.RecentSearches
 import com.aakash.novafork.ui.common.NovaTextField
 import com.aakash.novafork.ui.common.musicSearchResults
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.LibraryItemUi
 import com.aakash.novafork.ui.model.SearchUi
+import com.aakash.novafork.ui.phone.RecentSearches
 
 @Composable
 internal fun TabletSearchScreen(
@@ -91,7 +91,7 @@ internal fun TabletSearchScreen(
                 leadingIcon = { NovaIcon(R.drawable.ic_search, contentDescription = null) },
                 trailingIcon = if (query.isNotEmpty()) {
                     {
-                        IconButton(
+                        IosIconButton(
                             onClick = {
                                 query = ""
                                 actions.search("")
@@ -126,6 +126,7 @@ internal fun TabletSearchScreen(
                 },
                 onClear = actions::clearRecentSearches,
                 bottomSpace = 24.dp,
+                onForget = actions::forgetSearch,
             )
             query.isBlank() -> SearchMessage {
                 EmptyState(

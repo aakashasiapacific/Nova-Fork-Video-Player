@@ -11,11 +11,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -32,7 +29,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import com.aakash.novafork.R
+import com.aakash.novafork.ui.common.IosFilledTonalButton
+import com.aakash.novafork.ui.common.IosIconButton
 import com.aakash.novafork.ui.common.IosSpinner
+import com.aakash.novafork.ui.common.IosTextButton
 import com.aakash.novafork.ui.common.NovaAlertDialog
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.NovaTextField
@@ -138,7 +138,7 @@ internal fun SmbServerDialog(dialog: DialogUi.SmbServer, actions: AppActions) {
                     visualTransformation = if (showPassword) VisualTransformation.None else PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Next),
                     trailingIcon = {
-                        IconButton(onClick = { showPassword = !showPassword }) {
+                        IosIconButton(onClick = { showPassword = !showPassword }) {
                             NovaIcon(
                                 if (showPassword) R.drawable.ic_visibility_off else R.drawable.ic_visibility,
                                 contentDescription = if (showPassword) "Hide password" else "Show password",
@@ -156,7 +156,7 @@ internal fun SmbServerDialog(dialog: DialogUi.SmbServer, actions: AppActions) {
                 )
                 Spacer(Modifier.height(2.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    FilledTonalButton(
+                    IosFilledTonalButton(
                         onClick = {
                             checkedForm = form
                             actions.testSmb(form)
@@ -174,7 +174,7 @@ internal fun SmbServerDialog(dialog: DialogUi.SmbServer, actions: AppActions) {
             }
         },
         confirmButton = {
-            TextButton(
+            IosTextButton(
                 onClick = {
                     checkedForm = form
                     actions.saveSmb(form)
@@ -185,7 +185,7 @@ internal fun SmbServerDialog(dialog: DialogUi.SmbServer, actions: AppActions) {
             }
         },
         dismissButton = {
-            TextButton(onClick = actions::dismissDialog) { Text("Cancel") }
+            IosTextButton(onClick = actions::dismissDialog) { Text("Cancel") }
         },
     )
 }

@@ -20,11 +20,8 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -35,6 +32,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
 import com.aakash.novafork.ui.common.EmptyState
+import com.aakash.novafork.ui.common.IosFilledTonalButton
+import com.aakash.novafork.ui.common.IosIconButton
+import com.aakash.novafork.ui.common.IosTextButton
 import com.aakash.novafork.ui.common.LandscapeArt
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.ProgressStrip
@@ -116,20 +116,20 @@ private fun PlaylistHeader(playlist: PlaylistDetailsUi, actions: AppActions, mod
         ) {
             val hasVideos = playlist.videos.isNotEmpty()
             TabletPlayButton(label = "Play All", onClick = { actions.playPlaylist(playlist.id) }, enabled = hasVideos)
-            FilledTonalButton(
+            IosFilledTonalButton(
                 onClick = { actions.playPlaylist(playlist.id, shuffle = true) },
                 enabled = hasVideos,
                 modifier = Modifier.height(48.dp),
             ) {
                 ButtonLabel(R.drawable.ic_shuffle, "Shuffle")
             }
-            FilledTonalButton(
+            IosFilledTonalButton(
                 onClick = { actions.showDialog(DialogUi.RenamePlaylist(playlist.id, playlist.name)) },
                 modifier = Modifier.height(48.dp),
             ) {
                 ButtonLabel(R.drawable.ic_edit, "Rename")
             }
-            TextButton(
+            IosTextButton(
                 onClick = { actions.showDialog(DialogUi.ConfirmDeletePlaylist(playlist.id, playlist.name)) },
                 modifier = Modifier.height(48.dp),
             ) {
@@ -196,7 +196,7 @@ private fun PlaylistItemRow(
             }
         }
         Spacer(Modifier.width(8.dp))
-        IconButton(onClick = onRemove) {
+        IosIconButton(onClick = onRemove) {
             NovaIcon(R.drawable.ic_close, contentDescription = "Remove from playlist")
         }
     }

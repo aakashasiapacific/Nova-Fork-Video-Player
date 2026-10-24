@@ -20,7 +20,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
@@ -36,6 +35,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
 import com.aakash.novafork.data.AspectMode
+import com.aakash.novafork.ui.common.IosTextButton
 import com.aakash.novafork.ui.common.NovaChip
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.model.TrackUi
@@ -160,7 +160,7 @@ internal fun SubtitleDelayRow(delayMs: Long, onChange: (Long) -> Unit, modifier:
                 Text(text = "+", style = MaterialTheme.typography.titleLarge)
             }
             Spacer(Modifier.width(8.dp))
-            TextButton(onClick = { onChange(0L) }, enabled = delayMs != 0L) { Text("Reset") }
+            IosTextButton(onClick = { onChange(0L) }, enabled = delayMs != 0L) { Text("Reset") }
         }
     }
 }

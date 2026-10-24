@@ -34,8 +34,6 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -61,6 +59,8 @@ import com.aakash.novafork.ui.adaptive.DeviceLayout
 import com.aakash.novafork.ui.common.DeviceAccessCard
 import com.aakash.novafork.ui.common.DeviceStorageEmptyState
 import com.aakash.novafork.ui.common.EmptyState
+import com.aakash.novafork.ui.common.IosFilledTonalButton
+import com.aakash.novafork.ui.common.IosIconButton
 import com.aakash.novafork.ui.common.IosProgressBar
 import com.aakash.novafork.ui.common.IosSpinner
 import com.aakash.novafork.ui.common.NovaDropdownMenu
@@ -197,7 +197,7 @@ private fun SourcesPane(
                 Column {
                     Row(Modifier.padding(start = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                         Text("Browse", style = MaterialTheme.typography.headlineMedium, modifier = Modifier.weight(1f))
-                        IconButton(onClick = actions::refresh, enabled = !scan.running) {
+                        IosIconButton(onClick = actions::refresh, enabled = !scan.running) {
                             NovaIcon(R.drawable.ic_refresh, contentDescription = "Rescan all")
                         }
                     }
@@ -339,7 +339,7 @@ private fun SourceRow(source: SourceUi, selected: Boolean, actions: AppActions) 
                 )
             }
             Box {
-                IconButton(onClick = { menuOpen = true }) {
+                IosIconButton(onClick = { menuOpen = true }) {
                     NovaIcon(R.drawable.ic_more_vert, contentDescription = "Options for ${source.name}")
                 }
                 NovaDropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
@@ -639,16 +639,16 @@ private fun BrowseDirHeader(dir: BrowseDirUi, actions: AppActions, modifier: Mod
             )
             if (dir.videos.isNotEmpty()) {
                 // Plays the videos directly in this folder, not those in its subfolders.
-                FilledTonalButton(onClick = { actions.playFolder(dir.sourceId, dir.path) }) {
+                IosFilledTonalButton(onClick = { actions.playFolder(dir.sourceId, dir.path) }) {
                     ButtonLabel(R.drawable.ic_play_arrow, "Play All")
                 }
                 Spacer(Modifier.width(8.dp))
-                FilledTonalButton(onClick = { actions.playFolder(dir.sourceId, dir.path, shuffle = true) }) {
+                IosFilledTonalButton(onClick = { actions.playFolder(dir.sourceId, dir.path, shuffle = true) }) {
                     ButtonLabel(R.drawable.ic_shuffle, "Shuffle")
                 }
                 Spacer(Modifier.width(4.dp))
             }
-            IconButton(onClick = { actions.rescanSource(dir.sourceId) }, enabled = !dir.isLoading) {
+            IosIconButton(onClick = { actions.rescanSource(dir.sourceId) }, enabled = !dir.isLoading) {
                 NovaIcon(R.drawable.ic_refresh, contentDescription = "Refresh")
             }
         }

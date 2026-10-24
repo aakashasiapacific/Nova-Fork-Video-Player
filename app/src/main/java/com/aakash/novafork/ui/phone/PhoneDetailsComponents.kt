@@ -2,12 +2,14 @@ package com.aakash.novafork.ui.phone
 
 import androidx.annotation.DrawableRes
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -31,7 +33,6 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -75,6 +76,7 @@ import com.aakash.novafork.ui.common.BackdropArt
 import com.aakash.novafork.ui.common.Hairline
 import com.aakash.novafork.ui.common.HeroTitle
 import com.aakash.novafork.ui.common.IosColors
+import com.aakash.novafork.ui.common.IosIconButton
 import com.aakash.novafork.ui.common.NovaDropdownMenu
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.PosterArt
@@ -398,7 +400,7 @@ internal fun ScrimIconButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    IconButton(
+    IosIconButton(
         onClick = onClick,
         modifier = modifier,
         colors = IconButtonDefaults.iconButtonColors(
@@ -529,11 +531,14 @@ internal fun OverviewBlock(
             var overflows by remember(overview) { mutableStateOf(false) }
             val canToggle = expanded || overflows
             Column(
-                Modifier.clickable(
-                    enabled = canToggle,
-                    onClickLabel = if (expanded) "Show less" else "Show more",
-                    onClick = { expanded = !expanded },
-                ),
+                Modifier
+                    // MORE opens the synopsis by sliding it down, LESS closes it the same way.
+                    .animateContentSize(spring(dampingRatio = 0.9f, stiffness = 380f))
+                    .clickable(
+                        enabled = canToggle,
+                        onClickLabel = if (expanded) "Show less" else "Show more",
+                        onClick = { expanded = !expanded },
+                    ),
             ) {
                 Text(
                     text = overview,

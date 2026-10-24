@@ -556,3 +556,12 @@ The owner asked for Apple Music to be copied more precisely, with less clutter. 
   - Scrolling search results puts the keyboard away.
   - Switches tick wherever they are flipped (the switch itself does it now).
   - Not done: the grabber that bends into a chevron, since Now Playing has no grabber line by the owner's earlier choice.
+- **Build 117 (owner):**
+  - No pop-up after Favorite or Watchlist (owner): the buttons say it. Favourited, the star fills white on Apple Music red; on the Watchlist, the "+" turns into a bookmark on iOS blue (a tick would read as "watched"). The Watchlist link and its empty page use the bookmark too.
+  - Search: no Cancel button (owner: it broke the uniformity); the field is always full width.
+  - Material's ripple is gone everywhere: its buttons (icon, text, filled) fade while pressed as iOS buttons do (IosButtons), and menu rows take the same grey highlight as the rest of the app.
+  - A synopsis's MORE and LESS slide the text open and shut.
+  - Home's hero holds still while a finger rests on it, and carries on with the time it had left.
+  - At the end of an episode, Play Now's icon sits in a ring that fills smoothly through the countdown.
+  - A recent search can be swiped away on its own.
+  - The playing album's cover carries the mini player's bars in its corner.

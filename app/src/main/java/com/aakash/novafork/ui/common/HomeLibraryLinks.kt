@@ -42,7 +42,7 @@ fun HomeLibraryLinks(actions: AppActions, modifier: Modifier = Modifier) {
             actions.openLibrary(LibraryFilter.ALL)
             actions.setLibrarySort(LibrarySort.RECENT)
         }
-        LibraryLink(R.drawable.ic_add, "Watchlist") { actions.openLibrary(LibraryFilter.WATCHLIST) }
+        LibraryLink(R.drawable.ic_bookmark, "Watchlist") { actions.openLibrary(LibraryFilter.WATCHLIST) }
         LibraryLink(R.drawable.ic_star, "Favorites") { actions.openLibrary(LibraryFilter.FAVORITES) }
         LibraryLink(R.drawable.ic_video_library, "All Videos") {
             actions.openLibrary(LibraryFilter.ALL)

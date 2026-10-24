@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -24,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
 import com.aakash.novafork.ui.common.EmptyState
+import com.aakash.novafork.ui.common.IosIconButton
 import com.aakash.novafork.ui.common.IosSegmentedControl
 import com.aakash.novafork.ui.common.NovaDropdownMenu
 import com.aakash.novafork.ui.common.NovaIcon
@@ -65,7 +65,7 @@ fun PhoneLibraryScreen(
             },
             onBack = actions::back,
             actions = {
-                IconButton(onClick = { actions.navigate(Route.Search) }) {
+                IosIconButton(onClick = { actions.navigate(Route.Search) }) {
                     NovaIcon(R.drawable.ic_search, contentDescription = "Search")
                 }
                 if (library.filter.isChip) SortMenu(current = library.sort, onSelect = actions::setLibrarySort)
@@ -97,7 +97,7 @@ fun PhoneLibraryScreen(
 private fun SortMenu(current: LibrarySort, onSelect: (LibrarySort) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
     Box {
-        IconButton(onClick = { expanded = true }) {
+        IosIconButton(onClick = { expanded = true }) {
             NovaIcon(R.drawable.ic_sort, contentDescription = "Sort")
         }
         NovaDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
@@ -178,7 +178,7 @@ private fun emptyContentFor(filter: LibraryFilter): EmptyContent = when (filter)
         "Home videos, unidentified files and saved streams appear here.",
     )
     LibraryFilter.WATCHLIST -> EmptyContent(
-        R.drawable.ic_add,
+        R.drawable.ic_bookmark,
         "Your Watchlist is empty",
         "Tap + on the Home hero to save something for later.",
     )

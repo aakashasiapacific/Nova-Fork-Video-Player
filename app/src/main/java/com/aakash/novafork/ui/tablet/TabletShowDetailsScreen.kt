@@ -21,7 +21,6 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -40,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
 import com.aakash.novafork.ui.adaptive.DeviceLayout
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
+import com.aakash.novafork.ui.common.IosFilledTonalButton
 import com.aakash.novafork.ui.common.NovaChip
 import com.aakash.novafork.ui.common.NovaDropdownMenu
 import com.aakash.novafork.ui.common.NovaIcon
@@ -111,10 +111,10 @@ internal fun TabletShowDetailsScreen(
                 if (season.episodes.isNotEmpty()) {
                     item(key = "playSeason", span = { GridItemSpan(maxLineSpan) }, contentType = "playSeason") {
                         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            FilledTonalButton(onClick = { actions.playSeason(details.key, season.number) }) {
+                            IosFilledTonalButton(onClick = { actions.playSeason(details.key, season.number) }) {
                                 ButtonLabel(R.drawable.ic_play_arrow, if (seasons.size > 1) "Play ${season.title}" else "Play All")
                             }
-                            FilledTonalButton(onClick = { actions.playSeason(details.key, season.number, shuffle = true) }) {
+                            IosFilledTonalButton(onClick = { actions.playSeason(details.key, season.number, shuffle = true) }) {
                                 ButtonLabel(R.drawable.ic_shuffle, "Shuffle")
                             }
                         }
