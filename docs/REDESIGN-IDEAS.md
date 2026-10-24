@@ -536,3 +536,13 @@ The owner asked for Apple Music to be copied more precisely, with less clutter. 
 - **Build 114 (owner's crash report):**
   - Crash fix: swiping from Audio toward Video crashed the app. Audio's first page counted as a page opened over Home, so the swipe became a swipe back, and the swipe back moved the Home page (with its scrolling lists) between two places in the layout, which Compose cannot do. Swipe back is now Compose's own seekable page transition: both pages are drawn by the one page container, nothing is moved.
   - Swiping on a tab's first page changes tab again everywhere on the page (below Home's hero too): the swipe-back listener, idle there, was swallowing the swipe. A tab's first page now always swipes between tabs; pages opened from it swipe back.
+- **Build 115 (owner, all in one go):**
+  - Player: pull the video down to close it, as iOS's player closes; past a fifth of the screen (or with a flick) it goes, fading out, otherwise it springs back. Going into the pop-up window shrinks the picture itself into place (the system is told where the picture is).
+  - Show pages: the season menu's chevron turns while it is open, the season name crossfades and the new season's episodes fade in.
+  - Lyrics: a tap on a line jumps there with a tick (and plays if paused); scrolling them by hand lights every line up and pauses the follow for three seconds, as in Apple Music.
+  - Up Next: hold a song, or drag its handle, to move it; it lifts, the others slide aside, with a tick at each new place.
+  - Album pages: the cover sinks back smaller and fades as it scrolls away under the top, and grows when the page is pulled down.
+  - Search: the letters typed show in bold within each result's title.
+  - Songs: swipe right for Play Next (blue), left for Delete (red, asks first; in a playlist it takes the song out of the playlist). A swipe starting at the left edge still goes back.
+  - The app icon's long-press shortcuts: Continue the video left off most recently, and Search.
+  - Pull to refresh: the spinner's spokes appear one by one as the page is pulled and turn with it, with a tick when letting go will refresh.

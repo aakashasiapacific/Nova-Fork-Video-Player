@@ -1,5 +1,9 @@
 package com.aakash.novafork.ui.phone
 
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -32,6 +36,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
@@ -146,12 +151,19 @@ fun PhoneShowDetailsScreen(
                                     .padding(vertical = 6.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                Text(season?.title ?: "Episodes", style = MaterialTheme.typography.titleLarge, maxLines = 2)
+                                // The name crossfades to the new season; the chevron turns while open.
+                                Crossfade(targetState = season?.title ?: "Episodes", animationSpec = tween(200), label = "seasonTitle") { title ->
+                                    Text(title, style = MaterialTheme.typography.titleLarge, maxLines = 2)
+                                }
+                                val turn by animateFloatAsState(if (seasonMenu) 180f else 0f, spring(dampingRatio = 0.7f, stiffness = 500f), label = "seasonChevron")
                                 NovaIcon(
                                     R.drawable.ic_expand_more,
                                     contentDescription = null,
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.padding(start = 6.dp).size(18.dp),
+                                    modifier = Modifier
+                                        .padding(start = 6.dp)
+                                        .size(18.dp)
+                                        .graphicsLayer { rotationZ = turn },
                                 )
                             }
                             NovaDropdownMenu(expanded = seasonMenu, onDismissRequest = { seasonMenu = false }) {
@@ -207,6 +219,8 @@ fun PhoneShowDetailsScreen(
                         videoId = episode.videoId,
                         title = metaLine(details.title, episode.code, episode.title),
                         actions = actions,
+                        // Another season's episodes fade in as it is picked.
+                        modifier = Modifier.animateItem(fadeInSpec = tween(260), placementSpec = null, fadeOutSpec = null),
                     ) { openMenu ->
                         PhoneEpisodeRow(
                             episode = episode,

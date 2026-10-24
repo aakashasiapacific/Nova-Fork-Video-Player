@@ -171,4 +171,20 @@ class PlayQueueTest {
         queue.setShuffled(false)
         assertEquals(ids + 99L, queue.playOrder)
     }
+
+    @Test
+    fun `up next can be reordered but not the playing item or what came before`() {
+        val queue = PlayQueue()
+        queue.set(ids, startIndex = 1, shuffle = false)
+
+        queue.move(from = 4, to = 2)
+        assertEquals(listOf(10L, 20L, 50L, 30L, 40L), queue.playOrder)
+        assertEquals(20L, queue.currentId)
+
+        queue.move(from = 1, to = 3)
+        queue.move(from = 0, to = 2)
+        queue.move(from = 2, to = 9)
+        assertEquals(listOf(10L, 20L, 50L, 30L, 40L), queue.playOrder)
+        assertEquals(listOf(50L, 30L, 40L), queue.upNext(limit = 5))
+    }
 }

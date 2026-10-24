@@ -266,6 +266,13 @@ class MusicPlayer(
         saveResume()
     }
 
+    /** Up Next reordered: the song [from] places after this one goes to [to] places after it. */
+    fun moveUpNext(from: Int, to: Int) {
+        queue.move(queue.position + from, queue.position + to)
+        _state.update { it.withQueue() }
+        saveResume()
+    }
+
     /** Plays the song at [position] of the play order. */
     fun skipTo(position: Int) {
         if (position in 0 until queue.size) moveTo(position)

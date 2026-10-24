@@ -5,8 +5,8 @@ import android.app.RecoverableSecurityException
 import android.content.ActivityNotFoundException
 import android.content.ContentResolver
 import android.content.ContentUris
-import android.content.IntentSender
 import android.content.Intent
+import android.content.IntentSender
 import android.graphics.Color
 import android.net.Uri
 import android.os.Build
@@ -39,11 +39,14 @@ import com.aakash.novafork.ui.common.LocalHeroPreviewEnabled
 import com.aakash.novafork.ui.common.LocalStatusBarIcons
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.DialogUi
+import com.aakash.novafork.ui.model.TopDestination
 import com.aakash.novafork.ui.model.TrashedVideoUi
+import java.time.LocalDate
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.distinctUntilChangedBy
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.time.LocalDate
 
 /**
  * The library. Hosts [NovaRoot] and adds the actions that need an Activity on top of
@@ -230,6 +233,16 @@ class MainActivity : ComponentActivity() {
             }
         }
         lifecycleScope.launch {
+            // The app icon's "Continue" shortcut follows the first Continue Watching video.
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.state
+                    .map { it.home.continueWatching.firstOrNull() }
+                    .distinctUntilChangedBy { card -> card?.let { it.id to it.title } }
+                    .collect { card -> withContext(Dispatchers.Default) { AppShortcuts.update(this@MainActivity, card) } }
+            }
+        }
+        if (savedInstanceState == null) openShortcut(intent)
+        lifecycleScope.launch {
             // Queues resolve in the background (folder, season, playlist); play each one once.
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.queueRequests.collect { queue ->
@@ -244,6 +257,16 @@ class MainActivity : ComponentActivity() {
         if (savedInstanceState == null && !askedOnce && !StoragePermissions.hasAnyVideoAccess(this)) {
             requestStoragePermission()
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        openShortcut(intent)
+    }
+
+    /** The app icon's Search shortcut opens the Search tab. */
+    private fun openShortcut(intent: Intent?) {
+        if (intent?.action == AppShortcuts.ACTION_SEARCH) actions.selectTab(TopDestination.SEARCH)
     }
 
     private fun askToDelete(videoId: Long, target: MainViewModel.DeleteTarget, sender: IntentSender) {

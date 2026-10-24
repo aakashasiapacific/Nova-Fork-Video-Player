@@ -33,6 +33,9 @@ interface AudioActions {
     /** Plays the song [ahead] places after the current one in Now Playing's queue. */
     fun skipAhead(ahead: Int) = Unit
 
+    /** Up Next dragged into a new order: the song [from] places ahead goes to [to] places ahead. */
+    fun moveUpNext(from: Int, to: Int) = Unit
+
     /** Playlists' "New Playlist…": an empty playlist named [name]. */
     fun createPlaylist(name: String) = Unit
 

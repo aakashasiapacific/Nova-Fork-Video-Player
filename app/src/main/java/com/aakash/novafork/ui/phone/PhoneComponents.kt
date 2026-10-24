@@ -83,6 +83,7 @@ import com.aakash.novafork.ui.common.WatchedBadge
 import com.aakash.novafork.ui.common.metaLine
 import com.aakash.novafork.ui.common.pressDim
 import com.aakash.novafork.ui.common.pressScale
+import com.aakash.novafork.ui.common.searchHighlighted
 import com.aakash.novafork.ui.common.sourceTypeIcon
 import com.aakash.novafork.ui.common.staggeredAppear
 import com.aakash.novafork.ui.model.AppActions
@@ -187,7 +188,7 @@ private fun PosterCardLayout(
         }
         Spacer(Modifier.height(8.dp))
         Text(
-            text = title,
+            text = searchHighlighted(title),
             style = MaterialTheme.typography.titleSmall,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
@@ -746,6 +747,7 @@ internal fun PhonePullToRefresh(
     content: @Composable BoxScope.() -> Unit,
 ) {
     val state = rememberPullToRefreshState()
+    val haptics = LocalHapticFeedback.current
     var pulled by remember { mutableStateOf(false) }
     var scanSeen by remember { mutableStateOf(false) }
     LaunchedEffect(pulled, scanning) {
@@ -767,10 +769,12 @@ internal fun PhonePullToRefresh(
         },
         modifier = modifier,
         state = state,
-        // iOS's refresh control: the spinner fades in as the page is pulled and spins while the
-        // scan runs.
+        // iOS's refresh control: as the page is pulled its spokes appear one by one and turn
+        // with the finger, a tick says letting go will refresh, and it spins while the scan runs.
         indicator = {
             val fraction = state.distanceFraction.coerceIn(0f, 1f)
+            val armed = state.distanceFraction >= 1f
+            LaunchedEffect(armed) { if (armed && !pulled) haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove) }
             if (pulled || fraction > 0f) {
                 IosSpinner(
                     modifier = Modifier
@@ -779,10 +783,11 @@ internal fun PhonePullToRefresh(
                         .padding(top = 18.dp)
                         .size(26.dp)
                         .graphicsLayer {
-                            alpha = if (pulled) 1f else fraction
+                            alpha = if (pulled) 1f else 0.4f + 0.6f * fraction
                             rotationZ = if (pulled) 0f else fraction * 180f
                         },
                     color = Color.White.copy(alpha = 0.8f),
+                    reveal = if (pulled) null else fraction,
                 )
             }
         },

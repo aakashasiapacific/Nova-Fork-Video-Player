@@ -8,6 +8,7 @@ import android.content.ServiceConnection
 import android.content.pm.ActivityInfo
 import android.content.res.Configuration
 import android.media.AudioManager
+import android.os.Build
 import android.os.Bundle
 import android.os.IBinder
 import android.os.PowerManager
@@ -22,6 +23,9 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.toAndroidRect
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -92,6 +96,10 @@ class PlayerActivity : ComponentActivity(), PlayerController.Host {
         volumeControlStream = AudioManager.STREAM_MUSIC
         requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
 
+        // The player fades away as it closes (it is pulled down, or back), instead of sliding.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            overrideActivityTransition(OVERRIDE_TRANSITION_CLOSE, 0, android.R.anim.fade_out)
+        }
         pip = PipController(this) { controller?.togglePlay() }
         pip.register()
         subtitlePicker = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -123,7 +131,10 @@ class PlayerActivity : ComponentActivity(), PlayerController.Host {
                     ) {
                         AndroidView(
                             factory = { context -> VLCVideoLayout(context).also { onVideoLayoutCreated(it) } },
-                            modifier = Modifier.fillMaxSize(),
+                            modifier = Modifier
+                                .fillMaxSize()
+                                // For a smooth shrink into the pop-up window (PipController).
+                                .onGloballyPositioned { pip.videoBounds = it.boundsInWindow().toAndroidRect() },
                             onRelease = { layout -> onVideoLayoutReleased(layout) },
                         )
                     }

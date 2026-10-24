@@ -1,11 +1,15 @@
 package com.aakash.novafork.ui.player
 
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.EnterExitState
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -22,18 +26,21 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.BiasAlignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import com.aakash.novafork.ui.adaptive.DeviceLayout
 import com.aakash.novafork.ui.model.PlayerActions
 import com.aakash.novafork.ui.model.PlayerUiState
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 private const val AUTO_HIDE_MS = 3_500L
 private const val UNLOCK_HINT_MS = 2_000L
@@ -54,13 +61,20 @@ fun PlayerScreen(
     modifier: Modifier = Modifier,
     surface: @Composable () -> Unit,
 ) {
+    // How far the video has been pulled down to close the player (iOS), px.
+    val dismiss = remember { Animatable(0f) }
     Box(
         modifier
             .fillMaxSize()
             .background(Color.Black),
     ) {
         // Always the first child so entering or leaving PiP never recreates the video view.
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                .graphicsLayer { translationY = dismiss.value },
+            contentAlignment = Alignment.Center,
+        ) {
             surface()
         }
         val castingTo = state.castingTo
@@ -75,13 +89,17 @@ fun PlayerScreen(
         if (state.inPictureInPicture) {
             if (state.isBuffering) BufferingIndicator(Modifier.align(Alignment.Center))
         } else {
-            PlayerChrome(state = state, actions = actions, layout = layout)
+            PlayerChrome(state = state, actions = actions, layout = layout, dismiss = dismiss)
         }
     }
 }
 
 @Composable
-private fun PlayerChrome(state: PlayerUiState, actions: PlayerActions, layout: DeviceLayout) {
+private fun PlayerChrome(state: PlayerUiState, actions: PlayerActions, layout: DeviceLayout, dismiss: Animatable<Float, AnimationVector1D>) {
+    val scope = rememberCoroutineScope()
+    val backDispatcher = LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
+    // The finger's pull, added up here: several moves can arrive before one is drawn.
+    val pulled = remember { floatArrayOf(0f) }
     var controlsRequested by rememberSaveable { mutableStateOf(true) }
     var panel by rememberSaveable { mutableStateOf<PlayerPanel?>(null) }
     var sheet by rememberSaveable { mutableStateOf<PlayerSheet?>(null) }
@@ -183,7 +201,12 @@ private fun PlayerChrome(state: PlayerUiState, actions: PlayerActions, layout: D
         Box(
             Modifier
                 .fillMaxSize()
-                .observeTouches { touching = it },
+                .observeTouches { touching = it }
+                // While the video is pulled down to close, everything over it fades away.
+                .graphicsLayer {
+                    val height = size.height.coerceAtLeast(1f)
+                    alpha = (1f - dismiss.value / (height * 0.25f)).coerceIn(0f, 1f)
+                },
         ) {
             PlayerGestureLayer(
                 state = state,
@@ -191,6 +214,26 @@ private fun PlayerChrome(state: PlayerUiState, actions: PlayerActions, layout: D
                 onTap = onTap,
                 onDoubleTap = onDoubleTap,
                 onLockedTap = { unlockHintRequests += 1 },
+                onPullDown = { dy ->
+                    pulled[0] = (pulled[0] + dy).coerceAtLeast(0f)
+                    val to = pulled[0]
+                    scope.launch { dismiss.snapTo(to) }
+                },
+                onPullDownEnd = { velocity, height ->
+                    pulled[0] = 0f
+                    scope.launch {
+                        if (dismiss.value > height * DISMISS_FRACTION || velocity > DISMISS_VELOCITY) {
+                            // Off the bottom, then the player closes (fading out, see PlayerActivity).
+                            dismiss.animateTo(height, tween(180), initialVelocity = velocity)
+                            backDispatcher?.onBackPressed()
+                            // Still here (casting, or locked): the video comes back.
+                            delay(400)
+                            dismiss.snapTo(0f)
+                        } else {
+                            dismiss.animateTo(0f, spring(dampingRatio = 0.8f, stiffness = 500f), initialVelocity = velocity)
+                        }
+                    }
+                },
             )
             SeekBubbles(seekBubble)
             if (state.isBuffering && state.error == null && !controlsVisible) {
@@ -332,3 +375,7 @@ private fun PlayerChrome(state: PlayerUiState, actions: PlayerActions, layout: D
         sheet = null
     }
 }
+
+/** Pulled down past this share of the height (or flicked), the player closes. */
+private const val DISMISS_FRACTION = 0.22f
+private const val DISMISS_VELOCITY = 1_500f

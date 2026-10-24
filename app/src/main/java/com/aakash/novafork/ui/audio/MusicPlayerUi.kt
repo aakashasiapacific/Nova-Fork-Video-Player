@@ -17,10 +17,13 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
+import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -55,6 +58,7 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -86,6 +90,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
@@ -255,6 +260,9 @@ fun CoverFlight(artUri: String?) {
             },
     )
 }
+
+/** How long lyrics scrolled by hand stay lit and unfollowed after the finger lifts. */
+private const val LYRICS_BROWSE_MS = 3_000L
 
 /** How much larger the cover lands before it settles. */
 private const val SETTLE_FROM = 1.035f
@@ -755,7 +763,11 @@ private fun BigCover(player: MusicPlayerState) {
     }
 }
 
-/** Big, bold lyric lines; synced ones light up as the song plays and a tap jumps to them. */
+/**
+ * Big, bold lyric lines; synced ones light up as the song plays and a tap jumps to them (with a
+ * tick, playing again if paused). Scrolling them by hand lights every line up for reading and
+ * stops the follow for a moment, as in Apple Music.
+ */
 @Composable
 private fun LyricsPane(player: MusicPlayerState, actions: AudioActions) {
     val lyrics = player.lyrics
@@ -765,14 +777,25 @@ private fun LyricsPane(player: MusicPlayerState, actions: AudioActions) {
     }
     val active = lyrics.activeIndex(player.positionMs)
     val listState = rememberLazyListState()
-    LaunchedEffect(active) { if (active > 0) listState.animateScrollToItem((active - 1).coerceAtLeast(0)) }
+    val haptics = LocalHapticFeedback.current
+    val dragged by listState.interactionSource.collectIsDraggedAsState()
+    var browsing by remember { mutableStateOf(false) }
+    LaunchedEffect(dragged) {
+        if (dragged) {
+            browsing = true
+        } else if (browsing) {
+            delay(LYRICS_BROWSE_MS)
+            browsing = false
+        }
+    }
+    LaunchedEffect(active, browsing) { if (active > 0 && !browsing) listState.animateScrollToItem((active - 1).coerceAtLeast(0)) }
     LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
         itemsIndexed(lyrics.lines) { index, line ->
             val time = line.timeMs
             // Apple Music's lyrics: big, bold, left-aligned. The sung line is bright and full
             // size; the further a line is from it, the dimmer, smaller and softer it gets, and
             // each change glides rather than jumps.
-            val distance = if (lyrics.synced && active >= 0) kotlin.math.abs(index - active) else 0
+            val distance = if (lyrics.synced && active >= 0 && !browsing) kotlin.math.abs(index - active) else 0
             val alpha by animateFloatAsState(
                 when (distance) {
                     0 -> 1f
@@ -800,7 +823,14 @@ private fun LyricsPane(player: MusicPlayerState, actions: AudioActions) {
                         transformOrigin = TransformOrigin(0f, 0.5f)
                     }
                     .clip(RoundedCornerShape(10.dp))
-                    .clickable(enabled = lyrics.synced && time != null) { if (time != null) actions.seekTo(time) }
+                    .clickable(enabled = lyrics.synced && time != null) {
+                        if (time != null) {
+                            haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            actions.seekTo(time)
+                            if (!player.isPlaying) actions.togglePlay()
+                            browsing = false
+                        }
+                    }
                     .padding(vertical = 10.dp)
                     .then(if (blur > 0.dp) Modifier.blur(blur) else Modifier),
             )
@@ -810,10 +840,27 @@ private fun LyricsPane(player: MusicPlayerState, actions: AudioActions) {
 
 /**
  * Apple Music's queue: "Playing Next" with square shuffle and repeat toggles beside it, then the
- * songs to come (tap one to play it), and Stop at the end.
+ * songs to come (tap one to play it; hold one, or drag its handle, to move it: it lifts and the
+ * others slide aside, with a tick at each new place), and Stop at the end.
  */
 @Composable
 private fun QueuePane(player: MusicPlayerState, actions: AudioActions, upNext: List<SongEntity>) {
+    val haptics = LocalHapticFeedback.current
+    // The row being dragged ([dragFrom], -1 for none), how far, and the place it would drop at.
+    var dragFrom by remember { mutableIntStateOf(-1) }
+    var dragOffset by remember { mutableFloatStateOf(0f) }
+    var rowHeight by remember { mutableFloatStateOf(1f) }
+    val lastIndex = upNext.lastIndex.coerceAtLeast(0)
+    // Read when called: the gesture callbacks outlive the composition that made them.
+    fun target(): Int = if (dragFrom < 0) -1 else (dragFrom + (dragOffset / rowHeight).roundToInt()).coerceIn(0, lastIndex)
+    val dragTo = target()
+    LaunchedEffect(dragTo) { if (dragTo >= 0 && dragFrom >= 0 && dragTo != dragFrom) haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove) }
+    fun drop() {
+        val to = target()
+        if (dragFrom >= 0 && to >= 0 && to != dragFrom) actions.moveUpNext(dragFrom + 1, to + 1)
+        dragFrom = -1
+        dragOffset = 0f
+    }
     LazyColumn(Modifier.fillMaxSize()) {
         item(key = "header") {
             Row(Modifier.padding(bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -852,10 +899,51 @@ private fun QueuePane(player: MusicPlayerState, actions: AudioActions, upNext: L
             }
         }
         itemsIndexed(upNext, key = { index, song -> "$index:${song.id}" }) { index, song ->
+            val dragged = index == dragFrom
+            // The others make room for the dragged one at its new place.
+            val shift by animateFloatAsState(
+                when {
+                    dragFrom < 0 || dragged -> 0f
+                    dragFrom < dragTo && index in (dragFrom + 1)..dragTo -> -rowHeight
+                    dragFrom > dragTo && index in dragTo until dragFrom -> rowHeight
+                    else -> 0f
+                },
+                spring(dampingRatio = 0.85f, stiffness = 600f),
+                label = "queueShift",
+            )
+            val lift by animateFloatAsState(if (dragged) 1.03f else 1f, spring(dampingRatio = 0.6f, stiffness = 500f), label = "queueLift")
+            val reorder = Modifier.pointerInput(index, upNext.size) {
+                detectDragGesturesAfterLongPress(
+                    onDragStart = {
+                        dragFrom = index
+                        dragOffset = 0f
+                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                    },
+                    onDragEnd = { drop() },
+                    onDragCancel = {
+                        dragFrom = -1
+                        dragOffset = 0f
+                    },
+                ) { change, amount ->
+                    change.consume()
+                    dragOffset += amount.y
+                }
+            }
             Row(
                 Modifier
+                    .onSizeChanged { rowHeight = it.height.toFloat().coerceAtLeast(1f) }
+                    .zIndex(if (dragged) 1f else 0f)
+                    .graphicsLayer {
+                        translationY = if (dragged) dragOffset else shift
+                        scaleX = lift
+                        scaleY = lift
+                        shadowElevation = if (dragged) 12.dp.toPx() else 0f
+                        shape = RoundedCornerShape(8.dp)
+                    }
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(8.dp))
+                    .background(if (dragged) Color.White.copy(alpha = 0.12f) else Color.Transparent)
+                    .then(reorder)
                     .clickable { actions.skipAhead(index + 1) }
                     .padding(vertical = 7.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -871,6 +959,33 @@ private fun QueuePane(player: MusicPlayerState, actions: AudioActions, upNext: L
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
+                // Apple Music's handle: dragging it moves the song straight away.
+                NovaIcon(
+                    R.drawable.ic_drag_handle,
+                    contentDescription = "Move ${song.title}",
+                    tint = Color.White.copy(alpha = 0.5f),
+                    modifier = Modifier
+                        .padding(start = 8.dp)
+                        .size(40.dp)
+                        .pointerInput(index, upNext.size) {
+                            detectVerticalDragGestures(
+                                onDragStart = {
+                                    dragFrom = index
+                                    dragOffset = 0f
+                                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                },
+                                onDragEnd = { drop() },
+                                onDragCancel = {
+                                    dragFrom = -1
+                                    dragOffset = 0f
+                                },
+                            ) { change, amount ->
+                                change.consume()
+                                dragOffset += amount
+                            }
+                        }
+                        .padding(10.dp),
+                )
             }
         }
         item(key = "stop") {

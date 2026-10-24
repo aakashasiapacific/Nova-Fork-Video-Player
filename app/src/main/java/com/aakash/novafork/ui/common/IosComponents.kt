@@ -332,13 +332,15 @@ fun NovaChip(
 /**
  * iOS's activity indicator: eight spokes whose brightness steps round the circle. Takes
  * Material's CircularProgressIndicator parameters; [strokeWidth] is ignored, the spokes scale
- * with the size.
+ * with the size. With [reveal] (0 to 1) it stands still and shows that share of its spokes, one
+ * by one, as iOS's refresh control does while it is being pulled.
  */
 @Composable
 fun IosSpinner(
     modifier: Modifier = Modifier,
     color: Color = IosColors.SecondaryLabel,
     @Suppress("UNUSED_PARAMETER") strokeWidth: Dp = 0.dp,
+    reveal: Float? = null,
 ) {
     val transition = rememberInfiniteTransition(label = "spinner")
     val step by transition.animateFloat(
@@ -352,8 +354,9 @@ fun IosSpinner(
         val spoke = r * 0.42f
         val width = r * 0.2f
         val lead = step.toInt()
-        for (i in 0 until 8) {
-            val age = (lead - i + 8) % 8
+        val shown = if (reveal == null) 8 else kotlin.math.ceil(reveal.coerceIn(0f, 1f) * 8f).toInt()
+        for (i in 0 until shown) {
+            val age = if (reveal == null) (lead - i + 8) % 8 else 0
             val angle = Math.toRadians(i * 45.0 - 90.0)
             val dx = kotlin.math.cos(angle).toFloat()
             val dy = kotlin.math.sin(angle).toFloat()

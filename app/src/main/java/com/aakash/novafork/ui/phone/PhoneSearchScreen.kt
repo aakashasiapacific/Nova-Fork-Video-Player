@@ -67,6 +67,7 @@ import com.aakash.novafork.ui.common.EmptyState
 import com.aakash.novafork.ui.common.Hairline
 import com.aakash.novafork.ui.common.IosColors
 import com.aakash.novafork.ui.common.LocalBottomBarSpace
+import com.aakash.novafork.ui.common.LocalSearchQuery
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.OnTabReselect
 import com.aakash.novafork.ui.common.glass
@@ -123,8 +124,8 @@ fun PhoneSearchScreen(
                     .padding(start = dims.gutter, end = dims.gutter, top = 16.dp, bottom = 8.dp),
             )
             val query = search.query.trim()
-            // Lists end above the field.
-            CompositionLocalProvider(LocalBottomBarSpace provides listSpace) {
+            // Lists end above the field; results show what was typed in bold.
+            CompositionLocalProvider(LocalBottomBarSpace provides listSpace, LocalSearchQuery provides field.text) {
                 when {
                     field.text.isBlank() && search.recent.isNotEmpty() -> RecentSearches(
                         recent = search.recent,
