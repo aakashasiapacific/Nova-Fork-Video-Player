@@ -16,11 +16,9 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.FilledTonalIconButton
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -38,6 +36,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
 import com.aakash.novafork.data.AspectMode
+import com.aakash.novafork.ui.common.NovaChip
+import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.model.TrackUi
 
 // Option rows shared by the phone track sheet and the tablet side panel.
@@ -96,14 +96,17 @@ private fun OptionRow(selected: Boolean, label: String, onClick: () -> Unit) {
             .padding(horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        RadioButton(selected = selected, onClick = null)
-        Spacer(Modifier.width(14.dp))
         Text(
             text = label,
             style = MaterialTheme.typography.bodyLarge,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
         )
+        if (selected) {
+            Spacer(Modifier.width(14.dp))
+            NovaIcon(R.drawable.ic_check, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+        }
     }
 }
 
@@ -201,21 +204,10 @@ private fun <T> ChoiceChips(
     ) {
         options.forEach { option ->
             val selected = isSelected(option)
-            FilterChip(
+            NovaChip(
                 selected = selected,
                 onClick = { onSelect(option) },
                 label = { Text(label(option)) },
-                leadingIcon = if (selected) {
-                    {
-                        Icon(
-                            painter = painterResource(R.drawable.ic_check),
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp),
-                        )
-                    }
-                } else {
-                    null
-                },
             )
         }
     }

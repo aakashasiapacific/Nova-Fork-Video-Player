@@ -9,8 +9,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -26,6 +24,8 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
+import com.aakash.novafork.ui.common.IosSpinner
+import com.aakash.novafork.ui.common.NovaAlertDialog
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.DialogUi
@@ -36,14 +36,15 @@ internal fun LibraryDiagnosticsDialog(dialog: DialogUi.LibraryDiagnostics, actio
     val clipboard = LocalClipboardManager.current
     var copied by remember { mutableStateOf(false) }
     val report = dialog.report
-    AlertDialog(
+    NovaAlertDialog(
+        form = true,
         onDismissRequest = actions::dismissDialog,
         icon = { NovaIcon(R.drawable.ic_info, contentDescription = null) },
         title = { Text("Library diagnostics") },
         text = {
             if (report == null) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                    IosSpinner(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
                     Spacer(Modifier.width(12.dp))
                     Text("Checking storage access, Android's media library and your sources…")
                 }

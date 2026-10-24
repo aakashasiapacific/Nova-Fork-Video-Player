@@ -16,6 +16,8 @@ import com.aakash.novafork.data.db.SQL_CHUNK
 import com.aakash.novafork.data.db.SourceEntity
 import com.aakash.novafork.data.db.SourceType
 import com.aakash.novafork.data.db.VideoEntity
+import com.aakash.novafork.data.db.VideoFavoriteEntity
+import com.aakash.novafork.data.db.WatchlistEntity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.IOException
@@ -28,7 +30,8 @@ private const val TAG = "BackupManager"
 
 /**
  * Backs up and restores what the user put into the app: settings (the whole settings file),
- * sources, each video's playback state, Identify's manual matches and playlists.
+ * sources, each video's playback state, each song's plays, Identify's manual matches and
+ * playlists of videos and songs.
  *
  * A restore replaces the settings, adds the sources this device doesn't have and applies the
  * rest to the videos it finds (see [VideoMatcher]); entries whose videos are not in the library
@@ -52,6 +55,11 @@ class BackupManager(
     private val sourceDao = database.sourceDao()
     private val videoDao = database.videoDao()
     private val playlistDao = database.playlistDao()
+    private val playlistSongDao = database.playlistSongDao()
+    private val songDao = database.songDao()
+    private val watchlistDao = database.watchlistDao()
+    private val videoFavoriteDao = database.videoFavoriteDao()
+    private val favoriteSongDao = database.favoriteSongDao()
 
     private val settingsPrefs: SharedPreferences
         get() = appContext.getSharedPreferences(SettingsBackup.PREFS_NAME, Context.MODE_PRIVATE)
@@ -71,6 +79,22 @@ class BackupManager(
             val sources = sourceDao.all()
             val sourcesById = sources.associateBy { it.id }
             val withState = videoDao.withUserState()
+            val watchlist = watchlistDao.all().map { it.itemKey to it.addedAt }
+            val starred = videoFavoriteDao.all().map { it.itemKey to it.addedAt }
+            // "v:<id>" keys name this device's video ids; they travel as references to the files.
+            val savedVideos = (watchlist + starred).mapNotNull { (key, _) -> videoIdOf(key) }.distinct().chunked(SQL_CHUNK)
+                .flatMap { videoDao.byIds(it) }
+                .associateBy { it.id }
+            fun saved(key: String, addedAt: Long): BackupSavedItem? = when {
+                key.startsWith(SHOW_PREFIX) -> BackupSavedItem(showKey = key.removePrefix(SHOW_PREFIX), addedAt = addedAt)
+                else -> videoIdOf(key)?.let(savedVideos::get)?.let { video ->
+                    BackupSavedItem(video = VideoMatcher.refOf(video, sourcesById[video.sourceId], includeSecrets), addedAt = addedAt)
+                }
+            }
+            val songStars = favoriteSongDao.all()
+            val starredSongs = songStars.map { it.songId }.chunked(SQL_CHUNK)
+                .flatMap { songDao.byIds(it) }
+                .associateBy { it.id }
             NovaBackup(
                 appVersion = appVersion,
                 createdAt = clock(),
@@ -94,13 +118,34 @@ class BackupManager(
                     val videos = items.map { it.videoId }.distinct().chunked(SQL_CHUNK)
                         .flatMap { videoDao.byIds(it) }
                         .associateBy { it.id }
+                    val songItems = playlistSongDao.items(playlist.id)
+                    val songs = songItems.map { it.songId }.distinct().chunked(SQL_CHUNK)
+                        .flatMap { songDao.byIds(it) }
+                        .associateBy { it.id }
                     BackupPlaylist(
                         name = playlist.name,
                         createdAt = playlist.createdAt,
                         items = items.mapNotNull { item ->
                             videos[item.videoId]?.let { VideoMatcher.refOf(it, sourcesById[it.sourceId], includeSecrets) }
                         },
+                        songs = songItems.mapNotNull { item ->
+                            songs[item.songId]?.let { SongMatcher.refOf(it, sourcesById[it.sourceId]) }
+                        },
                     )
+                },
+                songs = songDao.withPlays().map { song ->
+                    BackupSongState(
+                        song = SongMatcher.refOf(song, sourcesById[song.sourceId]),
+                        playCount = song.playCount,
+                        lastPlayedAt = song.lastPlayedAt,
+                    )
+                },
+                watchlist = watchlist.mapNotNull { (key, addedAt) -> saved(key, addedAt) },
+                videoFavorites = starred.mapNotNull { (key, addedAt) -> saved(key, addedAt) },
+                songFavorites = songStars.mapNotNull { star ->
+                    starredSongs[star.songId]?.let { song ->
+                        BackupSongFavorite(SongMatcher.refOf(song, sourcesById[song.sourceId]), star.addedAt)
+                    }
                 },
             )
         }
@@ -234,12 +279,42 @@ class BackupManager(
             }
         }
 
+        // Shows are saved by their library key, the same on every device: they go in at once.
+        // Movies and videos wait in the pending restore like the rest until their files are found.
+        val showsSaved = withContext(Dispatchers.IO) {
+            database.withTransaction {
+                var added = 0
+                for (item in backup.watchlist) {
+                    val show = item.showKey?.takeIf { it.isNotBlank() } ?: continue
+                    if (watchlistDao.count(SHOW_PREFIX + show) == 0) added++
+                    watchlistDao.add(WatchlistEntity(SHOW_PREFIX + show, item.addedAt.takeIf { it > 0 } ?: clock()))
+                }
+                val stars = videoFavoriteDao.all().mapTo(HashSet()) { it.itemKey }
+                for (item in backup.videoFavorites) {
+                    val show = item.showKey?.takeIf { it.isNotBlank() } ?: continue
+                    if (stars.add(SHOW_PREFIX + show)) {
+                        videoFavoriteDao.add(VideoFavoriteEntity(SHOW_PREFIX + show, item.addedAt.takeIf { it > 0 } ?: clock()))
+                        added++
+                    }
+                }
+                added
+            }
+        }
+
         pending.add(
+            savedVideos = backup.watchlist.mapNotNull { item -> item.video?.let { PendingSavedVideo(WATCHLIST, it, item.addedAt) } } +
+                backup.videoFavorites.mapNotNull { item -> item.video?.let { PendingSavedVideo(FAVORITES, it, item.addedAt) } },
+            songFavorites = backup.songFavorites,
             videos = backup.videos,
             matches = backup.matches,
             playlistItems = backup.playlists.flatMap { playlist ->
                 val name = playlist.name.trim()
                 if (name.isEmpty()) emptyList() else playlist.items.map { PendingPlaylistItem(name, it) }
+            },
+            songs = backup.songs,
+            songPlaylistItems = backup.playlists.flatMap { playlist ->
+                val name = playlist.name.trim()
+                if (name.isEmpty()) emptyList() else playlist.songs.map { PendingSongPlaylistItem(name, it) }
             },
         )
         val result = pending.apply(library, identify = true)
@@ -251,7 +326,7 @@ class BackupManager(
             foldersToPick = foldersToPick,
             addedSourceIds = added,
             playlistsCreated = playlistsCreated,
-            applied = result.applied,
+            applied = result.applied + RestoreCounts(saved = showsSaved),
             waiting = result.waiting,
             matchesFailed = result.matchesFailed,
         )
@@ -367,3 +442,9 @@ private fun SourceEntity.toBackup(includeSecrets: Boolean): BackupSource? {
         userId = userId.takeIf { includeSecrets },
     )
 }
+
+private const val SHOW_PREFIX = "s:"
+private const val VIDEO_PREFIX = "v:"
+
+/** The video id in a watchlist or favorites key ("v:<id>"); null for a show. */
+private fun videoIdOf(key: String): Long? = key.takeIf { it.startsWith(VIDEO_PREFIX) }?.removePrefix(VIDEO_PREFIX)?.toLongOrNull()

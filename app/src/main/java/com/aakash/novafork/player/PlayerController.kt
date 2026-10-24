@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.pm.ActivityInfo
 import android.content.res.Configuration
 import android.media.AudioManager
+import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.os.Build
 import android.os.Handler
@@ -12,6 +13,7 @@ import android.os.ParcelFileDescriptor
 import android.os.SystemClock
 import android.provider.OpenableColumns
 import android.util.Log
+import android.view.KeyEvent
 import com.aakash.novafork.AppGraph
 import com.aakash.novafork.CrashReporter
 import com.aakash.novafork.core.library.VideoFiles
@@ -211,6 +213,9 @@ class PlayerController(
     private var resumeBannerPending = false
     private var userRotated = false
 
+    /** The current video's shape read from its file before playback, for turning the screen early. */
+    private var fileShape: VideoSize? = null
+
     /** False from open() until the new media is set: the player still holds the previous one. */
     private var mediaReady = false
 
@@ -261,7 +266,7 @@ class PlayerController(
 
     // Gestures
     private var volumeLevel = 0f
-    private var volumeGestureActive = false
+    private var volumeHudJob: Job? = null
     private var scrubStartMs: Long? = null
     private var seekSeriesStartMs: Long? = null
     private var seekSeriesTargetMs: Long? = null
@@ -401,7 +406,7 @@ class PlayerController(
                 brightness = brightness,
             )
         }
-        _videoSize.value?.let { applyOrientation(it) }
+        (_videoSize.value ?: fileShape)?.let { applyOrientation(it) }
     }
 
     fun detachHost(host: Host) {
@@ -432,7 +437,6 @@ class PlayerController(
         hostPaused = false
         pictureWatchJob?.cancel()
         scrubStartMs = null
-        volumeGestureActive = false
         // Off before the surface goes: a decoder writing to a vanished surface can fail.
         disableVideo()
         detachSurface()
@@ -716,6 +720,11 @@ class PlayerController(
 
         startSubtitleSearch(current, settings)
 
+        // Turn the screen to the video's shape from the file itself, before the first frame: a
+        // phone's reel opens in portrait straight away instead of landscape (owner).
+        fileShape = if (kind == UriKind.CONTENT || kind == UriKind.FILE) readFileShape(uri) else null
+        fileShape?.let { applyOrientation(it) }
+
         val decoding = MediaSource.decodingFor(uri, settings.hardwareDecoding)
         this.decoding = decoding
         PlayerDiagnostics.record("open: ${describeSource(kind, fileName)}, ${decodingLabel(decoding)}")
@@ -746,6 +755,32 @@ class PlayerController(
         } catch (e: Exception) {
             Log.w(TAG, "Library lookup failed", e)
             null
+        }
+    }
+
+    /**
+     * The picture's shape as it is shown: the stored width and height, swapped when the file
+     * says to turn it a quarter (how phones store videos filmed upright). Null when unknown.
+     */
+    private suspend fun readFileShape(uri: String): VideoSize? = withContext(Dispatchers.IO) {
+        val retriever = MediaMetadataRetriever()
+        try {
+            val parsed = Uri.parse(uri)
+            if (parsed.scheme == "file") retriever.setDataSource(parsed.path) else retriever.setDataSource(appContext, parsed)
+            val width = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)?.toIntOrNull() ?: 0
+            val height = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)?.toIntOrNull() ?: 0
+            val rotation = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION)?.toIntOrNull() ?: 0
+            when {
+                width <= 0 || height <= 0 -> null
+                rotation % 180 != 0 -> VideoSize(height, width)
+                else -> VideoSize(width, height)
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            null
+        } finally {
+            runCatching { retriever.release() }
         }
     }
 
@@ -950,11 +985,15 @@ class PlayerController(
         PlayerDiagnostics.record(if (inPictureInPicture) "picture-in-picture on" else "picture-in-picture off")
         if (inPictureInPicture) {
             scrubStartMs = null
-            volumeGestureActive = false
             feedbackJob?.cancel()
+            volumeHudJob?.cancel()
         }
         _state.update {
-            it.copy(inPictureInPicture = inPictureInPicture, feedback = if (inPictureInPicture) null else it.feedback)
+            it.copy(
+                inPictureInPicture = inPictureInPicture,
+                feedback = if (inPictureInPicture) null else it.feedback,
+                volumeHud = if (inPictureInPicture) null else it.volumeHud,
+            )
         }
     }
 
@@ -1107,39 +1146,39 @@ class PlayerController(
         }
     }
 
-    override fun adjustVolume(delta: Float) {
-        if (released) return
-        if (!volumeGestureActive) {
-            volumeGestureActive = true
-            volumeLevel = systemVolumeLevel()
+    /**
+     * A volume key while the player is on screen (not in picture-in-picture): one step of the
+     * media volume, without the system's volume panel, shown with the player's own indicator
+     * ([PlayerUiState.volumeHud]). False when the system should handle the key: a device with
+     * fixed volume, or a change it refused.
+     */
+    fun onVolumeKey(keyCode: Int): Boolean {
+        if (released || audioManager.isVolumeFixed) return false
+        val direction = when (keyCode) {
+            KeyEvent.KEYCODE_VOLUME_UP -> AudioManager.ADJUST_RAISE
+            KeyEvent.KEYCODE_VOLUME_DOWN -> AudioManager.ADJUST_LOWER
+            KeyEvent.KEYCODE_VOLUME_MUTE -> AudioManager.ADJUST_TOGGLE_MUTE
+            else -> return false
         }
-        // Kept as a fraction so slow drags add up across the coarse system steps.
-        volumeLevel = (volumeLevel + delta).coerceIn(0f, 1f)
-        val max = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
-        val index = (volumeLevel * max).roundToInt()
-        if (!audioManager.isVolumeFixed && index != audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)) {
-            try {
-                audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, index, 0)
-            } catch (e: SecurityException) {
-                Log.w(TAG, "Volume change refused", e)
-            }
+        try {
+            // No FLAG_SHOW_UI: the player shows the level itself.
+            audioManager.adjustStreamVolume(AudioManager.STREAM_MUSIC, direction, 0)
+        } catch (e: SecurityException) {
+            Log.w(TAG, "Volume change refused", e)
+            return false
         }
-        val level = volumeLevel
-        _state.update { it.copy(volume = level) }
-        showFeedback(GestureFeedback.Volume(level), hideAfterMs = null)
-    }
-
-    override fun adjustBrightness(delta: Float) {
-        val host = host
-        if (released || host == null) return
-        val level = (_state.value.brightness + delta).coerceIn(MIN_BRIGHTNESS, 1f)
-        host.windowBrightness = level
-        _state.update { it.copy(brightness = level) }
-        showFeedback(GestureFeedback.Brightness(level), hideAfterMs = null)
+        val level = if (audioManager.isStreamMute(AudioManager.STREAM_MUSIC)) 0f else systemVolumeLevel()
+        volumeLevel = level
+        _state.update { it.copy(volume = level, volumeHud = level) }
+        volumeHudJob?.cancel()
+        volumeHudJob = scope.launch {
+            delay(VOLUME_HUD_MS)
+            _state.update { it.copy(volumeHud = null) }
+        }
+        return true
     }
 
     override fun endGesture() {
-        volumeGestureActive = false
         scrubStartMs = null
         if (_state.value.feedback != null) hideFeedbackAfter(GESTURE_FEEDBACK_MS)
     }
@@ -1544,6 +1583,9 @@ class PlayerController(
             MediaPlayer.Event.ESAdded -> {
                 if (event.esChangedType == IMedia.Track.Type.Video) videoTrackSeen = true
                 onTracksChanged(added = true)
+                // The picture's size can be known here already; the video output event may come
+                // before libVLC reports the track.
+                if (event.esChangedType == IMedia.Track.Type.Video) onVideoOutput()
             }
             MediaPlayer.Event.ESDeleted, MediaPlayer.Event.ESSelected -> {
                 onTracksChanged(added = false)
@@ -2390,6 +2432,9 @@ class PlayerController(
         const val DISABLED_TRACK = -1
         const val FULL_VOLUME = 100
         const val DUCKED_VOLUME = 30
+
+        /** The volume indicator stays this long after the last volume key, like iOS's. */
+        const val VOLUME_HUD_MS = 1_500L
 
         const val SAVE_INTERVAL_MS = 10_000L
         const val POSITION_UPDATE_INTERVAL_MS = 250L

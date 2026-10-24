@@ -1,23 +1,33 @@
 package com.aakash.novafork.ui.phone
 
 import androidx.annotation.DrawableRes
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
@@ -31,57 +41,96 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.coerceAtMost
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.aakash.novafork.R
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
+import com.aakash.novafork.ui.common.ArtImage
+import com.aakash.novafork.ui.common.ArtPlaceholder
 import com.aakash.novafork.ui.common.BackdropArt
+import com.aakash.novafork.ui.common.HeroTitle
+import com.aakash.novafork.ui.common.NovaDropdownMenu
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.PosterArt
 import com.aakash.novafork.ui.common.RatingPill
 import com.aakash.novafork.ui.common.bottomScrim
 import com.aakash.novafork.ui.model.Artwork
 
-private val BackdropHeight = 280.dp
+/**
+ * How far the poster reaches up into the backdrop's faded lower edge, on the Home hero and the
+ * details pages alike (so opening a title from the hero keeps the poster where it was).
+ */
+internal val PosterOverlap = 40.dp
 
-/** How far the details poster reaches up into the backdrop. */
-private val PosterOverlap = 64.dp
-
-/** 280dp, but at most half the page so a phone in landscape still shows the title. */
-internal fun detailsBackdropHeight(pageHeight: Dp): Dp = BackdropHeight.coerceAtMost(pageHeight * 0.5f)
+/** At most half the page for the picture, so a phone in landscape still shows the title. */
+internal fun detailsBackdropHeight(pageHeight: Dp): Dp = pageHeight * 0.5f
 
 /**
- * Backdrop that melts into the page, with the poster overlapping its bottom edge and the title
- * block beside the poster.
+ * The phone's title header, shared by the Home hero and the details pages so both look the same:
+ * the backdrop at 16:9 (at most [maxBackdropHeight]) below the status bar, with a darkened sliver
+ * of it running under the bar, fading into the page; the poster reaching [PosterOverlap] up into
+ * the faded edge; [info] beside the poster, starting below the picture.
  */
 @Composable
-internal fun PhoneDetailsHeader(
+internal fun BackdropPosterHeader(
     artwork: Artwork,
     title: String,
-    meta: String,
-    rating: Float?,
-    genres: List<String>,
     modifier: Modifier = Modifier,
-    originalTitle: String? = null,
-    backdropHeight: Dp = BackdropHeight,
+    maxBackdropHeight: Dp = Dp.Infinity,
+    /** Home's hero: the backdrop drifts in a slow zoom, so the page feels alive. */
+    drift: Boolean = false,
+    info: @Composable ColumnScope.() -> Unit,
 ) {
     val dims = LocalNovaDimens.current
     val posterShape = RoundedCornerShape(10.dp)
-    Box(modifier.fillMaxWidth()) {
-        BackdropArt(
-            artwork = artwork,
-            modifier = Modifier
+    val statusBar = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    val background = MaterialTheme.colorScheme.background
+    BoxWithConstraints(modifier.fillMaxWidth()) {
+        val pageWidth = maxWidth
+        val backdropHeight = statusBar + minOf(pageWidth * 9f / 16f, maxBackdropHeight)
+        if (artwork.frameOnly) {
+            // A camera-roll or saved video: one picture, the frame in its own shape, and the
+            // title under it; no second copy of it as a poster.
+            Column(Modifier.fillMaxWidth()) {
+                FramePicture(artwork = artwork, modifier = Modifier.height(backdropHeight))
+                Column(
+                    Modifier.padding(start = dims.gutter, end = dims.gutter, top = 12.dp),
+                    content = info,
+                )
+            }
+            return@BoxWithConstraints
+        }
+        Box(
+            Modifier
                 .fillMaxWidth()
-                .height(backdropHeight)
-                .bottomScrim(MaterialTheme.colorScheme.background, startFraction = 0.3f),
-        )
+                .height(backdropHeight),
+        ) {
+            BackdropArt(artwork = artwork, modifier = Modifier.fillMaxSize().then(if (drift) Modifier.slowZoom() else Modifier))
+            StatusBarShade(statusBar)
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            0f to Color.Transparent,
+                            0.6f to Color.Transparent,
+                            1f to background,
+                        ),
+                    ),
+            )
+        }
         Row(
             Modifier
                 .fillMaxWidth()
@@ -103,45 +152,157 @@ internal fun PhoneDetailsHeader(
                 Modifier
                     .weight(1f)
                     .padding(top = PosterOverlap + 8.dp),
+                content = info,
+            )
+        }
+    }
+}
+
+/**
+ * A frame of a video in its own shape (a vertical camera clip stays vertical) on a blurred,
+ * darkened copy of itself that fills the height [modifier] gives it, from the top of the screen
+ * (the status bar strip shaded), fading into the page.
+ */
+@Composable
+internal fun FramePicture(artwork: Artwork, modifier: Modifier = Modifier) {
+    val background = MaterialTheme.colorScheme.background
+    val shape = RoundedCornerShape(12.dp)
+    val candidates = listOfNotNull(artwork.frameSource)
+    val statusBar = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    BoxWithConstraints(
+        modifier.fillMaxWidth(),
+        contentAlignment = Alignment.TopCenter,
+    ) {
+        val height = maxHeight
+        ArtImage(
+            candidates = candidates,
+            contentDescription = null,
+            modifier = Modifier
+                .fillMaxSize()
+                .blur(40.dp),
+            frameSource = artwork.frameSource,
+        ) {
+            ArtPlaceholder(seed = artwork.seed, title = null, modifier = Modifier.fillMaxSize())
+        }
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.45f)),
+        )
+        // The sharp frame, as large as fits under the status bar, never wider than the page, and
+        // centred in the room below the status bar (a wide frame would otherwise hang at the top
+        // over an empty band).
+        val aspect = (artwork.frameAspect ?: (16f / 9f)).coerceIn(0.4f, 2.4f)
+        val room = height - statusBar - 24.dp
+        val frameWidth = minOf(room * aspect, maxWidth - 40.dp)
+        Box(
+            Modifier
+                .fillMaxSize()
+                .padding(top = statusBar),
+            contentAlignment = Alignment.Center,
+        ) {
+            Box(
+                Modifier
+                    .width(frameWidth)
+                    .height(frameWidth / aspect)
+                    .shadow(16.dp, shape)
+                    .clip(shape),
             ) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.headlineSmall,
-                    maxLines = 3,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                if (!originalTitle.isNullOrBlank() && originalTitle != title) {
-                    Text(
-                        text = originalTitle,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                if (meta.isNotEmpty()) {
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        text = meta,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                if (rating != null && rating > 0f) {
-                    Spacer(Modifier.height(8.dp))
-                    RatingPill(rating)
-                }
-                if (genres.isNotEmpty()) {
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        text = genres.joinToString(", "),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
+                ArtImage(
+                    candidates = candidates,
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
+                    frameSource = artwork.frameSource,
+                ) {
+                    ArtPlaceholder(seed = artwork.seed, title = null, modifier = Modifier.fillMaxSize())
                 }
             }
+        }
+        StatusBarShade(statusBar)
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        0f to Color.Transparent,
+                        0.88f to Color.Transparent,
+                        1f to background,
+                    ),
+                ),
+        )
+    }
+}
+
+/** Darkens the status bar strip of a picture that runs under it: soft, darker at the very top. */
+@Composable
+internal fun StatusBarShade(statusBar: Dp) {
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .height(statusBar * 2)
+            .background(
+                Brush.verticalGradient(
+                    0f to Color.Black.copy(alpha = 0.85f),
+                    0.5f to Color.Black.copy(alpha = 0.55f),
+                    1f to Color.Transparent,
+                ),
+            ),
+    )
+}
+
+/** The details pages' header: [BackdropPosterHeader] with the title, meta, rating and genres. */
+@Composable
+internal fun PhoneDetailsHeader(
+    artwork: Artwork,
+    title: String,
+    meta: String,
+    rating: Float?,
+    genres: List<String>,
+    modifier: Modifier = Modifier,
+    originalTitle: String? = null,
+    maxBackdropHeight: Dp = Dp.Infinity,
+) {
+    BackdropPosterHeader(artwork = artwork, title = title, modifier = modifier, maxBackdropHeight = maxBackdropHeight) {
+        // The title's TMDB logo, as on Home's hero (owner): the same artwork on both pages.
+        HeroTitle(
+            title = title,
+            logoUrl = artwork.logoUrl,
+            textStyle = MaterialTheme.typography.headlineSmall,
+            textAlign = TextAlign.Start,
+            logoAlignment = Alignment.BottomStart,
+            maxWidthFraction = 1f,
+            logoHeight = 48.dp,
+        )
+        if (!originalTitle.isNullOrBlank() && originalTitle != title) {
+            Text(
+                text = originalTitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        if (meta.isNotEmpty()) {
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = meta,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        if (rating != null && rating > 0f) {
+            Spacer(Modifier.height(8.dp))
+            RatingPill(rating)
+        }
+        if (genres.isNotEmpty()) {
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = genres.joinToString(", "),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }
@@ -191,7 +352,7 @@ internal fun PhoneDetailsTopBar(
             var expanded by remember { mutableStateOf(false) }
             Box {
                 ScrimIconButton(R.drawable.ic_more_vert, contentDescription = "More options", onClick = { expanded = true })
-                DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                NovaDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
                     menu { expanded = false }
                 }
             }
@@ -221,7 +382,8 @@ internal fun OverviewBlock(
         if (!tagline.isNullOrBlank()) {
             Text(
                 text = tagline,
-                style = MaterialTheme.typography.bodyLarge.copy(fontStyle = FontStyle.Italic),
+                // Apple TV sets its one-line summaries upright and bold, never in italics.
+                style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.onSurface,
             )
             Spacer(Modifier.height(8.dp))
@@ -247,9 +409,10 @@ internal fun OverviewBlock(
                 )
                 if (canToggle) {
                     Text(
-                        text = if (expanded) "Less" else "More",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.primary,
+                        // Apple TV's caps "MORE" in white after a cut-off synopsis.
+                        text = if (expanded) "LESS" else "MORE",
+                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, letterSpacing = 0.4.sp),
+                        color = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.padding(vertical = 6.dp),
                     )
                 }
@@ -258,49 +421,18 @@ internal fun OverviewBlock(
     }
 }
 
-/** Card nudging the user to fix an unidentified title. */
-@Composable
-internal fun IdentifyHintCard(onIdentify: () -> Unit, modifier: Modifier = Modifier) {
-    Surface(
-        onClick = onIdentify,
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(LocalNovaDimens.current.cardRadius),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-    ) {
-        Row(
-            Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            NovaIcon(R.drawable.ic_info, contentDescription = null, tint = MaterialTheme.colorScheme.tertiary)
-            Spacer(Modifier.width(12.dp))
-            Column(Modifier.weight(1f)) {
-                Text("Not identified", style = MaterialTheme.typography.titleSmall)
-                Text(
-                    "Pick the right title to get its poster and details.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            Spacer(Modifier.width(8.dp))
-            Text("Identify", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
-        }
-    }
-}
 
-/** Label/value line for the file facts card. */
+/** A slow zoom in and back out over half a minute (Ken Burns), on a picture clipped to its box. */
 @Composable
-internal fun InfoRow(label: String, value: String, modifier: Modifier = Modifier) {
-    Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.width(84.dp),
-        )
-        Text(
-            text = value,
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.weight(1f),
-        )
+internal fun Modifier.slowZoom(): Modifier {
+    val zoom by rememberInfiniteTransition(label = "slowZoom").animateFloat(
+        initialValue = 1f,
+        targetValue = 1.1f,
+        animationSpec = infiniteRepeatable(tween(durationMillis = 15_000, easing = LinearEasing), RepeatMode.Reverse),
+        label = "slowZoomScale",
+    )
+    return clipToBounds().graphicsLayer {
+        scaleX = zoom
+        scaleY = zoom
     }
 }

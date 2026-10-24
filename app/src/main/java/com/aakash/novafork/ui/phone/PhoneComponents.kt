@@ -2,6 +2,7 @@ package com.aakash.novafork.ui.phone
 
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -19,8 +20,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyGridScope
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -30,16 +34,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
-import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -51,14 +50,22 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.aakash.novafork.R
 import com.aakash.novafork.core.format.Formats
 import com.aakash.novafork.data.db.SourceType
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
+import com.aakash.novafork.ui.common.GlassCircle
+import com.aakash.novafork.ui.common.IosSpinner
 import com.aakash.novafork.ui.common.LandscapeArt
+import com.aakash.novafork.ui.common.LocalBottomBarSpace
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.PosterArt
 import com.aakash.novafork.ui.common.ProgressStrip
@@ -73,6 +80,7 @@ import com.aakash.novafork.ui.model.EpisodeUi
 import com.aakash.novafork.ui.model.LibraryItemUi
 import com.aakash.novafork.ui.model.MediaKind
 import com.aakash.novafork.ui.model.ShowCardUi
+import com.aakash.novafork.ui.model.TimelineMonth
 import com.aakash.novafork.ui.model.VideoCardUi
 import kotlinx.coroutines.delay
 
@@ -166,7 +174,7 @@ private fun PosterCardLayout(
         Text(
             text = title,
             style = MaterialTheme.typography.titleSmall,
-            maxLines = 1,
+            maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
         // Always present so cards in a row or grid line up.
@@ -174,7 +182,7 @@ private fun PosterCardLayout(
             text = subtitle.orEmpty(),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
+            maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
         Spacer(Modifier.height(4.dp))
@@ -222,21 +230,7 @@ internal fun PhoneShowCard(
     )
 }
 
-/** Round translucent play mark drawn over 16:9 art. */
-@Composable
-internal fun PlayGlyph(modifier: Modifier = Modifier, size: Dp = 40.dp) {
-    Box(
-        modifier
-            .size(size)
-            .clip(CircleShape)
-            .background(Color.Black.copy(alpha = 0.45f)),
-        contentAlignment = Alignment.Center,
-    ) {
-        NovaIcon(R.drawable.ic_play_arrow, contentDescription = null, tint = Color.White, modifier = Modifier.size(size * 0.6f))
-    }
-}
-
-/** 16:9 card (continue watching, next episode): art with play mark and progress, text below. */
+/** 16:9 card (continue watching, next episode): art with progress, text below, as in Apple TV. */
 @Composable
 internal fun PhoneLandscapeCard(
     card: VideoCardUi,
@@ -245,6 +239,76 @@ internal fun PhoneLandscapeCard(
     onLongClick: (() -> Unit)? = null,
     title: String = card.displayTitle(),
     subtitle: String? = card.displaySubtitle(),
+    width: Dp = LocalNovaDimens.current.landscapeCardWidth,
+) {
+    WideCardLayout(
+        title = title,
+        subtitle = subtitle,
+        artwork = card.artwork,
+        artTitle = card.title,
+        onClick = onClick,
+        modifier = modifier,
+        onLongClick = onLongClick,
+        width = width,
+        progress = card.progress,
+        watched = card.watched,
+    )
+}
+
+/**
+ * Apple TV's row card for a movie or video: 16:9 art (backdrop, still or a frame) with the title
+ * and caption below, opening its page rather than playing.
+ */
+@Composable
+internal fun PhoneWideVideoCard(
+    card: VideoCardUi,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    onLongClick: (() -> Unit)? = null,
+) {
+    WideCardLayout(
+        title = card.displayTitle(),
+        subtitle = card.displaySubtitle(),
+        artwork = card.artwork,
+        artTitle = card.title,
+        onClick = onClick,
+        modifier = modifier,
+        onLongClick = onLongClick,
+        progress = card.progress,
+        watched = card.watched,
+    )
+}
+
+/** [PhoneWideVideoCard] for a TV show ("24 episodes"). */
+@Composable
+internal fun PhoneWideShowCard(
+    show: ShowCardUi,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    WideCardLayout(
+        title = show.title,
+        subtitle = countLabel(show.episodeCount, "episode"),
+        artwork = show.artwork,
+        artTitle = show.title,
+        onClick = onClick,
+        modifier = modifier,
+        progress = null,
+        watched = show.episodeCount > 0 && show.unwatchedCount == 0,
+    )
+}
+
+@Composable
+private fun WideCardLayout(
+    title: String,
+    subtitle: String?,
+    artwork: Artwork,
+    artTitle: String,
+    onClick: () -> Unit,
+    modifier: Modifier,
+    progress: Float?,
+    watched: Boolean,
+    onLongClick: (() -> Unit)? = null,
     width: Dp = LocalNovaDimens.current.landscapeCardWidth,
 ) {
     val shape = RoundedCornerShape(LocalNovaDimens.current.cardRadius)
@@ -261,23 +325,23 @@ internal fun PhoneLandscapeCard(
                 .clip(shape)
                 .background(MaterialTheme.colorScheme.surfaceContainerHigh),
         ) {
-            LandscapeArt(artwork = card.artwork, title = card.title, modifier = Modifier.fillMaxSize())
-            PlayGlyph(Modifier.align(Alignment.Center))
-            if (card.watched) WatchedBadge(Modifier.align(Alignment.TopEnd).padding(6.dp))
-            ProgressStrip(card.progress, Modifier.align(Alignment.BottomStart))
+            // A card without any 16:9 picture names its title on the placeholder.
+            LandscapeArt(artwork = artwork, title = artTitle, modifier = Modifier.fillMaxSize())
+            if (watched) WatchedBadge(Modifier.align(Alignment.TopEnd).padding(6.dp))
+            ProgressStrip(progress, Modifier.align(Alignment.BottomStart))
         }
         Spacer(Modifier.height(8.dp))
         Text(
             text = title,
             style = MaterialTheme.typography.titleSmall,
-            maxLines = 1,
+            maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
         Text(
             text = subtitle.orEmpty(),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
+            maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
         Spacer(Modifier.height(4.dp))
@@ -327,7 +391,7 @@ internal fun PhoneVideoRow(
                     text = subtitle,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
@@ -339,21 +403,35 @@ internal fun PhoneVideoRow(
     }
 }
 
-/** "Play all" and "Shuffle" side by side, for a folder, a season or a playlist. */
+/** "Play All" and "Shuffle" side by side, for a folder, a season or a playlist. */
 @Composable
 internal fun PhonePlayAllRow(
     onPlayAll: () -> Unit,
     onShuffle: () -> Unit,
     modifier: Modifier = Modifier,
-    playLabel: String = "Play all",
+    playLabel: String = "Play All",
 ) {
+    // Apple's Play and Shuffle: two equal grey pills with the accent on icon and label.
     Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        FilledTonalButton(onClick = onPlayAll, modifier = Modifier.weight(1f)) {
-            ButtonContent(R.drawable.ic_play_arrow, playLabel)
-        }
-        OutlinedButton(onClick = onShuffle, modifier = Modifier.weight(1f)) {
-            ButtonContent(R.drawable.ic_shuffle, "Shuffle")
-        }
+        GreyActionPill(R.drawable.ic_play_arrow, playLabel, onPlayAll, Modifier.weight(1f))
+        GreyActionPill(R.drawable.ic_shuffle, "Shuffle", onShuffle, Modifier.weight(1f))
+    }
+}
+
+@Composable
+private fun GreyActionPill(@DrawableRes icon: Int, label: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val accent = MaterialTheme.colorScheme.primary
+    Row(
+        modifier
+            .height(46.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainer)
+            .clickable(role = Role.Button, onClick = onClick),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        NovaIcon(icon, contentDescription = null, tint = accent, modifier = Modifier.size(20.dp))
+        Text(label, style = MaterialTheme.typography.titleMedium, color = accent, modifier = Modifier.padding(start = 6.dp))
     }
 }
 
@@ -381,17 +459,18 @@ internal fun PhoneEpisodeRow(
                     .background(MaterialTheme.colorScheme.surfaceContainerHigh),
             ) {
                 LandscapeArt(artwork = episode.artwork, title = episode.title, modifier = Modifier.fillMaxSize())
-                PlayGlyph(Modifier.align(Alignment.Center), size = 32.dp)
                 if (episode.watched) WatchedBadge(Modifier.align(Alignment.TopEnd).padding(4.dp))
                 ProgressStrip(episode.progress, Modifier.align(Alignment.BottomStart))
             }
             Spacer(Modifier.width(14.dp))
             Column(Modifier.weight(1f)) {
-                if (episode.code.isNotBlank()) {
+                // Apple TV's small grey caps above an episode's title: "EPISODE 3".
+                val label = if (episode.episode > 0) "EPISODE ${episode.episode}" else episode.code.uppercase()
+                if (label.isNotBlank()) {
                     Text(
-                        text = episode.code,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.primary,
+                        text = label,
+                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold, letterSpacing = 0.3.sp),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
                 Text(
@@ -406,7 +485,7 @@ internal fun PhoneEpisodeRow(
                         text = meta,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
+                        maxLines = 2,
                     )
                 }
             }
@@ -432,13 +511,15 @@ internal fun PhoneLibraryGrid(
     actions: AppActions,
     modifier: Modifier = Modifier,
     state: LazyGridState = rememberLazyGridState(),
+    /** More full-width content after the cards (search's music results). */
+    footer: LazyGridScope.() -> Unit = {},
 ) {
     val dims = LocalNovaDimens.current
     LazyVerticalGrid(
         columns = GridCells.Adaptive(dims.gridMinCell),
         modifier = modifier.fillMaxSize(),
         state = state,
-        contentPadding = PaddingValues(start = dims.gutter, end = dims.gutter, top = 8.dp, bottom = dims.sectionSpacing),
+        contentPadding = PaddingValues(start = dims.gutter, end = dims.gutter, top = 8.dp, bottom = dims.sectionSpacing + LocalBottomBarSpace.current),
         horizontalArrangement = Arrangement.spacedBy(dims.rowSpacing),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -455,6 +536,42 @@ internal fun PhoneLibraryGrid(
                 is LibraryItemUi.Show -> PhoneShowCard(item.card, onClick = { actions.openShow(item.card.key) })
             }
         }
+        footer()
+    }
+}
+
+/** The Recently Added timeline: a month heading ("October", "March 2024") over each month's videos, as Photos groups. */
+@Composable
+internal fun PhoneTimelineGrid(
+    months: List<TimelineMonth>,
+    actions: AppActions,
+    modifier: Modifier = Modifier,
+    state: LazyGridState = rememberLazyGridState(),
+) {
+    val dims = LocalNovaDimens.current
+    LazyVerticalGrid(
+        columns = GridCells.Adaptive(dims.gridMinCell),
+        modifier = modifier.fillMaxSize(),
+        state = state,
+        contentPadding = PaddingValues(start = dims.gutter, end = dims.gutter, top = 0.dp, bottom = dims.sectionSpacing + LocalBottomBarSpace.current),
+        horizontalArrangement = Arrangement.spacedBy(dims.rowSpacing),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        months.forEach { month ->
+            item(key = "month:" + month.title, span = { GridItemSpan(maxLineSpan) }) {
+                Text(
+                    month.title,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(top = 12.dp),
+                )
+            }
+            items(month.cards, key = { "v:" + it.id }) { card ->
+                VideoMenuBox(videoId = card.id, title = card.displayTitle(), actions = actions, showDetails = false) { openMenu ->
+                    PhonePosterCard(card, onClick = { actions.openVideo(card.id) }, onLongClick = openMenu)
+                }
+            }
+        }
     }
 }
 
@@ -462,7 +579,10 @@ internal fun PhoneLibraryGrid(
 // Page scaffolding
 // ---------------------------------------------------------------------------------------------
 
-/** Plain top bar on the page background; root screens get a bolder title. */
+/**
+ * iOS 26's navigation bar: a round glass back button, the title centred in 17pt semibold and the
+ * page's buttons on the right. A root page (no [onBack]) gets a bold title on the left instead.
+ */
 @Composable
 internal fun PhoneTopBar(
     title: String,
@@ -470,27 +590,40 @@ internal fun PhoneTopBar(
     onBack: (() -> Unit)? = null,
     actions: @Composable RowScope.() -> Unit = {},
 ) {
-    TopAppBar(
-        title = {
+    Box(
+        modifier
+            .fillMaxWidth()
+            .statusBarsPadding()
+            .height(56.dp)
+            .padding(horizontal = 12.dp),
+    ) {
+        if (onBack != null) {
+            GlassCircle(onClick = onBack, description = "Back", size = 40.dp, modifier = Modifier.align(Alignment.CenterStart)) {
+                NovaIcon(R.drawable.ic_arrow_back, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
+            }
             Text(
                 text = title,
-                style = if (onBack == null) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.titleLarge,
+                style = MaterialTheme.typography.titleMedium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .padding(horizontal = 100.dp),
             )
-        },
-        modifier = modifier,
-        navigationIcon = {
-            if (onBack != null) {
-                IconButton(onClick = onBack) { NovaIcon(R.drawable.ic_arrow_back, contentDescription = "Back") }
-            }
-        },
-        actions = actions,
-        colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = MaterialTheme.colorScheme.background,
-            scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
-        ),
-    )
+        } else {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.headlineMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .align(Alignment.CenterStart)
+                    .padding(start = 4.dp, end = 100.dp),
+            )
+        }
+        Row(Modifier.align(Alignment.CenterEnd), verticalAlignment = Alignment.CenterVertically, content = actions)
+    }
 }
 
 /**
@@ -547,14 +680,24 @@ internal fun PhonePullToRefresh(
         },
         modifier = modifier,
         state = state,
+        // iOS's refresh control: the spinner fades in as the page is pulled and spins while the
+        // scan runs.
         indicator = {
-            PullToRefreshDefaults.Indicator(
-                state = state,
-                isRefreshing = pulled,
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .then(indicatorModifier),
-            )
+            val fraction = state.distanceFraction.coerceIn(0f, 1f)
+            if (pulled || fraction > 0f) {
+                IosSpinner(
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .then(indicatorModifier)
+                        .padding(top = 18.dp)
+                        .size(26.dp)
+                        .graphicsLayer {
+                            alpha = if (pulled) 1f else fraction
+                            rotationZ = if (pulled) 0f else fraction * 180f
+                        },
+                    color = Color.White.copy(alpha = 0.8f),
+                )
+            }
         },
         content = content,
     )
@@ -563,7 +706,7 @@ internal fun PhonePullToRefresh(
 @Composable
 internal fun LoadingBox(modifier: Modifier = Modifier) {
     Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        CircularProgressIndicator()
+        IosSpinner()
     }
 }
 

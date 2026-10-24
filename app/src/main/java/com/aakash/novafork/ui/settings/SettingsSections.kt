@@ -2,6 +2,7 @@ package com.aakash.novafork.ui.settings
 
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -12,12 +13,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -41,23 +38,28 @@ import com.aakash.novafork.data.AspectMode
 import com.aakash.novafork.data.HwDecoding
 import com.aakash.novafork.data.LayoutMode
 import com.aakash.novafork.data.Settings
-import com.aakash.novafork.data.ThemeMode
 import com.aakash.novafork.data.TmdbHost
 import com.aakash.novafork.data.db.SourceType
+import com.aakash.novafork.ui.common.IosSpinner
+import com.aakash.novafork.ui.common.NovaAlertDialog
+import com.aakash.novafork.ui.common.NovaDropdownMenu
 import com.aakash.novafork.ui.common.NovaIcon
+import com.aakash.novafork.ui.common.NovaMenuItem
+import com.aakash.novafork.ui.common.NovaTextField
 import com.aakash.novafork.ui.common.sourceTypeIcon
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.DialogUi
 import com.aakash.novafork.ui.model.KeyStatus
+import com.aakash.novafork.ui.model.Route
 import com.aakash.novafork.ui.model.SettingsUi
 import com.aakash.novafork.ui.model.SourceUi
 import com.aakash.novafork.ui.theme.NovaColors
 
 internal enum class SettingsSection(val title: String, val summary: String, @DrawableRes val icon: Int) {
-    LIBRARY("Library", "Device storage, folders and network shares", R.drawable.ic_video_library),
+    LIBRARY("Sources", "Device storage, folders, network shares and playlists", R.drawable.ic_video_library),
     ARTWORK("Artwork & metadata", "TMDB key, language and server", R.drawable.ic_image),
     PLAYER("Player", "Decoding, subtitles and audio", R.drawable.ic_smart_display),
-    APPEARANCE("Appearance", "Theme and layout", R.drawable.ic_dark_mode),
+    APPEARANCE("Appearance", "Phone or tablet layout", R.drawable.ic_dark_mode),
     ABOUT("About", "Version, library diagnostics and credits", R.drawable.ic_info),
 }
 
@@ -92,6 +94,15 @@ private fun libraryGroups(state: SettingsUi, actions: AppActions): List<Settings
                         onCheckedChange = { on -> actions.updateSettings { it.copy(scanDeviceStorage = on) } },
                     )
                 },
+                SettingsRow("browse") { shape ->
+                    ActionRow(
+                        shape = shape,
+                        icon = R.drawable.ic_folder_open,
+                        title = "Browse sources and playlists",
+                        summary = "Folders, shares, servers, streams and playlists, file by file",
+                        onClick = { actions.navigate(Route.Browse) },
+                    )
+                },
                 SettingsRow("all-files") { shape ->
                     AllFilesAccessRow(
                         shape = shape,
@@ -101,6 +112,8 @@ private fun libraryGroups(state: SettingsUi, actions: AppActions): List<Settings
                     )
                 },
             ),
+            // iOS Settings explains a permission under its group, not inside the row.
+            footer = "All files access lets subtitles and posters next to device videos load. Android hides those files from apps without it.",
         ),
         SettingsGroup(
             key = "folders",
@@ -118,7 +131,7 @@ private fun libraryGroups(state: SettingsUi, actions: AppActions): List<Settings
                 ActionRow(
                     shape = shape,
                     icon = R.drawable.ic_create_new_folder,
-                    title = "Add folder",
+                    title = "Add Folder",
                     summary = "Pick a folder on this device, a USB drive or an SD card",
                     onClick = actions::addFolder,
                 )
@@ -140,7 +153,7 @@ private fun libraryGroups(state: SettingsUi, actions: AppActions): List<Settings
                 ActionRow(
                     shape = shape,
                     icon = R.drawable.ic_lan,
-                    title = "Add network source",
+                    title = "Add Network Source",
                     summary = "SMB, FTP, SFTP, NFS, WebDAV, DLNA, Jellyfin, Emby or Plex",
                     onClick = actions::addNetworkSource,
                 )
@@ -177,20 +190,15 @@ private fun AllFilesAccessRow(shape: Shape, granted: Boolean, canRequest: Boolea
                     canRequest -> "Not allowed"
                     else -> "Comes with access to videos"
                 },
-                style = MaterialTheme.typography.labelLarge,
-                color = if (granted) NovaColors.Mint else MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Text(
-                text = "Lets subtitles and posters next to device videos load. Android hides those files from apps without it.",
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = if (granted) NovaColors.Mint else MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
         if (canRequest) {
             if (granted) {
                 TextButton(onClick = onRequest) { Text("Manage") }
             } else {
-                FilledTonalButton(onClick = onRequest) { Text("Allow") }
+                TextButton(onClick = onRequest) { Text("Allow") }
             }
         }
     }
@@ -201,14 +209,14 @@ private fun SourceRow(shape: Shape, source: SourceUi, onEdit: (() -> Unit)?, onR
     RowSurface(shape = shape, onClick = onEdit) {
         RowIcon(sourceTypeIcon(source.type))
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(source.name, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(source.name, style = MaterialTheme.typography.bodyLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
             // A folder picked at the top of a volume is usually named like its path.
             if (!source.detail.equals(source.name, ignoreCase = true)) {
                 Text(
                     text = source.detail,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
@@ -226,10 +234,34 @@ private fun SourceRow(shape: Shape, source: SourceUi, onEdit: (() -> Unit)?, onR
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        if (onEdit != null) {
-            IconButton(onClick = onEdit) { NovaIcon(R.drawable.ic_edit, contentDescription = "Edit ${source.name}") }
+        // One "…" menu instead of a pencil and a bin on every row, as iOS keeps a list's actions.
+        var menuOpen by remember { mutableStateOf(false) }
+        Box {
+            IconButton(onClick = { menuOpen = true }) {
+                NovaIcon(R.drawable.ic_more_vert, contentDescription = "Options for ${source.name}")
+            }
+            NovaDropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                if (onEdit != null) {
+                    NovaMenuItem(
+                        text = { Text("Edit") },
+                        leadingIcon = { NovaIcon(R.drawable.ic_edit, contentDescription = null) },
+                        onClick = {
+                            menuOpen = false
+                            onEdit()
+                        },
+                    )
+                }
+                NovaMenuItem(
+                    text = { Text("Remove") },
+                    destructive = true,
+                    leadingIcon = { NovaIcon(R.drawable.ic_delete, contentDescription = null) },
+                    onClick = {
+                        menuOpen = false
+                        onRemove()
+                    },
+                )
+            }
         }
-        IconButton(onClick = onRemove) { NovaIcon(R.drawable.ic_delete, contentDescription = "Remove ${source.name}") }
     }
 }
 
@@ -328,7 +360,7 @@ private fun TmdbKeyRow(shape: Shape, state: SettingsUi, actions: AppActions) {
                 Text("TMDB API key", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
                 KeyStatusPill(state.keyStatus)
             }
-            OutlinedTextField(
+            NovaTextField(
                 value = edited ?: saved,
                 onValueChange = { text ->
                     edited = text
@@ -374,7 +406,7 @@ private fun TmdbKeyRow(shape: Shape, state: SettingsUi, actions: AppActions) {
                 Spacer(Modifier.width(8.dp))
                 val checking = state.keyStatus == KeyStatus.CHECKING
                 if (checking) {
-                    CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                    IosSpinner(Modifier.size(18.dp), strokeWidth = 2.dp)
                 }
                 TextButton(
                     onClick = actions::checkTmdbKey,
@@ -425,7 +457,7 @@ private fun ClearMetadataRow(shape: Shape, onConfirm: () -> Unit) {
         onClick = { confirming = true },
     )
     if (confirming) {
-        AlertDialog(
+        NovaAlertDialog(
             onDismissRequest = { confirming = false },
             title = { Text("Clear metadata?") },
             text = {
@@ -546,8 +578,9 @@ private fun playerGroups(settings: Settings, actions: AppActions): List<Settings
                 SwitchRow(
                     shape = shape,
                     icon = R.drawable.ic_volume_up,
-                    title = "Background audio",
-                    summary = "Keep the sound playing after leaving the player, with controls in a notification",
+                    title = "Background play for videos",
+                    summary = "Keep a video's sound playing after leaving the player, with controls in a notification. " +
+                        "Off: leaving the player pauses it",
                     checked = settings.backgroundAudio,
                     onCheckedChange = { on -> actions.updateSettings { it.copy(backgroundAudio = on) } },
                 )
@@ -611,16 +644,6 @@ private fun appearanceGroups(settings: Settings, actions: AppActions): List<Sett
         key = "appearance",
         title = null,
         rows = listOf(
-            SettingsRow("theme") { shape ->
-                ChoiceRow(
-                    shape = shape,
-                    icon = R.drawable.ic_dark_mode,
-                    title = "Theme",
-                    options = ThemeMode.entries.map { Option(it, it.label) },
-                    selected = settings.themeMode,
-                    onSelect = { mode -> actions.updateSettings { it.copy(themeMode = mode) } },
-                )
-            },
             SettingsRow("layout") { shape ->
                 ChoiceRow(
                     shape = shape,

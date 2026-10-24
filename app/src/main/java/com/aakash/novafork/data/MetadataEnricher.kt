@@ -117,8 +117,10 @@ internal class MetadataEnricher(
         if (!tmdb.isEnabled) return
         val pass = Pass(generation.get())
         val orphanKeys = videoDao.orphanMetadataKeys()
+        // Rows from before schema version 5 get their textless poster and credits once.
+        val detailKeys = metadataDao.keysWithoutDetails() - orphanKeys.toSet()
         val candidates = videoDao.needingMatch(retryBefore = pass.now - MATCH_RETRY_AFTER_MS)
-        if (orphanKeys.isEmpty() && candidates.isEmpty()) return
+        if (orphanKeys.isEmpty() && detailKeys.isEmpty() && candidates.isEmpty()) return
         if (!connectivity.isOnline) {
             waitForNetwork()
             return
@@ -126,7 +128,7 @@ internal class MetadataEnricher(
 
         val groups = candidates.groupBy { it.matchQueryKey() }
         scanState.update {
-            it.copy(enriching = true, enrichDone = 0, enrichTotal = orphanKeys.size + candidates.size)
+            it.copy(enriching = true, enrichDone = 0, enrichTotal = orphanKeys.size + detailKeys.size + candidates.size)
         }
         try {
             coroutineScope {
@@ -134,6 +136,12 @@ internal class MetadataEnricher(
                 for (key in orphanKeys) {
                     launch {
                         permits.withPermit { isolated("Restoring $key") { pass.restore(key) } }
+                        advance(1)
+                    }
+                }
+                for (key in detailKeys) {
+                    launch {
+                        permits.withPermit { isolated("Refreshing $key") { pass.refreshDetails(key) } }
                         advance(1)
                     }
                 }
@@ -195,6 +203,17 @@ internal class MetadataEnricher(
                         markUnmatched(group, cached.checkedAt)
                     else -> lookUp(query, group)
                 }
+            }
+        }
+
+        /** Fetches a stored movie's or show's details again (not its episodes): textless poster and credits. */
+        suspend fun refreshDetails(key: String) {
+            ensureCurrent()
+            val tmdbId = LibraryKeys.tmdbId(key) ?: return
+            tmdbStep(onNotFound = { metadataDao.markDetailsChecked(key) }) {
+                val row = if (key.startsWith("movie:")) tmdb.movie(tmdbId).toMetadata(now) else tmdb.tv(tmdbId).toMetadata(now)
+                ensureCurrent()
+                metadataDao.upsert(row)
             }
         }
 
@@ -403,6 +422,10 @@ internal fun TmdbMovieDetails.toMetadata(now: Long): MetadataEntity = MetadataEn
     genres = genres.joinToString(", ") { it.name },
     runtimeMin = runtime?.takeIf { it > 0 },
     updatedAt = now,
+    textlessPosterPath = images.textlessPoster,
+    logoPath = logoPath,
+    castNames = credits.topCast().joinToString(", "),
+    directors = credits.directors.joinToString(", "),
 )
 
 internal fun TmdbTvDetails.toMetadata(now: Long): MetadataEntity {
@@ -428,6 +451,10 @@ internal fun TmdbTvDetails.toMetadata(now: Long): MetadataEntity {
         runtimeMin = episodeRunTime.firstOrNull { it > 0 },
         seasonPostersJson = if (seasonPosters.isEmpty()) null else seasonPosters.toString(),
         updatedAt = now,
+        textlessPosterPath = images.textlessPoster,
+        logoPath = logoPath,
+        castNames = credits.topCast().joinToString(", "),
+        directors = createdBy.map { it.name }.filter { it.isNotBlank() }.joinToString(", "),
     )
 }
 

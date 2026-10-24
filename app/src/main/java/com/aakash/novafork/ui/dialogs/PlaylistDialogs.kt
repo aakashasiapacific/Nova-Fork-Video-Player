@@ -6,6 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -14,15 +15,16 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.AlertDialog
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -41,33 +43,48 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import com.aakash.novafork.R
+import com.aakash.novafork.ui.common.IosColors
+import com.aakash.novafork.ui.common.IosGrabber
+import com.aakash.novafork.ui.common.IosSheetShape
+import com.aakash.novafork.ui.common.IosSpinner
 import com.aakash.novafork.ui.common.LandscapeArt
+import com.aakash.novafork.ui.common.NovaAlertDialog
 import com.aakash.novafork.ui.common.NovaIcon
+import com.aakash.novafork.ui.common.NovaTextField
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.Artwork
 import com.aakash.novafork.ui.model.DialogUi
 import com.aakash.novafork.ui.model.PlaylistUi
+import com.aakash.novafork.ui.model.TrashedVideoUi
 
 /** Playlist names are short labels; longer input is cut rather than refused. */
 private const val MAX_NAME_LENGTH = 80
 
-/** "Add to playlist": every playlist (most recently changed first) and New playlist on top. */
+/** "Add to Playlist": every playlist (most recently changed first) and New playlist on top. */
 @Composable
 internal fun AddToPlaylistSheet(dialog: DialogUi.AddToPlaylist, playlists: List<PlaylistUi>, actions: AppActions) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     ModalBottomSheet(
         onDismissRequest = actions::dismissDialog,
         sheetState = sheetState,
-        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        containerColor = IosColors.GroupedCard,
+        shape = IosSheetShape,
+        dragHandle = { IosGrabber() },
     ) {
-        Column(Modifier.padding(start = 24.dp, end = 24.dp, bottom = 8.dp)) {
-            Text("Add to playlist", style = MaterialTheme.typography.titleLarge)
+        // Centred like an iOS sheet's title, with what is being added under it.
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .padding(start = 24.dp, end = 24.dp, bottom = 8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text("Add to Playlist", style = MaterialTheme.typography.titleMedium)
             if (dialog.label.isNotBlank()) {
                 Text(
                     text = dialog.label,
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
@@ -79,7 +96,7 @@ internal fun AddToPlaylistSheet(dialog: DialogUi.AddToPlaylist, playlists: List<
                     leadingContent = {
                         PlaylistThumb(artwork = null, icon = R.drawable.ic_add)
                     },
-                    headlineContent = { Text("New playlist", color = MaterialTheme.colorScheme.primary) },
+                    headlineContent = { Text("New Playlist…", color = MaterialTheme.colorScheme.primary) },
                     colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                 )
             }
@@ -87,7 +104,7 @@ internal fun AddToPlaylistSheet(dialog: DialogUi.AddToPlaylist, playlists: List<
                 ListItem(
                     modifier = Modifier.clickable { actions.addVideosToPlaylist(playlist.id, dialog.videoIds) },
                     leadingContent = { PlaylistThumb(artwork = playlist.artwork) },
-                    headlineContent = { Text(playlist.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    headlineContent = { Text(playlist.name, maxLines = 2, overflow = TextOverflow.Ellipsis) },
                     supportingContent = { Text(playlistCountLabel(playlist.itemCount)) },
                     colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                 )
@@ -137,13 +154,14 @@ internal fun PlaylistNameDialog(
 ) {
     var name by remember { mutableStateOf(initialName) }
     val canSave = name.isNotBlank()
-    AlertDialog(
+    NovaAlertDialog(
+        form = true,
         onDismissRequest = onDismiss,
         properties = DialogProperties(dismissOnClickOutside = false),
         icon = { NovaIcon(R.drawable.ic_playlist_add, contentDescription = null) },
         title = { Text(title) },
         text = {
-            OutlinedTextField(
+            NovaTextField(
                 value = name,
                 onValueChange = { name = it.take(MAX_NAME_LENGTH) },
                 modifier = Modifier.fillMaxWidth(),
@@ -166,8 +184,34 @@ internal fun PlaylistNameDialog(
 }
 
 @Composable
+internal fun ConfirmDeleteVideoDialog(title: String, toBin: Boolean, onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    NovaAlertDialog(
+        onDismissRequest = onDismiss,
+        icon = { NovaIcon(R.drawable.ic_delete, contentDescription = null) },
+        title = { Text("Delete $title?") },
+        text = {
+            Text(
+                if (toBin) {
+                    "It moves to Recently Deleted (Home › Library), where you can restore it for 30 days."
+                } else {
+                    "Videos in picked folders have no bin: the file is deleted for good."
+                },
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = onConfirm, colors = ButtonDefaults.textButtonColors(contentColor = IosColors.Red)) {
+                Text(if (toBin) "Delete" else "Delete for Good")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        },
+    )
+}
+
+@Composable
 internal fun ConfirmDeletePlaylistDialog(name: String, onConfirm: () -> Unit, onDismiss: () -> Unit) {
-    AlertDialog(
+    NovaAlertDialog(
         onDismissRequest = onDismiss,
         icon = { NovaIcon(R.drawable.ic_delete, contentDescription = null) },
         title = { Text("Delete $name?") },
@@ -177,6 +221,44 @@ internal fun ConfirmDeletePlaylistDialog(name: String, onConfirm: () -> Unit, on
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text("Cancel") }
+        },
+    )
+}
+
+/** Recently Deleted: Android's bin, each video with the days it has left and Restore. */
+@Composable
+internal fun RecentlyDeletedDialog(items: List<TrashedVideoUi>?, onRestore: (String) -> Unit, onDismiss: () -> Unit) {
+    NovaAlertDialog(
+        form = true,
+        onDismissRequest = onDismiss,
+        title = { Text("Recently Deleted") },
+        text = {
+            when {
+                items == null -> Box(Modifier.fillMaxWidth().padding(vertical = 24.dp), contentAlignment = Alignment.Center) {
+                    IosSpinner(Modifier.size(24.dp))
+                }
+                items.isEmpty() -> Text("Nothing here. Deleted videos stay for 30 days before they are gone for good.")
+                else -> Column(Modifier.verticalScroll(rememberScrollState())) {
+                    items.forEach { item ->
+                        Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f)) {
+                                Text(item.name, style = MaterialTheme.typography.bodyLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                item.daysLeft?.let { days ->
+                                    Text(
+                                        if (days == 1) "1 day left" else "$days days left",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = IosColors.SecondaryLabel,
+                                    )
+                                }
+                            }
+                            TextButton(onClick = { onRestore(item.uri) }) { Text("Restore") }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("Done") }
         },
     )
 }

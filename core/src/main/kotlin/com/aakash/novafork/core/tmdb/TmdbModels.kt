@@ -2,6 +2,7 @@ package com.aakash.novafork.core.tmdb
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 
 // Wire models for the TMDB v3 API. Every field has a default so partial responses still decode.
 
@@ -60,6 +61,10 @@ data class TmdbMovieDetails(
     val genres: List<TmdbGenre> = emptyList(),
     @SerialName("vote_average") val voteAverage: Double = 0.0,
     @SerialName("imdb_id") val imdbId: String? = null,
+    val images: TmdbImages = TmdbImages(),
+    /** The title logo in the app's language ([TmdbImages.logo]), picked by [TmdbClient]. */
+    @Transient val logoPath: String? = null,
+    val credits: TmdbCredits = TmdbCredits(),
 ) {
     val year: Int? get() = releaseDate?.take(4)?.toIntOrNull()
 }
@@ -88,6 +93,11 @@ data class TmdbTvDetails(
     @SerialName("number_of_seasons") val numberOfSeasons: Int = 0,
     @SerialName("episode_run_time") val episodeRunTime: List<Int> = emptyList(),
     val seasons: List<TmdbSeasonSummary> = emptyList(),
+    @SerialName("created_by") val createdBy: List<TmdbPerson> = emptyList(),
+    val images: TmdbImages = TmdbImages(),
+    /** The title logo in the app's language ([TmdbImages.logo]), picked by [TmdbClient]. */
+    @Transient val logoPath: String? = null,
+    val credits: TmdbCredits = TmdbCredits(),
 ) {
     val year: Int? get() = firstAirDate?.take(4)?.toIntOrNull()
 }
@@ -113,3 +123,51 @@ data class TmdbSeasonDetails(
     val overview: String? = null,
     val episodes: List<TmdbEpisode> = emptyList(),
 )
+
+@Serializable
+data class TmdbImage(
+    @SerialName("file_path") val filePath: String = "",
+    /** Null for an image without text (textless key art). */
+    @SerialName("iso_639_1") val language: String? = null,
+    val width: Int = 0,
+    val height: Int = 0,
+    @SerialName("vote_average") val voteAverage: Double = 0.0,
+)
+
+@Serializable
+data class TmdbImages(
+    val posters: List<TmdbImage> = emptyList(),
+    val backdrops: List<TmdbImage> = emptyList(),
+    val logos: List<TmdbImage> = emptyList(),
+) {
+    /** The best-voted poster without text, for a tall hero; null when TMDB has none. */
+    val textlessPoster: String?
+        get() = posters.filter { it.language == null && it.filePath.isNotBlank() }
+            .maxByOrNull { it.voteAverage }?.filePath
+
+    /**
+     * The title logo (transparent artwork of the title, as Apple TV shows over its hero): the
+     * best-voted one in [language] ("hi"), else English, else one without a language. PNG only:
+     * TMDB also has SVG logos, which the image loader can't draw. Null when TMDB has none.
+     */
+    fun logo(language: String): String? {
+        val usable = logos.filter { it.filePath.endsWith(".png", ignoreCase = true) }
+        return listOf(language.lowercase(), "en", null).distinct().firstNotNullOfOrNull { lang ->
+            usable.filter { it.language == lang }.maxByOrNull { it.voteAverage }?.filePath
+        }
+    }
+}
+
+@Serializable
+data class TmdbPerson(val id: Int = 0, val name: String = "", val job: String? = null, val character: String? = null)
+
+@Serializable
+data class TmdbCredits(
+    val cast: List<TmdbPerson> = emptyList(),
+    val crew: List<TmdbPerson> = emptyList(),
+) {
+    /** The first billed actors. */
+    fun topCast(limit: Int = 12): List<String> = cast.map { it.name }.filter { it.isNotBlank() }.distinct().take(limit)
+
+    val directors: List<String> get() = crew.filter { it.job == "Director" }.map { it.name }.filter { it.isNotBlank() }.distinct()
+}

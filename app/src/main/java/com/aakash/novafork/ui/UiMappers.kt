@@ -5,8 +5,12 @@ import com.aakash.novafork.core.smb.SmbUris
 import com.aakash.novafork.core.tmdb.TmdbClient
 import com.aakash.novafork.data.PlaylistWithCount
 import com.aakash.novafork.data.ScanState
+import com.aakash.novafork.data.db.MetadataEntity
 import com.aakash.novafork.data.db.SourceEntity
 import com.aakash.novafork.data.db.SourceType
+import com.aakash.novafork.data.music.MusicLibrary
+import com.aakash.novafork.data.music.MusicLibraryData
+import com.aakash.novafork.data.music.MusicSearch
 import com.aakash.novafork.ui.model.Artwork
 import com.aakash.novafork.ui.model.BrowseDirUi
 import com.aakash.novafork.ui.model.BrowseUi
@@ -21,6 +25,7 @@ import com.aakash.novafork.ui.model.LibraryItemUi
 import com.aakash.novafork.ui.model.LibrarySort
 import com.aakash.novafork.ui.model.LibraryUi
 import com.aakash.novafork.ui.model.MediaKind
+import com.aakash.novafork.ui.model.MusicResultUi
 import com.aakash.novafork.ui.model.PlaylistDetailsUi
 import com.aakash.novafork.ui.model.PlaylistUi
 import com.aakash.novafork.ui.model.RemoteFileUi
@@ -29,8 +34,15 @@ import com.aakash.novafork.ui.model.SearchUi
 import com.aakash.novafork.ui.model.SeasonUi
 import com.aakash.novafork.ui.model.ShowDetailsUi
 import com.aakash.novafork.ui.model.SourceUi
+import com.aakash.novafork.ui.model.TimelineMonth
 import com.aakash.novafork.ui.model.VideoCardUi
 import com.aakash.novafork.ui.model.VideoDetailsUi
+import java.time.Instant
+import java.time.LocalDate
+import java.time.YearMonth
+import java.time.ZoneId
+import java.time.format.TextStyle
+import java.util.Locale
 
 /**
  * Turns a [LibraryIndex] (plus the scan state and what the user picked) into the screen models.
@@ -110,9 +122,19 @@ object UiMappers {
             .sortedByDescending { it.first }
             .forEach { add(it.second) }
         // sortedByDescending is stable, so the order above survives within each group.
-        return candidates.values
-            .sortedByDescending { it.artwork.backdropUrl != null }
+        val main = candidates.values
+            .sortedByDescending { it.artwork.tallUrl != null || it.artwork.backdropUrl != null }
             .take(HERO_LIMIT)
+        if (main.size >= HERO_LIMIT) return main
+        // A library with few movies and shows fills the hero with its newest personal videos too,
+        // shown with a frame of the video (or their own picture) instead of a backdrop.
+        val taken = main.mapTo(HashSet()) { it.target }
+        val personal = index.otherVideos
+            .filter { video -> video.card.artwork.let { it.frameSource != null || it.posterUrl != null || it.backdropUrl != null } }
+            .sortedByDescending { it.video.dateAdded }
+            .map(::heroForVideo)
+            .filter { it.target !in taken }
+        return (main + personal).take(HERO_LIMIT)
     }
 
     private fun heroForInProgress(index: LibraryIndex, video: IndexedVideo): HeroUi {
@@ -150,8 +172,14 @@ object UiMappers {
             progress = video.card.progress,
             playVideoId = video.id,
             playLabel = if (video.inProgress) "Resume" else "Play",
+            deleteVideoId = video.id.takeIf { isDeletable(video) },
         )
     }
+
+    /** A file on this phone (device storage or a picked folder), which Delete can remove. */
+    private fun isDeletable(video: IndexedVideo): Boolean =
+        (video.source?.type == SourceType.DEVICE || video.source?.type == SourceType.FOLDER) &&
+            video.video.uri.startsWith("content://")
 
     private fun heroForShow(show: IndexedShow): HeroUi {
         val next = nextUp(show)
@@ -175,7 +203,13 @@ object UiMappers {
 
     // Library
 
-    fun library(index: LibraryIndex, filter: LibraryFilter, sort: LibrarySort): LibraryUi {
+    fun library(
+        index: LibraryIndex,
+        filter: LibraryFilter,
+        sort: LibrarySort,
+        now: Long = System.currentTimeMillis(),
+        zone: ZoneId = ZoneId.systemDefault(),
+    ): LibraryUi {
         val movies = index.movies.map(::videoEntry)
         val shows = index.shows.map(::showEntry)
         val videos = index.otherVideos.map(::videoEntry)
@@ -184,7 +218,11 @@ object UiMappers {
             LibraryFilter.MOVIES -> movies
             LibraryFilter.SHOWS -> shows
             LibraryFilter.VIDEOS -> videos
+            // Built from their saved keys by the view model.
+            LibraryFilter.WATCHLIST, LibraryFilter.FAVORITES -> emptyList()
         }
+        val timelineMonths = if (filter == LibraryFilter.ALL && sort == LibrarySort.RECENT) timeline(index, now, zone) else emptyList()
+        val timeline = timelineMonths.flatMap { it.cards }
         return LibraryUi(
             filter = filter,
             sort = sort,
@@ -195,7 +233,52 @@ object UiMappers {
                 LibraryFilter.SHOWS to shows.size,
                 LibraryFilter.VIDEOS to videos.size,
             ),
+            timeline = timeline,
+            timelineMonths = timelineMonths,
         )
+    }
+
+    /**
+     * Every video (episodes one by one), newest first by when it reached the device, as one
+     * gapless grid: each card's second line says when it arrived ("Today · 2h 37m").
+     */
+    private fun timeline(index: LibraryIndex, now: Long, zone: ZoneId): List<TimelineMonth> {
+        val today = Instant.ofEpochMilli(now).atZone(zone).toLocalDate()
+        return index.videos
+            .sortedWith(compareByDescending<IndexedVideo> { it.video.dateAdded }.thenBy(NaturalOrder) { it.sortKey })
+            .map { video ->
+                val card = video.card
+                val day = Instant.ofEpochMilli(video.video.dateAdded).atZone(zone).toLocalDate()
+                val arrived = arrivedLabel(day, today)
+                // Episodes keep their "S1 · E4"; the rest show their length.
+                val detail = if (card.kind == MediaKind.EPISODE) card.subtitle else timelineDuration(card.durationMs)
+                YearMonth.from(day) to card.copy(subtitle = joinMeta(arrived, detail))
+            }
+            .groupBy({ it.first }, { it.second })
+            .map { (month, cards) -> TimelineMonth(monthTitle(month, today), cards) }
+    }
+
+    /** "October" this year, "October 2024" before. */
+    internal fun monthTitle(month: YearMonth, today: LocalDate): String {
+        val name = month.month.getDisplayName(TextStyle.FULL, Locale.getDefault())
+        return if (month.year == today.year) name else "$name ${month.year}"
+    }
+
+    private fun timelineDuration(durationMs: Long?): String? {
+        if (durationMs == null || durationMs <= 0L) return null
+        return if (durationMs < 60_000L) Formats.clock(durationMs) else Formats.runtime(((durationMs + 30_000L) / 60_000L).toInt())
+    }
+
+    /** "Today", "Yesterday", a weekday this week, then "12 Mar", and "12 Mar 2024" for earlier years. */
+    internal fun arrivedLabel(day: LocalDate, today: LocalDate): String {
+        val month = day.month.getDisplayName(TextStyle.SHORT, Locale.getDefault())
+        return when {
+            !day.isBefore(today) -> "Today"
+            day == today.minusDays(1) -> "Yesterday"
+            day.isAfter(today.minusDays(7)) -> day.dayOfWeek.getDisplayName(TextStyle.FULL, Locale.getDefault())
+            day.year == today.year -> "${day.dayOfMonth} $month"
+            else -> "${day.dayOfMonth} $month ${day.year}"
+        }
     }
 
     private class Entry(
@@ -287,6 +370,7 @@ object UiMappers {
             resolutionLabel = resolutionLabel(video.width, video.height),
             sourceLabel = item.source?.let(::sourceLabel).orEmpty(),
             isMatched = meta != null,
+            deletable = isDeletable(item),
         )
     }
 
@@ -627,27 +711,73 @@ object UiMappers {
     // Search
 
     /** Title, show title and file name, case-insensitive; episodes show up as their show. */
-    fun search(index: LibraryIndex, query: String): SearchUi {
+    fun search(index: LibraryIndex, query: String, music: MusicLibraryData = MusicLibraryData()): SearchUi {
         val needle = query.trim()
         if (needle.isEmpty()) return SearchUi(query = query)
+        val found = MusicSearch.search(music, needle)
+        val songIds = found.songs.map { it.id }
         val entries = ArrayList<Entry>()
         val showKeys = LinkedHashSet<String>()
         for (video in index.videos) {
             val matches = video.title.contains(needle, ignoreCase = true) ||
                 video.showTitle?.contains(needle, ignoreCase = true) == true ||
-                video.video.fileName.contains(needle, ignoreCase = true)
+                video.video.fileName.contains(needle, ignoreCase = true) ||
+                creditsMatch(video.meta, needle)
             if (!matches) continue
             val showKey = video.showKey
             if (showKey != null) showKeys += showKey else entries += videoEntry(video)
         }
         // A matched show's TMDB name can differ from what its files are called.
-        index.shows.filter { it.title.contains(needle, ignoreCase = true) }.forEach { showKeys += it.key }
+        index.shows.filter { it.title.contains(needle, ignoreCase = true) || creditsMatch(it.meta, needle) }
+            .forEach { showKeys += it.key }
         showKeys.mapNotNullTo(entries) { key -> index.showsByKey[key]?.let(::showEntry) }
         val ranked = entries.sortedWith(
             compareBy<Entry> { !it.item.title.startsWith(needle, ignoreCase = true) }.then(ENTRY_TITLE_ORDER),
         )
-        return SearchUi(query = query, results = ranked.take(SEARCH_LIMIT).map { it.item })
+        return SearchUi(
+            query = query,
+            results = ranked.take(SEARCH_LIMIT).map { it.item },
+            songs = found.songs.mapIndexed { i, song ->
+                MusicResultUi(
+                    key = "song:${song.id}",
+                    title = song.title,
+                    subtitle = listOfNotNull("Song", song.artist ?: song.albumArtist).joinToString(" · "),
+                    artUri = MusicLibrary.artUri(song),
+                    songIds = songIds,
+                    startIndex = i,
+                )
+            },
+            albums = found.albums.map { album ->
+                MusicResultUi(
+                    key = "album:${album.key}",
+                    title = album.title,
+                    subtitle = "Album · ${album.artist}",
+                    artUri = album.artUri,
+                    songIds = album.songs.map { it.id },
+                )
+            },
+            artists = found.artists.map { artist ->
+                MusicResultUi(
+                    key = "artist:${artist.key}",
+                    title = artist.name,
+                    subtitle = "Artist",
+                    artUri = artist.albums.firstOrNull()?.artUri,
+                    songIds = artist.songs.map { it.id },
+                    round = true,
+                )
+            },
+        )
     }
+
+    /** Cast or director (creator, for shows) names of a TMDB title contain [needle]. */
+    private fun creditsMatch(meta: MetadataEntity?, needle: String): Boolean {
+        if (meta == null || needle.length < MIN_CREDIT_QUERY) return false
+        return meta.castNames?.contains(needle, ignoreCase = true) == true ||
+            meta.directors?.contains(needle, ignoreCase = true) == true
+    }
+
+    /** Two letters would match half the cast lists; names need three. */
+    private const val MIN_CREDIT_QUERY = 3
 
     // Scan
 

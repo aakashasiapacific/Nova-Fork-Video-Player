@@ -1,8 +1,11 @@
 package com.aakash.novafork.ui.phone
 
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -12,28 +15,31 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ScrollableTabRow
-import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
+import com.aakash.novafork.ui.common.IosProgressBar
+import com.aakash.novafork.ui.common.LocalBottomBarSpace
+import com.aakash.novafork.ui.common.NovaDropdownMenu
 import com.aakash.novafork.ui.common.NovaIcon
+import com.aakash.novafork.ui.common.NovaMenuItem
 import com.aakash.novafork.ui.common.SectionHeader
 import com.aakash.novafork.ui.common.VideoMenuBox
 import com.aakash.novafork.ui.common.metaLine
@@ -64,7 +70,7 @@ fun PhoneShowDetailsScreen(
         val backdropHeight = detailsBackdropHeight(maxHeight)
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(bottom = dims.sectionSpacing),
+            contentPadding = PaddingValues(bottom = dims.sectionSpacing + LocalBottomBarSpace.current),
         ) {
             item(key = "header") {
                 PhoneDetailsHeader(
@@ -77,7 +83,7 @@ fun PhoneShowDetailsScreen(
                     ),
                     rating = details.rating,
                     genres = details.genres,
-                    backdropHeight = backdropHeight,
+                    maxBackdropHeight = backdropHeight,
                 )
             }
             item(key = "play") {
@@ -95,14 +101,14 @@ fun PhoneShowDetailsScreen(
                         Text(
                             text = details.playLabel,
                             style = MaterialTheme.typography.titleSmall,
-                            maxLines = 1,
+                            maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
                         )
                     }
                     val progress = nextUp?.progress
                     if (progress != null && progress > 0f) {
                         Spacer(Modifier.height(12.dp))
-                        LinearProgressIndicator(
+                        IosProgressBar(
                             progress = { progress.coerceIn(0f, 1f) },
                             modifier = Modifier.fillMaxWidth(),
                         )
@@ -112,7 +118,7 @@ fun PhoneShowDetailsScreen(
                             text = metaLine(nextUp.code, nextUp.title),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
+                            maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.padding(top = 8.dp),
                         )
@@ -126,30 +132,44 @@ fun PhoneShowDetailsScreen(
                     modifier = Modifier.padding(start = dims.gutter, end = dims.gutter, top = 16.dp),
                 )
             }
-            if (!details.isMatched && identifyVideoId != null) {
-                item(key = "identify") {
-                    IdentifyHintCard(
-                        onIdentify = { actions.identify(identifyVideoId) },
-                        modifier = Modifier.padding(start = dims.gutter, end = dims.gutter, top = dims.sectionSpacing),
-                    )
-                }
-            }
             item(key = "seasons") {
                 Column(Modifier.padding(top = dims.sectionSpacing)) {
                     if (seasons.size > 1) {
-                        ScrollableTabRow(
-                            selectedTabIndex = seasonIndex,
-                            edgePadding = dims.gutter,
-                            containerColor = Color.Transparent,
-                            divider = {},
-                        ) {
-                            seasons.forEach { s ->
-                                Tab(
-                                    selected = s.number == season?.number,
-                                    onClick = { selectedSeason = s.number },
-                                    text = { Text(s.title, maxLines = 1) },
-                                    unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        // Apple TV's season picker: "Season 1 ⌄" opening a menu of the seasons.
+                        var seasonMenu by remember { mutableStateOf(false) }
+                        Box(Modifier.padding(horizontal = dims.gutter)) {
+                            Row(
+                                Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .clickable(onClickLabel = "Choose a season") { seasonMenu = true }
+                                    .padding(vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(season?.title ?: "Episodes", style = MaterialTheme.typography.titleLarge, maxLines = 2)
+                                NovaIcon(
+                                    R.drawable.ic_expand_more,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(start = 6.dp).size(18.dp),
                                 )
+                            }
+                            NovaDropdownMenu(expanded = seasonMenu, onDismissRequest = { seasonMenu = false }) {
+                                seasons.forEach { s ->
+                                    NovaMenuItem(
+                                        text = { Text(s.title) },
+                                        leadingIcon = {
+                                            Box(Modifier.size(18.dp), contentAlignment = Alignment.Center) {
+                                                if (s.number == season?.number) {
+                                                    NovaIcon(R.drawable.ic_check, contentDescription = "Selected", modifier = Modifier.size(16.dp))
+                                                }
+                                            }
+                                        },
+                                        onClick = {
+                                            seasonMenu = false
+                                            selectedSeason = s.number
+                                        },
+                                    )
+                                }
                             }
                         }
                     } else {
@@ -176,7 +196,7 @@ fun PhoneShowDetailsScreen(
                         PhonePlayAllRow(
                             onPlayAll = { actions.playSeason(details.key, season.number) },
                             onShuffle = { actions.playSeason(details.key, season.number, shuffle = true) },
-                            playLabel = if (seasons.size > 1) "Play season" else "Play all",
+                            playLabel = if (seasons.size > 1) "Play Season" else "Play All",
                             modifier = Modifier.padding(start = dims.gutter, end = dims.gutter, bottom = 8.dp),
                         )
                     }
@@ -201,12 +221,20 @@ fun PhoneShowDetailsScreen(
             modifier = Modifier.align(Alignment.TopStart),
             menu = if (identifyVideoId != null) {
                 { close ->
-                    DropdownMenuItem(
-                        text = { Text("Identify show…") },
+                    NovaMenuItem(
+                        text = { Text("Identify Show…") },
                         leadingIcon = { NovaIcon(R.drawable.ic_search, contentDescription = null) },
                         onClick = {
                             close()
                             actions.identify(identifyVideoId)
+                        },
+                    )
+                    NovaMenuItem(
+                        text = { Text("Change Artwork…") },
+                        leadingIcon = { NovaIcon(R.drawable.ic_image, contentDescription = null) },
+                        onClick = {
+                            close()
+                            actions.changeArtwork(identifyVideoId)
                         },
                     )
                 }

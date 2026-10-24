@@ -23,7 +23,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -116,7 +115,7 @@ private fun PlaylistHeader(playlist: PlaylistDetailsUi, actions: AppActions, mod
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             val hasVideos = playlist.videos.isNotEmpty()
-            TabletPlayButton(label = "Play all", onClick = { actions.playPlaylist(playlist.id) }, enabled = hasVideos)
+            TabletPlayButton(label = "Play All", onClick = { actions.playPlaylist(playlist.id) }, enabled = hasVideos)
             FilledTonalButton(
                 onClick = { actions.playPlaylist(playlist.id, shuffle = true) },
                 enabled = hasVideos,
@@ -124,7 +123,7 @@ private fun PlaylistHeader(playlist: PlaylistDetailsUi, actions: AppActions, mod
             ) {
                 ButtonLabel(R.drawable.ic_shuffle, "Shuffle")
             }
-            OutlinedButton(
+            FilledTonalButton(
                 onClick = { actions.showDialog(DialogUi.RenamePlaylist(playlist.id, playlist.name)) },
                 modifier = Modifier.height(48.dp),
             ) {
@@ -134,7 +133,7 @@ private fun PlaylistHeader(playlist: PlaylistDetailsUi, actions: AppActions, mod
                 onClick = { actions.showDialog(DialogUi.ConfirmDeletePlaylist(playlist.id, playlist.name)) },
                 modifier = Modifier.height(48.dp),
             ) {
-                ButtonLabel(R.drawable.ic_delete, "Delete playlist")
+                ButtonLabel(R.drawable.ic_delete, "Delete Playlist")
             }
         }
     }
@@ -191,7 +190,7 @@ private fun PlaylistItemRow(
                     text = subtitle,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
             }

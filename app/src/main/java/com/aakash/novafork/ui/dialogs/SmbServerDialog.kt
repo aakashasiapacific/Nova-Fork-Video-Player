@@ -11,12 +11,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -35,7 +32,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import com.aakash.novafork.R
+import com.aakash.novafork.ui.common.IosSpinner
+import com.aakash.novafork.ui.common.NovaAlertDialog
 import com.aakash.novafork.ui.common.NovaIcon
+import com.aakash.novafork.ui.common.NovaTextField
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.DialogUi
 import com.aakash.novafork.ui.model.SmbForm
@@ -75,7 +75,8 @@ internal fun SmbServerDialog(dialog: DialogUi.SmbServer, actions: AppActions) {
     // The share may still be empty: a full address pasted into Server ("smb://nas/Movies") fills it in.
     val canSubmit = host.isNotBlank() && !dialog.testing
 
-    AlertDialog(
+    NovaAlertDialog(
+        form = true,
         onDismissRequest = actions::dismissDialog,
         properties = DialogProperties(dismissOnClickOutside = false),
         icon = { NovaIcon(R.drawable.ic_lan, contentDescription = null) },
@@ -128,7 +129,7 @@ internal fun SmbServerDialog(dialog: DialogUi.SmbServer, actions: AppActions) {
                     label = "Username (optional)",
                     supporting = "Leave empty for guest access",
                 )
-                OutlinedTextField(
+                NovaTextField(
                     value = password,
                     onValueChange = { password = it },
                     modifier = Modifier.fillMaxWidth(),
@@ -155,18 +156,18 @@ internal fun SmbServerDialog(dialog: DialogUi.SmbServer, actions: AppActions) {
                 )
                 Spacer(Modifier.height(2.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    OutlinedButton(
+                    FilledTonalButton(
                         onClick = {
                             checkedForm = form
                             actions.testSmb(form)
                         },
                         enabled = canSubmit,
                     ) {
-                        Text("Test connection")
+                        Text("Test Connection")
                     }
                     if (dialog.testing) {
                         Spacer(Modifier.width(16.dp))
-                        CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                        IosSpinner(Modifier.size(20.dp), strokeWidth = 2.dp)
                     }
                 }
                 if (!dialog.testing && result != null) TestResultLine(result)
@@ -201,13 +202,13 @@ internal fun FormField(
     capitalization: KeyboardCapitalization = KeyboardCapitalization.None,
     imeAction: ImeAction = ImeAction.Next,
 ) {
-    OutlinedTextField(
+    NovaTextField(
         value = value,
         onValueChange = onValueChange,
         modifier = modifier,
-        label = { Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+        label = { Text(label, maxLines = 2, overflow = TextOverflow.Ellipsis) },
         placeholder = if (placeholder != null) {
-            { Text(placeholder, maxLines = 1) }
+            { Text(placeholder, maxLines = 2) }
         } else {
             null
         },

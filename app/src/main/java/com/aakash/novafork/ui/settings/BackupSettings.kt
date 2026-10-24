@@ -13,9 +13,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -32,6 +29,9 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
+import com.aakash.novafork.ui.common.IosSpinner
+import com.aakash.novafork.ui.common.IosSwitch
+import com.aakash.novafork.ui.common.NovaAlertDialog
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.RestorePreviewUi
 import java.text.DateFormat
@@ -60,8 +60,8 @@ private fun BackupRow(shape: Shape, actions: AppActions) {
     val lastText = remember(last) { if (last == null) "No backup made on this device yet" else "Last backup ${dateTime(last)}" }
     RowSurface(shape = shape, onClick = { if (!backup.working) asking = true }) {
         RowIcon(R.drawable.ic_storage)
-        RowTexts("Back up", lastText, Modifier.weight(1f), note = "Saves a file you can keep or move to another device")
-        if (backup.working) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+        RowTexts("Back Up", lastText, Modifier.weight(1f), note = "Saves a file you can keep or move to another device")
+        if (backup.working) IosSpinner(Modifier.size(20.dp), strokeWidth = 2.dp)
     }
     if (asking) {
         BackupDialog(
@@ -77,9 +77,10 @@ private fun BackupRow(shape: Shape, actions: AppActions) {
 @Composable
 private fun BackupDialog(onBackUp: (includeSecrets: Boolean) -> Unit, onDismiss: () -> Unit) {
     var includeSecrets by remember { mutableStateOf(false) }
-    AlertDialog(
+    NovaAlertDialog(
+        form = true,
         onDismissRequest = onDismiss,
-        title = { Text("Back up") },
+        title = { Text("Back Up") },
         text = {
             Column(
                 Modifier.verticalScroll(rememberScrollState()),
@@ -91,13 +92,13 @@ private fun BackupDialog(onBackUp: (includeSecrets: Boolean) -> Unit, onDismiss:
                         .fillMaxWidth()
                         .heightIn(min = 48.dp)
                         .clip(RoundedCornerShape(12.dp))
-                        .toggleable(value = includeSecrets, role = Role.Checkbox, onValueChange = { includeSecrets = it })
+                        .toggleable(value = includeSecrets, role = Role.Switch, onValueChange = { includeSecrets = it })
                         .padding(horizontal = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Checkbox(checked = includeSecrets, onCheckedChange = null)
+                    Text("Include passwords and sign-ins", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
                     Spacer(Modifier.width(12.dp))
-                    Text("Include passwords and sign-ins", style = MaterialTheme.typography.bodyLarge)
+                    IosSwitch(checked = includeSecrets, onCheckedChange = null)
                 }
                 if (includeSecrets) {
                     Text(
@@ -115,7 +116,7 @@ private fun BackupDialog(onBackUp: (includeSecrets: Boolean) -> Unit, onDismiss:
                 }
             }
         },
-        confirmButton = { TextButton(onClick = { onBackUp(includeSecrets) }) { Text("Back up") } },
+        confirmButton = { TextButton(onClick = { onBackUp(includeSecrets) }) { Text("Back Up") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )
 }
@@ -146,7 +147,8 @@ private fun RestoreRow(shape: Shape, actions: AppActions) {
 @Composable
 private fun RestoreDialog(preview: RestorePreviewUi, onRestore: () -> Unit, onCancel: () -> Unit) {
     val made = remember(preview.createdAt) { if (preview.createdAt > 0) dateTime(preview.createdAt) else null }
-    AlertDialog(
+    NovaAlertDialog(
+        form = true,
         onDismissRequest = onCancel,
         title = { Text("Restore this backup?") },
         text = {
@@ -166,6 +168,8 @@ private fun RestoreDialog(preview: RestorePreviewUi, onRestore: () -> Unit, onCa
                     SummaryLine(count(preview.sources, "source", "sources"))
                     SummaryLine(count(preview.videos, "video with watch history", "videos with watch history"))
                     SummaryLine(count(preview.matches, "manual match", "manual matches"))
+                    if (preview.songs > 0) SummaryLine(count(preview.songs, "song with plays", "songs with plays"))
+                    if (preview.saved > 0) SummaryLine(count(preview.saved, "watchlist or favorites entry", "watchlist and favorites entries"))
                     SummaryLine(count(preview.playlists, "playlist", "playlists"))
                 }
                 Text(

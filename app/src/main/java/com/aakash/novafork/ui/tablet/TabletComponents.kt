@@ -40,15 +40,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonDefaults
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
-import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -67,6 +65,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -75,6 +74,8 @@ import com.aakash.novafork.core.format.Formats
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
 import com.aakash.novafork.ui.common.ArtPlaceholder
 import com.aakash.novafork.ui.common.BackdropArt
+import com.aakash.novafork.ui.common.IosProgressBar
+import com.aakash.novafork.ui.common.IosSpinner
 import com.aakash.novafork.ui.common.LandscapeArt
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.PosterArt
@@ -91,9 +92,9 @@ import com.aakash.novafork.ui.model.MediaKind
 import com.aakash.novafork.ui.model.ShowCardUi
 import com.aakash.novafork.ui.model.VideoCardUi
 import com.aakash.novafork.ui.theme.NovaColors
+import kotlin.math.roundToInt
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
-import kotlin.math.roundToInt
 
 // ---------------------------------------------------------------------------------------------
 // Insets and small helpers
@@ -181,14 +182,23 @@ internal fun TabletPullToRefresh(
         },
         modifier = modifier,
         state = refreshState,
+        // iOS's refresh control: the spinner fades in with the pull and spins while the scan runs.
         indicator = {
-            PullToRefreshDefaults.Indicator(
-                state = refreshState,
-                isRefreshing = pulled,
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .statusBarsPadding(),
-            )
+            val fraction = refreshState.distanceFraction.coerceIn(0f, 1f)
+            if (pulled || fraction > 0f) {
+                IosSpinner(
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .statusBarsPadding()
+                        .padding(top = 18.dp)
+                        .size(28.dp)
+                        .graphicsLayer {
+                            alpha = if (pulled) 1f else fraction
+                            rotationZ = if (pulled) 0f else fraction * 180f
+                        },
+                    color = Color.White.copy(alpha = 0.8f),
+                )
+            }
         },
         content = content,
     )
@@ -211,7 +221,7 @@ internal fun TabletPlayButton(label: String, onClick: () -> Unit, modifier: Modi
     ) {
         NovaIcon(R.drawable.ic_play_arrow, contentDescription = null, modifier = Modifier.size(22.dp))
         Spacer(Modifier.width(ButtonDefaults.IconSpacing))
-        Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(label, maxLines = 2, overflow = TextOverflow.Ellipsis)
     }
 }
 
@@ -220,7 +230,7 @@ internal fun TabletPlayButton(label: String, onClick: () -> Unit, modifier: Modi
 internal fun ButtonLabel(@DrawableRes icon: Int, text: String) {
     NovaIcon(icon, contentDescription = null, modifier = Modifier.size(ButtonDefaults.IconSize))
     Spacer(Modifier.width(ButtonDefaults.IconSpacing))
-    Text(text, maxLines = 1)
+    Text(text, maxLines = 2)
 }
 
 /** Round back button that stays readable over artwork. */
@@ -251,7 +261,7 @@ internal fun TabletTag(text: String, modifier: Modifier = Modifier) {
             text = text,
             style = MaterialTheme.typography.labelLarge,
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-            maxLines = 1,
+            maxLines = 2,
         )
     }
 }
@@ -263,7 +273,7 @@ internal fun ImageLabel(text: String, modifier: Modifier = Modifier, emphasized:
         text = text,
         style = MaterialTheme.typography.labelMedium,
         color = if (emphasized) MaterialTheme.colorScheme.onPrimary else Color.White,
-        maxLines = 1,
+        maxLines = 2,
         modifier = modifier
             .clip(RoundedCornerShape(6.dp))
             .background(if (emphasized) MaterialTheme.colorScheme.primary else Color.Black.copy(alpha = 0.6f))
@@ -275,21 +285,26 @@ internal fun ImageLabel(text: String, modifier: Modifier = Modifier, emphasized:
 @Composable
 internal fun TabletLoading(modifier: Modifier = Modifier) {
     Box(modifier, contentAlignment = Alignment.Center) {
-        CircularProgressIndicator()
+        IosSpinner()
     }
 }
 
-/** The brand mark: amber → coral disc with a play glyph. */
+/** The brand mark: the launcher icon on its iOS-blue rounded square. */
 @Composable
 internal fun BrandMark(modifier: Modifier = Modifier, size: Dp = 40.dp) {
     Box(
         modifier
             .size(size)
-            .clip(CircleShape)
-            .background(Brush.linearGradient(listOf(NovaColors.Amber, NovaColors.Coral))),
+            .clip(RoundedCornerShape(size * 0.24f))
+            .background(NovaColors.IosBlue),
         contentAlignment = Alignment.Center,
     ) {
-        NovaIcon(R.drawable.ic_play_arrow, contentDescription = null, tint = Color.White, modifier = Modifier.size(size * 0.6f))
+        Icon(
+            painterResource(R.drawable.ic_launcher_foreground),
+            contentDescription = null,
+            tint = Color.Unspecified,
+            modifier = Modifier.size(size * 1.5f),
+        )
     }
 }
 
@@ -354,7 +369,7 @@ internal fun TabletPosterCard(
         Text(
             text = title,
             style = MaterialTheme.typography.titleSmall,
-            maxLines = 1,
+            maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
         if (!subtitle.isNullOrBlank()) {
@@ -362,7 +377,7 @@ internal fun TabletPosterCard(
                 text = subtitle,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
         }
@@ -508,7 +523,7 @@ internal fun TabletLandscapeCard(
                     text = card.primaryLine(),
                     style = MaterialTheme.typography.titleMedium,
                     color = Color.White,
-                    maxLines = 1,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
                 val secondary = metaLine(card.secondaryLine(), card.remainingLabel())
@@ -517,20 +532,10 @@ internal fun TabletLandscapeCard(
                         text = secondary,
                         style = MaterialTheme.typography.bodySmall,
                         color = Color.White.copy(alpha = 0.78f),
-                        maxLines = 1,
+                        maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
-            }
-            Spacer(Modifier.width(12.dp))
-            Box(
-                Modifier
-                    .size(44.dp)
-                    .clip(CircleShape)
-                    .background(Color.White.copy(alpha = 0.22f)),
-                contentAlignment = Alignment.Center,
-            ) {
-                NovaIcon(R.drawable.ic_play_arrow, contentDescription = null, tint = Color.White, modifier = Modifier.size(28.dp))
             }
         }
         if (card.watched) WatchedBadge(Modifier.align(Alignment.TopEnd).padding(10.dp))
@@ -557,6 +562,7 @@ internal fun TabletStillCard(
     watched: Boolean = false,
     badge: String? = null,
     highlighted: Boolean = false,
+    onClickLabel: String = "Play",
 ) {
     val dims = LocalNovaDimens.current
     val shape = RoundedCornerShape(dims.cardRadius)
@@ -571,7 +577,7 @@ internal fun TabletStillCard(
             .combinedClickable(
                 interactionSource = interactionSource,
                 indication = null,
-                onClickLabel = "Play",
+                onClickLabel = onClickLabel,
                 onLongClickLabel = "Details",
                 onLongClick = onLongClick,
                 onClick = onClick,
@@ -597,7 +603,7 @@ internal fun TabletStillCard(
         Text(
             text = title,
             style = MaterialTheme.typography.titleSmall,
-            maxLines = 1,
+            maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
         if (!subtitle.isNullOrBlank()) {
@@ -605,7 +611,7 @@ internal fun TabletStillCard(
                 text = subtitle,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
         }
@@ -625,7 +631,7 @@ internal fun TabletStillCard(
                 text = footnote,
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
+                maxLines = 2,
             )
         }
     }
@@ -667,7 +673,7 @@ internal fun WatchProgress(progress: Float?, positionMs: Long, durationMs: Long?
         "${(fraction * 100).roundToInt()}% watched"
     }
     Row(modifier, verticalAlignment = Alignment.CenterVertically) {
-        LinearProgressIndicator(
+        IosProgressBar(
             progress = { fraction },
             modifier = Modifier
                 .width(240.dp)

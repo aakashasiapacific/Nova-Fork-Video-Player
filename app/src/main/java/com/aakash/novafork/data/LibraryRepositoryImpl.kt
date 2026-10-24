@@ -192,6 +192,8 @@ class LibraryRepositoryImpl(
 
     override suspend fun video(id: Long): VideoWithMeta? = withContext(Dispatchers.IO) { videoDao.withMeta(id) }
 
+    override suspend fun forgetDeletedVideo(id: Long) = withContext(Dispatchers.IO) { videoDao.markMissing(listOf(id)) }
+
     override suspend fun source(id: Long): SourceEntity? = withContext(Dispatchers.IO) { sourceDao.byId(id) }
 
     override suspend fun findByUri(uri: String): VideoWithMeta? =

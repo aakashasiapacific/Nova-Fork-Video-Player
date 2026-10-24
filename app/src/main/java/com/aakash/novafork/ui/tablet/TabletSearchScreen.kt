@@ -21,8 +21,6 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -41,6 +39,9 @@ import com.aakash.novafork.R
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
 import com.aakash.novafork.ui.common.EmptyState
 import com.aakash.novafork.ui.common.NovaIcon
+import com.aakash.novafork.ui.phone.RecentSearches
+import com.aakash.novafork.ui.common.NovaTextField
+import com.aakash.novafork.ui.common.musicSearchResults
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.LibraryItemUi
 import com.aakash.novafork.ui.model.SearchUi
@@ -74,7 +75,7 @@ internal fun TabletSearchScreen(
                 TabletBackButton(onClick = actions::back)
                 Spacer(Modifier.width(16.dp))
             }
-            OutlinedTextField(
+            NovaTextField(
                 value = query,
                 onValueChange = {
                     query = it
@@ -86,7 +87,7 @@ internal fun TabletSearchScreen(
                     .fillMaxWidth()
                     .focusRequester(focusRequester),
                 textStyle = MaterialTheme.typography.titleLarge,
-                placeholder = { Text("Search movies, shows and videos", style = MaterialTheme.typography.titleLarge) },
+                placeholder = { Text("Search videos and music", style = MaterialTheme.typography.titleLarge) },
                 leadingIcon = { NovaIcon(R.drawable.ic_search, contentDescription = null) },
                 trailingIcon = if (query.isNotEmpty()) {
                     {
@@ -104,25 +105,36 @@ internal fun TabletSearchScreen(
                     null
                 },
                 singleLine = true,
-                shape = RoundedCornerShape(28.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-                ),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                keyboardActions = KeyboardActions(onSearch = { keyboard?.hide() }),
+                keyboardActions = KeyboardActions(
+                    onSearch = {
+                        actions.rememberSearch(query)
+                        keyboard?.hide()
+                    },
+                ),
             )
         }
         val results = search.results
         when {
+            query.isBlank() && search.recent.isNotEmpty() -> RecentSearches(
+                recent = search.recent,
+                onPick = { picked ->
+                    query = picked
+                    actions.search(picked)
+                    actions.rememberSearch(picked)
+                    keyboard?.hide()
+                },
+                onClear = actions::clearRecentSearches,
+                bottomSpace = 24.dp,
+            )
             query.isBlank() -> SearchMessage {
                 EmptyState(
                     icon = R.drawable.ic_search,
                     title = "Search your library",
-                    body = "Find movies, shows, episodes and videos by title.",
+                    body = "Find movies, shows, episodes, videos, songs, albums and artists.",
                 )
             }
-            results.isNotEmpty() -> LazyVerticalGrid(
+            !search.isEmpty -> LazyVerticalGrid(
                 columns = GridCells.Adaptive(dims.gridMinCell),
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(
@@ -147,12 +159,13 @@ internal fun TabletSearchScreen(
                         )
                     }
                 }
+                musicSearchResults(search) { actions.playMusic(it.songIds, it.startIndex) }
             }
             // Only claim "no matches" once the results belong to what is typed.
             search.query.trim() == query.trim() -> SearchMessage {
                 EmptyState(
                     icon = R.drawable.ic_search,
-                    title = "No matches",
+                    title = "No Matches",
                     body = "Nothing in your library matches “${query.trim()}”.",
                 )
             }

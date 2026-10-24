@@ -1,14 +1,25 @@
 package com.aakash.novafork.ui.player
 
+import android.content.res.Configuration
 import androidx.annotation.DrawableRes
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -29,7 +40,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -37,13 +47,16 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.AbsoluteAlignment
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.BiasAlignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
@@ -51,15 +64,15 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
 import com.aakash.novafork.core.format.Formats
+import com.aakash.novafork.ui.common.IosSpinner
 import com.aakash.novafork.ui.common.LandscapeArt
 import com.aakash.novafork.ui.model.GestureFeedback
 import com.aakash.novafork.ui.model.UpNextUi
 import com.aakash.novafork.ui.theme.NovaColors
-import kotlin.math.roundToInt
 
 private val TabularNumbers = TextStyle(fontFeatureSettings = "tnum")
 
-/** Centred pill for seek / volume / brightness / label feedback; fades out after the state clears it. */
+/** Centred pill for seek / label feedback; fades out after the state clears it. */
 @Composable
 internal fun FeedbackOverlay(feedback: GestureFeedback?, modifier: Modifier = Modifier) {
     val shown = rememberLatestNonNull(feedback)
@@ -78,16 +91,6 @@ private fun FeedbackPill(feedback: GestureFeedback) {
     Surface(shape = RoundedCornerShape(28.dp), color = NovaColors.PlayerSurface, contentColor = Color.White) {
         when (feedback) {
             is GestureFeedback.Seek -> SeekFeedback(feedback)
-            is GestureFeedback.Volume -> LevelFeedback(
-                icon = if (feedback.level <= 0f) R.drawable.ic_volume_off else R.drawable.ic_volume_up,
-                description = "Volume",
-                level = feedback.level,
-            )
-            is GestureFeedback.Brightness -> LevelFeedback(
-                icon = R.drawable.ic_brightness_6,
-                description = "Brightness",
-                level = feedback.level,
-            )
             is GestureFeedback.Label -> Text(
                 text = feedback.text,
                 style = MaterialTheme.typography.titleMedium,
@@ -120,41 +123,71 @@ private fun SeekFeedback(seek: GestureFeedback.Seek) {
     }
 }
 
+/**
+ * The player's volume indicator after a volume key, in the style of iOS: a slim frosted pill that
+ * fills with the level, on the end edge where the phone's volume keys are (portrait) or along the
+ * top (landscape), with the speaker icon. It replaces the system's volume panel in the player and
+ * fades a moment after the last press (see PlayerController.onVolumeKey). [modifier] should fill
+ * the screen: the pill places itself.
+ */
 @Composable
-private fun LevelFeedback(@DrawableRes icon: Int, description: String, level: Float) {
-    val clamped = level.coerceIn(0f, 1f)
-    Row(
-        modifier = Modifier.padding(horizontal = 20.dp, vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(14.dp),
-    ) {
-        Icon(painterResource(icon), contentDescription = description, modifier = Modifier.size(24.dp))
-        Box(
-            Modifier
-                .width(140.dp)
-                .height(4.dp)
-                .clip(CircleShape)
-                .background(Color.White.copy(alpha = 0.25f)),
+internal fun VolumeHud(level: Float?, modifier: Modifier = Modifier) {
+    val shown = (rememberLatestNonNull(level) ?: 0f).coerceIn(0f, 1f)
+    val fill by animateFloatAsState(
+        targetValue = shown,
+        animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow),
+        label = "volumeHud",
+    )
+    val landscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
+    Box(modifier, contentAlignment = if (landscape) Alignment.TopCenter else BiasAlignment(horizontalBias = 1f, verticalBias = -0.35f)) {
+        AnimatedVisibility(
+            visible = level != null,
+            enter = fadeIn(tween(140)) + scaleIn(tween(180), initialScale = 0.85f),
+            exit = fadeOut(tween(320)) + scaleOut(tween(320), targetScale = 0.85f),
         ) {
-            Box(
-                Modifier
-                    .fillMaxHeight()
-                    .fillMaxWidth(clamped)
-                    .background(Color.White),
-            )
+            val icon = if (shown <= 0f) R.drawable.ic_volume_off else R.drawable.ic_volume_up
+            if (landscape) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    VolumeIcon(icon)
+                    VolumeTrack(fill, vertical = false)
+                }
+            } else {
+                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    VolumeTrack(fill, vertical = true)
+                    VolumeIcon(icon)
+                }
+            }
         }
-        Text(
-            text = "${(clamped * 100).roundToInt()}%",
-            style = MaterialTheme.typography.labelLarge.merge(TabularNumbers),
-            textAlign = TextAlign.End,
-            modifier = Modifier.widthIn(min = 40.dp),
-        )
+    }
+}
+
+@Composable
+private fun VolumeIcon(@DrawableRes icon: Int) {
+    Icon(painterResource(icon), contentDescription = "Volume", tint = Color.White, modifier = Modifier.size(18.dp))
+}
+
+@Composable
+private fun VolumeTrack(fill: Float, vertical: Boolean) {
+    val shape = RoundedCornerShape(percent = 50)
+    val size = if (vertical) Modifier.size(width = 14.dp, height = 156.dp) else Modifier.size(width = 196.dp, height = 14.dp)
+    Box(
+        size
+            .clip(shape)
+            .background(Color.Black.copy(alpha = 0.55f))
+            .border(0.5.dp, Color.White.copy(alpha = 0.2f), shape),
+    ) {
+        val level = if (vertical) {
+            Modifier.align(Alignment.BottomCenter).fillMaxWidth().fillMaxHeight(fill)
+        } else {
+            Modifier.align(Alignment.CenterStart).fillMaxHeight().fillMaxWidth(fill)
+        }
+        Box(level.background(Color.White))
     }
 }
 
 @Composable
 internal fun BufferingIndicator(modifier: Modifier = Modifier) {
-    CircularProgressIndicator(modifier = modifier.size(48.dp), color = Color.White, strokeWidth = 3.dp)
+    IosSpinner(modifier = modifier.size(48.dp), color = Color.White, strokeWidth = 3.dp)
 }
 
 /** "−10s" / "+20s" halves shown on the side that was double-tapped. */
@@ -210,17 +243,11 @@ private fun SeekBubbleSide(bubble: SeekBubble?, forward: Boolean, modifier: Modi
                     scaleY = pulse.value
                 },
             ) {
-                Icon(
-                    painter = painterResource(R.drawable.ic_replay),
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier
-                        .size(32.dp)
-                        .graphicsLayer { if (forward) scaleX = -1f },
-                )
+                // Samsung's three chevrons, lighting up one after another toward the way it seeks.
+                SeekChevrons(forward)
                 Spacer(Modifier.height(6.dp))
                 Text(
-                    text = formatSeekSeconds(forward, shown?.totalMs ?: 0L),
+                    text = "${(shown?.totalMs ?: 0L) / 1000} seconds",
                     style = MaterialTheme.typography.titleMedium,
                     color = Color.White,
                 )
@@ -257,7 +284,7 @@ internal fun ResumeBanner(
                     maxLines = 1,
                 )
                 Spacer(Modifier.width(4.dp))
-                TextButton(onClick = onStartOver) { Text("Start over") }
+                TextButton(onClick = onStartOver) { Text("Start Over") }
                 PlayerIconButton(
                     icon = R.drawable.ic_close,
                     contentDescription = "Dismiss",
@@ -311,7 +338,7 @@ private fun UpNextContent(item: UpNextUi, onPlayNow: () -> Unit, onCancel: () ->
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
                     Text(
-                        text = "Up next",
+                        text = "Up Next",
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.primary,
                     )
@@ -358,7 +385,7 @@ private fun UpNextContent(item: UpNextUi, onPlayNow: () -> Unit, onCancel: () ->
                 Button(onClick = onPlayNow) {
                     Icon(painterResource(R.drawable.ic_play_arrow), contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(6.dp))
-                    Text("Play now")
+                    Text("Play Now")
                 }
             }
         }
@@ -403,7 +430,7 @@ internal fun ErrorCard(
                     onClick = onRetry,
                     colors = ButtonDefaults.textButtonColors(contentColor = Color.White),
                 ) {
-                    Text("Try again")
+                    Text("Try Again")
                 }
                 Button(onClick = onClose) { Text("Close") }
             }
@@ -434,6 +461,31 @@ internal fun UnlockButton(visible: Boolean, onClick: () -> Unit, modifier: Modif
                     modifier = Modifier.size(28.dp),
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun SeekChevrons(forward: Boolean) {
+    val step by rememberInfiniteTransition(label = "chevrons").animateFloat(
+        initialValue = 0f,
+        targetValue = 3f,
+        animationSpec = infiniteRepeatable(tween(durationMillis = 750, easing = LinearEasing)),
+        label = "chevronStep",
+    )
+    Row {
+        repeat(3) { i ->
+            // Lit from the edge inward when rewinding, outward when going forward.
+            val order = if (forward) i else 2 - i
+            val lit = step.toInt() == order
+            Icon(
+                painter = painterResource(R.drawable.ic_chevron_right),
+                contentDescription = null,
+                tint = Color.White.copy(alpha = if (lit) 1f else 0.35f),
+                modifier = Modifier
+                    .size(18.dp)
+                    .graphicsLayer { if (!forward) scaleX = -1f },
+            )
         }
     }
 }

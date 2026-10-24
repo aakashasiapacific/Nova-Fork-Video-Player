@@ -33,11 +33,9 @@ import com.aakash.novafork.R
 import com.aakash.novafork.ui.adaptive.DeviceLayout
 import com.aakash.novafork.ui.model.PlayerActions
 import com.aakash.novafork.ui.model.PlayerUiState
-import com.aakash.novafork.ui.model.RepeatMode
 
 private val TransportButtonSize = 64.dp
 private val TransportIconSize = 40.dp
-private val ToggleButtonSize = 56.dp
 
 /**
  * Tablet controls: larger targets, title top-left with cast, queue and more on the right,
@@ -67,6 +65,7 @@ internal fun TabletPlayerControls(
                 state = state,
                 actions = actions,
                 onOpenSheet = onOpenSheet,
+                onOpenPanel = onOpenPanel,
                 modifier = Modifier.align(Alignment.TopCenter),
             )
             if (state.error == null) {
@@ -93,6 +92,7 @@ private fun TabletTopBar(
     state: PlayerUiState,
     actions: PlayerActions,
     onOpenSheet: (PlayerSheet) -> Unit,
+    onOpenPanel: (PlayerPanel) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Row(
@@ -109,24 +109,7 @@ private fun TabletTopBar(
             iconSize = 28.dp,
         )
         Spacer(Modifier.width(12.dp))
-        Column(Modifier.weight(1f)) {
-            Text(
-                text = state.title,
-                style = MaterialTheme.typography.titleLarge,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            val subtitle = state.subtitle
-            if (!subtitle.isNullOrBlank()) {
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Color.White.copy(alpha = 0.72f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-        }
+        PlayerTitle(state, Modifier.weight(1f), large = true)
         Spacer(Modifier.width(12.dp))
         CastButton(
             castingTo = state.castingTo,
@@ -144,7 +127,17 @@ private fun TabletTopBar(
             )
         }
         PlayerMoreMenu(
-            items = listOf(PlayerMenuItem(R.drawable.ic_volume_up, "Play in background", actions::playInBackground)),
+            // Aspect ratio, repeat, shuffle and rotate live here, as on the phone, so the bars
+            // keep only what iOS's player shows.
+            items = buildList {
+                add(PlayerMenuItem(R.drawable.ic_volume_up, "Play in Background", actions::playInBackground))
+                add(PlayerMenuItem(R.drawable.ic_aspect_ratio, "Aspect Ratio: ${state.aspect.label}") { onOpenPanel(PlayerPanel.ASPECT) })
+                add(PlayerMenuItem(state.repeatMode.iconRes(), state.repeatMode.label, actions::cycleRepeat))
+                if (state.canShuffle) {
+                    add(PlayerMenuItem(R.drawable.ic_shuffle, if (state.shuffle) "Shuffle On" else "Shuffle Off", actions::toggleShuffle))
+                }
+                add(PlayerMenuItem(R.drawable.ic_screen_rotation, "Rotate", actions::rotate))
+            },
             buttonSize = 56.dp,
             iconSize = 26.dp,
         )
@@ -153,26 +146,13 @@ private fun TabletTopBar(
 
 @Composable
 private fun TabletTransportRow(state: PlayerUiState, actions: PlayerActions, modifier: Modifier = Modifier) {
-    // Previous/next keep both slots when either exists so play/pause stays centred; shuffle and
-    // repeat flank the row the same way.
+    // Previous/next keep both slots when either exists so play/pause stays centred.
     val showSkips = state.hasPrevious || state.hasNext
     Row(
         modifier = modifier,
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(32.dp),
     ) {
-        if (state.canShuffle) {
-            PlayerToggleButton(
-                icon = R.drawable.ic_shuffle,
-                contentDescription = "Shuffle",
-                checked = state.shuffle,
-                onClick = actions::toggleShuffle,
-                buttonSize = ToggleButtonSize,
-                iconSize = 26.dp,
-            )
-        } else {
-            Spacer(Modifier.size(ToggleButtonSize))
-        }
         if (showSkips) {
             if (state.hasPrevious) {
                 PlayerIconButton(
@@ -198,7 +178,7 @@ private fun TabletTransportRow(state: PlayerUiState, actions: PlayerActions, mod
             isPlaying = state.isPlaying,
             buffering = state.isBuffering,
             onClick = actions::togglePlay,
-            size = 80.dp,
+            size = 72.dp,
         )
         SeekStepButton(
             forward = true,
@@ -221,14 +201,6 @@ private fun TabletTransportRow(state: PlayerUiState, actions: PlayerActions, mod
                 Spacer(Modifier.size(TransportButtonSize))
             }
         }
-        PlayerToggleButton(
-            icon = state.repeatMode.iconRes(),
-            contentDescription = state.repeatMode.label,
-            checked = state.repeatMode != RepeatMode.OFF,
-            onClick = actions::cycleRepeat,
-            buttonSize = ToggleButtonSize,
-            iconSize = 26.dp,
-        )
     }
 }
 
@@ -286,23 +258,12 @@ private fun TabletBottomBar(
                     label = "Speed ${formatRate(state.rate)}",
                     onClick = { onOpenPanel(PlayerPanel.SPEED) },
                 )
-                LabelledButton(
-                    icon = R.drawable.ic_aspect_ratio,
-                    label = "Aspect: ${state.aspect.label}",
-                    onClick = { onOpenPanel(PlayerPanel.ASPECT) },
-                )
             }
             Spacer(Modifier.width(8.dp))
             LabelledButton(
                 icon = R.drawable.ic_lock,
                 label = "Lock",
                 onClick = actions::toggleLock,
-                showLabel = labelSecondary,
-            )
-            LabelledButton(
-                icon = R.drawable.ic_screen_rotation,
-                label = "Rotate",
-                onClick = actions::rotate,
                 showLabel = labelSecondary,
             )
             if (state.canEnterPictureInPicture) {

@@ -177,6 +177,21 @@ class TmdbClientTest {
     }
 
     @Test
+    fun detailsPickTheTitleLogoInTheAppLanguage() = runBlocking<Unit> {
+        language = "hi-IN"
+        server.enqueue(
+            json(
+                """{"id": 1, "title": "RRR", "images": {"logos": [
+                    {"file_path": "/en.png", "iso_639_1": "en", "vote_average": 9.0},
+                    {"file_path": "/hi.png", "iso_639_1": "hi", "vote_average": 2.0}
+                ]}}""",
+            ),
+        )
+        assertEquals("/hi.png", client.movie(1).logoPath)
+        assertEquals("null,hi,en", server.takeRequest().requestUrl?.queryParameter("include_image_language"))
+    }
+
+    @Test
     fun decodesTvDetails() = runBlocking<Unit> {
         server.enqueue(json(TV_DETAILS))
         val show = client.tv(2316)

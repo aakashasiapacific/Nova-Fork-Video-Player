@@ -97,7 +97,11 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
         const val KEY_PREFERRED_SUBTITLE_LANGUAGE = "preferred_subtitle_language"
         const val KEY_SEEK_STEP_SECONDS = "seek_step_seconds"
         const val KEY_AUTO_PLAY_NEXT = "auto_play_next"
-        const val KEY_BACKGROUND_AUDIO = "background_audio"
+        /**
+         * "background_audio" until it became off by default: a new key, so the old stored "on"
+         * doesn't carry over and every install starts with it off.
+         */
+        const val KEY_BACKGROUND_AUDIO = "background_play_video"
         const val KEY_OPENSUBTITLES_API_KEY = "opensubtitles_api_key"
         const val KEY_OPENSUBTITLES_USERNAME = "opensubtitles_username"
         const val KEY_OPENSUBTITLES_PASSWORD = "opensubtitles_password"

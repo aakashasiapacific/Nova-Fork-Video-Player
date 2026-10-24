@@ -83,6 +83,7 @@ private fun PlayerChrome(state: PlayerUiState, actions: PlayerActions, layout: D
     var controlsRequested by rememberSaveable { mutableStateOf(true) }
     var panel by rememberSaveable { mutableStateOf<PlayerPanel?>(null) }
     var sheet by rememberSaveable { mutableStateOf<PlayerSheet?>(null) }
+    // The full length, as Samsung's player shows it; a tap on it switches to the time left.
     var showRemaining by rememberSaveable { mutableStateOf(false) }
     var touching by remember { mutableStateOf(false) }
     var unlockHintRequests by remember { mutableIntStateOf(0) }
@@ -198,6 +199,13 @@ private fun PlayerChrome(state: PlayerUiState, actions: PlayerActions, layout: D
                 modifier = Modifier
                     .align(BiasAlignment(horizontalBias = 0f, verticalBias = feedbackBias))
                     .padding(horizontal = 24.dp),
+            )
+            VolumeHud(
+                level = state.volumeHud,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .safeDrawingPadding()
+                    .padding(12.dp),
             )
             AnimatedVisibility(
                 visible = controlsVisible,

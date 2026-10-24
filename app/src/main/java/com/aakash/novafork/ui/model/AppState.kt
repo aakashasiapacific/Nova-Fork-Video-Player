@@ -6,8 +6,20 @@ import com.aakash.novafork.data.db.SourceType
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
-/** Top-level tabs. Phone shows them in a bottom NavigationBar, tablet in a NavigationRail. */
-enum class TopDestination(val label: String) { HOME("Home"), LIBRARY("Library"), BROWSE("Browse"), SETTINGS("Settings") }
+/**
+ * The four tabs, in the Apple TV app's order (owner's decision): Video (the Home feed, with the
+ * library behind its row headers and "Library" entry), Audio, Settings (with the sources) and
+ * Search. Phone shows them in a bottom bar, tablet in a rail.
+ */
+enum class TopDestination(val label: String) {
+    VIDEO("Video"),
+
+    /** Music (a temporary test screen until the Apple Music-style design). */
+    AUDIO("Audio"),
+    /** Settings, called "Preferences" with a person icon (owner's choice). */
+    SETTINGS("Preferences"),
+    SEARCH("Search"),
+}
 
 @Immutable
 sealed interface Route {
@@ -15,6 +27,7 @@ sealed interface Route {
     data object Library : Route
     data object Browse : Route
     data object Settings : Route
+    data object Audio : Route
     data object Search : Route
     data class VideoDetails(val videoId: Long) : Route
     data class ShowDetails(val showKey: String) : Route
@@ -25,10 +38,11 @@ sealed interface Route {
 /** The tab a route belongs to (for highlighting the nav bar / rail). */
 val Route.top: TopDestination
     get() = when (this) {
-        Route.Home, is Route.VideoDetails, is Route.ShowDetails, Route.Search -> TopDestination.HOME
-        Route.Library -> TopDestination.LIBRARY
-        Route.Browse, is Route.BrowseDir, is Route.Playlist -> TopDestination.BROWSE
-        Route.Settings -> TopDestination.SETTINGS
+        Route.Home, Route.Library, is Route.VideoDetails, is Route.ShowDetails, is Route.Playlist -> TopDestination.VIDEO
+        // Sources are under Settings.
+        Route.Browse, is Route.BrowseDir, Route.Settings -> TopDestination.SETTINGS
+        Route.Audio -> TopDestination.AUDIO
+        Route.Search -> TopDestination.SEARCH
     }
 
 @Immutable
@@ -112,7 +126,7 @@ sealed interface DialogUi {
     /** Save a stream URL to the library. */
     data object AddStream : DialogUi
 
-    /** Play a URL once without saving ("Open network stream" in VLC). */
+    /** Play a URL once without saving ("Open Network Stream" in VLC). */
     data object OpenUrl : DialogUi
 
     data class SmbServer(
@@ -133,7 +147,24 @@ sealed interface DialogUi {
 
     data class ConfirmRemoveSource(val source: SourceUi) : DialogUi
 
-    /** "Add network source": picks the kind of server (SMB, FTP, SFTP, NFS, WebDAV, DLNA/UPnP, Jellyfin, Emby, Plex). */
+    /**
+     * "Change artwork": TMDB's posters and backdrops for a movie or show ([metadataKey]), as TMDB
+     * paths ("/abc.jpg"); [poster]/[backdrop] are the ones shown now. Picking one applies it.
+     */
+    data class ChangeArtwork(
+        val metadataKey: String,
+        val title: String,
+        val loading: Boolean = true,
+        val posters: List<String> = emptyList(),
+        val backdrops: List<String> = emptyList(),
+        val poster: String? = null,
+        val backdrop: String? = null,
+        /** The user picked artwork for it before: "Use TMDB's" undoes that. */
+        val customised: Boolean = false,
+        val error: String? = null,
+    ) : DialogUi
+
+    /** "Add Network Source": picks the kind of server (SMB, FTP, SFTP, NFS, WebDAV, DLNA/UPnP, Jellyfin, Emby, Plex). */
     data object AddSource : DialogUi
 
     /** Add or edit an FTP, SFTP, NFS, WebDAV, DLNA/UPnP (by address), Jellyfin, Emby or Plex source. */
@@ -170,6 +201,15 @@ sealed interface DialogUi {
     data class ConfirmDeletePlaylist(val playlistId: Long, val name: String) : DialogUi
 
     /**
+     * Asked before any video goes: into Android's bin ([toBin], Android 11 and later, restorable
+     * for 30 days from Recently Deleted) or, where there is no bin (a picked folder), for good.
+     */
+    data class ConfirmDeleteVideo(val videoId: Long, val title: String, val toBin: Boolean) : DialogUi
+
+    /** Videos in Android's bin, restorable until they expire; [items] is null while loading. */
+    data class RecentlyDeleted(val items: List<TrashedVideoUi>? = null) : DialogUi
+
+    /**
      * Settings › About › Library diagnostics: a plain-text report to copy or share; [report] is
      * null while it is being put together.
      */
@@ -203,6 +243,10 @@ data class RestorePreviewUi(
     val videos: Int,
     val matches: Int,
     val playlists: Int,
+    /** Songs with plays. */
+    val songs: Int = 0,
+    /** Watchlist and favorites entries. */
+    val saved: Int = 0,
 )
 
 private val IdleBackupState: StateFlow<BackupUi> = MutableStateFlow(BackupUi())
@@ -211,7 +255,7 @@ private val IdleBackupState: StateFlow<BackupUi> = MutableStateFlow(BackupUi())
 data class AppUiState(
     val route: Route = Route.Home,
     /** The tab the current page was opened from (details opened from Library keep Library highlighted). */
-    val tab: TopDestination = TopDestination.HOME,
+    val tab: TopDestination = TopDestination.VIDEO,
     val canGoBack: Boolean = false,
     val home: HomeUi = HomeUi(),
     val library: LibraryUi = LibraryUi(),
@@ -261,6 +305,35 @@ interface AppActions {
     fun setLibraryFilter(filter: LibraryFilter)
     fun setLibrarySort(sort: LibrarySort)
     fun search(query: String)
+
+    /** Keeps [query] in Search's recent searches (the keyboard's Search key, a result opened). */
+    fun rememberSearch(query: String) {}
+
+    fun clearRecentSearches() {}
+
+    /** Opens the library (under the Video tab) showing [filter]. */
+    fun openLibrary(filter: LibraryFilter) {
+        navigate(Route.Library)
+        setLibraryFilter(filter)
+    }
+
+    /** Opens "Change artwork" for the movie or show [videoId] belongs to. */
+    fun changeArtwork(videoId: Long) {}
+
+    /** Uses this poster and/or backdrop (TMDB paths) for [metadataKey]; null leaves that one as it is. */
+    fun chooseArtwork(metadataKey: String, posterPath: String?, backdropPath: String?) {}
+
+    /** Back to TMDB's own poster and backdrop for [metadataKey]. */
+    fun resetArtwork(metadataKey: String) {}
+
+    /** The hero's "+": adds the item ([HeroUi.itemKey]) to the watchlist, or takes it off. */
+    fun toggleWatchlist(itemKey: String) {}
+
+    /** The hero's star: adds the item to Favorites, or takes it out. */
+    fun toggleFavorite(itemKey: String) {}
+
+    /** Plays songs from search results (see [MusicResultUi]). */
+    fun playMusic(songIds: List<Long>, startIndex: Int) {}
 
     fun openSource(sourceId: Long) = navigate(Route.BrowseDir(sourceId, ""))
     fun openFolder(folder: FolderUi) = navigate(Route.BrowseDir(folder.sourceId, folder.path))
@@ -321,7 +394,7 @@ interface AppActions {
 
     fun openPlaylist(playlistId: Long) = navigate(Route.Playlist(playlistId))
 
-    /** Opens the "Add to playlist" sheet for [videoIds]; [label] names them in the sheet's title. */
+    /** Opens the "Add to Playlist" sheet for [videoIds]; [label] names them in the sheet's title. */
     fun addToPlaylist(videoIds: List<Long>, label: String = "") = showDialog(DialogUi.AddToPlaylist(videoIds, label))
 
     /** Appends [videoIds] to the playlist (videos already in it are skipped). */
@@ -334,6 +407,17 @@ interface AppActions {
 
     fun deletePlaylist(playlistId: Long) {}
 
+    /** Asks first ([DialogUi.ConfirmDeleteVideo]); [confirmDeleteVideo] then bins or deletes it. */
+    fun deleteVideo(videoId: Long) {}
+
+    fun confirmDeleteVideo(videoId: Long) {}
+
+    /** Lists the videos in Android's bin ([DialogUi.RecentlyDeleted]). */
+    fun showRecentlyDeleted() {}
+
+    /** Takes a video out of Android's bin, back into the library. */
+    fun restoreVideo(uri: String) {}
+
     fun removeFromPlaylist(playlistId: Long, videoId: Long) {}
 
     /** Moves the playlist's video at index [from] to index [to] (indices of [PlaylistDetailsUi.videos]). */
@@ -341,7 +425,7 @@ interface AppActions {
 
     // Network sources: FTP, SFTP, NFS, WebDAV, DLNA/UPnP, Jellyfin, Emby and Plex (SMB keeps saveSmb/testSmb).
 
-    /** Opens the "Add network source" type picker ([DialogUi.AddSource]). */
+    /** Opens the "Add Network Source" type picker ([DialogUi.AddSource]). */
     fun addNetworkSource() = showDialog(DialogUi.AddSource)
 
     /**
@@ -431,3 +515,7 @@ open class NoOpAppActions : AppActions {
     override fun shareCrashReport() {}
     override fun dismissCrashReport() {}
 }
+
+/** A video in Android's bin: its MediaStore uri, file name and days until it is gone for good. */
+@Immutable
+data class TrashedVideoUi(val uri: String, val name: String, val daysLeft: Int?)

@@ -7,8 +7,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -17,10 +17,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -34,11 +32,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
+import com.aakash.novafork.ui.common.IosProgressBar
 import com.aakash.novafork.ui.model.ScanUi
 import com.aakash.novafork.ui.theme.NovaColors
 import java.util.Locale
 
-/** Icon from res/drawable (Material Icons Round, see docs/ARCHITECTURE.md for the list). */
+/** Icon from res/drawable (Framework7 Icons, MIT: see docs/ARCHITECTURE.md for the list). */
 @Composable
 fun NovaIcon(
     @DrawableRes res: Int,
@@ -70,15 +69,20 @@ fun RatingPill(rating: Float?, modifier: Modifier = Modifier, onImage: Boolean =
     }
 }
 
-/** Thin progress strip for the bottom edge of a card. Draws nothing for null/0. */
+/**
+ * Progress on a card, as Apple TV draws it: a rounded bar inset from the picture's bottom edge
+ * on a translucent track. Draws nothing for null/0.
+ */
 @Composable
-fun ProgressStrip(progress: Float?, modifier: Modifier = Modifier, height: Dp = 3.dp) {
+fun ProgressStrip(progress: Float?, modifier: Modifier = Modifier, height: Dp = 4.dp) {
     if (progress == null || progress <= 0f) return
     Box(
         modifier
+            .padding(horizontal = 8.dp, vertical = 7.dp)
             .fillMaxWidth()
             .height(height)
-            .background(Color.White.copy(alpha = 0.25f)),
+            .clip(CircleShape)
+            .background(Color.White.copy(alpha = 0.3f)),
     ) {
         Box(
             Modifier
@@ -121,7 +125,7 @@ fun SectionHeader(
             text = title,
             style = MaterialTheme.typography.titleLarge,
             modifier = Modifier.weight(1f),
-            maxLines = 1,
+            maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
         if (actionLabel != null && onAction != null) {
@@ -147,13 +151,10 @@ fun EmptyState(
             .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Surface(shape = CircleShape, color = MaterialTheme.colorScheme.surfaceContainerHigh, modifier = Modifier.size(72.dp)) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(painterResource(icon), contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(34.dp))
-            }
-        }
-        Spacer(Modifier.height(16.dp))
-        Text(title, style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center)
+        // iOS's "content unavailable" look: a large grey symbol on its own, a bold title, grey text.
+        Icon(painterResource(icon), contentDescription = null, tint = IosColors.SecondaryLabel, modifier = Modifier.size(56.dp))
+        Spacer(Modifier.height(14.dp))
+        Text(title, style = MaterialTheme.typography.headlineSmall, textAlign = TextAlign.Center)
         Spacer(Modifier.height(8.dp))
         Text(
             body,
@@ -178,9 +179,9 @@ fun ScanBanner(scan: ScanUi, modifier: Modifier = Modifier) {
     Column(modifier.fillMaxWidth()) {
         val p = scan.progress
         if (p == null) {
-            LinearProgressIndicator(modifier = Modifier.fillMaxWidth().height(2.dp))
+            IosProgressBar(modifier = Modifier.fillMaxWidth().height(2.dp))
         } else {
-            LinearProgressIndicator(progress = { p }, modifier = Modifier.fillMaxWidth().height(2.dp))
+            IosProgressBar(progress = { p }, modifier = Modifier.fillMaxWidth().height(2.dp))
         }
         if (!scan.label.isNullOrBlank()) {
             Text(
@@ -188,7 +189,7 @@ fun ScanBanner(scan: ScanUi, modifier: Modifier = Modifier) {
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
-                maxLines = 1,
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
         }

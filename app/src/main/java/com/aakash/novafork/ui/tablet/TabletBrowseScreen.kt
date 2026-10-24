@@ -34,17 +34,10 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.AssistChipDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -68,7 +61,12 @@ import com.aakash.novafork.ui.adaptive.DeviceLayout
 import com.aakash.novafork.ui.common.DeviceAccessCard
 import com.aakash.novafork.ui.common.DeviceStorageEmptyState
 import com.aakash.novafork.ui.common.EmptyState
+import com.aakash.novafork.ui.common.IosProgressBar
+import com.aakash.novafork.ui.common.IosSpinner
+import com.aakash.novafork.ui.common.NovaDropdownMenu
 import com.aakash.novafork.ui.common.NovaIcon
+import com.aakash.novafork.ui.common.NovaMenuItem
+import com.aakash.novafork.ui.common.PathCrumb
 import com.aakash.novafork.ui.common.ScanBanner
 import com.aakash.novafork.ui.common.VideoMenuBox
 import com.aakash.novafork.ui.common.deviceAccessNotice
@@ -88,6 +86,8 @@ import com.aakash.novafork.ui.model.Route
 import com.aakash.novafork.ui.model.ScanUi
 import com.aakash.novafork.ui.model.SourceUi
 import com.aakash.novafork.ui.model.VideoCardUi
+import com.aakash.novafork.ui.settings.IconTile
+import com.aakash.novafork.ui.settings.tileColor
 
 private val PaneGutter = 28.dp
 
@@ -222,7 +222,7 @@ private fun SourcesPane(
                     }
                 } else if (!permission.granted) {
                     item(key = "allowDevice", contentType = "action") {
-                        ActionRow(R.drawable.ic_video_library, "Allow access to videos", actions::requestPermission)
+                        ActionRow(R.drawable.ic_video_library, "Allow Access to Videos", actions::requestPermission)
                     }
                 }
             }
@@ -232,7 +232,7 @@ private fun SourcesPane(
                 SourceRow(source = source, selected = source.id == selectedSourceId, actions = actions)
             }
             item(key = "addFolder", contentType = "action") {
-                ActionRow(R.drawable.ic_create_new_folder, "Add folder", actions::addFolder)
+                ActionRow(R.drawable.ic_create_new_folder, "Add Folder", actions::addFolder)
             }
 
             sectionHeader("network", "Network")
@@ -240,7 +240,7 @@ private fun SourcesPane(
                 SourceRow(source = source, selected = source.id == selectedSourceId, actions = actions)
             }
             item(key = "addNetwork", contentType = "action") {
-                ActionRow(R.drawable.ic_add, "Add network source", actions::addNetworkSource)
+                ActionRow(R.drawable.ic_add, "Add Network Source", actions::addNetworkSource)
             }
 
             sectionHeader("streams", "Streams")
@@ -252,10 +252,10 @@ private fun SourcesPane(
                 )
             }
             item(key = "addStream", contentType = "action") {
-                ActionRow(R.drawable.ic_add, "Add stream") { actions.showDialog(DialogUi.AddStream) }
+                ActionRow(R.drawable.ic_add, "Add Stream") { actions.showDialog(DialogUi.AddStream) }
             }
             item(key = "openUrl", contentType = "action") {
-                ActionRow(R.drawable.ic_link, "Open network stream") { actions.showDialog(DialogUi.OpenUrl) }
+                ActionRow(R.drawable.ic_link, "Open Network Stream") { actions.showDialog(DialogUi.OpenUrl) }
             }
 
             sectionHeader("playlists", "Playlists")
@@ -267,7 +267,7 @@ private fun SourcesPane(
                 )
             }
             item(key = "newPlaylist", contentType = "action") {
-                ActionRow(R.drawable.ic_playlist_add, "New playlist") { actions.showDialog(DialogUi.NewPlaylist()) }
+                ActionRow(R.drawable.ic_playlist_add, "New Playlist…") { actions.showDialog(DialogUi.NewPlaylist()) }
             }
         }
     }
@@ -285,16 +285,9 @@ private fun LazyListScope.sectionHeader(key: String, title: String) {
 }
 
 @Composable
-private fun RowIcon(@DrawableRes icon: Int, tint: Color = MaterialTheme.colorScheme.primary) {
-    Box(
-        Modifier
-            .size(40.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainerHighest),
-        contentAlignment = Alignment.Center,
-    ) {
-        NovaIcon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(22.dp))
-    }
+private fun RowIcon(@DrawableRes icon: Int) {
+    // The coloured tiles of Preferences and the phone's Browse, as iPad Settings draws them.
+    IconTile(icon, tileColor(icon), size = 36.dp)
 }
 
 @Composable
@@ -314,13 +307,13 @@ private fun SourceRow(source: SourceUi, selected: Boolean, actions: AppActions) 
             RowIcon(sourceTypeIcon(source.type))
             Spacer(Modifier.width(14.dp))
             Column(Modifier.weight(1f)) {
-                Text(source.name, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(source.name, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 if (source.detail.isNotBlank()) {
                     Text(
                         text = source.detail,
                         style = MaterialTheme.typography.bodySmall,
                         color = LocalContentColor.current.copy(alpha = 0.7f),
-                        maxLines = 1,
+                        maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
@@ -337,7 +330,7 @@ private fun SourceRow(source: SourceUi, selected: Boolean, actions: AppActions) 
             }
             Spacer(Modifier.width(8.dp))
             if (source.isScanning) {
-                CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                IosSpinner(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
             } else {
                 Text(
                     text = source.videoCount.toString(),
@@ -349,8 +342,8 @@ private fun SourceRow(source: SourceUi, selected: Boolean, actions: AppActions) 
                 IconButton(onClick = { menuOpen = true }) {
                     NovaIcon(R.drawable.ic_more_vert, contentDescription = "Options for ${source.name}")
                 }
-                DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                    DropdownMenuItem(
+                NovaDropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                    NovaMenuItem(
                         text = { Text("Rescan") },
                         leadingIcon = { NovaIcon(R.drawable.ic_refresh, contentDescription = null) },
                         onClick = {
@@ -359,7 +352,7 @@ private fun SourceRow(source: SourceUi, selected: Boolean, actions: AppActions) 
                         },
                     )
                     if (source.type.isNetworkShare || source.type.isMediaServer) {
-                        DropdownMenuItem(
+                        NovaMenuItem(
                             text = { Text("Edit") },
                             leadingIcon = { NovaIcon(R.drawable.ic_edit, contentDescription = null) },
                             onClick = {
@@ -368,8 +361,9 @@ private fun SourceRow(source: SourceUi, selected: Boolean, actions: AppActions) 
                             },
                         )
                     }
-                    DropdownMenuItem(
+                    NovaMenuItem(
                         text = { Text("Remove") },
+                        destructive = true,
                         leadingIcon = { NovaIcon(R.drawable.ic_delete, contentDescription = null) },
                         onClick = {
                             menuOpen = false
@@ -395,14 +389,14 @@ private fun StreamRow(stream: VideoCardUi, onClick: () -> Unit, onLongClick: () 
         RowIcon(R.drawable.ic_live_tv)
         Spacer(Modifier.width(14.dp))
         Column(Modifier.weight(1f)) {
-            Text(stream.title, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(stream.title, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
             val subtitle = stream.subtitle
             if (!subtitle.isNullOrBlank()) {
                 Text(
                     text = subtitle,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
@@ -434,7 +428,7 @@ private fun PlaylistRow(playlist: PlaylistUi, selected: Boolean, onClick: () -> 
             Text(
                 text = playlist.name,
                 style = MaterialTheme.typography.titleSmall,
-                maxLines = 1,
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
             )
@@ -499,14 +493,14 @@ private fun BrowseWelcome(actions: AppActions, modifier: Modifier = Modifier) {
                 Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                     ActionTile(
                         icon = R.drawable.ic_create_new_folder,
-                        title = "Add folder",
+                        title = "Add Folder",
                         body = "Any folder on this tablet or an SD card.",
                         onClick = actions::addFolder,
                         modifier = Modifier.weight(1f),
                     )
                     ActionTile(
                         icon = R.drawable.ic_lan,
-                        title = "Add network source",
+                        title = "Add Network Source",
                         body = "SMB, FTP, SFTP, NFS, WebDAV, DLNA, Jellyfin, Emby or Plex.",
                         onClick = actions::addNetworkSource,
                         modifier = Modifier.weight(1f),
@@ -515,14 +509,14 @@ private fun BrowseWelcome(actions: AppActions, modifier: Modifier = Modifier) {
                 Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                     ActionTile(
                         icon = R.drawable.ic_live_tv,
-                        title = "Add stream",
+                        title = "Add Stream",
                         body = "Save a live channel or video URL to your library.",
                         onClick = { actions.showDialog(DialogUi.AddStream) },
                         modifier = Modifier.weight(1f),
                     )
                     ActionTile(
                         icon = R.drawable.ic_link,
-                        title = "Open network stream",
+                        title = "Open Network Stream",
                         body = "Play a link once without saving it.",
                         onClick = { actions.showDialog(DialogUi.OpenUrl) },
                         modifier = Modifier.weight(1f),
@@ -558,7 +552,7 @@ private fun ActionTile(
                 NovaIcon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
             }
             Spacer(Modifier.height(16.dp))
-            Text(title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(title, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
             Spacer(Modifier.height(4.dp))
             Text(
                 text = body,
@@ -589,7 +583,7 @@ private fun BrowseDirPane(
                 .padding(start = PaneGutter, end = PaneGutter - 8.dp, top = 20.dp, bottom = 8.dp),
         )
         if (dir.isLoading && !isEmpty) {
-            LinearProgressIndicator(
+            IosProgressBar(
                 Modifier
                     .fillMaxWidth()
                     .padding(horizontal = PaneGutter)
@@ -616,7 +610,7 @@ private fun BrowseDirPane(
                     icon = R.drawable.ic_error,
                     title = "Couldn't open this folder",
                     body = error,
-                    actionLabel = "Try again",
+                    actionLabel = "Try Again",
                     onAction = { actions.rescanSource(dir.sourceId) },
                 )
             }
@@ -639,17 +633,17 @@ private fun BrowseDirHeader(dir: BrowseDirUi, actions: AppActions, modifier: Mod
             Text(
                 text = dir.title,
                 style = MaterialTheme.typography.headlineMedium,
-                maxLines = 1,
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
             )
             if (dir.videos.isNotEmpty()) {
                 // Plays the videos directly in this folder, not those in its subfolders.
                 FilledTonalButton(onClick = { actions.playFolder(dir.sourceId, dir.path) }) {
-                    ButtonLabel(R.drawable.ic_play_arrow, "Play all")
+                    ButtonLabel(R.drawable.ic_play_arrow, "Play All")
                 }
                 Spacer(Modifier.width(8.dp))
-                OutlinedButton(onClick = { actions.playFolder(dir.sourceId, dir.path, shuffle = true) }) {
+                FilledTonalButton(onClick = { actions.playFolder(dir.sourceId, dir.path, shuffle = true) }) {
                     ButtonLabel(R.drawable.ic_shuffle, "Shuffle")
                 }
                 Spacer(Modifier.width(4.dp))
@@ -675,29 +669,12 @@ private fun BrowseDirHeader(dir: BrowseDirUi, actions: AppActions, modifier: Mod
                                 .size(18.dp),
                         )
                     }
-                    if (index == dir.crumbs.lastIndex) {
-                        Text(
-                            text = crumb.label,
-                            style = MaterialTheme.typography.labelLarge,
-                            modifier = Modifier.padding(horizontal = 8.dp),
-                        )
-                    } else {
-                        AssistChip(
-                            onClick = { actions.navigate(Route.BrowseDir(dir.sourceId, crumb.path)) },
-                            label = { Text(crumb.label) },
-                            leadingIcon = if (index == 0) {
-                                {
-                                    NovaIcon(
-                                        sourceTypeIcon(dir.sourceType),
-                                        contentDescription = null,
-                                        modifier = Modifier.size(AssistChipDefaults.IconSize),
-                                    )
-                                }
-                            } else {
-                                null
-                            },
-                        )
-                    }
+                    PathCrumb(
+                        label = crumb.label,
+                        current = index == dir.crumbs.lastIndex,
+                        onClick = { actions.navigate(Route.BrowseDir(dir.sourceId, crumb.path)) },
+                        icon = if (index == 0) sourceTypeIcon(dir.sourceType) else null,
+                    )
                 }
             }
         }
@@ -802,12 +779,12 @@ private fun FolderTile(folder: FolderUi, onClick: () -> Unit) {
             }
             Spacer(Modifier.width(14.dp))
             Column(Modifier.weight(1f)) {
-                Text(folder.name, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(folder.name, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 Text(
                     text = folder.note ?: metaLine(countLabel(folder.videoCount, "video")),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
+                    maxLines = 2,
                 )
             }
             NovaIcon(

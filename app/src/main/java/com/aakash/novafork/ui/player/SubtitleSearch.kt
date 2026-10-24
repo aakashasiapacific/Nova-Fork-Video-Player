@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
@@ -35,6 +34,10 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
+import com.aakash.novafork.ui.common.IosColors
+import com.aakash.novafork.ui.common.IosGrabber
+import com.aakash.novafork.ui.common.IosSheetShape
+import com.aakash.novafork.ui.common.IosSpinner
 import com.aakash.novafork.ui.model.PlayerActions
 import com.aakash.novafork.ui.model.SubtitleResultUi
 import com.aakash.novafork.ui.model.SubtitleSearchUi
@@ -72,7 +75,9 @@ internal fun SubtitleSearchSheet(search: SubtitleSearchUi, actions: PlayerAction
     ModalBottomSheet(
         onDismissRequest = actions::dismissSubtitleSearch,
         sheetState = sheetState,
-        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        containerColor = IosColors.GroupedCard,
+        shape = IosSheetShape,
+        dragHandle = { IosGrabber() },
     ) {
         Text(
             text = SUBTITLE_SEARCH_TITLE,
@@ -84,7 +89,7 @@ internal fun SubtitleSearchSheet(search: SubtitleSearchUi, actions: PlayerAction
 }
 
 /**
- * Where the subtitles come from, then a spinner, an error with "Try again", "nothing found", or
+ * Where the subtitles come from, then a spinner, an error with "Try Again", "nothing found", or
  * the results; a tap on one downloads it. Shared by the phone sheet and the tablet side panel.
  */
 @Composable
@@ -106,7 +111,7 @@ internal fun SubtitleSearchContent(search: SubtitleSearchUi, actions: PlayerActi
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                IosSpinner(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
                 Spacer(Modifier.width(14.dp))
                 Text(text = "Searching…", style = MaterialTheme.typography.bodyMedium, color = dim)
             }
@@ -150,7 +155,7 @@ private fun SearchError(message: String, onRetry: () -> Unit, retryEnabled: Bool
         )
         Spacer(Modifier.width(12.dp))
         Text(text = message, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-        TextButton(onClick = onRetry, enabled = retryEnabled) { Text("Try again") }
+        TextButton(onClick = onRetry, enabled = retryEnabled) { Text("Try Again") }
     }
 }
 
@@ -193,7 +198,7 @@ private fun SubtitleResultRow(item: SubtitleResultUi, downloading: Boolean, enab
         }
         Spacer(Modifier.width(12.dp))
         when {
-            downloading -> CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+            downloading -> IosSpinner(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
             item.downloaded -> Icon(
                 painter = painterResource(R.drawable.ic_check),
                 contentDescription = "Downloaded",
@@ -219,7 +224,7 @@ private fun ResultBadge(text: String, color: Color, @DrawableRes icon: Int? = nu
             horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             if (icon != null) Icon(painter = painterResource(icon), contentDescription = null, modifier = Modifier.size(14.dp))
-            Text(text = text, style = MaterialTheme.typography.labelMedium, maxLines = 1)
+            Text(text = text, style = MaterialTheme.typography.labelMedium, maxLines = 2)
         }
     }
 }

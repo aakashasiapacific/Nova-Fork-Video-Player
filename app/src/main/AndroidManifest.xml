@@ -14,6 +14,8 @@
     <!-- Android 13+: videos, plus images so poster.jpg / fanart.jpg next to a video can be shown -->
     <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <!-- Android 13+: music for the Audio tab -->
+    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
     <!-- Android 14+: "Allow limited access" -->
     <uses-permission android:name="android.permission.READ_MEDIA_VISUAL_USER_SELECTED" />
     <!-- Android 12 and older -->
@@ -114,6 +116,12 @@
              without it (background audio). Media buttons reach it through its MediaSession. -->
         <service
             android:name=".player.PlaybackService"
+            android:exported="false"
+            android:foregroundServiceType="mediaPlayback" />
+
+        <!-- Music playback: in the foreground with a media notification while songs play. -->
+        <service
+            android:name=".music.MusicService"
             android:exported="false"
             android:foregroundServiceType="mediaPlayback" />
     </application>

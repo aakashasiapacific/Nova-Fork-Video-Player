@@ -17,9 +17,22 @@ data class Artwork(
     val stillUrl: String? = null,
     /** A local video URI (content:// or file://) to grab a frame from when nothing else exists. Null for network files. */
     val frameSource: String? = null,
+    /** Portrait key art without text (TMDB's textless poster), for the tall Home hero. */
+    val tallUrl: String? = null,
+    /** The title drawn as transparent artwork (TMDB's logo), shown over the hero in place of text. */
+    val logoUrl: String? = null,
+    /** The video's width over height, for showing its frame in its own shape. */
+    val frameAspect: Float? = null,
     /** Seed for the placeholder colours (usually the title). */
     val seed: String = "",
-)
+) {
+    /**
+     * Only a frame of the video exists: no poster, backdrop or still (a camera-roll clip, a saved
+     * YouTube video), so there is nothing to lay out as backdrop plus poster.
+     */
+    val frameOnly: Boolean
+        get() = posterUrl == null && tallUrl == null && backdropUrl == null && stillUrl == null && frameSource != null
+}
 
 enum class MediaKind { MOVIE, EPISODE, VIDEO, STREAM }
 
@@ -100,12 +113,33 @@ data class HeroUi(
     val playVideoId: Long? = null,
     /** "Play", "Resume", "Play S2 · E4". */
     val playLabel: String = "Play",
-)
+    /**
+     * The local file (content:// or file://) the hero plays as a preview, from [previewStartMs]:
+     * the video Play plays, when it is a short clip (a minute or less). Null otherwise.
+     */
+    val previewUri: String? = null,
+    val previewStartMs: Long = 0,
+    /** On the watchlist (the "+" button shows a check). */
+    val onWatchlist: Boolean = false,
+    /** Starred (the hero's star is filled). */
+    val favorite: Boolean = false,
+    /** The video Delete removes: a single file on this phone; null hides Delete. */
+    val deleteVideoId: Long? = null,
+) {
+    /** The library item key ("v:<id>" / "s:<showKey>"), which the watchlist stores. */
+    val itemKey: String
+        get() = when (val t = target) {
+            is HeroTarget.Video -> "v:${t.id}"
+            is HeroTarget.Show -> "s:${t.key}"
+        }
+}
 
 @Immutable
 data class HomeUi(
     val hero: List<HeroUi> = emptyList(),
     val continueWatching: List<VideoCardUi> = emptyList(),
+    /** Movies, shows and videos saved with the hero's "+", most recently added first. */
+    val watchlist: List<LibraryItemUi> = emptyList(),
     val recentlyAdded: List<VideoCardUi> = emptyList(),
     val movies: List<VideoCardUi> = emptyList(),
     val shows: List<ShowCardUi> = emptyList(),
@@ -115,9 +149,22 @@ data class HomeUi(
     val isEmpty: Boolean = true,
 )
 
-enum class LibraryFilter(val label: String) { ALL("All"), MOVIES("Movies"), SHOWS("TV shows"), VIDEOS("Videos") }
+enum class LibraryFilter(val label: String) {
+    ALL("All"),
+    MOVIES("Movies"),
+    SHOWS("TV Shows"),
+    VIDEOS("Videos"),
 
-enum class LibrarySort(val label: String) { RECENT("Recently added"), TITLE("Title"), YEAR("Year"), RATING("Rating") }
+    /** The hero's "+" list and its star list: their own Library pages, not filter chips. */
+    WATCHLIST("Watchlist"),
+    FAVORITES("Favorites"),
+    ;
+
+    /** Shown as a chip on the Library page (Videos left the library; the lists have pages). */
+    val isChip: Boolean get() = this == ALL || this == MOVIES || this == SHOWS
+}
+
+enum class LibrarySort(val label: String) { RECENT("Recently Added"), TITLE("Title"), YEAR("Year"), RATING("Rating") }
 
 @Immutable
 data class LibraryUi(
@@ -125,7 +172,19 @@ data class LibraryUi(
     val sort: LibrarySort = LibrarySort.RECENT,
     val items: List<LibraryItemUi> = emptyList(),
     val counts: Map<LibraryFilter, Int> = emptyMap(),
+    /**
+     * Every video newest first, by when it reached the device, each card's second line saying
+     * when ("Today · 2h 37m"): what "All Videos" shows when sorted by Recently added, as one
+     * gapless grid. Empty otherwise.
+     */
+    val timeline: List<VideoCardUi> = emptyList(),
+    /** [timeline] by the month the videos arrived ("October", "March 2024"), as Photos groups. */
+    val timelineMonths: List<TimelineMonth> = emptyList(),
 )
+
+/** One month of the timeline: its heading and its videos, newest first. */
+@Immutable
+data class TimelineMonth(val title: String, val cards: List<VideoCardUi>)
 
 @Immutable
 data class VideoDetailsUi(
@@ -164,6 +223,8 @@ data class VideoDetailsUi(
     val sourceLabel: String = "",
     /** True when the info came from TMDB. */
     val isMatched: Boolean = false,
+    /** A file on this phone (device storage or a picked folder) that Delete can remove. */
+    val deletable: Boolean = false,
 )
 
 @Immutable
@@ -305,6 +366,30 @@ data class RemoteFileUi(
 data class SearchUi(
     val query: String = "",
     val results: List<LibraryItemUi> = emptyList(),
+    /** Music that matches, one section each, best first (one search over videos and music). */
+    val songs: List<MusicResultUi> = emptyList(),
+    val albums: List<MusicResultUi> = emptyList(),
+    val artists: List<MusicResultUi> = emptyList(),
+    /** Searches the user ran, newest first, shown while the field is empty. */
+    val recent: List<String> = emptyList(),
+) {
+    val hasMusic: Boolean get() = songs.isNotEmpty() || albums.isNotEmpty() || artists.isNotEmpty()
+    val isEmpty: Boolean get() = results.isEmpty() && !hasMusic
+}
+
+/** A song, album or artist in search results; tapping it plays [songIds] from [startIndex]. */
+@Immutable
+data class MusicResultUi(
+    val key: String,
+    val title: String,
+    /** "Song · Queen", "Album · Queen", "Artist". */
+    val subtitle: String,
+    /** Cover file or embedded picture; null for none. */
+    val artUri: String?,
+    val songIds: List<Long>,
+    val startIndex: Int = 0,
+    /** Artists show round art, like Apple Music. */
+    val round: Boolean = false,
 )
 
 @Immutable
@@ -356,3 +441,10 @@ data class IdentifyResultUi(
     val overview: String? = null,
     val posterUrl: String? = null,
 )
+
+/** Recent searches: [query] first, no repeats (ignoring case), at most [max]. */
+internal fun withRecentSearch(recent: List<String>, query: String, max: Int = 8): List<String> {
+    val q = query.trim()
+    if (q.isEmpty()) return recent
+    return (listOf(q) + recent.filterNot { it.equals(q, ignoreCase = true) }).take(max)
+}

@@ -17,10 +17,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
@@ -40,7 +37,10 @@ import com.aakash.novafork.data.db.SourceType
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
 import com.aakash.novafork.ui.common.DeviceStorageEmptyState
 import com.aakash.novafork.ui.common.EmptyState
+import com.aakash.novafork.ui.common.IosProgressBar
+import com.aakash.novafork.ui.common.LocalBottomBarSpace
 import com.aakash.novafork.ui.common.NovaIcon
+import com.aakash.novafork.ui.common.PathCrumb
 import com.aakash.novafork.ui.common.VideoMenuBox
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.BrowseDirUi
@@ -88,7 +88,7 @@ private fun BrowseDirContent(dir: BrowseDirUi, permission: PermissionUi, actions
         Breadcrumbs(dir = dir, actions = actions)
     }
     if (dir.isLoading && !isEmpty) {
-        LinearProgressIndicator(Modifier.fillMaxWidth())
+        IosProgressBar(Modifier.fillMaxWidth())
     }
     when {
         isEmpty && dir.isLoading -> LoadingBox()
@@ -121,7 +121,7 @@ private fun BrowseDirContent(dir: BrowseDirUi, permission: PermissionUi, actions
         }
         else -> LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(top = 4.dp, bottom = dims.sectionSpacing),
+            contentPadding = PaddingValues(top = 4.dp, bottom = dims.sectionSpacing + LocalBottomBarSpace.current),
         ) {
             if (!error.isNullOrBlank()) {
                 item(key = "error") {
@@ -189,22 +189,11 @@ private fun Breadcrumbs(dir: BrowseDirUi, actions: AppActions) {
                             .size(18.dp),
                     )
                 }
-                AssistChip(
-                    onClick = { if (!isCurrent) actions.navigate(Route.BrowseDir(dir.sourceId, crumb.path)) },
-                    label = { Text(crumb.label, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                    leadingIcon = if (index == 0) {
-                        { NovaIcon(dir.sourceType.iconRes(), contentDescription = null, modifier = Modifier.size(AssistChipDefaults.IconSize)) }
-                    } else {
-                        null
-                    },
-                    colors = if (isCurrent) {
-                        AssistChipDefaults.assistChipColors(
-                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                            labelColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                        )
-                    } else {
-                        AssistChipDefaults.assistChipColors()
-                    },
+                PathCrumb(
+                    label = crumb.label,
+                    current = isCurrent,
+                    onClick = { actions.navigate(Route.BrowseDir(dir.sourceId, crumb.path)) },
+                    icon = if (index == 0) dir.sourceType.iconRes() else null,
                 )
             }
         }
@@ -226,7 +215,7 @@ private fun FolderRow(folder: FolderUi, onClick: () -> Unit) {
                 NovaIcon(R.drawable.ic_folder, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
             }
         },
-        headlineContent = { Text(folder.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+        headlineContent = { Text(folder.name, maxLines = 2, overflow = TextOverflow.Ellipsis) },
         supportingContent = { Text(folder.note ?: countLabel(folder.videoCount, "video")) },
         trailingContent = {
             NovaIcon(R.drawable.ic_chevron_right, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)

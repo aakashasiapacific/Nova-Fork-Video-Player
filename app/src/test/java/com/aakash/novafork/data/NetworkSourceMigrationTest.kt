@@ -38,7 +38,7 @@ class NetworkSourceMigrationTest {
 
         val database = NovaDatabase.create(context)
         try {
-            assertEquals(3, database.openHelper.writableDatabase.version)
+            assertEquals(8, database.openHelper.writableDatabase.version)
 
             val share = requireNotNull(database.sourceDao().byId(SOURCE_ID))
             assertEquals(SourceType.SMB, share.type)

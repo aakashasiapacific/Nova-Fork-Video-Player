@@ -34,7 +34,8 @@ private const val MAX_SCRUB_SPAN_MS = 600_000L
  * Full-screen touch layer under the controls.
  *
  * Unlocked: tap, double tap ([onDoubleTap] with the third of the screen it hit), horizontal drag
- * scrubs, vertical drag on the left half changes brightness and on the right half volume.
+ * scrubs. Vertical drags do nothing: brightness and volume are the phone's own (the volume keys
+ * show the player's indicator, see PlayerController.onVolumeKey).
  * Locked: only [onLockedTap].
  */
 @Composable
@@ -111,7 +112,8 @@ private suspend fun PointerInputScope.detectPlayerDrags(
         if (abs(moved.x) > abs(moved.y)) {
             scrub(start, overSlop.x, state(), actions)
         } else {
-            adjustLevel(start, brightness = down.position.x < size.width / 2f, initialDy = overSlop.y, actions = actions)
+            // Swallowed, so a vertical swipe is not read as a tap either.
+            drag(start.id) { it.consume() }
         }
     }
 }
@@ -145,30 +147,5 @@ private suspend fun AwaitPointerEventScope.scrub(
     } finally {
         // Cancelled mid-drag (lock, PiP, leaving the screen): drop the preview instead of seeking.
         if (!committed) actions().endGesture()
-    }
-}
-
-private suspend fun AwaitPointerEventScope.adjustLevel(
-    start: PointerInputChange,
-    brightness: Boolean,
-    initialDy: Float,
-    actions: () -> PlayerActions,
-) {
-    val height = size.height.toFloat().coerceAtLeast(1f)
-    fun adjust(dy: Float) {
-        if (dy == 0f) return
-        // Up is positive; a drag over the full height spans the whole range.
-        val delta = -dy / height
-        if (brightness) actions().adjustBrightness(delta) else actions().adjustVolume(delta)
-    }
-    try {
-        adjust(initialDy)
-        drag(start.id) { change ->
-            val dy = change.positionChange().y
-            change.consume()
-            adjust(dy)
-        }
-    } finally {
-        actions().endGesture()
     }
 }

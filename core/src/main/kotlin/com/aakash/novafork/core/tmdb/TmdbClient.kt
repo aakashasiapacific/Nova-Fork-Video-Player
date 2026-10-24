@@ -75,11 +75,30 @@ class TmdbClient(
 
     suspend fun searchTv(query: String, year: Int? = null): List<TmdbTvSummary> = searchTvHits(query, year).map { it.summary }
 
+    /** With its images (textless and English posters and backdrops) and credits, in one request. */
     suspend fun movie(id: Int): TmdbMovieDetails =
-        get("movie/$id", listOf("language" to language()), TmdbMovieDetails.serializer())
+        get("movie/$id", detailParams(), TmdbMovieDetails.serializer()).let { it.copy(logoPath = it.images.logo(logoLanguage())) }
 
     suspend fun tv(id: Int): TmdbTvDetails =
-        get("tv/$id", listOf("language" to language()), TmdbTvDetails.serializer())
+        get("tv/$id", detailParams(), TmdbTvDetails.serializer()).let { it.copy(logoPath = it.images.logo(logoLanguage())) }
+
+    private fun logoLanguage(): String = language().substringBefore('-').lowercase()
+
+    /** Every poster and backdrop TMDB has for a title, for "Change artwork" (any language). */
+    suspend fun images(type: String, id: Int): TmdbImages =
+        get("$type/$id/images", emptyList(), TmdbImages.serializer())
+
+    private fun detailParams(): List<Pair<String, String?>> {
+        val language = language()
+        val lang = logoLanguage()
+        // "null" = images without text (textless key art), for the tall Home hero.
+        val imageLanguages = listOf("null", lang, "en").distinct().joinToString(",")
+        return listOf(
+            "language" to language,
+            "append_to_response" to "images,credits",
+            "include_image_language" to imageLanguages,
+        )
+    }
 
     suspend fun season(tvId: Int, seasonNumber: Int): TmdbSeasonDetails =
         get("tv/$tvId/season/$seasonNumber", listOf("language" to language()), TmdbSeasonDetails.serializer())

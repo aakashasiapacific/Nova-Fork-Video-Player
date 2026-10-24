@@ -7,8 +7,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -22,7 +20,11 @@ import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
 import com.aakash.novafork.ui.common.EmptyState
+import com.aakash.novafork.ui.common.LocalBottomBarSpace
+import com.aakash.novafork.ui.common.NovaDropdownMenu
 import com.aakash.novafork.ui.common.NovaIcon
+import com.aakash.novafork.ui.common.NovaMenuItem
+import com.aakash.novafork.ui.common.SwipeToDelete
 import com.aakash.novafork.ui.common.VideoMenuBox
 import com.aakash.novafork.ui.dialogs.playlistCountLabel
 import com.aakash.novafork.ui.model.AppActions
@@ -66,7 +68,7 @@ private fun PlaylistContent(playlist: PlaylistDetailsUi, actions: AppActions) {
     val ids = remember(playlist.videos) { playlist.videos.map { it.id } }
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(bottom = dims.sectionSpacing),
+        contentPadding = PaddingValues(bottom = dims.sectionSpacing + LocalBottomBarSpace.current),
     ) {
         item(key = "header") {
             Column(Modifier.padding(start = dims.gutter, end = dims.gutter, bottom = 8.dp)) {
@@ -83,17 +85,37 @@ private fun PlaylistContent(playlist: PlaylistDetailsUi, actions: AppActions) {
             }
         }
         itemsIndexed(playlist.videos, key = { _, video -> "video:${video.id}" }) { index, video ->
-            VideoMenuBox(videoId = video.id, title = video.displayTitle(), actions = actions) { openMenu ->
-                PhoneVideoRow(
-                    card = video,
-                    onClick = { actions.playQueue(ids, startIndex = index) },
-                    onLongClick = openMenu,
-                    trailing = {
-                        IconButton(onClick = { actions.removeFromPlaylist(playlist.id, video.id) }) {
-                            NovaIcon(R.drawable.ic_close, contentDescription = "Remove from playlist")
-                        }
-                    },
-                )
+            // One "…" per row (and a long press) instead of an × on every row: removing sits in
+            // the menu with Details and Add to playlist, as in Apple's apps.
+            VideoMenuBox(
+                videoId = video.id,
+                title = video.displayTitle(),
+                actions = actions,
+                extraItems = { close ->
+                    NovaMenuItem(
+                        text = { Text("Remove from Playlist") },
+                        destructive = true,
+                        leadingIcon = { NovaIcon(R.drawable.ic_delete, contentDescription = null) },
+                        onClick = {
+                            close()
+                            actions.removeFromPlaylist(playlist.id, video.id)
+                        },
+                    )
+                },
+            ) { openMenu ->
+                // As in iOS, a swipe left removes it too.
+                SwipeToDelete(onDelete = { actions.removeFromPlaylist(playlist.id, video.id) }, label = "Remove") {
+                    PhoneVideoRow(
+                        card = video,
+                        onClick = { actions.playQueue(ids, startIndex = index) },
+                        onLongClick = openMenu,
+                        trailing = {
+                            IconButton(onClick = openMenu) {
+                                NovaIcon(R.drawable.ic_more_vert, contentDescription = "More")
+                            }
+                        },
+                    )
+                }
             }
         }
     }
@@ -107,8 +129,8 @@ private fun PlaylistMenu(playlist: PlaylistDetailsUi, actions: AppActions) {
         IconButton(onClick = { open = true }) {
             NovaIcon(R.drawable.ic_more_vert, contentDescription = "Playlist options")
         }
-        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-            DropdownMenuItem(
+        NovaDropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            NovaMenuItem(
                 text = { Text("Rename") },
                 leadingIcon = { NovaIcon(R.drawable.ic_edit, contentDescription = null) },
                 onClick = {
@@ -116,8 +138,9 @@ private fun PlaylistMenu(playlist: PlaylistDetailsUi, actions: AppActions) {
                     actions.showDialog(DialogUi.RenamePlaylist(playlist.id, playlist.name))
                 },
             )
-            DropdownMenuItem(
-                text = { Text("Delete playlist") },
+            NovaMenuItem(
+                text = { Text("Delete Playlist") },
+                destructive = true,
                 leadingIcon = { NovaIcon(R.drawable.ic_delete, contentDescription = null) },
                 onClick = {
                     open = false

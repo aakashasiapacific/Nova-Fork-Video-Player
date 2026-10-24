@@ -5,15 +5,13 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalContentColor
@@ -37,10 +35,14 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
 import com.aakash.novafork.core.format.Formats
+import com.aakash.novafork.ui.common.IosSpinner
+import com.aakash.novafork.ui.common.NovaDropdownMenu
+import com.aakash.novafork.ui.common.NovaMenuItem
 import com.aakash.novafork.ui.model.PlayerUiState
 import com.aakash.novafork.ui.model.RepeatMode
 import com.aakash.novafork.ui.model.TrackUi
@@ -88,10 +90,6 @@ internal fun formatSignedClock(deltaMs: Long): String =
 /** "−0:42:10" for the remaining-time label. */
 internal fun formatRemaining(positionMs: Long, durationMs: Long): String =
     MINUS + Formats.clock((durationMs - positionMs).coerceAtLeast(0))
-
-/** "+20s" / "−10s" in the double-tap bubble. */
-internal fun formatSeekSeconds(forward: Boolean, totalMs: Long): String =
-    (if (forward) "+" else MINUS) + "${totalMs / 1000}s"
 
 /** "0 ms", "+300 ms", "−1200 ms". */
 internal fun formatDelay(delayMs: Long): String = when {
@@ -143,19 +141,20 @@ internal fun PlayerMoreMenu(
     modifier: Modifier = Modifier,
     buttonSize: Dp = 48.dp,
     iconSize: Dp = 24.dp,
+    @DrawableRes icon: Int = R.drawable.ic_more_vert,
 ) {
     var open by remember { mutableStateOf(false) }
     Box(modifier) {
         PlayerIconButton(
-            icon = R.drawable.ic_more_vert,
+            icon = icon,
             contentDescription = "More options",
             onClick = { open = true },
             buttonSize = buttonSize,
             iconSize = iconSize,
         )
-        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+        NovaDropdownMenu(expanded = open, onDismissRequest = { open = false }) {
             items.forEach { item ->
-                DropdownMenuItem(
+                NovaMenuItem(
                     text = { Text(item.label) },
                     leadingIcon = { Icon(painterResource(item.icon), contentDescription = null) },
                     onClick = {
@@ -241,19 +240,20 @@ internal fun PlayPauseButton(
             Modifier
                 .size(size)
                 .clip(CircleShape)
-                .background(Color.White.copy(alpha = 0.16f))
+                // A dark see-through disc behind the glyph, as Samsung's player draws it.
+                .background(Color.Black.copy(alpha = 0.3f))
                 .clickable(role = Role.Button, onClick = onClick),
             contentAlignment = Alignment.Center,
         ) {
             Icon(
                 painter = painterResource(if (isPlaying) R.drawable.ic_pause else R.drawable.ic_play_arrow),
                 contentDescription = if (isPlaying) "Pause" else "Play",
-                modifier = Modifier.size(size * 0.6f),
+                modifier = Modifier.size(size * 0.5f),
                 tint = Color.White,
             )
         }
         if (buffering) {
-            CircularProgressIndicator(modifier = Modifier.fillMaxSize(), color = Color.White, strokeWidth = 3.dp)
+            IosSpinner(modifier = Modifier.fillMaxSize(), color = Color.White, strokeWidth = 3.dp)
         }
     }
 }
@@ -344,4 +344,30 @@ internal fun <T : Any> rememberLatestNonNull(value: T?): T? {
 
 private class LatestHolder<T : Any> {
     var value: T? = null
+}
+
+/**
+ * The title beside the back arrow, as Samsung's player shows it, with its details small and grey
+ * beneath.
+ */
+@Composable
+internal fun PlayerTitle(state: PlayerUiState, modifier: Modifier = Modifier, large: Boolean = false) {
+    Column(modifier) {
+        Text(
+            text = state.title,
+            style = if (large) MaterialTheme.typography.titleLarge else MaterialTheme.typography.titleMedium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        val subtitle = state.subtitle
+        if (!subtitle.isNullOrBlank()) {
+            Text(
+                text = subtitle,
+                style = if (large) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.bodySmall,
+                color = Color.White.copy(alpha = 0.72f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
 }

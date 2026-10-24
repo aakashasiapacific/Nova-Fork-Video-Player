@@ -805,7 +805,7 @@ object FakeScreens {
     private fun videoDetailsUi(videoId: Long): VideoDetailsUi =
         requireNotNull(UiMappers.videoDetails(index, videoId)) { "No video $videoId in the fake library" }
 
-    private val TOP_LEVEL = setOf(Route.Home, Route.Library, Route.Browse, Route.Settings)
+    private val TOP_LEVEL = setOf(Route.Home, Route.Audio, Route.Settings, Route.Search)
 }
 
 /** Player states as PlayerController publishes them. */
