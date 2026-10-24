@@ -19,6 +19,7 @@ import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.unit.dp
+import com.aakash.novafork.data.AspectMode
 import com.aakash.novafork.ui.model.PlayerActions
 import com.aakash.novafork.ui.model.PlayerUiState
 import kotlin.math.abs
@@ -70,9 +71,50 @@ internal fun PlayerGestureLayer(
             }
             .pointerInput(locked) {
                 if (!locked) detectPlayerDrags(state = { currentState }, actions = { currentActions })
+            }
+            .pointerInput(locked) {
+                if (!locked) detectPinchZoom(actions = { currentActions })
             },
     )
 }
+
+/**
+ * Two fingers spread to fill the screen (cropping the edges) or pinch in to fit the whole picture,
+ * as Samsung's and Apple's players do; the player names the new fit.
+ */
+private suspend fun PointerInputScope.detectPinchZoom(actions: () -> PlayerActions) {
+    awaitEachGesture {
+        awaitFirstDown(requireUnconsumed = false)
+        var startSpan = 0f
+        var decided = false
+        do {
+            val event = awaitPointerEvent()
+            val pressed = event.changes.filter { it.pressed }
+            if (pressed.size >= 2) {
+                val span = (pressed[0].position - pressed[1].position).getDistance()
+                if (startSpan == 0f) {
+                    startSpan = span
+                } else if (!decided) {
+                    when {
+                        span / startSpan > PINCH_OUT -> {
+                            actions().setAspect(AspectMode.FIT_SCREEN)
+                            decided = true
+                        }
+                        span / startSpan < PINCH_IN -> {
+                            actions().setAspect(AspectMode.BEST_FIT)
+                            decided = true
+                        }
+                    }
+                }
+                // Two fingers are a pinch, never a scrub or a tap.
+                event.changes.forEach { it.consume() }
+            }
+        } while (event.changes.any { it.pressed })
+    }
+}
+
+private const val PINCH_OUT = 1.15f
+private const val PINCH_IN = 0.87f
 
 /** Reports whether any pointer is down anywhere below this node, without consuming anything. */
 internal fun Modifier.observeTouches(onTouchingChanged: (Boolean) -> Unit): Modifier = pointerInput(Unit) {

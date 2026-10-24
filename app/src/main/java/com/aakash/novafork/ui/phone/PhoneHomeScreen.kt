@@ -74,6 +74,7 @@ import com.aakash.novafork.ui.common.LocalBottomBarSpace
 import com.aakash.novafork.ui.common.LocalHeroPreviewEnabled
 import com.aakash.novafork.ui.common.LocalStatusBarIcons
 import com.aakash.novafork.ui.common.NovaIcon
+import com.aakash.novafork.ui.common.NovaMenuItem
 import com.aakash.novafork.ui.common.RatingPill
 import com.aakash.novafork.ui.common.ScanBanner
 import com.aakash.novafork.ui.common.SectionHeader
@@ -307,7 +308,23 @@ private fun LandscapeRow(cards: List<VideoCardUi>, actions: AppActions) {
         horizontalArrangement = Arrangement.spacedBy(dims.rowSpacing),
     ) {
         items(cards) { card ->
-            VideoMenuBox(videoId = card.id, title = card.displayTitle(), actions = actions) { openMenu ->
+            VideoMenuBox(
+                videoId = card.id,
+                title = card.displayTitle(),
+                actions = actions,
+                // Apple TV's "Remove from Up Next": it forgets where it was left, so it leaves the row.
+                extraItems = { close ->
+                    NovaMenuItem(
+                        text = { Text("Remove from Continue Watching") },
+                        destructive = true,
+                        leadingIcon = { NovaIcon(R.drawable.ic_close, contentDescription = null) },
+                        onClick = {
+                            close()
+                            actions.setWatched(card.id, false)
+                        },
+                    )
+                },
+            ) { openMenu ->
                 PhoneLandscapeCard(
                     card = card,
                     onClick = { actions.play(card.id) },

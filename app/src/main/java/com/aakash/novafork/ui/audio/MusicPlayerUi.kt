@@ -394,16 +394,28 @@ fun MiniPlayerBar(
     ) {
         val sheet = LocalNowPlayingSheet.current
         DisposableEffect(sheet) { onDispose { sheet?.miniCover = null } }
-        Cover(
-            now?.artUri,
-            size = 42,
-            corner = 8,
-            modifier = Modifier
+        Box(
+            Modifier
                 .offset { IntOffset((swipe * 0.5f).roundToInt(), 0) }
                 .onGloballyPositioned { if (sheet != null) sheet.miniCover = it.boundsInRoot() }
                 // The flying cover lands here; this one shows once Now Playing is closed.
                 .graphicsLayer { alpha = if (sheet != null && sheet.openFraction > 0f && sheet.bigCover != null) 0f else 1f },
-        )
+            contentAlignment = Alignment.Center,
+        ) {
+            Cover(now?.artUri, size = 42, corner = 8)
+            // Little bars over the cover: dancing while it plays, still when paused.
+            if (now != null) {
+                Box(
+                    Modifier
+                        .size(42.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(Color.Black.copy(alpha = 0.35f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    PlayingBars(playing = player.isPlaying, color = Color.White)
+                }
+            }
+        }
         Column(
             Modifier
                 .weight(1f)

@@ -35,6 +35,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -108,11 +109,19 @@ internal fun NovaTabCapsule(selected: TopDestination, onSelect: (TopDestination)
         val slot = maxWidth / tabs.size
         val widthPx = constraints.maxWidth.toFloat().coerceAtLeast(1f)
         val active = dragX?.let { x -> (x / widthPx * tabs.size).toInt().coerceIn(0, tabs.lastIndex) } ?: tabs.indexOf(selected)
-        val pillX by animateDpAsState(slot * active, animationSpec = spring(dampingRatio = 0.75f, stiffness = Spring.StiffnessMediumLow), label = "tabPill")
+        // iOS 26's liquid pill: the edge in front races to the new tab, the one behind follows a
+        // beat later, so the pill stretches as it travels and settles back into shape.
+        var lastActive by remember { mutableStateOf(active) }
+        val forward = active >= lastActive
+        SideEffect { lastActive = active }
+        val fast = spring<Dp>(dampingRatio = 0.72f, stiffness = Spring.StiffnessMedium)
+        val slow = spring<Dp>(dampingRatio = 0.8f, stiffness = Spring.StiffnessLow)
+        val left by animateDpAsState(slot * active, animationSpec = if (forward) slow else fast, label = "tabPillLeft")
+        val right by animateDpAsState(slot * (active + 1), animationSpec = if (forward) fast else slow, label = "tabPillRight")
         Box(
             Modifier
-                .offset(x = pillX)
-                .size(width = slot, height = maxHeight)
+                .offset(x = left)
+                .size(width = (right - left).coerceAtLeast(slot * 0.5f), height = maxHeight)
                 .clip(RoundedCornerShape(percent = 50))
                 .background(SelectedPillColor),
         )

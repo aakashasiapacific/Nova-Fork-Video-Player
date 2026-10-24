@@ -76,7 +76,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -532,7 +534,22 @@ private fun AlbumPage(album: Album, ctx: PageContext) {
     AudioPage(album.title) {
         row("back") { BackRow(ctx) { close -> QueueItems(album.songs, ctx, close) } }
         row("cover") {
-            Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+            // A soft glow of the cover's own colours spreads behind it (owner), as the Home hero's.
+            val glow = rememberCoverTint(album.artUri)
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .drawBehind {
+                        val center = Offset(size.width / 2f, size.width * 0.4f)
+                        val radius = size.width * 0.85f
+                        drawCircle(
+                            Brush.radialGradient(listOf(glow.copy(alpha = 0.55f * glow.alpha), Color.Transparent), center = center, radius = radius),
+                            radius = radius,
+                            center = center,
+                        )
+                    },
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
                 Box(
                     Modifier
                         .padding(top = 8.dp)

@@ -495,3 +495,15 @@ The owner asked for Apple Music to be copied more precisely, with less clutter. 
   - Real frosted glass: the tab bar, the round glass buttons and the mini player blur what scrolls under them (Haze 1.1.0, Android 12 and later; a dark tint as before on older phones) (`frostedGlass`).
   - Long-press on a poster as iOS: the whole screen blurs and dims while a sharp copy of the card floats over it, a little larger, with its menu below (`LocalMenuFocus`).
 - **Cover flight, second fix (build 107, owner's recording):** the real cover hid in the draw phase while the flying one moved in the next composition, so the cover blinked out as a drag began; and the hidden cover's shadow stayed as a dark box around the shrinking one. The flying cover is now laid out once at the big cover's size and only moved and scaled in the draw phase, in the same frame the real ones hide; the hidden cover drops its shadow; and the big cover is measured within Now Playing, so the sheet's slide never skews it.
+- **Polish set 3 (build 108, owner: all in one go):**
+  - Movie and show pages: the backdrop scrolls at half speed (parallax).
+  - Home's dots already fill with the auto-advance timer (Apple TV).
+  - The player grows out of the Play button that was tapped (a scale-up activity animation from the last touch).
+  - Two-finger pinch in the player: spread to fill the screen, pinch in to fit; the player names the fit.
+  - The tab bar's pill stretches as it slides (front edge fast, back edge following), as iOS 26's glass.
+  - An album page glows softly in its cover's colours behind the cover.
+  - The mini player's cover carries small bars, dancing while music plays, still when paused.
+  - Grid posters and search results fade up one after another the first time they show.
+  - A soft haptic knock as a poster's menu opens.
+  - Android 12+: a plain black launch screen that fades into Home.
+  - Continue Watching cards' menu: "Remove from Continue Watching" (forgets where it was left).

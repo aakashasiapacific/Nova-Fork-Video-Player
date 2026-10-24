@@ -93,6 +93,8 @@ internal fun BackdropPosterHeader(
     drift: Boolean = false,
     /** What the backdrop fades into at its foot: the page, or clear over a tinted hero. */
     fadeTo: Color? = null,
+    /** How far the page has scrolled past its top, in px: the backdrop moves at half that (parallax). */
+    scrolled: () -> Float = { 0f },
     info: @Composable ColumnScope.() -> Unit,
 ) {
     val dims = LocalNovaDimens.current
@@ -117,7 +119,9 @@ internal fun BackdropPosterHeader(
         Box(
             Modifier
                 .fillMaxWidth()
-                .height(backdropHeight),
+                .height(backdropHeight)
+                // iOS parallax: as the page scrolls up, the backdrop follows at half the speed.
+                .graphicsLayer { translationY = scrolled() * 0.5f },
         ) {
             BackdropArt(artwork = artwork, modifier = Modifier.fillMaxSize().then(if (drift) Modifier.slowZoom() else Modifier))
             StatusBarShade(statusBar)
@@ -263,8 +267,9 @@ internal fun PhoneDetailsHeader(
     modifier: Modifier = Modifier,
     originalTitle: String? = null,
     maxBackdropHeight: Dp = Dp.Infinity,
+    scrolled: () -> Float = { 0f },
 ) {
-    BackdropPosterHeader(artwork = artwork, title = title, modifier = modifier, maxBackdropHeight = maxBackdropHeight) {
+    BackdropPosterHeader(artwork = artwork, title = title, modifier = modifier, maxBackdropHeight = maxBackdropHeight, scrolled = scrolled) {
         // The title's TMDB logo, as on Home's hero (owner): the same artwork on both pages.
         HeroTitle(
             title = title,

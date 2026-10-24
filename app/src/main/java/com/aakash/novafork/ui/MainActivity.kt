@@ -1,5 +1,6 @@
 package com.aakash.novafork.ui
 
+import android.app.ActivityOptions
 import android.app.RecoverableSecurityException
 import android.content.ActivityNotFoundException
 import android.content.ContentResolver
@@ -14,6 +15,7 @@ import android.provider.DocumentsContract
 import android.provider.MediaStore
 import android.provider.Settings as AndroidSettings
 import android.util.Log
+import android.view.MotionEvent
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
@@ -98,7 +100,7 @@ class MainActivity : ComponentActivity() {
     private val actions: AppActions by lazy {
         object : AppActions by viewModel {
             override fun play(videoId: Long, startOver: Boolean) {
-                startActivity(PlayerIntents.forVideo(this@MainActivity, videoId, startOver))
+                startActivity(PlayerIntents.forVideo(this@MainActivity, videoId, startOver), growFromTouch())
             }
 
             override fun playUrl(url: String) {
@@ -108,11 +110,11 @@ class MainActivity : ComponentActivity() {
                     return
                 }
                 viewModel.dismissDialog()
-                startActivity(PlayerIntents.forUri(this@MainActivity, link))
+                startActivity(PlayerIntents.forUri(this@MainActivity, link), growFromTouch())
             }
 
             override fun playRemote(uri: String, title: String) {
-                startActivity(PlayerIntents.forUri(this@MainActivity, uri, title.ifBlank { null }))
+                startActivity(PlayerIntents.forUri(this@MainActivity, uri, title.ifBlank { null }), growFromTouch())
             }
 
             override fun openWebPage(url: String) {
@@ -208,6 +210,12 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        // Android 12+: the black launch screen fades into Home instead of cutting (iOS).
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            splashScreen.setOnExitAnimationListener { view ->
+                view.animate().alpha(0f).setDuration(SPLASH_FADE_MS).withEndAction { view.remove() }.start()
+            }
+        }
         setContent {
             val state by viewModel.state.collectAsStateWithLifecycle()
             // One dark theme: light (white) system bar icons on clear bars, except where a page
@@ -227,6 +235,7 @@ class MainActivity : ComponentActivity() {
                 viewModel.queueRequests.collect { queue ->
                     startActivity(
                         PlayerIntents.forQueue(this@MainActivity, queue.videoIds.toLongArray(), queue.startIndex, queue.shuffle),
+                        growFromTouch(),
                     )
                 }
             }
@@ -303,6 +312,30 @@ class MainActivity : ComponentActivity() {
                 }
             }.getOrNull().orEmpty()
         }
+    }
+
+    /** Where the last touch went down, for the player to grow out of. */
+    private var lastTouchX = 0f
+    private var lastTouchY = 0f
+
+    override fun dispatchTouchEvent(event: MotionEvent): Boolean {
+        if (event.actionMasked == MotionEvent.ACTION_DOWN) {
+            lastTouchX = event.rawX
+            lastTouchY = event.rawY
+        }
+        return super.dispatchTouchEvent(event)
+    }
+
+    /** The player grows out of the Play button that was tapped instead of sliding in (iOS). */
+    private fun growFromTouch(): Bundle {
+        val size = (120 * resources.displayMetrics.density).toInt()
+        return ActivityOptions.makeScaleUpAnimation(
+            window.decorView,
+            (lastTouchX - size / 2).toInt(),
+            (lastTouchY - size / 4).toInt(),
+            size,
+            size / 2,
+        ).toBundle()
     }
 
     override fun onResume() {
@@ -426,6 +459,9 @@ class MainActivity : ComponentActivity() {
         const val TAG = "MainActivity"
         const val UI_PREFS = "ui"
         const val KEY_ASKED_STORAGE = "asked_storage_permission"
+
+        /** How long the launch screen takes to fade into Home. */
+        const val SPLASH_FADE_MS = 260L
 
         /** The navigation bar scrim enableEdgeToEdge uses on Android 8.0, which has no dark nav icons. */
         val DARK_SCRIM = Color.argb(0x80, 0x1b, 0x1b, 0x1b)

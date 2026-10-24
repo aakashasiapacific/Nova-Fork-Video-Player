@@ -97,3 +97,19 @@ internal fun CoverGradient(artUri: String?, modifier: Modifier = Modifier) {
 
 /** The size the cover is read at: plenty for three averages. */
 private const val GRADIENT_PX = 24
+
+/** [artUri]'s middle colour (see [coverColors]), crossfading as it changes; clear until known. */
+@Composable
+internal fun rememberCoverTint(artUri: String?): Color {
+    val context = LocalContext.current
+    val tint by produceState(Color.Transparent, artUri) {
+        value = artUri?.let { uri ->
+            runCatching {
+                val request = ImageRequest.Builder(context).data(uri).size(GRADIENT_PX).allowHardware(false).build()
+                (context.imageLoader.execute(request).drawable as? BitmapDrawable)?.bitmap?.let { coverColors(it).middle }
+            }.getOrNull()
+        } ?: Color.Transparent
+    }
+    val shown by animateColorAsState(tint, tween(600), label = "coverTint")
+    return shown
+}

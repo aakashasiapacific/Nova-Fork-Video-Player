@@ -28,6 +28,7 @@ import androidx.compose.foundation.lazy.grid.LazyGridScope
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -74,6 +75,7 @@ import com.aakash.novafork.ui.common.VideoMenuBox
 import com.aakash.novafork.ui.common.WatchedBadge
 import com.aakash.novafork.ui.common.metaLine
 import com.aakash.novafork.ui.common.sourceTypeIcon
+import com.aakash.novafork.ui.common.staggeredAppear
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.Artwork
 import com.aakash.novafork.ui.model.EpisodeUi
@@ -515,6 +517,7 @@ internal fun PhoneLibraryGrid(
     footer: LazyGridScope.() -> Unit = {},
 ) {
     val dims = LocalNovaDimens.current
+    val seen = remember { mutableSetOf<Any>() }
     LazyVerticalGrid(
         columns = GridCells.Adaptive(dims.gridMinCell),
         modifier = modifier.fillMaxSize(),
@@ -523,17 +526,19 @@ internal fun PhoneLibraryGrid(
         horizontalArrangement = Arrangement.spacedBy(dims.rowSpacing),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        items(items, key = { it.key }) { item ->
+        itemsIndexed(items, key = { _, item -> item.key }) { index, item ->
+            val appear = Modifier.staggeredAppear(item.key, index, seen)
             when (item) {
                 is LibraryItemUi.Video -> VideoMenuBox(
                     videoId = item.card.id,
                     title = item.card.displayTitle(),
                     actions = actions,
                     showDetails = false,
+                    modifier = appear,
                 ) { openMenu ->
                     PhonePosterCard(item.card, onClick = { actions.openVideo(item.card.id) }, onLongClick = openMenu)
                 }
-                is LibraryItemUi.Show -> PhoneShowCard(item.card, onClick = { actions.openShow(item.card.key) })
+                is LibraryItemUi.Show -> PhoneShowCard(item.card, onClick = { actions.openShow(item.card.key) }, modifier = appear)
             }
         }
         footer()
@@ -549,6 +554,7 @@ internal fun PhoneTimelineGrid(
     state: LazyGridState = rememberLazyGridState(),
 ) {
     val dims = LocalNovaDimens.current
+    val seen = remember { mutableSetOf<Any>() }
     LazyVerticalGrid(
         columns = GridCells.Adaptive(dims.gridMinCell),
         modifier = modifier.fillMaxSize(),
@@ -566,8 +572,9 @@ internal fun PhoneTimelineGrid(
                     modifier = Modifier.padding(top = 12.dp),
                 )
             }
-            items(month.cards, key = { "v:" + it.id }) { card ->
-                VideoMenuBox(videoId = card.id, title = card.displayTitle(), actions = actions, showDetails = false) { openMenu ->
+            itemsIndexed(month.cards, key = { _, card -> "v:" + card.id }) { index, card ->
+                val appear = Modifier.staggeredAppear("v:" + card.id, index, seen)
+                VideoMenuBox(videoId = card.id, title = card.displayTitle(), actions = actions, showDetails = false, modifier = appear) { openMenu ->
                     PhonePosterCard(card, onClick = { actions.openVideo(card.id) }, onLongClick = openMenu)
                 }
             }

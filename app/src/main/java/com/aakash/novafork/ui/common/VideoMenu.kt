@@ -17,8 +17,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
@@ -50,6 +52,9 @@ fun VideoMenuBox(
     // In the phone shell the page behind blurs and dims (LocalMenuFocus) while a sharp copy of
     // the card floats over it, a little larger, with the menu under it: iOS's context menu.
     val focus = LocalMenuFocus.current
+    // The soft knock iOS gives as a context menu opens.
+    val haptics = LocalHapticFeedback.current
+    LaunchedEffect(open) { if (open) haptics.performHapticFeedback(HapticFeedbackType.LongPress) }
     var size by remember { mutableStateOf(IntSize.Zero) }
     DisposableEffect(open, focus) {
         if (open && focus != null) focus.value += 1
