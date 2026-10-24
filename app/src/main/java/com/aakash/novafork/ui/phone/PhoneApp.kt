@@ -91,6 +91,8 @@ import com.aakash.novafork.ui.adaptive.DeviceLayout
 import com.aakash.novafork.ui.audio.AudioScreen
 import com.aakash.novafork.ui.audio.MiniPlayerBar
 import com.aakash.novafork.ui.audio.MiniPlayerHeight
+import com.aakash.novafork.ui.audio.CoverFlight
+import com.aakash.novafork.ui.audio.LocalNowPlayingSheet
 import com.aakash.novafork.ui.audio.NowPlayingSheet
 import com.aakash.novafork.ui.audio.ShellNowPlaying
 import com.aakash.novafork.ui.audio.rememberMusicShell
@@ -169,120 +171,123 @@ fun PhoneApp(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
     // grows out of it and shrinks back into it (iOS 18's zoom transition).
     var tapOrigin by remember { mutableStateOf(TransformOrigin.Center) }
     val zoomOrigins = remember { mutableMapOf<Route, TransformOrigin>() }
-    Box(
-        modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .pointerInput(Unit) {
-                awaitEachGesture {
-                    val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
-                    if (size.width > 0 && size.height > 0) {
-                        tapOrigin = TransformOrigin(down.position.x / size.width, down.position.y / size.height)
-                    }
-                }
-            },
-    ) {
-        CompositionLocalProvider(LocalBottomBarSpace provides barSpace) {
-            // Keyed by route, so state updates within a page recompose it in place, while a route
-            // change crossfades and the outgoing page keeps showing the state it was built with.
-            AnimatedContent(
-                targetState = state,
-                modifier = Modifier
-                    .fillMaxSize()
-                    // Under Now Playing the page sinks back, smaller, rounded and dimmed, and
-                    // comes forward again as Now Playing is pulled down (iOS's sheet stack).
-                    .graphicsLayer {
-                        val open = nowPlayingSheet.openFraction
-                        val scale = 1f - 0.07f * open
-                        scaleX = scale
-                        scaleY = scale
-                        shape = RoundedCornerShape(16.dp.toPx() * open)
-                        clip = open > 0f
-                    }
-                    .drawWithContent {
-                        drawContent()
-                        val open = nowPlayingSheet.openFraction
-                        if (open > 0f) drawRect(Color.Black.copy(alpha = 0.4f * open))
-                    }
-                    .nestedScroll(barScroll)
-                    .swipeBetweenTabs(top, enabled = !state.canGoBack, onSelect = actions::selectTab, onBack = actions::back)
-                    .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)),
-                transitionSpec = {
-                    val fade = fadeIn(tween(durationMillis = 220, delayMillis = 40)) togetherWith fadeOut(tween(durationMillis = 140))
-                    val from = initialState.route
-                    val to = targetState.route
-                    when {
-                        from.top != to.top -> tabSlide(from = from.top, to = to.top, fade = fade)
-                        to.isTitlePage() && to != from -> {
-                            val origin = tapOrigin.also { zoomOrigins[to] = it }
-                            (scaleIn(spring(dampingRatio = 0.86f, stiffness = 380f), initialScale = 0.2f, transformOrigin = origin) + fadeIn(tween(160))) togetherWith
-                                (fadeOut(tween(220)) + scaleOut(tween(300), targetScale = 0.94f))
+    CompositionLocalProvider(LocalNowPlayingSheet provides nowPlayingSheet) {
+        Box(
+            modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
+                .pointerInput(Unit) {
+                    awaitEachGesture {
+                        val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                        if (size.width > 0 && size.height > 0) {
+                            tapOrigin = TransformOrigin(down.position.x / size.width, down.position.y / size.height)
                         }
-                        from.isTitlePage() && !to.isTitlePage() -> {
-                            val origin = zoomOrigins[from] ?: TransformOrigin.Center
-                            (fadeIn(tween(220)) + scaleIn(tween(300), initialScale = 0.94f)) togetherWith
-                                (scaleOut(tween(260), targetScale = 0.2f, transformOrigin = origin) + fadeOut(tween(220, delayMillis = 60)))
-                        }
-                        else -> fade
                     }
                 },
-                contentKey = { it.route },
-                label = "phoneRoute",
-            ) { pageState ->
-                pageStates.SaveableStateProvider(pageState.route.toString()) {
-                    PhonePage(state = pageState, actions = actions)
+        ) {
+            CompositionLocalProvider(LocalBottomBarSpace provides barSpace) {
+                // Keyed by route, so state updates within a page recompose it in place, while a route
+                // change crossfades and the outgoing page keeps showing the state it was built with.
+                AnimatedContent(
+                    targetState = state,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        // Under Now Playing the page sinks back, smaller, rounded and dimmed, and
+                        // comes forward again as Now Playing is pulled down (iOS's sheet stack).
+                        .graphicsLayer {
+                            val open = nowPlayingSheet.openFraction
+                            val scale = 1f - 0.07f * open
+                            scaleX = scale
+                            scaleY = scale
+                            shape = RoundedCornerShape(16.dp.toPx() * open)
+                            clip = open > 0f
+                        }
+                        .drawWithContent {
+                            drawContent()
+                            val open = nowPlayingSheet.openFraction
+                            if (open > 0f) drawRect(Color.Black.copy(alpha = 0.4f * open))
+                        }
+                        .nestedScroll(barScroll)
+                        .swipeBetweenTabs(top, enabled = !state.canGoBack, onSelect = actions::selectTab, onBack = actions::back)
+                        .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)),
+                    transitionSpec = {
+                        val fade = fadeIn(tween(durationMillis = 220, delayMillis = 40)) togetherWith fadeOut(tween(durationMillis = 140))
+                        val from = initialState.route
+                        val to = targetState.route
+                        when {
+                            from.top != to.top -> tabSlide(from = from.top, to = to.top, fade = fade)
+                            to.isTitlePage() && to != from -> {
+                                val origin = tapOrigin.also { zoomOrigins[to] = it }
+                                (scaleIn(spring(dampingRatio = 0.86f, stiffness = 380f), initialScale = 0.2f, transformOrigin = origin) + fadeIn(tween(160))) togetherWith
+                                    (fadeOut(tween(220)) + scaleOut(tween(300), targetScale = 0.94f))
+                            }
+                            from.isTitlePage() && !to.isTitlePage() -> {
+                                val origin = zoomOrigins[from] ?: TransformOrigin.Center
+                                (fadeIn(tween(220)) + scaleIn(tween(300), initialScale = 0.94f)) togetherWith
+                                    (scaleOut(tween(260), targetScale = 0.2f, transformOrigin = origin) + fadeOut(tween(220, delayMillis = 60)))
+                            }
+                            else -> fade
+                        }
+                    },
+                    contentKey = { it.route },
+                    label = "phoneRoute",
+                ) { pageState ->
+                    pageStates.SaveableStateProvider(pageState.route.toString()) {
+                        PhonePage(state = pageState, actions = actions)
+                    }
                 }
             }
-        }
-        PhoneNavigationBar(
-            selected = top,
-            collapsed = barCollapsed,
-            onSelect = actions::selectTab,
-            modifier = Modifier.align(Alignment.BottomCenter),
-            miniPlayer = if (music != null && miniInBar) {
-                { miniModifier ->
+            PhoneNavigationBar(
+                selected = top,
+                collapsed = barCollapsed,
+                onSelect = actions::selectTab,
+                modifier = Modifier.align(Alignment.BottomCenter),
+                miniPlayer = if (music != null && miniInBar) {
+                    { miniModifier ->
+                        MiniPlayerBar(
+                            player = music.second,
+                            actions = music.first,
+                            onOpen = { nowPlayingOpen = true },
+                            // It fades back in as Now Playing comes down into it.
+                            modifier = miniModifier.graphicsLayer { alpha = 1f - nowPlayingSheet.openFraction },
+                            compact = true,
+                        )
+                    }
+                } else {
+                    null
+                },
+            )
+            if (music != null) {
+                val (viewModel, musicState) = music
+                AnimatedVisibility(
+                    visible = miniAboveBar,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(
+                            start = BarSideMargin,
+                            end = BarSideMargin,
+                            bottom = navBar + BarBottomMargin + TabBarHeight + MiniPlayerGap,
+                        ),
+                    enter = fadeIn(tween(200)) + scaleIn(tween(240), initialScale = 0.9f),
+                    exit = fadeOut(tween(140)),
+                ) {
                     MiniPlayerBar(
-                        player = music.second,
-                        actions = music.first,
+                        player = musicState,
+                        actions = viewModel,
                         onOpen = { nowPlayingOpen = true },
-                        // It fades back in as Now Playing comes down into it.
-                        modifier = miniModifier.graphicsLayer { alpha = 1f - nowPlayingSheet.openFraction },
-                        compact = true,
+                        modifier = Modifier.graphicsLayer { alpha = 1f - nowPlayingSheet.openFraction },
                     )
                 }
-            } else {
-                null
-            },
-        )
-        if (music != null) {
-            val (viewModel, musicState) = music
-            AnimatedVisibility(
-                visible = miniAboveBar,
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(
-                        start = BarSideMargin,
-                        end = BarSideMargin,
-                        bottom = navBar + BarBottomMargin + TabBarHeight + MiniPlayerGap,
-                    ),
-                enter = fadeIn(tween(200)) + scaleIn(tween(240), initialScale = 0.9f),
-                exit = fadeOut(tween(140)),
-            ) {
-                MiniPlayerBar(
+                ShellNowPlaying(
+                    viewModel = viewModel,
                     player = musicState,
-                    actions = viewModel,
-                    onOpen = { nowPlayingOpen = true },
-                    modifier = Modifier.graphicsLayer { alpha = 1f - nowPlayingSheet.openFraction },
+                    open = nowPlayingOpen,
+                    onDismiss = { nowPlayingOpen = false },
+                    onShowAudio = { actions.selectTab(TopDestination.AUDIO) },
+                    sheet = nowPlayingSheet,
                 )
+                CoverFlight(musicState.nowPlaying?.artUri)
             }
-            ShellNowPlaying(
-                viewModel = viewModel,
-                player = musicState,
-                open = nowPlayingOpen,
-                onDismiss = { nowPlayingOpen = false },
-                onShowAudio = { actions.selectTab(TopDestination.AUDIO) },
-                sheet = nowPlayingSheet,
-            )
         }
     }
 }
