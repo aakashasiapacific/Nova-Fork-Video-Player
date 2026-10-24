@@ -17,6 +17,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
@@ -170,6 +171,22 @@ internal fun PlaylistNameDialog(
         },
         confirmButton = {
             TextButton(onClick = { onConfirm(name) }, enabled = canSave) { Text(confirmLabel) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        },
+    )
+}
+
+@Composable
+internal fun ConfirmDeleteVideoDialog(title: String, onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    NovaAlertDialog(
+        onDismissRequest = onDismiss,
+        icon = { NovaIcon(R.drawable.ic_delete, contentDescription = null) },
+        title = { Text("Delete $title?") },
+        text = { Text("The video file is deleted from this phone. This can't be undone.") },
+        confirmButton = {
+            TextButton(onClick = onConfirm, colors = ButtonDefaults.textButtonColors(contentColor = IosColors.Red)) { Text("Delete") }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text("Cancel") }

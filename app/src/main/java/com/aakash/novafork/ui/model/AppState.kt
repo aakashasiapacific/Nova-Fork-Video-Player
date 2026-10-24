@@ -200,6 +200,9 @@ sealed interface DialogUi {
 
     data class ConfirmDeletePlaylist(val playlistId: Long, val name: String) : DialogUi
 
+    /** Deleting a video's file from a picked folder (device videos get Android's own prompt). */
+    data class ConfirmDeleteVideo(val videoId: Long, val title: String) : DialogUi
+
     /**
      * Settings › About › Library diagnostics: a plain-text report to copy or share; [report] is
      * null while it is being put together.
@@ -397,6 +400,14 @@ interface AppActions {
     fun renamePlaylist(playlistId: Long, name: String) {}
 
     fun deletePlaylist(playlistId: Long) {}
+
+    /**
+     * Deletes a video's file from the phone: Android's own prompt for device storage, ours
+     * ([DialogUi.ConfirmDeleteVideo]) for a picked folder, then [confirmDeleteVideo].
+     */
+    fun deleteVideo(videoId: Long) {}
+
+    fun confirmDeleteVideo(videoId: Long) {}
 
     fun removeFromPlaylist(playlistId: Long, videoId: Long) {}
 

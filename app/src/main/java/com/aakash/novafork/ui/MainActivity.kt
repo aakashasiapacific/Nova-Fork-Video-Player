@@ -1,18 +1,22 @@
 package com.aakash.novafork.ui
 
+import android.app.RecoverableSecurityException
 import android.content.ActivityNotFoundException
+import android.content.IntentSender
 import android.content.Intent
 import android.graphics.Color
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.DocumentsContract
+import android.provider.MediaStore
 import android.provider.Settings as AndroidSettings
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.runtime.CompositionLocalProvider
@@ -30,6 +34,7 @@ import com.aakash.novafork.ui.audio.LocalMusicEnabled
 import com.aakash.novafork.ui.common.LocalHeroPreviewEnabled
 import com.aakash.novafork.ui.common.LocalStatusBarIcons
 import com.aakash.novafork.ui.model.AppActions
+import com.aakash.novafork.ui.model.DialogUi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -64,6 +69,21 @@ class MainActivity : ComponentActivity() {
 
     private val backupOpener = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) viewModel.readBackup(uri)
+    }
+
+    /** The video whose deletion waits on Android's prompt. */
+    private var pendingDelete: Pair<Long, MainViewModel.DeleteTarget>? = null
+
+    private val deletePrompt = registerForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
+        val (videoId, target) = pendingDelete ?: return@registerForActivityResult
+        pendingDelete = null
+        if (result.resultCode != RESULT_OK) return@registerForActivityResult
+        // Android 11 and later delete on "Allow"; Android 10 only granted the right, so try again.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            viewModel.onVideoDeleted(videoId, target.title)
+        } else {
+            deleteFile(videoId, target)
+        }
     }
 
     private val actions: AppActions by lazy {
@@ -128,6 +148,27 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
+            override fun deleteVideo(videoId: Long) {
+                lifecycleScope.launch {
+                    val target = viewModel.deleteTarget(videoId) ?: return@launch
+                    if (target.mediaStore && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                        // Android's own "Allow Nova Fork to delete this video?" is the one prompt.
+                        val request = MediaStore.createDeleteRequest(contentResolver, listOf(Uri.parse(target.uri)))
+                        askToDelete(videoId, target, request.intentSender)
+                    } else {
+                        viewModel.showDialog(DialogUi.ConfirmDeleteVideo(videoId, target.title))
+                    }
+                }
+            }
+
+            override fun confirmDeleteVideo(videoId: Long) {
+                viewModel.dismissDialog()
+                lifecycleScope.launch {
+                    val target = viewModel.deleteTarget(videoId) ?: return@launch
+                    deleteFile(videoId, target)
+                }
+            }
+
             override fun importBackup() {
                 try {
                     backupOpener.launch(BackupManager.OPEN_MIME_TYPES)
@@ -167,6 +208,38 @@ class MainActivity : ComponentActivity() {
         val askedOnce = uiPrefs.getBoolean(KEY_ASKED_STORAGE, false)
         if (savedInstanceState == null && !askedOnce && !StoragePermissions.hasAnyVideoAccess(this)) {
             requestStoragePermission()
+        }
+    }
+
+    private fun askToDelete(videoId: Long, target: MainViewModel.DeleteTarget, sender: IntentSender) {
+        pendingDelete = videoId to target
+        try {
+            deletePrompt.launch(IntentSenderRequest.Builder(sender).build())
+        } catch (e: ActivityNotFoundException) {
+            pendingDelete = null
+            viewModel.showMessage("Couldn't delete this video")
+        }
+    }
+
+    /** Deletes the file itself: a picked folder's document, or (Android 10 and older) a MediaStore row. */
+    private fun deleteFile(videoId: Long, target: MainViewModel.DeleteTarget) {
+        lifecycleScope.launch {
+            val uri = Uri.parse(target.uri)
+            val result = withContext(Dispatchers.IO) {
+                runCatching {
+                    if (target.mediaStore) contentResolver.delete(uri, null, null) > 0 else DocumentsContract.deleteDocument(contentResolver, uri)
+                }
+            }
+            val error = result.exceptionOrNull()
+            when {
+                result.getOrDefault(false) -> viewModel.onVideoDeleted(videoId, target.title)
+                // Android 10: a video another app made needs the user's yes first.
+                Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && error is RecoverableSecurityException ->
+                    askToDelete(videoId, target, error.userAction.actionIntent.intentSender)
+                else -> viewModel.showMessage(
+                    if (target.mediaStore) "Couldn't delete this video" else "Couldn't delete this video. Add its folder again to allow changes.",
+                )
+            }
         }
     }
 
@@ -246,7 +319,15 @@ class MainActivity : ComponentActivity() {
         lifecycleScope.launch {
             val name = withContext(Dispatchers.IO) {
                 try {
-                    contentResolver.takePersistableUriPermission(treeUri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    // Write too, when the picker gave it, so a video can be deleted from the app.
+                    try {
+                        contentResolver.takePersistableUriPermission(
+                            treeUri,
+                            Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+                        )
+                    } catch (e: SecurityException) {
+                        contentResolver.takePersistableUriPermission(treeUri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }
                 } catch (e: SecurityException) {
                     Log.w(TAG, "No persistable permission for $treeUri", e)
                     return@withContext null

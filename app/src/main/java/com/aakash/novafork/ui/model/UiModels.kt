@@ -215,6 +215,8 @@ data class VideoDetailsUi(
     val sourceLabel: String = "",
     /** True when the info came from TMDB. */
     val isMatched: Boolean = false,
+    /** A file on this phone (device storage or a picked folder) that Delete can remove. */
+    val deletable: Boolean = false,
 )
 
 @Immutable

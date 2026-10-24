@@ -1,5 +1,7 @@
 package com.aakash.novafork.ui.phone
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -23,6 +25,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
@@ -38,6 +43,7 @@ import com.aakash.novafork.ui.common.metaLine
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.MediaKind
 import com.aakash.novafork.ui.model.VideoDetailsUi
+import com.aakash.novafork.ui.theme.NovaColors
 import kotlin.math.roundToInt
 
 @Composable
@@ -165,17 +171,44 @@ fun PhoneVideoDetailsScreen(
 
 @Composable
 private fun PlaySection(details: VideoDetailsUi, actions: AppActions, modifier: Modifier = Modifier) {
+    val inProgress = (details.progress ?: 0f) > 0f
     Column(modifier.fillMaxWidth()) {
-        Button(
-            onClick = { actions.play(details.id) },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(52.dp),
-            contentPadding = ButtonDefaults.ButtonWithIconContentPadding,
-        ) {
-            NovaIcon(R.drawable.ic_play_arrow, contentDescription = null, modifier = Modifier.size(24.dp))
-            Spacer(Modifier.width(ButtonDefaults.IconSpacing))
-            Text(details.playLabel, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        // A blue Play as wide as the poster above it, and Delete in the rest of the row (owner).
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Button(
+                onClick = { actions.play(details.id) },
+                modifier = Modifier
+                    .then(if (details.deletable) Modifier.width(LocalNovaDimens.current.detailPosterWidth) else Modifier.weight(1f))
+                    .height(52.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = NovaColors.IosBlue, contentColor = Color.White),
+                contentPadding = ButtonDefaults.ButtonWithIconContentPadding,
+            ) {
+                NovaIcon(R.drawable.ic_play_arrow, contentDescription = null, modifier = Modifier.size(24.dp))
+                Spacer(Modifier.width(ButtonDefaults.IconSpacing))
+                Text(
+                    // "Resume from 1:05:12" does not fit beside Delete; the time left shows below.
+                    if (details.deletable) (if (inProgress) "Resume" else "Play") else details.playLabel,
+                    style = MaterialTheme.typography.titleSmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            if (details.deletable) {
+                Row(
+                    Modifier
+                        .weight(1f)
+                        .height(52.dp)
+                        .clip(RoundedCornerShape(percent = 50))
+                        .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                        .clickable(onClickLabel = "Delete ${details.title}", role = Role.Button) { actions.deleteVideo(details.id) },
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    NovaIcon(R.drawable.ic_delete, contentDescription = null, tint = IosColors.Red, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Delete", style = MaterialTheme.typography.titleSmall, color = IosColors.Red)
+                }
+            }
         }
         val progress = details.progress
         if (progress != null && progress > 0f) {

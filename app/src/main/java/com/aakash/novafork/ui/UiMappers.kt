@@ -350,6 +350,8 @@ object UiMappers {
             resolutionLabel = resolutionLabel(video.width, video.height),
             sourceLabel = item.source?.let(::sourceLabel).orEmpty(),
             isMatched = meta != null,
+            deletable = (item.source?.type == SourceType.DEVICE || item.source?.type == SourceType.FOLDER) &&
+                video.uri.startsWith("content://"),
         )
     }
 

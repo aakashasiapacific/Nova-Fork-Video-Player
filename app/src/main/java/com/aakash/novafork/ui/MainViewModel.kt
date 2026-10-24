@@ -566,6 +566,33 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
         local.update { it.copy(message = text) }
     }
 
+    // Deleting a video (MainActivity does the deleting, as Android's prompt needs the activity)
+
+    /** What deleting a video needs: its file, whether MediaStore holds it, and a name to show. */
+    class DeleteTarget(val uri: String, val mediaStore: Boolean, val title: String)
+
+    suspend fun deleteTarget(videoId: Long): DeleteTarget? {
+        val row = library.video(videoId) ?: return null
+        val uri = row.video.uri.takeIf { it.startsWith("content://") } ?: return null
+        val title = row.meta?.title?.takeIf { it.isNotBlank() } ?: row.video.parsedTitle
+        return DeleteTarget(uri, mediaStore = uri.startsWith("content://media/"), title = title)
+    }
+
+    /** The file is gone: the video leaves the library and its page closes. */
+    fun onVideoDeleted(videoId: Long, title: String) {
+        launchSafely("Couldn't update the library") {
+            library.forgetDeletedVideo(videoId)
+            local.update { state ->
+                val stack = state.backStack.filterNot { it is Route.VideoDetails && it.videoId == videoId }
+                state.copy(
+                    backStack = stack.ifEmpty { listOf(Route.Home) },
+                    dialog = state.dialog.takeUnless { it is DialogUi.ConfirmDeleteVideo },
+                    message = "Deleted $title",
+                )
+            }
+        }
+    }
+
     override fun consumeMessage() {
         local.update { it.copy(message = null) }
     }
