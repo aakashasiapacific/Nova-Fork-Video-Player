@@ -464,3 +464,7 @@ The owner asked for Apple Music to be copied more precisely, with less clutter. 
   - Playlists in the list show the same 2×2 grid of album covers as their own page.
   - The library's All / Movies / TV Shows pills are an iOS segmented control.
   - The video player's title sits at the bottom left above the scrubber, as on iOS.
+- **Build 95 (owner):**
+  - Now Playing loses the volume slider and the output button again: the system's control centre does both; the app stays clean.
+  - The video player follows Samsung's own player: back and the title at the top with only subtitles and "⋮" (audio track and Play on TV moved into it; cast shows only while casting); plain play/pause and 10-second steps with no circles; a thin seek bar with a small round knob showing the full length; lock and rotate bottom left, speed and picture-in-picture bottom right.
+  - Videos open in their own shape: the player reads the file's size and rotation before playing, so a reel filmed upright opens in portrait straight away (rotate is still at hand).

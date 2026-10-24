@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.pm.ActivityInfo
 import android.content.res.Configuration
 import android.media.AudioManager
+import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.os.Build
 import android.os.Handler
@@ -212,6 +213,9 @@ class PlayerController(
     private var resumeBannerPending = false
     private var userRotated = false
 
+    /** The current video's shape read from its file before playback, for turning the screen early. */
+    private var fileShape: VideoSize? = null
+
     /** False from open() until the new media is set: the player still holds the previous one. */
     private var mediaReady = false
 
@@ -402,7 +406,7 @@ class PlayerController(
                 brightness = brightness,
             )
         }
-        _videoSize.value?.let { applyOrientation(it) }
+        (_videoSize.value ?: fileShape)?.let { applyOrientation(it) }
     }
 
     fun detachHost(host: Host) {
@@ -716,6 +720,11 @@ class PlayerController(
 
         startSubtitleSearch(current, settings)
 
+        // Turn the screen to the video's shape from the file itself, before the first frame: a
+        // phone's reel opens in portrait straight away instead of landscape (owner).
+        fileShape = if (kind == UriKind.CONTENT || kind == UriKind.FILE) readFileShape(uri) else null
+        fileShape?.let { applyOrientation(it) }
+
         val decoding = MediaSource.decodingFor(uri, settings.hardwareDecoding)
         this.decoding = decoding
         PlayerDiagnostics.record("open: ${describeSource(kind, fileName)}, ${decodingLabel(decoding)}")
@@ -746,6 +755,32 @@ class PlayerController(
         } catch (e: Exception) {
             Log.w(TAG, "Library lookup failed", e)
             null
+        }
+    }
+
+    /**
+     * The picture's shape as it is shown: the stored width and height, swapped when the file
+     * says to turn it a quarter (how phones store videos filmed upright). Null when unknown.
+     */
+    private suspend fun readFileShape(uri: String): VideoSize? = withContext(Dispatchers.IO) {
+        val retriever = MediaMetadataRetriever()
+        try {
+            val parsed = Uri.parse(uri)
+            if (parsed.scheme == "file") retriever.setDataSource(parsed.path) else retriever.setDataSource(appContext, parsed)
+            val width = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)?.toIntOrNull() ?: 0
+            val height = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)?.toIntOrNull() ?: 0
+            val rotation = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION)?.toIntOrNull() ?: 0
+            when {
+                width <= 0 || height <= 0 -> null
+                rotation % 180 != 0 -> VideoSize(height, width)
+                else -> VideoSize(width, height)
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            null
+        } finally {
+            runCatching { retriever.release() }
         }
     }
 
@@ -1548,6 +1583,9 @@ class PlayerController(
             MediaPlayer.Event.ESAdded -> {
                 if (event.esChangedType == IMedia.Track.Type.Video) videoTrackSeen = true
                 onTracksChanged(added = true)
+                // The picture's size can be known here already; the video output event may come
+                // before libVLC reports the track.
+                if (event.esChangedType == IMedia.Track.Type.Video) onVideoOutput()
             }
             MediaPlayer.Event.ESDeleted, MediaPlayer.Event.ESSelected -> {
                 onTracksChanged(added = false)

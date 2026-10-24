@@ -55,7 +55,7 @@ internal fun TabletPlayerControls(
     modifier: Modifier = Modifier,
 ) {
     Box(modifier.fillMaxSize()) {
-        ControlScrims(top = 160.dp, bottom = 280.dp)
+        ControlScrims(top = 160.dp, bottom = 230.dp)
         Box(
             Modifier
                 .fillMaxSize()
@@ -108,8 +108,9 @@ private fun TabletTopBar(
             buttonSize = 56.dp,
             iconSize = 28.dp,
         )
-        // The title sits above the scrubber, as on iOS.
-        Spacer(Modifier.weight(1f))
+        Spacer(Modifier.width(12.dp))
+        PlayerTitle(state, Modifier.weight(1f), large = true)
+        Spacer(Modifier.width(12.dp))
         CastButton(
             castingTo = state.castingTo,
             onClick = { onOpenSheet(PlayerSheet.CAST) },
@@ -177,7 +178,7 @@ private fun TabletTransportRow(state: PlayerUiState, actions: PlayerActions, mod
             isPlaying = state.isPlaying,
             buffering = state.isBuffering,
             onClick = actions::togglePlay,
-            size = 80.dp,
+            size = 72.dp,
         )
         SeekStepButton(
             forward = true,
@@ -218,7 +219,6 @@ private fun TabletBottomBar(
             .fillMaxWidth()
             .padding(start = 20.dp, end = 20.dp, bottom = 12.dp),
     ) {
-        PlayerTitle(state, Modifier.padding(start = 4.dp, end = 4.dp, bottom = 8.dp), large = true)
         PlayerSeekBar(
             state = state,
             actions = actions,

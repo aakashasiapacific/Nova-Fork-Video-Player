@@ -243,14 +243,14 @@ internal fun PlayPauseButton(
             Modifier
                 .size(size)
                 .clip(CircleShape)
-                .background(Color.White.copy(alpha = 0.16f))
+                // A plain glyph, no disc behind it, as Samsung's player draws it.
                 .clickable(role = Role.Button, onClick = onClick),
             contentAlignment = Alignment.Center,
         ) {
             Icon(
                 painter = painterResource(if (isPlaying) R.drawable.ic_pause else R.drawable.ic_play_arrow),
                 contentDescription = if (isPlaying) "Pause" else "Play",
-                modifier = Modifier.size(size * 0.6f),
+                modifier = Modifier.size(size * 0.7f),
                 tint = Color.White,
             )
         }
@@ -349,8 +349,8 @@ private class LatestHolder<T : Any> {
 }
 
 /**
- * The title as the iOS player shows it: bottom left, just above the scrubber, in bold with its
- * details small and grey beneath.
+ * The title beside the back arrow, as Samsung's player shows it, with its details small and grey
+ * beneath.
  */
 @Composable
 internal fun PlayerTitle(state: PlayerUiState, modifier: Modifier = Modifier, large: Boolean = false) {

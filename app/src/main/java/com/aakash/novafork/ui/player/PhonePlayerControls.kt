@@ -29,12 +29,13 @@ import com.aakash.novafork.R
 import com.aakash.novafork.ui.model.PlayerActions
 import com.aakash.novafork.ui.model.PlayerUiState
 
-private val CenterButtonSize = 52.dp
-private val CenterIconSize = 32.dp
+private val CenterButtonSize = 48.dp
+private val CenterIconSize = 28.dp
 
 /**
- * Phone controls: compact top bar (back, cast, subtitles, audio, more), centre transport row,
- * then at the bottom the title, seek bar and an icon row, as iOS lays its player out. Track pickers open in [TrackSheet] via
+ * Phone controls after Samsung's own video player (owner): small and few. Back and the title at
+ * the top with subtitles and "⋮"; plain play/pause and the 10-second steps in the middle, with no
+ * circles; the seek bar and a short icon row (lock, rotate | speed, picture-in-picture) below. Track pickers open in [TrackSheet] via
  * [onOpenPanel]; the queue and cast devices in a sheet via [onOpenSheet].
  */
 @Composable
@@ -49,7 +50,7 @@ internal fun PhonePlayerControls(
     modifier: Modifier = Modifier,
 ) {
     Box(modifier.fillMaxSize()) {
-        ControlScrims(top = 112.dp, bottom = 210.dp)
+        ControlScrims(top = 104.dp, bottom = 150.dp)
         Box(
             Modifier
                 .fillMaxSize()
@@ -94,21 +95,19 @@ private fun PhoneTopBar(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         PlayerIconButton(icon = R.drawable.ic_arrow_back, contentDescription = "Back", onClick = actions::close)
-        // The title sits above the scrubber, as on iOS.
-        Spacer(Modifier.weight(1f))
-        CastButton(castingTo = state.castingTo, onClick = { onOpenSheet(PlayerSheet.CAST) })
+        PlayerTitle(state, Modifier.weight(1f).padding(horizontal = 4.dp))
+        // Cast shows here only while casting, so where the picture went is never hidden.
+        if (state.castingTo != null) CastButton(castingTo = state.castingTo, onClick = { onOpenSheet(PlayerSheet.CAST) })
         PlayerIconButton(
             icon = if (subtitlesOn(state.subtitleTracks)) R.drawable.ic_subtitles else R.drawable.ic_subtitles_off,
             contentDescription = "Subtitles",
             onClick = { onOpenPanel(PlayerPanel.SUBTITLES) },
-        )
-        PlayerIconButton(
-            icon = R.drawable.ic_audiotrack,
-            contentDescription = "Audio track",
-            onClick = { onOpenPanel(PlayerPanel.AUDIO) },
+            iconSize = 22.dp,
         )
         PlayerMoreMenu(
             items = buildList {
+                add(PlayerMenuItem(R.drawable.ic_audiotrack, "Audio Track") { onOpenPanel(PlayerPanel.AUDIO) })
+                if (state.castingTo == null) add(PlayerMenuItem(R.drawable.ic_cast, "Play on TV") { onOpenSheet(PlayerSheet.CAST) })
                 add(PlayerMenuItem(R.drawable.ic_speed, "Speed and aspect ratio") { onOpenPanel(PlayerPanel.SPEED) })
                 if (state.queue.size > 1) {
                     add(PlayerMenuItem(R.drawable.ic_playlist_play, "Queue") { onOpenSheet(PlayerSheet.QUEUE) })
@@ -121,7 +120,6 @@ private fun PhoneTopBar(
                 if (state.canShuffle) {
                     add(PlayerMenuItem(R.drawable.ic_shuffle, if (state.shuffle) "Shuffle On" else "Shuffle Off", actions::toggleShuffle))
                 }
-                add(PlayerMenuItem(R.drawable.ic_screen_rotation, "Rotate", actions::rotate))
             },
         )
     }
@@ -134,7 +132,7 @@ private fun PhoneTransportRow(state: PlayerUiState, actions: PlayerActions, modi
     Row(
         modifier = modifier,
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        horizontalArrangement = Arrangement.spacedBy(28.dp),
     ) {
         if (showSkips) {
             if (state.hasPrevious) {
@@ -161,7 +159,7 @@ private fun PhoneTransportRow(state: PlayerUiState, actions: PlayerActions, modi
             isPlaying = state.isPlaying,
             buffering = state.isBuffering,
             onClick = actions::togglePlay,
-            size = 64.dp,
+            size = 56.dp,
         )
         SeekStepButton(
             forward = true,
@@ -201,7 +199,6 @@ private fun PhoneBottomBar(
             .fillMaxWidth()
             .padding(start = 4.dp, end = 4.dp, bottom = 4.dp),
     ) {
-        PlayerTitle(state, Modifier.padding(start = 12.dp, end = 12.dp, bottom = 6.dp))
         PlayerSeekBar(
             state = state,
             actions = actions,
@@ -212,7 +209,11 @@ private fun PhoneBottomBar(
                 .padding(horizontal = 8.dp),
         )
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            PlayerIconButton(icon = R.drawable.ic_lock, contentDescription = "Lock screen", onClick = actions::toggleLock)
+            PlayerIconButton(icon = R.drawable.ic_lock, contentDescription = "Lock screen", onClick = actions::toggleLock, iconSize = 22.dp)
+            // Samsung keeps rotate by the lock, at hand while holding the phone sideways.
+            if (state.canRotate) {
+                PlayerIconButton(icon = R.drawable.ic_screen_rotation, contentDescription = "Rotate", onClick = actions::rotate, iconSize = 22.dp)
+            }
             Spacer(Modifier.weight(1f))
             SpeedButton(rate = state.rate, onClick = { onOpenPanel(PlayerPanel.SPEED) })
             if (state.canEnterPictureInPicture) {

@@ -151,14 +151,15 @@ private fun SeekSlider(
     val dragged by interactionSource.collectIsDraggedAsState()
     val pressed by interactionSource.collectIsPressedAsState()
     val active = dragged || pressed
-    // iOS's video scrubber: no knob, a thin white bar on a translucent track that swells while
-    // it is held, so the finger never hides where it is.
-    val trackHeight by animateDpAsState(
+    // Samsung's seek bar (owner): a thin white line on a translucent track with a small round
+    // knob that grows a little while held.
+    val trackHeight = if (large) 4.dp else 3.dp
+    val knob by animateDpAsState(
         targetValue = when {
-            active -> if (large) 14.dp else 12.dp
-            else -> if (large) 7.dp else 6.dp
+            active -> if (large) 20.dp else 18.dp
+            else -> if (large) 16.dp else 14.dp
         },
-        label = "seekTrack",
+        label = "seekKnob",
     )
 
     Slider(
@@ -168,8 +169,11 @@ private fun SeekSlider(
         enabled = enabled,
         onValueChangeFinished = onValueChangeFinished,
         interactionSource = interactionSource,
-        // An empty, zero-width thumb: the bar alone shows the position, as on iOS.
-        thumb = { Box(Modifier.size(width = 0.dp, height = 24.dp)) },
+        thumb = {
+            Box(Modifier.size(24.dp), contentAlignment = Alignment.Center) {
+                if (enabled) Box(Modifier.size(knob).clip(CircleShape).background(Color.White))
+            }
+        },
         track = { sliderState ->
             val range = sliderState.valueRange
             val span = range.endInclusive - range.start
