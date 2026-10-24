@@ -145,11 +145,12 @@ internal fun PlayerMoreMenu(
     modifier: Modifier = Modifier,
     buttonSize: Dp = 48.dp,
     iconSize: Dp = 24.dp,
+    @DrawableRes icon: Int = R.drawable.ic_more_vert,
 ) {
     var open by remember { mutableStateOf(false) }
     Box(modifier) {
         PlayerIconButton(
-            icon = R.drawable.ic_more_vert,
+            icon = icon,
             contentDescription = "More options",
             onClick = { open = true },
             buttonSize = buttonSize,
@@ -243,14 +244,15 @@ internal fun PlayPauseButton(
             Modifier
                 .size(size)
                 .clip(CircleShape)
-                // A plain glyph, no disc behind it, as Samsung's player draws it.
+                // A dark see-through disc behind the glyph, as Samsung's player draws it.
+                .background(Color.Black.copy(alpha = 0.3f))
                 .clickable(role = Role.Button, onClick = onClick),
             contentAlignment = Alignment.Center,
         ) {
             Icon(
                 painter = painterResource(if (isPlaying) R.drawable.ic_pause else R.drawable.ic_play_arrow),
                 contentDescription = if (isPlaying) "Pause" else "Play",
-                modifier = Modifier.size(size * 0.7f),
+                modifier = Modifier.size(size * 0.5f),
                 tint = Color.White,
             )
         }
