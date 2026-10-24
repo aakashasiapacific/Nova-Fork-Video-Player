@@ -1,6 +1,7 @@
 package com.aakash.novafork.ui.phone
 
 import androidx.annotation.DrawableRes
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -57,6 +58,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -299,7 +301,15 @@ internal fun PhoneDetailsHeader(
     maxBackdropHeight: Dp = Dp.Infinity,
     scrolled: () -> Float = { 0f },
 ) {
-    BackdropPosterHeader(artwork = artwork, title = title, modifier = modifier, maxBackdropHeight = maxBackdropHeight, scrolled = scrolled) {
+    // The backdrop melts into the page's tint (see rememberDetailsTint) rather than ending in black.
+    BackdropPosterHeader(
+        artwork = artwork,
+        title = title,
+        modifier = modifier,
+        maxBackdropHeight = maxBackdropHeight,
+        fadeTo = Color.Transparent,
+        scrolled = scrolled,
+    ) {
         // The title's TMDB logo, as on Home's hero (owner): the same artwork on both pages.
         HeroTitle(
             title = title,
@@ -343,6 +353,42 @@ internal fun PhoneDetailsHeader(
         }
     }
 }
+
+/**
+ * A details page's tint, as Home's hero has (owner: the page was blank black under the backdrop):
+ * the colour of the foot of the backdrop, taken much deeper so it reads as the picture's own dark
+ * on an AMOLED screen, never grey. Clear until known.
+ */
+@Composable
+internal fun rememberDetailsTint(artwork: Artwork): Color {
+    val base = rememberArtTint(artwork.backdropUrl ?: artwork.stillUrl ?: artwork.posterUrl)
+    val deep = remember(base) {
+        if (base.alpha == 0f) {
+            base
+        } else {
+            val hsv = FloatArray(3)
+            android.graphics.Color.colorToHSV(base.toArgb(), hsv)
+            hsv[2] *= DetailsTintDepth
+            Color(android.graphics.Color.HSVToColor(hsv))
+        }
+    }
+    val shown by animateColorAsState(deep, tween(600), label = "detailsTint")
+    return shown
+}
+
+/**
+ * One stretch of a details page's tint, from [from] of its strength at the top to [to] at the
+ * foot; the header, Play and summary each carry one, so it runs on down to plain black.
+ */
+internal fun Modifier.tintBand(tint: Color, from: Float, to: Float): Modifier =
+    if (tint.alpha == 0f) {
+        this
+    } else {
+        background(Brush.verticalGradient(listOf(tint.copy(alpha = tint.alpha * from), tint.copy(alpha = tint.alpha * to))))
+    }
+
+/** How much of the backdrop colour's brightness the details tint keeps. */
+private const val DetailsTintDepth = 0.6f
 
 /** Icon button on a dark translucent circle so it stays visible over any artwork. */
 @Composable

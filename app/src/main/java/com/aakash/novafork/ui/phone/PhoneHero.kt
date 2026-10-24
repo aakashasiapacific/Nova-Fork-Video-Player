@@ -692,7 +692,7 @@ private fun MuteButton(muted: Boolean, onClick: () -> Unit) {
 
 /** The colour of the bottom of [url]'s picture, made richer and kept dark; clear until it is known. */
 @Composable
-private fun rememberArtTint(url: String?): Color {
+internal fun rememberArtTint(url: String?): Color {
     val context = LocalContext.current
     val tint by produceState(Color.Transparent, url) {
         value = url?.let {

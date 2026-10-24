@@ -71,6 +71,8 @@ fun PhoneShowDetailsScreen(
         val backdropHeight = detailsBackdropHeight(maxHeight)
         val listState = rememberLazyListState()
         val titleCollapse = rememberTitleCollapse(listState, backdropHeight)
+        val tint = rememberDetailsTint(details.artwork)
+        val hasOverview = !details.tagline.isNullOrBlank() || !details.overview.isNullOrBlank()
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             state = listState,
@@ -89,10 +91,11 @@ fun PhoneShowDetailsScreen(
                     rating = details.rating,
                     genres = details.genres,
                     maxBackdropHeight = backdropHeight,
+                    modifier = Modifier.tintBand(tint, from = 1f, to = 0.8f),
                 )
             }
             item(key = "play") {
-                Column(Modifier.padding(start = dims.gutter, end = dims.gutter, top = 20.dp)) {
+                Column(Modifier.tintBand(tint, from = 0.8f, to = if (hasOverview) 0.55f else 0f).padding(start = dims.gutter, end = dims.gutter, top = 20.dp)) {
                     Button(
                         onClick = { if (nextUp != null) actions.play(nextUp.videoId) },
                         enabled = nextUp != null,
@@ -134,7 +137,7 @@ fun PhoneShowDetailsScreen(
                 OverviewBlock(
                     tagline = details.tagline,
                     overview = details.overview,
-                    modifier = Modifier.padding(start = dims.gutter, end = dims.gutter, top = 16.dp),
+                    modifier = Modifier.tintBand(tint, from = 0.55f, to = 0f).padding(start = dims.gutter, end = dims.gutter, top = 16.dp),
                 )
             }
             item(key = "seasons") {

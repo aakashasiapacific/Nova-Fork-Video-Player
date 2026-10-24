@@ -159,6 +159,18 @@ fun PhoneSearchScreen(
         // iOS: while the field is being typed in, "Cancel" slides in beside it and the field
         // narrows to make room; Cancel empties it and puts the keyboard away.
         var focused by remember { mutableStateOf(false) }
+        // Putting the keyboard away (its arrow, or back) ends typing as Cancel would, so Cancel
+        // goes with it instead of staying beside an idle field (owner).
+        val keyboardUp = imeBottom > 0.dp
+        var keyboardWasUp by remember { mutableStateOf(false) }
+        LaunchedEffect(keyboardUp) {
+            if (keyboardUp) {
+                keyboardWasUp = true
+            } else if (keyboardWasUp) {
+                keyboardWasUp = false
+                focusManager.clearFocus()
+            }
+        }
         Row(
             Modifier
                 .align(Alignment.BottomCenter)
@@ -238,11 +250,12 @@ private fun SearchField(
             contentAlignment = Alignment.CenterStart,
         ) {
             if (value.text.isEmpty()) {
+                // One line always (owner: it broke in two once Cancel narrowed the field).
                 Text(
                     "Movies, music and more",
                     style = MaterialTheme.typography.bodyLarge,
                     color = Color.White.copy(alpha = 0.45f),
-                    maxLines = 2,
+                    maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
             }

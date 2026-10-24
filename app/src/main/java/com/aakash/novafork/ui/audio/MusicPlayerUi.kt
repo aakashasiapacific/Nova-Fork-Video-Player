@@ -4,7 +4,6 @@ import androidx.activity.compose.BackHandler
 import androidx.annotation.DrawableRes
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
@@ -209,9 +208,9 @@ class NowPlayingSheet {
 val LocalNowPlayingSheet = staticCompositionLocalOf<NowPlayingSheet?> { null }
 
 /**
- * The one cover in flight between Now Playing and the mini player. As Now Playing starts down it
- * rides along in its place; past halfway it leaves the sheet and shrinks into the mini player,
- * landing as the sheet fades. Opening runs the same path backwards. Drawn by the shell over all.
+ * The one cover in flight between Now Playing and the mini player: it travels in a straight
+ * line between the two, shrinking as it goes, in step with the sheet from start to end. Opening
+ * runs the same path backwards. Drawn by the shell over all.
  */
 @Composable
 fun CoverFlight(artUri: String?) {
@@ -238,13 +237,15 @@ fun CoverFlight(artUri: String?) {
                     alpha = 0f
                     return@graphicsLayer
                 }
-                val open = sheet.openFraction
-                val t = FastOutSlowInEasing.transform(((0.55f - open) / 0.55f).coerceIn(0f, 1f))
+                // Apple Music's flight: one straight diagonal from the big cover's place to the
+                // mini player's, place, size and corners all moving together with the sheet from
+                // the first pixel (owner: it used to ride down with the sheet, then swing across).
+                val t = (1f - sheet.openFraction).coerceIn(0f, 1f)
                 fun mix(a: Float, b: Float) = a + (b - a) * t
                 alpha = 1f
                 transformOrigin = TransformOrigin(0f, 0f)
                 translationX = mix(big.left, mini.left)
-                translationY = mix(big.top + (1f - open) * sheet.heightPx, mini.top)
+                translationY = mix(big.top, mini.top)
                 scaleX = mix(1f, mini.width / big.width)
                 scaleY = mix(1f, mini.height / big.height)
                 // The corner as seen, 12dp to the mini player's 8dp, through the scale.
@@ -346,9 +347,14 @@ fun rememberUpNext(viewModel: MusicViewModel, player: MusicPlayerState): List<So
 /** The floating mini player's height; the space pages leave for it comes from the shell. */
 val MiniPlayerHeight = 60.dp
 
+/** The docked (old Apple Music) mini player's height on the phone. */
+val MiniPlayerDockedHeight = 64.dp
+
 /**
  * Apple Music's mini player: a floating glass capsule with the cover, the song and artist, and
- * play/pause and next. Tapping it opens Now Playing.
+ * play/pause and next. Tapping it opens Now Playing. [docked] (phone, owner: the old tab bar wants
+ * the old mini player): iOS 13–17's instead, a full-width strip sitting on the tab bar in its
+ * material (the shell paints it), a bigger cover and the title alone on one line.
  */
 @Composable
 fun MiniPlayerBar(
@@ -358,6 +364,7 @@ fun MiniPlayerBar(
     modifier: Modifier = Modifier,
     /** In the shrunk tab bar: no Next button, so the song's title has room. */
     compact: Boolean = false,
+    docked: Boolean = false,
 ) {
     val now = player.nowPlaying
     // As in Apple Music, a sideways swipe on the mini player skips: left for the next song,
@@ -369,8 +376,8 @@ fun MiniPlayerBar(
     Row(
         modifier
             .fillMaxWidth()
-            .height(MiniPlayerHeight)
-            .frostedGlass(RoundedCornerShape(percent = 50))
+            .height(if (docked) MiniPlayerDockedHeight else MiniPlayerHeight)
+            .then(if (docked) Modifier else Modifier.frostedGlass(RoundedCornerShape(percent = 50)))
             .clickable(onClickLabel = "Open Now Playing", onClick = onOpen)
             .draggable(
                 state = swipeState,
@@ -389,9 +396,11 @@ fun MiniPlayerBar(
                     animate(swipe, 0f, velocity, spring(dampingRatio = 0.7f, stiffness = 500f)) { value, _ -> swipe = value }
                 },
             )
-            .padding(start = 10.dp, end = 6.dp),
+            .padding(start = if (docked) 16.dp else 10.dp, end = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        val coverSize = if (docked) 48 else 42
+        val coverCorner = if (docked) 6 else 8
         val sheet = LocalNowPlayingSheet.current
         DisposableEffect(sheet) { onDispose { sheet?.miniCover = null } }
         Box(
@@ -402,13 +411,13 @@ fun MiniPlayerBar(
                 .graphicsLayer { alpha = if (sheet != null && sheet.openFraction > 0f && sheet.bigCover != null) 0f else 1f },
             contentAlignment = Alignment.Center,
         ) {
-            Cover(now?.artUri, size = 42, corner = 8)
+            Cover(now?.artUri, size = coverSize, corner = coverCorner)
             // Little bars over the cover: dancing while it plays, still when paused.
             if (now != null) {
                 Box(
                     Modifier
-                        .size(42.dp)
-                        .clip(RoundedCornerShape(8.dp))
+                        .size(coverSize.dp)
+                        .clip(RoundedCornerShape(coverCorner.dp))
                         .background(Color.Black.copy(alpha = 0.35f)),
                     contentAlignment = Alignment.Center,
                 ) {
@@ -426,18 +435,21 @@ fun MiniPlayerBar(
             Text(
                 now?.title ?: "Loading…",
                 style = androidx.compose.material3.MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.SemiBold,
+                fontWeight = if (docked) FontWeight.Normal else FontWeight.SemiBold,
                 color = Color.White,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            Text(
-                player.error ?: now?.artist.orEmpty(),
-                style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
-                color = if (player.error != null) NovaColors.AppleMusicRed else Color.White.copy(alpha = 0.6f),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            // The old docked one names only the song, unless something went wrong.
+            if (!docked || player.error != null) {
+                Text(
+                    player.error ?: now?.artist.orEmpty(),
+                    style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
+                    color = if (player.error != null) NovaColors.AppleMusicRed else Color.White.copy(alpha = 0.6f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
         IconButton(onClick = actions::togglePlay) {
             NovaIcon(

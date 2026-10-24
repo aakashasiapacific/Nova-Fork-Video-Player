@@ -522,3 +522,8 @@ The owner asked for Apple Music to be copied more precisely, with less clutter. 
   - The artist page's picture drifts at half speed as the page scrolls and grows into the gap when the page is pulled down.
   - Search: "Cancel" slides in beside the field while typing (the field narrows for it); it empties the field and puts the keyboard away.
   - Album track lists already show moving bars in place of the playing song's number.
+- **Build 112 (owner):**
+  - Movie and show pages are no longer blank black under the backdrop: the backdrop melts into a deep version of its own bottom colour (dark enough to read as the picture's shade on an AMOLED screen), which fades to true black by the end of the summary.
+  - Now Playing's cover flies to and from the mini player in one straight diagonal, in step with the sheet from the first pixel, as in Apple Music; it used to ride down with the sheet and then swing across.
+  - The old Apple Music mini player to go with the old tab bar: a full-width strip docked on the bar in the same dark material, a hairline between, a bigger cover and the song's title alone; it slides up from behind the bar.
+  - Search: the hint stays on one line beside Cancel, and putting the keyboard away ends typing so Cancel goes with it.

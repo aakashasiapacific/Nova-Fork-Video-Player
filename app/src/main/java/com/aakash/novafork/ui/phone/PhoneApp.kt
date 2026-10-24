@@ -17,7 +17,9 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.LocalOverscrollConfiguration
 import androidx.compose.foundation.background
@@ -108,7 +110,7 @@ import com.aakash.novafork.ui.audio.AudioScreen
 import com.aakash.novafork.ui.audio.CoverFlight
 import com.aakash.novafork.ui.audio.LocalNowPlayingSheet
 import com.aakash.novafork.ui.audio.MiniPlayerBar
-import com.aakash.novafork.ui.audio.MiniPlayerHeight
+import com.aakash.novafork.ui.audio.MiniPlayerDockedHeight
 import com.aakash.novafork.ui.audio.NowPlayingSheet
 import com.aakash.novafork.ui.audio.ShellNowPlaying
 import com.aakash.novafork.ui.audio.rememberMusicShell
@@ -156,8 +158,7 @@ fun PhoneApp(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
     val miniAboveBar = hasQueue
     var nowPlayingOpen by rememberSaveable { mutableStateOf(false) }
     val nowPlayingSheet = remember { NowPlayingSheet() }
-    val barSpace = TabBarHeight + navBar +
-        (if (miniAboveBar) MiniPlayerHeight + MiniPlayerGap * 2 else 0.dp)
+    val barSpace = TabBarHeight + navBar + (if (miniAboveBar) MiniPlayerDockedHeight else 0.dp)
     // Where the last touch went down, as a fraction of the screen: a page opened from a poster
     // grows out of it and shrinks back into it (iOS 18's zoom transition).
     var tapOrigin by remember { mutableStateOf(TransformOrigin.Center) }
@@ -337,6 +338,32 @@ fun PhoneApp(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
                     }
                 }
             }
+            if (music != null) {
+                val (viewModel, musicState) = music
+                // The old Apple Music mini player (owner): a full-width strip docked on the tab
+                // bar, in the bar's own material with a hairline between, sliding up from behind it.
+                AnimatedVisibility(
+                    visible = miniAboveBar,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = navBar + TabBarHeight),
+                    enter = slideInVertically(spring(dampingRatio = 0.9f, stiffness = 500f)) { it } + fadeIn(tween(160)),
+                    exit = slideOutVertically(tween(220)) { it } + fadeOut(tween(160)),
+                ) {
+                    Column(Modifier.fillMaxWidth().background(DockColor)) {
+                        Box(Modifier.fillMaxWidth().height(Hairline).background(IosColors.Separator))
+                        MiniPlayerBar(
+                            player = musicState,
+                            actions = viewModel,
+                            onOpen = { nowPlayingOpen = true },
+                            docked = true,
+                            // Its content fades back in as Now Playing comes down into it.
+                            modifier = Modifier.graphicsLayer { alpha = 1f - nowPlayingSheet.openFraction },
+                        )
+                    }
+                }
+            }
+            // Over the mini player, so it slides up from behind the bar.
             PhoneNavigationBar(
                 selected = top,
                 onSelect = actions::selectTab,
@@ -344,26 +371,6 @@ fun PhoneApp(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
             )
             if (music != null) {
                 val (viewModel, musicState) = music
-                AnimatedVisibility(
-                    visible = miniAboveBar,
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(
-                            start = MiniPlayerGap,
-                            end = MiniPlayerGap,
-                            bottom = navBar + TabBarHeight + MiniPlayerGap,
-                        ),
-                    enter = fadeIn(tween(200)) + scaleIn(tween(240), initialScale = 0.9f),
-                    exit = fadeOut(tween(140)),
-                ) {
-                    MiniPlayerBar(
-                        player = musicState,
-                        actions = viewModel,
-                        onOpen = { nowPlayingOpen = true },
-                        // It fades back in as Now Playing comes down into it.
-                        modifier = Modifier.graphicsLayer { alpha = 1f - nowPlayingSheet.openFraction },
-                    )
-                }
                 ShellNowPlaying(
                     viewModel = viewModel,
                     player = musicState,
@@ -593,7 +600,6 @@ private val SwipeShadow = 14.dp
 private const val MaxPageContents = 24
 
 private val TabBarHeight = 52.dp
-private val MiniPlayerGap = 8.dp
 
 /** iOS's dark tab bar material: near-black and a little see-through. */
 private val DockColor = Color(0xF2121214)
