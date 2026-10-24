@@ -472,3 +472,10 @@ The owner asked for Apple Music to be copied more precisely, with less clutter. 
 - **Samsung player, closer (build 97, owner's screenshots):** the whole picture dims; a bold title (no back arrow) with repeat, "CC" and a vertical "⋮" (Audio Track, Play on TV, Queue, Shuffle, Play in Background); previous, play/pause and next on dark see-through discs (previous restarts a single video); a big white knob on the seek bar, the times above it in portrait; fit, pop-up, a "1.0x" speed pill, rotate and lock along the bottom, spread across in portrait.
 - **Home hero buttons (build 98, owner):** the hero's Play is iOS blue (no longer white) and as wide as the poster above it; the freed width holds the star, the "+" and, for a video file on this phone, a round red bin that deletes it (the same Delete as the video page).
 - **Safe delete (build 99, owner):** Delete always asks first in the app (some phones granted Android's request with no prompt and deleted at once). On Android 11 and later the video goes to Android's bin, not deleted: Home › Library › Recently Deleted lists the bin with days left and Restore. Picked-folder videos have no bin; their question says "Delete for Good".
+- **Polish (build 100, owner chose all six):**
+  1. Now Playing's cover sinks back with a light shadow when paused and springs forward with a deep one when playing, as in Apple Music.
+  2. A movie or show page zooms out of the poster that was tapped and shrinks back into it on Back (iOS 18's zoom transition), on the phone.
+  3. Recently Added groups the videos under month headings ("October", "March 2024"), as Photos does.
+  4. A soft light sweeps across pictures while they load, instead of flat grey boxes.
+  5. Home's hero backdrop drifts in a slow zoom.
+  6. A double tap shows Samsung's side bubble: three chevrons lighting up in turn and "10 seconds".

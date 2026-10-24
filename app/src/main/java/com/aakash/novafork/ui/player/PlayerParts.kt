@@ -91,10 +91,6 @@ internal fun formatSignedClock(deltaMs: Long): String =
 internal fun formatRemaining(positionMs: Long, durationMs: Long): String =
     MINUS + Formats.clock((durationMs - positionMs).coerceAtLeast(0))
 
-/** "+20s" / "−10s" in the double-tap bubble. */
-internal fun formatSeekSeconds(forward: Boolean, totalMs: Long): String =
-    (if (forward) "+" else MINUS) + "${totalMs / 1000}s"
-
 /** "0 ms", "+300 ms", "−1200 ms". */
 internal fun formatDelay(delayMs: Long): String = when {
     delayMs > 0 -> "+$delayMs ms"

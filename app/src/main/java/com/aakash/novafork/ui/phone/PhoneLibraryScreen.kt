@@ -31,7 +31,6 @@ import com.aakash.novafork.ui.common.NovaMenuItem
 import com.aakash.novafork.ui.common.ScanBanner
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.LibraryFilter
-import com.aakash.novafork.ui.model.LibraryItemUi
 import com.aakash.novafork.ui.model.LibrarySort
 import com.aakash.novafork.ui.model.LibraryUi
 import com.aakash.novafork.ui.model.Route
@@ -84,9 +83,9 @@ fun PhoneLibraryScreen(
         ) {
             if (library.items.isEmpty()) {
                 LibraryEmpty(filter = library.filter, actions = actions)
-            } else if (library.timeline.isNotEmpty()) {
-                // All videos, newest first, as one gapless grid (each card says when it arrived).
-                PhoneLibraryGrid(items = library.timeline.map { LibraryItemUi.Video(it) }, actions = actions, state = gridState)
+            } else if (library.timelineMonths.isNotEmpty()) {
+                // All videos, newest first, under month headings (each card says the day it arrived).
+                PhoneTimelineGrid(months = library.timelineMonths, actions = actions, state = gridState)
             } else {
                 PhoneLibraryGrid(items = library.items, actions = actions, state = gridState)
             }

@@ -340,7 +340,7 @@ private fun DetailsStyleHeroPage(
             .fillMaxSize()
             .clickable(onClickLabel = "Details", onClick = openTarget),
     ) {
-        BackdropPosterHeader(artwork = hero.artwork, title = hero.title) {
+        BackdropPosterHeader(artwork = hero.artwork, title = hero.title, drift = true) {
             HeroTitle(
                 title = hero.title,
                 logoUrl = hero.artwork.logoUrl,

@@ -1,5 +1,10 @@
 package com.aakash.novafork.ui.common
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -9,6 +14,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -46,9 +52,12 @@ fun ArtImage(
 ) {
     val context = LocalContext.current
     var index by remember(candidates) { mutableIntStateOf(0) }
+    val current = candidates.getOrNull(index)
+    // A soft sweep of light while the picture loads, instead of a flat grey box.
+    var loading by remember(current) { mutableStateOf(current != null) }
     Box(modifier) {
         placeholder()
-        val current = candidates.getOrNull(index)
+        if (loading) Box(Modifier.fillMaxSize().shimmer())
         if (current != null) {
             val model = remember(current) {
                 ImageRequest.Builder(context)
@@ -63,7 +72,11 @@ fun ArtImage(
                 modifier = Modifier.fillMaxSize(),
                 contentScale = contentScale,
                 alignment = alignment,
-                onError = { index += 1 },
+                onSuccess = { loading = false },
+                onError = {
+                    loading = false
+                    index += 1
+                },
             )
         }
     }
@@ -186,4 +199,27 @@ fun Modifier.startScrim(color: Color, endFraction: Float = 0.7f): Modifier = dra
             endFraction to Color.Transparent,
         ),
     )
+}
+
+/** A light band sweeping across, iOS-style, over a picture that is still loading. */
+@Composable
+internal fun Modifier.shimmer(): Modifier {
+    val sweep by rememberInfiniteTransition(label = "shimmer").animateFloat(
+        initialValue = -1f,
+        targetValue = 2f,
+        animationSpec = infiniteRepeatable(tween(durationMillis = 1_300, easing = LinearEasing)),
+        label = "shimmerSweep",
+    )
+    return drawWithContent {
+        drawContent()
+        val band = size.width * 0.6f
+        val x = size.width * sweep
+        drawRect(
+            Brush.linearGradient(
+                colors = listOf(Color.Transparent, Color.White.copy(alpha = 0.08f), Color.Transparent),
+                start = androidx.compose.ui.geometry.Offset(x - band, 0f),
+                end = androidx.compose.ui.geometry.Offset(x, size.height),
+            ),
+        )
+    }
 }

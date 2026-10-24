@@ -34,10 +34,12 @@ import com.aakash.novafork.ui.model.SearchUi
 import com.aakash.novafork.ui.model.SeasonUi
 import com.aakash.novafork.ui.model.ShowDetailsUi
 import com.aakash.novafork.ui.model.SourceUi
+import com.aakash.novafork.ui.model.TimelineMonth
 import com.aakash.novafork.ui.model.VideoCardUi
 import com.aakash.novafork.ui.model.VideoDetailsUi
 import java.time.Instant
 import java.time.LocalDate
+import java.time.YearMonth
 import java.time.ZoneId
 import java.time.format.TextStyle
 import java.util.Locale
@@ -219,6 +221,8 @@ object UiMappers {
             // Built from their saved keys by the view model.
             LibraryFilter.WATCHLIST, LibraryFilter.FAVORITES -> emptyList()
         }
+        val timelineMonths = if (filter == LibraryFilter.ALL && sort == LibrarySort.RECENT) timeline(index, now, zone) else emptyList()
+        val timeline = timelineMonths.flatMap { it.cards }
         return LibraryUi(
             filter = filter,
             sort = sort,
@@ -229,7 +233,8 @@ object UiMappers {
                 LibraryFilter.SHOWS to shows.size,
                 LibraryFilter.VIDEOS to videos.size,
             ),
-            timeline = if (filter == LibraryFilter.ALL && sort == LibrarySort.RECENT) timeline(index, now, zone) else emptyList(),
+            timeline = timeline,
+            timelineMonths = timelineMonths,
         )
     }
 
@@ -237,17 +242,26 @@ object UiMappers {
      * Every video (episodes one by one), newest first by when it reached the device, as one
      * gapless grid: each card's second line says when it arrived ("Today · 2h 37m").
      */
-    private fun timeline(index: LibraryIndex, now: Long, zone: ZoneId): List<VideoCardUi> {
+    private fun timeline(index: LibraryIndex, now: Long, zone: ZoneId): List<TimelineMonth> {
         val today = Instant.ofEpochMilli(now).atZone(zone).toLocalDate()
         return index.videos
             .sortedWith(compareByDescending<IndexedVideo> { it.video.dateAdded }.thenBy(NaturalOrder) { it.sortKey })
             .map { video ->
                 val card = video.card
-                val arrived = arrivedLabel(Instant.ofEpochMilli(video.video.dateAdded).atZone(zone).toLocalDate(), today)
+                val day = Instant.ofEpochMilli(video.video.dateAdded).atZone(zone).toLocalDate()
+                val arrived = arrivedLabel(day, today)
                 // Episodes keep their "S1 · E4"; the rest show their length.
                 val detail = if (card.kind == MediaKind.EPISODE) card.subtitle else timelineDuration(card.durationMs)
-                card.copy(subtitle = joinMeta(arrived, detail))
+                YearMonth.from(day) to card.copy(subtitle = joinMeta(arrived, detail))
             }
+            .groupBy({ it.first }, { it.second })
+            .map { (month, cards) -> TimelineMonth(monthTitle(month, today), cards) }
+    }
+
+    /** "October" this year, "October 2024" before. */
+    internal fun monthTitle(month: YearMonth, today: LocalDate): String {
+        val name = month.month.getDisplayName(TextStyle.FULL, Locale.getDefault())
+        return if (month.year == today.year) name else "$name ${month.year}"
     }
 
     private fun timelineDuration(durationMs: Long?): String? {

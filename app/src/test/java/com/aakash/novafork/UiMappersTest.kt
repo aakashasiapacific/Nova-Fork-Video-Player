@@ -186,6 +186,17 @@ class UiMappersTest {
         // Other sorts and filters are the plain grid.
         assertTrue(UiMappers.library(index, LibraryFilter.ALL, LibrarySort.TITLE).timeline.isEmpty())
         assertTrue(UiMappers.library(index, LibraryFilter.MOVIES, LibrarySort.RECENT).timeline.isEmpty())
+        // The same cards under month headings, newest month first.
+        assertEquals(library.timeline, library.timelineMonths.flatMap { it.cards })
+        assertEquals(library.timelineMonths.map { it.title }.distinct(), library.timelineMonths.map { it.title })
+    }
+
+    @Test
+    fun monthHeadingsNameTheYearOnlyBeforeThisOne() {
+        val today = java.time.LocalDate.of(2025, 10, 20)
+        fun name(month: java.time.Month) = month.getDisplayName(java.time.format.TextStyle.FULL, java.util.Locale.getDefault())
+        assertEquals(name(java.time.Month.OCTOBER), UiMappers.monthTitle(java.time.YearMonth.of(2025, 10), today))
+        assertEquals("${name(java.time.Month.MARCH)} 2024", UiMappers.monthTitle(java.time.YearMonth.of(2024, 3), today))
     }
 
     @Test

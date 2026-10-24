@@ -4,8 +4,12 @@ import android.content.res.Configuration
 import androidx.annotation.DrawableRes
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -239,17 +243,11 @@ private fun SeekBubbleSide(bubble: SeekBubble?, forward: Boolean, modifier: Modi
                     scaleY = pulse.value
                 },
             ) {
-                Icon(
-                    painter = painterResource(R.drawable.ic_replay),
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier
-                        .size(32.dp)
-                        .graphicsLayer { if (forward) scaleX = -1f },
-                )
+                // Samsung's three chevrons, lighting up one after another toward the way it seeks.
+                SeekChevrons(forward)
                 Spacer(Modifier.height(6.dp))
                 Text(
-                    text = formatSeekSeconds(forward, shown?.totalMs ?: 0L),
+                    text = "${(shown?.totalMs ?: 0L) / 1000} seconds",
                     style = MaterialTheme.typography.titleMedium,
                     color = Color.White,
                 )
@@ -463,6 +461,31 @@ internal fun UnlockButton(visible: Boolean, onClick: () -> Unit, modifier: Modif
                     modifier = Modifier.size(28.dp),
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun SeekChevrons(forward: Boolean) {
+    val step by rememberInfiniteTransition(label = "chevrons").animateFloat(
+        initialValue = 0f,
+        targetValue = 3f,
+        animationSpec = infiniteRepeatable(tween(durationMillis = 750, easing = LinearEasing)),
+        label = "chevronStep",
+    )
+    Row {
+        repeat(3) { i ->
+            // Lit from the edge inward when rewinding, outward when going forward.
+            val order = if (forward) i else 2 - i
+            val lit = step.toInt() == order
+            Icon(
+                painter = painterResource(R.drawable.ic_chevron_right),
+                contentDescription = null,
+                tint = Color.White.copy(alpha = if (lit) 1f else 0.35f),
+                modifier = Modifier
+                    .size(18.dp)
+                    .graphicsLayer { if (!forward) scaleX = -1f },
+            )
         }
     }
 }

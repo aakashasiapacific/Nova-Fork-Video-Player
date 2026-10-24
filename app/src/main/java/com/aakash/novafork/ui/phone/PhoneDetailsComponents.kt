@@ -1,6 +1,12 @@
 package com.aakash.novafork.ui.phone
 
 import androidx.annotation.DrawableRes
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -37,9 +43,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -81,6 +89,8 @@ internal fun BackdropPosterHeader(
     title: String,
     modifier: Modifier = Modifier,
     maxBackdropHeight: Dp = Dp.Infinity,
+    /** Home's hero: the backdrop drifts in a slow zoom, so the page feels alive. */
+    drift: Boolean = false,
     info: @Composable ColumnScope.() -> Unit,
 ) {
     val dims = LocalNovaDimens.current
@@ -107,7 +117,7 @@ internal fun BackdropPosterHeader(
                 .fillMaxWidth()
                 .height(backdropHeight),
         ) {
-            BackdropArt(artwork = artwork, modifier = Modifier.fillMaxSize())
+            BackdropArt(artwork = artwork, modifier = Modifier.fillMaxSize().then(if (drift) Modifier.slowZoom() else Modifier))
             StatusBarShade(statusBar)
             Box(
                 Modifier
@@ -411,3 +421,18 @@ internal fun OverviewBlock(
     }
 }
 
+
+/** A slow zoom in and back out over half a minute (Ken Burns), on a picture clipped to its box. */
+@Composable
+internal fun Modifier.slowZoom(): Modifier {
+    val zoom by rememberInfiniteTransition(label = "slowZoom").animateFloat(
+        initialValue = 1f,
+        targetValue = 1.1f,
+        animationSpec = infiniteRepeatable(tween(durationMillis = 15_000, easing = LinearEasing), RepeatMode.Reverse),
+        label = "slowZoomScale",
+    )
+    return clipToBounds().graphicsLayer {
+        scaleX = zoom
+        scaleY = zoom
+    }
+}

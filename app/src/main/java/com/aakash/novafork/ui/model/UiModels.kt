@@ -178,7 +178,13 @@ data class LibraryUi(
      * gapless grid. Empty otherwise.
      */
     val timeline: List<VideoCardUi> = emptyList(),
+    /** [timeline] by the month the videos arrived ("October", "March 2024"), as Photos groups. */
+    val timelineMonths: List<TimelineMonth> = emptyList(),
 )
+
+/** One month of the timeline: its heading and its videos, newest first. */
+@Immutable
+data class TimelineMonth(val title: String, val cards: List<VideoCardUi>)
 
 @Immutable
 data class VideoDetailsUi(

@@ -532,7 +532,14 @@ private fun FavoriteButton(favorite: Boolean, onClick: () -> Unit) {
 /** The big cover; it shrinks back a little while paused, as in Apple Music. */
 @Composable
 private fun BigCover(player: MusicPlayerState) {
-    val scale by animateFloatAsState(if (player.isPlaying) 1f else 0.82f, spring(dampingRatio = 0.7f), label = "coverScale")
+    // Apple Music: paused, the cover sinks back small with a light shadow; playing, it springs
+    // forward with a deep one.
+    val scale by animateFloatAsState(
+        if (player.isPlaying) 1f else 0.8f,
+        spring(dampingRatio = 0.62f, stiffness = 300f),
+        label = "coverScale",
+    )
+    val shadow by animateDpAsState(if (player.isPlaying) 30.dp else 8.dp, spring(stiffness = 300f), label = "coverShadow")
     BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         val side = minOf(maxWidth, maxHeight)
         Box(
@@ -542,7 +549,7 @@ private fun BigCover(player: MusicPlayerState) {
                     scaleX = scale
                     scaleY = scale
                 }
-                .shadow(24.dp, RoundedCornerShape(12.dp))
+                .shadow(shadow, RoundedCornerShape(12.dp))
                 .clip(RoundedCornerShape(12.dp))
                 .background(Color(0xFF2C2C2E)),
             contentAlignment = Alignment.Center,

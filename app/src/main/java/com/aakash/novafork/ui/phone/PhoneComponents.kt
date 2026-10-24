@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyGridScope
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -79,6 +80,7 @@ import com.aakash.novafork.ui.model.EpisodeUi
 import com.aakash.novafork.ui.model.LibraryItemUi
 import com.aakash.novafork.ui.model.MediaKind
 import com.aakash.novafork.ui.model.ShowCardUi
+import com.aakash.novafork.ui.model.TimelineMonth
 import com.aakash.novafork.ui.model.VideoCardUi
 import kotlinx.coroutines.delay
 
@@ -535,6 +537,41 @@ internal fun PhoneLibraryGrid(
             }
         }
         footer()
+    }
+}
+
+/** The Recently Added timeline: a month heading ("October", "March 2024") over each month's videos, as Photos groups. */
+@Composable
+internal fun PhoneTimelineGrid(
+    months: List<TimelineMonth>,
+    actions: AppActions,
+    modifier: Modifier = Modifier,
+    state: LazyGridState = rememberLazyGridState(),
+) {
+    val dims = LocalNovaDimens.current
+    LazyVerticalGrid(
+        columns = GridCells.Adaptive(dims.gridMinCell),
+        modifier = modifier.fillMaxSize(),
+        state = state,
+        contentPadding = PaddingValues(start = dims.gutter, end = dims.gutter, top = 0.dp, bottom = dims.sectionSpacing + LocalBottomBarSpace.current),
+        horizontalArrangement = Arrangement.spacedBy(dims.rowSpacing),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        months.forEach { month ->
+            item(key = "month:" + month.title, span = { GridItemSpan(maxLineSpan) }) {
+                Text(
+                    month.title,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(top = 12.dp),
+                )
+            }
+            items(month.cards, key = { "v:" + it.id }) { card ->
+                VideoMenuBox(videoId = card.id, title = card.displayTitle(), actions = actions, showDetails = false) { openMenu ->
+                    PhonePosterCard(card, onClick = { actions.openVideo(card.id) }, onLongClick = openMenu)
+                }
+            }
+        }
     }
 }
 

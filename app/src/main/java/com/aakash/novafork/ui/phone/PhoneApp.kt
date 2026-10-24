@@ -19,6 +19,8 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -69,10 +71,12 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
@@ -89,13 +93,13 @@ import com.aakash.novafork.ui.audio.MiniPlayerHeight
 import com.aakash.novafork.ui.audio.ShellNowPlaying
 import com.aakash.novafork.ui.audio.rememberMusicShell
 import com.aakash.novafork.ui.common.GlassCircle
-import com.aakash.novafork.ui.common.swipeBetweenTabs
-import com.aakash.novafork.ui.common.tabSlide
 import com.aakash.novafork.ui.common.LocalBottomBarSpace
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.NovaTabCapsule
 import com.aakash.novafork.ui.common.activeColor
+import com.aakash.novafork.ui.common.swipeBetweenTabs
 import com.aakash.novafork.ui.common.tabIconRes
+import com.aakash.novafork.ui.common.tabSlide
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.AppUiState
 import com.aakash.novafork.ui.model.Route
@@ -158,7 +162,23 @@ fun PhoneApp(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
     var nowPlayingOpen by rememberSaveable { mutableStateOf(false) }
     val barSpace = TabBarHeight + BarTopMargin + BarBottomMargin + navBar +
         (if (miniAboveBar) MiniPlayerHeight + MiniPlayerGap else 0.dp)
-    Box(modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+    // Where the last touch went down, as a fraction of the screen: a page opened from a poster
+    // grows out of it and shrinks back into it (iOS 18's zoom transition).
+    var tapOrigin by remember { mutableStateOf(TransformOrigin.Center) }
+    val zoomOrigins = remember { mutableMapOf<Route, TransformOrigin>() }
+    Box(
+        modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .pointerInput(Unit) {
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                    if (size.width > 0 && size.height > 0) {
+                        tapOrigin = TransformOrigin(down.position.x / size.width, down.position.y / size.height)
+                    }
+                }
+            },
+    ) {
         CompositionLocalProvider(LocalBottomBarSpace provides barSpace) {
             // Keyed by route, so state updates within a page recompose it in place, while a route
             // change crossfades and the outgoing page keeps showing the state it was built with.
@@ -170,11 +190,23 @@ fun PhoneApp(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
                     .swipeBetweenTabs(top, enabled = !state.canGoBack, onSelect = actions::selectTab, onBack = actions::back)
                     .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)),
                 transitionSpec = {
-                    tabSlide(
-                        from = initialState.route.top,
-                        to = targetState.route.top,
-                        fade = fadeIn(tween(durationMillis = 220, delayMillis = 40)) togetherWith fadeOut(tween(durationMillis = 140)),
-                    )
+                    val fade = fadeIn(tween(durationMillis = 220, delayMillis = 40)) togetherWith fadeOut(tween(durationMillis = 140))
+                    val from = initialState.route
+                    val to = targetState.route
+                    when {
+                        from.top != to.top -> tabSlide(from = from.top, to = to.top, fade = fade)
+                        to.isTitlePage() && to != from -> {
+                            val origin = tapOrigin.also { zoomOrigins[to] = it }
+                            (scaleIn(spring(dampingRatio = 0.86f, stiffness = 380f), initialScale = 0.2f, transformOrigin = origin) + fadeIn(tween(160))) togetherWith
+                                (fadeOut(tween(220)) + scaleOut(tween(300), targetScale = 0.94f))
+                        }
+                        from.isTitlePage() && !to.isTitlePage() -> {
+                            val origin = zoomOrigins[from] ?: TransformOrigin.Center
+                            (fadeIn(tween(220)) + scaleIn(tween(300), initialScale = 0.94f)) togetherWith
+                                (scaleOut(tween(260), targetScale = 0.2f, transformOrigin = origin) + fadeOut(tween(220, delayMillis = 60)))
+                        }
+                        else -> fade
+                    }
                 },
                 contentKey = { it.route },
                 label = "phoneRoute",
@@ -362,3 +394,6 @@ private val BarTopMargin = 6.dp
 private val BarBottomMargin = 10.dp
 private val MiniPlayerGap = 10.dp
 
+
+/** A movie, episode or show page: the pages that zoom out of the poster that opened them. */
+private fun Route.isTitlePage(): Boolean = this is Route.VideoDetails || this is Route.ShowDetails
