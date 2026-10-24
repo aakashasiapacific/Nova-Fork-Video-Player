@@ -68,6 +68,7 @@ import com.aakash.novafork.ui.common.Hairline
 import com.aakash.novafork.ui.common.IosColors
 import com.aakash.novafork.ui.common.LocalBottomBarSpace
 import com.aakash.novafork.ui.common.NovaIcon
+import com.aakash.novafork.ui.common.OnTabReselect
 import com.aakash.novafork.ui.common.glass
 import com.aakash.novafork.ui.common.musicSearchResults
 import com.aakash.novafork.ui.model.AppActions
@@ -98,6 +99,8 @@ fun PhoneSearchScreen(
     }
     val keyboard = LocalSoftwareKeyboardController.current
     val focusManager = LocalFocusManager.current
+    // Tapping Search again goes to the field, keyboard up, as on iOS.
+    OnTabReselect { focusRequester.requestFocus() }
     LaunchedEffect(focusRequester) {
         // Coming back to existing results should not pop the keyboard over them.
         if (field.text.isEmpty()) focusRequester.requestFocus()

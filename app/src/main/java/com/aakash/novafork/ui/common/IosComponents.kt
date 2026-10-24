@@ -758,3 +758,16 @@ fun Modifier.pressDim(source: InteractionSource): Modifier {
         if (dim > 0f) drawRect(Color.Black.copy(alpha = dim))
     }
 }
+
+/**
+ * Apple TV's Resume button: the part of the pill as far as the video was watched ([progress],
+ * 0 to 1) is a shade lighter. Nothing for a video not started. Goes on a pill-shaped button.
+ */
+fun Modifier.resumeFill(progress: Float?): Modifier {
+    val watched = progress?.coerceIn(0f, 1f) ?: 0f
+    if (watched <= 0f) return this
+    return clip(RoundedCornerShape(percent = 50)).drawWithContent {
+        drawContent()
+        drawRect(Color.White.copy(alpha = 0.18f), size = size.copy(width = size.width * watched))
+    }
+}

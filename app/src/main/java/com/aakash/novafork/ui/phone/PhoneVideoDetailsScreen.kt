@@ -35,12 +35,12 @@ import com.aakash.novafork.R
 import com.aakash.novafork.core.format.Formats
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
 import com.aakash.novafork.ui.common.IosColors
-import com.aakash.novafork.ui.common.IosProgressBar
 import com.aakash.novafork.ui.common.LocalBottomBarSpace
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.NovaMenuItem
 import com.aakash.novafork.ui.common.SectionHeader
 import com.aakash.novafork.ui.common.metaLine
+import com.aakash.novafork.ui.common.resumeFill
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.MediaKind
 import com.aakash.novafork.ui.model.VideoDetailsUi
@@ -189,7 +189,9 @@ private fun PlaySection(details: VideoDetailsUi, actions: AppActions, modifier: 
                 onClick = { actions.play(details.id) },
                 modifier = Modifier
                     .then(if (details.deletable) Modifier.width(LocalNovaDimens.current.detailPosterWidth) else Modifier.weight(1f))
-                    .height(52.dp),
+                    .height(52.dp)
+                    // How far it was watched shows in the button itself, as on Apple TV.
+                    .resumeFill(details.progress),
                 colors = ButtonDefaults.buttonColors(containerColor = NovaColors.IosBlue, contentColor = Color.White),
                 contentPadding = ButtonDefaults.ButtonWithIconContentPadding,
             ) {
@@ -222,11 +224,7 @@ private fun PlaySection(details: VideoDetailsUi, actions: AppActions, modifier: 
         }
         val progress = details.progress
         if (progress != null && progress > 0f) {
-            Spacer(Modifier.height(14.dp))
-            IosProgressBar(
-                progress = { progress.coerceIn(0f, 1f) },
-                modifier = Modifier.fillMaxWidth(),
-            )
+            Spacer(Modifier.height(6.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 val duration = details.durationMs
                 Text(

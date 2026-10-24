@@ -22,6 +22,7 @@ import com.aakash.novafork.data.db.SourceEntity
 import com.aakash.novafork.data.db.SourceType
 import com.aakash.novafork.data.db.VideoFavoriteEntity
 import com.aakash.novafork.data.db.WatchlistEntity
+import java.io.IOException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -39,7 +40,6 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
-import java.io.IOException
 
 /** How the music scan is doing, for the Audio tab. */
 data class MusicScanState(
@@ -333,6 +333,11 @@ class MusicRepository(
     }
 
     suspend fun deletePlaylist(playlistId: Long) = playlistDao.delete(playlistId)
+
+    /** Songs whose files were deleted (or binned) leave the library until they show up again. */
+    suspend fun forgetDeletedSongs(ids: List<Long>) {
+        for (chunk in ids.chunked(SQL_CHUNK)) songDao.markMissing(chunk)
+    }
 
     // Watchlist (the hero's "+" button)
 

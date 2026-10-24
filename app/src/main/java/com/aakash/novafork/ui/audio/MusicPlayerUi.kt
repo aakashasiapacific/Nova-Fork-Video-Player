@@ -52,6 +52,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.Stable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -254,6 +255,9 @@ fun CoverFlight(artUri: String?) {
             },
     )
 }
+
+/** How much larger the cover lands before it settles. */
+private const val SETTLE_FROM = 1.035f
 
 /** The size the flying cover is decoded at, sharp enough for the big cover. */
 private const val FLIGHT_PX = 720
@@ -704,14 +708,24 @@ private fun BigCover(player: MusicPlayerState) {
     val shadow by animateDpAsState(if (player.isPlaying) 30.dp else 8.dp, spring(stiffness = 300f), label = "coverShadow")
     val sheet = LocalNowPlayingSheet.current
     DisposableEffect(sheet) { onDispose { sheet?.bigCover = null } }
+    // As Now Playing finishes opening, the cover that flew in settles with a small spring, as
+    // Apple Music's does.
+    val settle = remember { Animatable(1f) }
+    val landed by remember(sheet) { derivedStateOf { sheet == null || sheet.openFraction >= 1f } }
+    LaunchedEffect(landed) {
+        if (landed && sheet != null) {
+            settle.snapTo(SETTLE_FROM)
+            settle.animateTo(1f, spring(dampingRatio = 0.45f, stiffness = 380f))
+        }
+    }
     BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         val side = minOf(maxWidth, maxHeight)
         Box(
             Modifier
                 .size(side)
                 .graphicsLayer {
-                    scaleX = scale
-                    scaleY = scale
+                    scaleX = scale * settle.value
+                    scaleY = scale * settle.value
                     // While the cover flies to or from the mini player, the flying one is shown,
                     // shadow and all (a hidden cover's shadow was the dark box around it).
                     val flying = sheet?.flying == true

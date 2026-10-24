@@ -42,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import com.aakash.novafork.ui.adaptive.DeviceLayout
 import com.aakash.novafork.ui.common.CollapsedTitleBar
 import com.aakash.novafork.ui.common.IosColors
+import com.aakash.novafork.ui.common.OnTabReselect
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.SettingsUi
 
@@ -76,6 +77,7 @@ private fun PhoneSettings(state: SettingsUi, actions: AppActions, modifier: Modi
     }
     // iOS's large title: "Preferences" scrolls away and comes back small in a bar at the top.
     val listState = rememberLazyListState()
+    OnTabReselect { listState.animateScrollToItem(0) }
     val collapsed by remember { derivedStateOf { listState.firstVisibleItemIndex > 0 } }
     Box(modifier.fillMaxSize()) {
         LazyColumn(

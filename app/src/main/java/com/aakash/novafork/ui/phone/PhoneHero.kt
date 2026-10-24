@@ -97,6 +97,7 @@ import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.PosterArt
 import com.aakash.novafork.ui.common.RatingPill
 import com.aakash.novafork.ui.common.pressScale
+import com.aakash.novafork.ui.common.resumeFill
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.Artwork
 import com.aakash.novafork.ui.model.HeroTarget
@@ -524,7 +525,7 @@ private fun HeroActions(
                 hero.artwork.frameOnly -> Modifier.weight(1f)
                 // Never wider than the row leaves, on a narrow phone.
                 else -> Modifier.weight(1f, fill = false).width(LocalNovaDimens.current.detailPosterWidth)
-            }.height(50.dp).pressScale(playPress),
+            }.height(50.dp).pressScale(playPress).resumeFill(hero.progress),
             colors = ButtonDefaults.buttonColors(containerColor = NovaColors.IosBlue, contentColor = Color.White),
             contentPadding = PaddingValues(horizontal = 16.dp),
         ) {

@@ -527,3 +527,9 @@ The owner asked for Apple Music to be copied more precisely, with less clutter. 
   - Now Playing's cover flies to and from the mini player in one straight diagonal, in step with the sheet from the first pixel, as in Apple Music; it used to ride down with the sheet and then swing across.
   - The old Apple Music mini player to go with the old tab bar: a full-width strip docked on the bar in the same dark material, a hairline between, a bigger cover and the song's title alone; it slides up from behind the bar.
   - Search: the hint stays on one line beside Cancel, and putting the keyboard away ends typing so Cancel goes with it.
+- **Build 113 (owner):**
+  - Tapping the selected tab again, as on iOS: from a page opened on it, back to its first page; on its first page, a smooth scroll to the top (Search puts the cursor in the field; Audio goes back to Library).
+  - Resume shows how far a video was watched inside the blue button itself (a lighter part of the pill), on the hero, movie and show pages; the separate bar under it is gone.
+  - Lists fade out under the clock and battery instead of running into them (not over Home's hero, whose picture sets the status bar).
+  - Long-pressing a song or album lifts it over the blurred page with a haptic knock, as videos do; albums get a menu (Play, Shuffle, Play Next, Play Last, Go to Artist, Delete Album) and songs a Delete. Deleting asks first, then on Android 11+ puts the files in the phone's bin (30 days); songs in picked folders are deleted for good.
+  - Now Playing's cover lands with a small spring as the sheet finishes opening.

@@ -129,6 +129,10 @@ class MusicViewModel(app: Application) : AndroidViewModel(app), AudioActions {
         music.setFavorite(songId, favorite = songId !in favorites.value)
     }
 
+    override fun forgetDeletedSongs(ids: List<Long>) = launchSafely {
+        music.forgetDeletedSongs(ids)
+    }
+
     private suspend fun refreshOpenPlaylist() {
         val open = _openPlaylist.value ?: return
         _openPlaylist.value = open.copy(songs = music.playlistSongs(open.id))

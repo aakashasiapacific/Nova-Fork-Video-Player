@@ -35,4 +35,7 @@ interface AudioActions {
 
     /** Playlists' "New Playlist…": an empty playlist named [name]. */
     fun createPlaylist(name: String) = Unit
+
+    /** The files of these songs were deleted (or binned): they leave the library. */
+    fun forgetDeletedSongs(ids: List<Long>) = Unit
 }

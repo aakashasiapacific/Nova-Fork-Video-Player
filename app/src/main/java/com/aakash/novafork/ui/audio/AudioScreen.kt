@@ -9,10 +9,8 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.StartOffset
 import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -86,10 +84,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -112,6 +108,7 @@ import com.aakash.novafork.data.music.MusicLibraryData
 import com.aakash.novafork.data.music.MusicScanState
 import com.aakash.novafork.music.MusicPlayerState
 import com.aakash.novafork.ui.common.CollapsedTitleBar
+import com.aakash.novafork.ui.common.ContextMenuLift
 import com.aakash.novafork.ui.common.IosColors
 import com.aakash.novafork.ui.common.IosGrabber
 import com.aakash.novafork.ui.common.IosSheetShape
@@ -123,6 +120,7 @@ import com.aakash.novafork.ui.common.NovaDropdownMenu
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.NovaMenuItem
 import com.aakash.novafork.ui.common.NovaTextField
+import com.aakash.novafork.ui.common.OnTabReselect
 import com.aakash.novafork.ui.common.SwipeToDelete
 import com.aakash.novafork.ui.theme.AudioTheme
 import com.aakash.novafork.ui.theme.NovaColors
@@ -215,7 +213,13 @@ fun AudioContent(
     fun back() {
         if (openPlaylist != null) actions.closePlaylist() else stackText = stack.dropLast(1).joinToString(STACK_SEPARATOR)
     }
+    // Tapping Audio again: back to Library from a page opened over it (Library itself scrolls up).
+    OnTabReselect {
+        if (openPlaylist != null) actions.closePlaylist()
+        stackText = ""
+    }
     var addingSong by remember { mutableStateOf<SongEntity?>(null) }
+    var deleting by remember { mutableStateOf<SongDeleteRequest?>(null) }
     BackHandler(enabled = stack.isNotEmpty() || openPlaylist != null) { back() }
 
     val page = if (openPlaylist != null) "playlist:${openPlaylist.id}" else stack.lastOrNull() ?: HOME
@@ -235,6 +239,7 @@ fun AudioContent(
         onAdd = { addingSong = it },
         favorites = favorites.toSet(),
         isPlaying = player.isPlaying,
+        onDelete = { songs, label -> deleting = SongDeleteRequest(songs, label) },
     )
     // On a page opened over Library a swipe right goes back, as on iOS (and is not taken for a
     // tab change).
@@ -290,6 +295,8 @@ fun AudioContent(
         }
     }
 
+    // Always composed: it carries on through Android's own prompt after its question closes.
+    SongDeleteDialog(request = deleting, actions = actions, onClose = { deleting = null })
     addingSong?.let { song ->
         AddToPlaylistDialog(
             song = song,
@@ -317,6 +324,8 @@ private class PageContext(
     val favorites: Set<Long> = emptySet(),
     /** The playing song's bars move only while it plays. */
     val isPlaying: Boolean = false,
+    /** Asks to delete these songs' files, [label] naming them ("“Song”", "the album “Album”"). */
+    val onDelete: (songs: List<SongEntity>, label: String) -> Unit = { _, _ -> },
 )
 
 private fun pageTitle(page: String, library: MusicLibraryData): String = when {
@@ -345,6 +354,7 @@ private fun pageTitle(page: String, library: MusicLibraryData): String = when {
 @Composable
 private fun AudioPage(title: String?, content: LazyGridScope.() -> Unit) {
     val gridState = rememberLazyGridState()
+    OnTabReselect { gridState.animateScrollToItem(0) }
     val collapsed by remember { derivedStateOf { gridState.firstVisibleItemIndex > 1 } }
     Box(Modifier.fillMaxSize()) {
         CompositionLocalProvider(LocalPageGrid provides gridState) {
@@ -414,7 +424,7 @@ private fun LibraryHome(
             row("albumsTitle") { SectionTitle("Albums") }
             // Newest first.
             items(library.recentlyAdded, key = { "album:" + it.key }) { album ->
-                AlbumTile(album) { ctx.onOpen(ALBUM + album.key) }
+                AlbumTile(album, ctx) { ctx.onOpen(ALBUM + album.key) }
             }
         } else if (!scan.scanning && hasAccess) {
             row("empty") { Hint("No music found. Songs on this phone and in folders added under Preferences › Sources show up here.") }
@@ -496,7 +506,7 @@ private fun ArtistsPage(artists: List<Artist>, ctx: PageContext) {
 private fun AlbumsPage(title: String, albums: List<Album>, ctx: PageContext) {
     AudioPage(title) {
         header(title, ctx)
-        items(albums, key = { it.key }) { album -> AlbumTile(album) { ctx.onOpen(ALBUM + album.key) } }
+        items(albums, key = { it.key }) { album -> AlbumTile(album, ctx) { ctx.onOpen(ALBUM + album.key) } }
     }
 }
 
@@ -616,7 +626,7 @@ private fun AlbumPage(album: Album, ctx: PageContext) {
             row("more") {
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                     items(more, key = { it.key }) { other ->
-                        AlbumTile(other, Modifier.width(150.dp)) { ctx.onOpen(ALBUM + other.key) }
+                        AlbumTile(other, ctx, Modifier.width(150.dp)) { ctx.onOpen(ALBUM + other.key) }
                     }
                 }
             }
@@ -710,7 +720,7 @@ private fun ArtistPage(artist: Artist, ctx: PageContext) {
             row("albums") {
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                     items(artist.albums, key = { it.key }) { album ->
-                        AlbumTile(album, Modifier.width(150.dp)) { ctx.onOpen(ALBUM + album.key) }
+                        AlbumTile(album, ctx, Modifier.width(150.dp)) { ctx.onOpen(ALBUM + album.key) }
                     }
                 }
             }
@@ -915,12 +925,62 @@ private fun SectionTitle(text: String) {
 }
 
 /** Square cover, title and artist below: Recently Added, Albums, an artist's albums. */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun AlbumTile(album: Album, modifier: Modifier = Modifier, onClick: () -> Unit) {
+private fun AlbumTile(album: Album, ctx: PageContext, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    // Long press: the cover lifts over the blurred page with the album's menu (owner).
+    var menuOpen by remember { mutableStateOf(false) }
+    Box(modifier) {
+        ContextMenuLift(open = menuOpen) { _ ->
+            AlbumTileContent(album, onClick = onClick, onLongClick = { menuOpen = true })
+        }
+        NovaDropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+            val close = { menuOpen = false }
+            NovaMenuItem(
+                text = { Text("Play") },
+                leadingIcon = { NovaIcon(R.drawable.ic_play_arrow, contentDescription = null) },
+                onClick = {
+                    close()
+                    ctx.actions.play(album.songs, 0, false)
+                },
+            )
+            NovaMenuItem(
+                text = { Text("Shuffle") },
+                leadingIcon = { NovaIcon(R.drawable.ic_shuffle, contentDescription = null) },
+                onClick = {
+                    close()
+                    ctx.actions.play(album.songs, 0, true)
+                },
+            )
+            QueueItems(album.songs, ctx, close)
+            NovaMenuItem(
+                text = { Text("Go to Artist") },
+                leadingIcon = { NovaIcon(R.drawable.ic_artist, contentDescription = null) },
+                onClick = {
+                    close()
+                    ctx.onOpen(ARTIST + album.artistKey)
+                },
+            )
+            NovaMenuItem(
+                text = { Text("Delete Album") },
+                destructive = true,
+                leadingIcon = { NovaIcon(R.drawable.ic_delete, contentDescription = null) },
+                onClick = {
+                    close()
+                    ctx.onDelete(album.songs, "the album “${album.title}”")
+                },
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun AlbumTileContent(album: Album, onClick: () -> Unit, onLongClick: () -> Unit) {
     Column(
-        modifier
+        Modifier
             .padding(bottom = 18.dp)
-            .clickable(onClick = onClick),
+            .combinedClickable(onClick = onClick, onLongClickLabel = "More", onLongClick = onLongClick),
     ) {
         Box(
             Modifier
@@ -982,62 +1042,70 @@ private fun LazyGridScope.songRows(songs: List<SongEntity>, ctx: PageContext) {
 private fun SongRow(song: SongEntity, ctx: PageContext, onClick: () -> Unit, onRemove: (() -> Unit)? = null) {
     val playing = song.id == ctx.nowPlayingId
     var menuOpen by remember { mutableStateOf(false) }
-    val haptics = LocalHapticFeedback.current
-    // iOS lifts the row its context menu is for.
-    val lift by animateFloatAsState(if (menuOpen) 1.03f else 1f, spring(dampingRatio = 0.6f, stiffness = 500f), label = "rowLift")
+    // A long press opens the menu iOS's way (the row lifted over the blurred page); "…" plainly.
+    var pressed by remember { mutableStateOf(false) }
     Box {
-        Column(
-            Modifier.graphicsLayer {
-                scaleX = lift
-                scaleY = lift
-            }.combinedClickable(
-                onClick = onClick,
-                onLongClickLabel = "More",
-                onLongClick = {
-                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                    menuOpen = true
-                },
-            ),
-        ) {
-            Row(Modifier.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                Box(contentAlignment = Alignment.Center) {
-                    Cover(MusicLibrary.artUri(song), size = 48, corner = 6)
-                    if (playing) {
-                        Box(
-                            Modifier
-                                .size(48.dp)
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(Color.Black.copy(alpha = 0.45f)),
-                        )
-                        PlayingBars(ctx.isPlaying, color = Color.White)
+        ContextMenuLift(open = menuOpen && pressed, grow = 1.03f, copyBackground = RowLiftColor) { _ ->
+            Column(
+                Modifier.combinedClickable(
+                    onClick = onClick,
+                    onLongClickLabel = "More",
+                    onLongClick = {
+                        pressed = true
+                        menuOpen = true
+                    },
+                ),
+            ) {
+                Row(Modifier.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Cover(MusicLibrary.artUri(song), size = 48, corner = 6)
+                        if (playing) {
+                            Box(
+                                Modifier
+                                    .size(48.dp)
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(Color.Black.copy(alpha = 0.45f)),
+                            )
+                            PlayingBars(ctx.isPlaying, color = Color.White)
+                        }
                     }
+                    Column(
+                        Modifier
+                            .weight(1f)
+                            .padding(start = 12.dp),
+                    ) {
+                        Text(
+                            song.title,
+                            fontSize = 16.sp,
+                            color = if (playing) NovaColors.AppleMusicRed else Color.White,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Text(
+                            song.artist ?: song.albumArtist ?: "Unknown artist",
+                            fontSize = 13.sp,
+                            color = Color.White.copy(alpha = 0.55f),
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    FavoriteStar(song.id in ctx.favorites)
+                    RowMoreButton { menuOpen = true }
                 }
-                Column(
-                    Modifier
-                        .weight(1f)
-                        .padding(start = 12.dp),
-                ) {
-                    Text(
-                        song.title,
-                        fontSize = 16.sp,
-                        color = if (playing) NovaColors.AppleMusicRed else Color.White,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Text(
-                        song.artist ?: song.albumArtist ?: "Unknown artist",
-                        fontSize = 13.sp,
-                        color = Color.White.copy(alpha = 0.55f),
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                FavoriteStar(song.id in ctx.favorites)
-                RowMoreButton { menuOpen = true }
+                HorizontalDivider(Modifier.padding(start = 60.dp), thickness = 0.5.dp, color = Color.White.copy(alpha = 0.12f))
             }
-            HorizontalDivider(Modifier.padding(start = 60.dp), thickness = 0.5.dp, color = Color.White.copy(alpha = 0.12f))
         }
-        SongMenu(song, ctx, expanded = menuOpen, onDismiss = { menuOpen = false }, showAlbum = true, onRemove = onRemove)
+        SongMenu(
+            song,
+            ctx,
+            expanded = menuOpen,
+            onDismiss = {
+                menuOpen = false
+                pressed = false
+            },
+            showAlbum = true,
+            onRemove = onRemove,
+        )
     }
 }
 
@@ -1047,47 +1115,57 @@ private fun SongRow(song: SongEntity, ctx: PageContext, onClick: () -> Unit, onR
 private fun TrackRow(song: SongEntity, ctx: PageContext, onClick: () -> Unit) {
     val playing = song.id == ctx.nowPlayingId
     var menuOpen by remember { mutableStateOf(false) }
-    val haptics = LocalHapticFeedback.current
-    // iOS lifts the row its context menu is for.
-    val lift by animateFloatAsState(if (menuOpen) 1.03f else 1f, spring(dampingRatio = 0.6f, stiffness = 500f), label = "rowLift")
+    // A long press opens the menu iOS's way (the row lifted over the blurred page); "…" plainly.
+    var pressed by remember { mutableStateOf(false) }
     Box {
-        Column(
-            Modifier.graphicsLayer {
-                scaleX = lift
-                scaleY = lift
-            }.combinedClickable(
-                onClick = onClick,
-                onLongClickLabel = "More",
-                onLongClick = {
-                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                    menuOpen = true
-                },
-            ),
-        ) {
-            Row(Modifier.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.width(32.dp)) {
-                    if (playing) {
-                        PlayingBars(ctx.isPlaying, color = NovaColors.AppleMusicRed)
-                    } else {
-                        Text(song.trackNumber?.toString() ?: "", fontSize = 16.sp, color = Color.White.copy(alpha = 0.55f))
+        ContextMenuLift(open = menuOpen && pressed, grow = 1.03f, copyBackground = RowLiftColor) { _ ->
+            Column(
+                Modifier.combinedClickable(
+                    onClick = onClick,
+                    onLongClickLabel = "More",
+                    onLongClick = {
+                        pressed = true
+                        menuOpen = true
+                    },
+                ),
+            ) {
+                Row(Modifier.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.width(32.dp)) {
+                        if (playing) {
+                            PlayingBars(ctx.isPlaying, color = NovaColors.AppleMusicRed)
+                        } else {
+                            Text(song.trackNumber?.toString() ?: "", fontSize = 16.sp, color = Color.White.copy(alpha = 0.55f))
+                        }
                     }
+                    Text(
+                        song.title,
+                        fontSize = 16.sp,
+                        color = if (playing) NovaColors.AppleMusicRed else Color.White,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                    )
+                    FavoriteStar(song.id in ctx.favorites)
+                    RowMoreButton { menuOpen = true }
                 }
-                Text(
-                    song.title,
-                    fontSize = 16.sp,
-                    color = if (playing) NovaColors.AppleMusicRed else Color.White,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
-                )
-                FavoriteStar(song.id in ctx.favorites)
-                RowMoreButton { menuOpen = true }
+                HorizontalDivider(Modifier.padding(start = 32.dp), thickness = 0.5.dp, color = Color.White.copy(alpha = 0.12f))
             }
-            HorizontalDivider(Modifier.padding(start = 32.dp), thickness = 0.5.dp, color = Color.White.copy(alpha = 0.12f))
         }
-        SongMenu(song, ctx, expanded = menuOpen, onDismiss = { menuOpen = false }, showAlbum = false)
+        SongMenu(
+            song,
+            ctx,
+            expanded = menuOpen,
+            onDismiss = {
+                menuOpen = false
+                pressed = false
+            },
+            showAlbum = false,
+        )
     }
 }
+
+/** Behind a lifted row's copy: iOS's raised dark grey. */
+private val RowLiftColor = Color(0xFF1C1C1E)
 
 /** Apple Music's small star beside a favorite song. */
 @Composable
@@ -1164,6 +1242,16 @@ private fun SongMenu(
                 onClick = {
                     onDismiss()
                     onRemove()
+                },
+            )
+        } else {
+            NovaMenuItem(
+                text = { Text("Delete") },
+                destructive = true,
+                leadingIcon = { NovaIcon(R.drawable.ic_delete, contentDescription = null) },
+                onClick = {
+                    onDismiss()
+                    ctx.onDelete(listOf(song), "“${song.title}”")
                 },
             )
         }

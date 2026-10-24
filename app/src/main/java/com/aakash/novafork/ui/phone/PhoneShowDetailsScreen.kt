@@ -36,7 +36,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
-import com.aakash.novafork.ui.common.IosProgressBar
 import com.aakash.novafork.ui.common.LocalBottomBarSpace
 import com.aakash.novafork.ui.common.NovaDropdownMenu
 import com.aakash.novafork.ui.common.NovaIcon
@@ -44,6 +43,7 @@ import com.aakash.novafork.ui.common.NovaMenuItem
 import com.aakash.novafork.ui.common.SectionHeader
 import com.aakash.novafork.ui.common.VideoMenuBox
 import com.aakash.novafork.ui.common.metaLine
+import com.aakash.novafork.ui.common.resumeFill
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.ShowDetailsUi
 
@@ -101,7 +101,8 @@ fun PhoneShowDetailsScreen(
                         enabled = nextUp != null,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(52.dp),
+                            .height(52.dp)
+                            .resumeFill(nextUp?.progress),
                         contentPadding = ButtonDefaults.ButtonWithIconContentPadding,
                     ) {
                         NovaIcon(R.drawable.ic_play_arrow, contentDescription = null, modifier = Modifier.size(24.dp))
@@ -111,14 +112,6 @@ fun PhoneShowDetailsScreen(
                             style = MaterialTheme.typography.titleSmall,
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                    val progress = nextUp?.progress
-                    if (progress != null && progress > 0f) {
-                        Spacer(Modifier.height(12.dp))
-                        IosProgressBar(
-                            progress = { progress.coerceIn(0f, 1f) },
-                            modifier = Modifier.fillMaxWidth(),
                         )
                     }
                     if (nextUp != null && nextUp.title.isNotBlank()) {

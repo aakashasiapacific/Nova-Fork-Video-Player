@@ -3,8 +3,10 @@ package com.aakash.novafork.ui.common
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -16,6 +18,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.onSizeChanged
@@ -25,6 +29,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
@@ -47,45 +52,8 @@ fun VideoMenuBox(
     content: @Composable (openMenu: () -> Unit) -> Unit,
 ) {
     var open by remember { mutableStateOf(false) }
-    // iOS lifts what a context menu is for while the menu is open.
-    val lift by animateFloatAsState(if (open) 1.04f else 1f, spring(dampingRatio = 0.6f, stiffness = 500f), label = "menuLift")
-    // In the phone shell the page behind blurs and dims (LocalMenuFocus) while a sharp copy of
-    // the card floats over it, a little larger, with the menu under it: iOS's context menu.
-    val focus = LocalMenuFocus.current
-    // The soft knock iOS gives as a context menu opens.
-    val haptics = LocalHapticFeedback.current
-    LaunchedEffect(open) { if (open) haptics.performHapticFeedback(HapticFeedbackType.LongPress) }
-    var size by remember { mutableStateOf(IntSize.Zero) }
-    DisposableEffect(open, focus) {
-        if (open && focus != null) focus.value += 1
-        onDispose { if (open && focus != null) focus.value -= 1 }
-    }
-    Box(modifier.onSizeChanged { size = it }) {
-        Box(
-            Modifier.graphicsLayer {
-                scaleX = lift
-                scaleY = lift
-            },
-        ) {
-            content { open = true }
-        }
-        if (open && focus != null && size != IntSize.Zero) {
-            Popup(popupPositionProvider = OverAnchor, properties = PopupProperties(focusable = false, clippingEnabled = false)) {
-                val density = LocalDensity.current
-                val grow = remember { Animatable(1f) }
-                LaunchedEffect(Unit) { grow.animateTo(1.08f, spring(dampingRatio = 0.6f, stiffness = 400f)) }
-                Box(
-                    Modifier
-                        .size(with(density) { size.width.toDp() }, with(density) { size.height.toDp() })
-                        .graphicsLayer {
-                            scaleX = grow.value
-                            scaleY = grow.value
-                        },
-                ) {
-                    content {}
-                }
-            }
-        }
+    Box(modifier) {
+        ContextMenuLift(open = open) { copy -> content(if (copy) ({}) else ({ open = true })) }
         NovaDropdownMenu(expanded = open, onDismissRequest = { open = false }) {
             if (showDetails) {
                 NovaMenuItem(
@@ -106,6 +74,66 @@ fun VideoMenuBox(
                 },
             )
             extraItems?.invoke { open = false }
+        }
+    }
+}
+
+/**
+ * iOS's context menu look for whatever [content] is (a poster, a row, a cover) while [open]: it
+ * lifts a little with a soft haptic knock, and in the phone shell the page behind blurs and dims
+ * (LocalMenuFocus) while a sharp copy of it floats over the blur, growing to [grow], with the
+ * menu under it. [content] is told whether it is drawing that copy; [copyBackground] backs a copy
+ * that is see-through (a list row), so the blurred original does not show through it.
+ */
+@Composable
+fun ContextMenuLift(
+    open: Boolean,
+    modifier: Modifier = Modifier,
+    grow: Float = 1.08f,
+    copyBackground: Color? = null,
+    content: @Composable (copy: Boolean) -> Unit,
+) {
+    val lift by animateFloatAsState(if (open) 1f + (grow - 1f) / 2f else 1f, spring(dampingRatio = 0.6f, stiffness = 500f), label = "menuLift")
+    val focus = LocalMenuFocus.current
+    val haptics = LocalHapticFeedback.current
+    LaunchedEffect(open) { if (open) haptics.performHapticFeedback(HapticFeedbackType.LongPress) }
+    var size by remember { mutableStateOf(IntSize.Zero) }
+    DisposableEffect(open, focus) {
+        if (open && focus != null) focus.value += 1
+        onDispose { if (open && focus != null) focus.value -= 1 }
+    }
+    Box(modifier.onSizeChanged { size = it }) {
+        Box(
+            Modifier.graphicsLayer {
+                scaleX = lift
+                scaleY = lift
+            },
+        ) {
+            content(false)
+        }
+        if (open && focus != null && size != IntSize.Zero) {
+            Popup(popupPositionProvider = OverAnchor, properties = PopupProperties(focusable = false, clippingEnabled = false)) {
+                val density = LocalDensity.current
+                val growing = remember { Animatable(1f) }
+                LaunchedEffect(Unit) { growing.animateTo(grow, spring(dampingRatio = 0.6f, stiffness = 400f)) }
+                Box(
+                    Modifier
+                        .size(with(density) { size.width.toDp() }, with(density) { size.height.toDp() })
+                        .graphicsLayer {
+                            scaleX = growing.value
+                            scaleY = growing.value
+                        }
+                        .then(
+                            if (copyBackground != null) {
+                                Modifier.clip(RoundedCornerShape(12.dp)).background(copyBackground)
+                            } else {
+                                Modifier
+                            },
+                        ),
+                ) {
+                    content(true)
+                }
+            }
         }
     }
 }

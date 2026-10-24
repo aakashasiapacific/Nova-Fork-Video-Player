@@ -75,6 +75,7 @@ import com.aakash.novafork.ui.common.LocalHeroPreviewEnabled
 import com.aakash.novafork.ui.common.LocalStatusBarIcons
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.NovaMenuItem
+import com.aakash.novafork.ui.common.OnTabReselect
 import com.aakash.novafork.ui.common.RatingPill
 import com.aakash.novafork.ui.common.ScanBanner
 import com.aakash.novafork.ui.common.SectionHeader
@@ -134,6 +135,7 @@ fun PhoneHomeScreen(
 private fun HomeFeed(home: HomeUi, scan: ScanUi, permission: PermissionUi, actions: AppActions) {
     val dims = LocalNovaDimens.current
     val listState = rememberLazyListState()
+    OnTabReselect { listState.animateScrollToItem(0) }
     val hasHero = home.hero.isNotEmpty()
     val pagerState = rememberPagerState { home.hero.size }
     // Short clips play with sound; the hero's mute button silences them.

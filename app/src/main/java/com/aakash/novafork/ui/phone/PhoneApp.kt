@@ -51,6 +51,7 @@ import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.selection.selectable
@@ -119,7 +120,9 @@ import com.aakash.novafork.ui.common.IosColors
 import com.aakash.novafork.ui.common.LocalBottomBarSpace
 import com.aakash.novafork.ui.common.LocalMenuFocus
 import com.aakash.novafork.ui.common.LocalPagePull
+import com.aakash.novafork.ui.common.LocalTabReselect
 import com.aakash.novafork.ui.common.NovaIcon
+import com.aakash.novafork.ui.common.TabReselect
 import com.aakash.novafork.ui.common.activeColor
 import com.aakash.novafork.ui.common.iosOverscroll
 import com.aakash.novafork.ui.common.swipeBetweenTabs
@@ -167,6 +170,9 @@ fun PhoneApp(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
     val menuFocus = remember { mutableStateOf(0) }
     val menuDim by animateFloatAsState(if (menuFocus.value > 0) 1f else 0f, tween(220), label = "menuDim")
     val backSwipe = remember { BackSwipe() }
+    val statusBarTop = WindowInsets.statusBars.getTop(LocalDensity.current).toFloat()
+    val statusFade = state.route != Route.Home
+    val tabReselect = remember { TabReselect() }
     // Each page's content, movable: a page uncovered by a swipe back moves into place with its
     // scroll position and everything else intact, instead of being built again.
     val currentActions by rememberUpdatedState(actions)
@@ -202,6 +208,7 @@ fun PhoneApp(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
     CompositionLocalProvider(
         LocalNowPlayingSheet provides nowPlayingSheet,
         LocalMenuFocus provides menuFocus,
+        LocalTabReselect provides tabReselect,
     ) {
         Box(
             modifier
@@ -252,6 +259,19 @@ fun PhoneApp(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
                         }
                         .drawWithContent {
                             drawContent()
+                            // iOS 26's scroll edge: lists fade out under the clock and battery
+                            // instead of running into them. Not over Home's hero, whose picture
+                            // sets the status bar's own colours.
+                            val fadeEnd = statusBarTop + StatusFade.toPx()
+                            if (statusFade) drawRect(
+                                Brush.verticalGradient(
+                                    0f to Color.Black.copy(alpha = StatusFadeStrength),
+                                    statusBarTop / fadeEnd to Color.Black.copy(alpha = StatusFadeStrength * 0.8f),
+                                    1f to Color.Transparent,
+                                    endY = fadeEnd,
+                                ),
+                                size = size.copy(height = fadeEnd),
+                            )
                             val open = nowPlayingSheet.openFraction
                             if (open > 0f) drawRect(Color.Black.copy(alpha = 0.4f * open))
                         }
@@ -366,7 +386,11 @@ fun PhoneApp(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
             // Over the mini player, so it slides up from behind the bar.
             PhoneNavigationBar(
                 selected = top,
-                onSelect = actions::selectTab,
+                // The selected tab tapped again (iOS): from a page opened on it, back to its first
+                // page; on its first page, up to the top.
+                onSelect = { tab ->
+                    if (tab != top || state.canGoBack && state.route != rootOf(tab)) actions.selectTab(tab) else tabReselect.fire()
+                },
                 modifier = Modifier.align(Alignment.BottomCenter),
             )
             if (music != null) {
@@ -599,10 +623,22 @@ private const val SwipeFlingVelocity = 800f
 private val SwipeShadow = 14.dp
 private const val MaxPageContents = 24
 
+/** How far below the status bar the scroll-edge fade runs, and how dark it starts. */
+private val StatusFade = 14.dp
+private const val StatusFadeStrength = 0.6f
+
 private val TabBarHeight = 52.dp
 
 /** iOS's dark tab bar material: near-black and a little see-through. */
 private val DockColor = Color(0xF2121214)
+
+/** The first page of [tab], as [AppActions.selectTab] opens it. */
+private fun rootOf(tab: TopDestination): Route = when (tab) {
+    TopDestination.VIDEO -> Route.Home
+    TopDestination.AUDIO -> Route.Audio
+    TopDestination.SETTINGS -> Route.Settings
+    TopDestination.SEARCH -> Route.Search
+}
 
 /** A movie, episode or show page: the pages that zoom out of the poster that opened them. */
 private fun Route.isTitlePage(): Boolean = this is Route.VideoDetails || this is Route.ShowDetails
