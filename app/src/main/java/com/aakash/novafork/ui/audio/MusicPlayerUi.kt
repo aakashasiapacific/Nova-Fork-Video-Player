@@ -73,6 +73,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
@@ -196,6 +197,9 @@ class NowPlayingSheet {
     /** The mini player's cover; null when there is no mini player. */
     var miniCover by mutableStateOf<Rect?>(null)
 
+    /** Now Playing's own layout, which the big cover is measured within (its slide left out). */
+    var sheetCoordinates: LayoutCoordinates? = null
+
     /** Between open and closed, with both ends known: [CoverFlight] draws the cover. */
     val flying: Boolean
         get() = openFraction > 0f && openFraction < 1f && bigCover != null && miniCover != null
@@ -213,34 +217,41 @@ val LocalNowPlayingSheet = staticCompositionLocalOf<NowPlayingSheet?> { null }
 fun CoverFlight(artUri: String?) {
     val sheet = LocalNowPlayingSheet.current ?: return
     if (artUri == null) return
+    val big = sheet.bigCover ?: return
     val context = LocalContext.current
-    // Loaded ahead at one fixed size and kept composed (unseen while nothing flies), so a flight
-    // starts with the picture already there: no blank frame, no fade, no placeholder note.
+    // Loaded ahead at one fixed size and laid out once at the big cover's size; the flight only
+    // moves and scales it in the draw phase, in the same frame the real covers hide (owner: no
+    // blank frame when the drag starts, no reload or dark box as it shrinks).
     val request = remember(artUri) {
         ImageRequest.Builder(context).data(artUri).size(FLIGHT_PX).crossfade(false).build()
     }
-    val big = sheet.bigCover
-    val mini = sheet.miniCover
-    val flying = sheet.flying && big != null && mini != null
     val density = LocalDensity.current
-    val modifier = if (flying) {
-        val open = sheet.openFraction
-        val t = FastOutSlowInEasing.transform(((0.55f - open) / 0.55f).coerceIn(0f, 1f))
-        fun mix(a: Float, b: Float) = a + (b - a) * t
-        val bigTop = big!!.top + (1f - open) * sheet.heightPx
-        val left = mix(big.left, mini!!.left)
-        val top = mix(bigTop, mini.top)
-        val corner = with(density) { mix(12f, 8f).dp }
-        Modifier
-            .offset { IntOffset(left.roundToInt(), top.roundToInt()) }
-            .size(with(density) { mix(big.width, mini.width).toDp() }, with(density) { mix(big.height, mini.height).toDp() })
-            .clip(RoundedCornerShape(corner))
-    } else {
-        Modifier
-            .size(64.dp)
-            .graphicsLayer { alpha = 0f }
-    }
-    AsyncImage(model = request, contentDescription = null, contentScale = ContentScale.Crop, modifier = modifier)
+    AsyncImage(
+        model = request,
+        contentDescription = null,
+        contentScale = ContentScale.Crop,
+        modifier = Modifier
+            .size(with(density) { big.width.toDp() }, with(density) { big.height.toDp() })
+            .graphicsLayer {
+                val mini = sheet.miniCover
+                if (!sheet.flying || mini == null) {
+                    alpha = 0f
+                    return@graphicsLayer
+                }
+                val open = sheet.openFraction
+                val t = FastOutSlowInEasing.transform(((0.55f - open) / 0.55f).coerceIn(0f, 1f))
+                fun mix(a: Float, b: Float) = a + (b - a) * t
+                alpha = 1f
+                transformOrigin = TransformOrigin(0f, 0f)
+                translationX = mix(big.left, mini.left)
+                translationY = mix(big.top + (1f - open) * sheet.heightPx, mini.top)
+                scaleX = mix(1f, mini.width / big.width)
+                scaleY = mix(1f, mini.height / big.height)
+                // The corner as seen, 12dp to the mini player's 8dp, through the scale.
+                shape = RoundedCornerShape(mix(12f, 8f).dp.toPx() / scaleX.coerceAtLeast(0.01f))
+                clip = true
+            },
+    )
 }
 
 /** The size the flying cover is decoded at, sharp enough for the big cover. */
@@ -489,6 +500,7 @@ fun NowPlayingScreen(
                 shape = RoundedCornerShape(topStart = corner, topEnd = corner)
                 clip = offsetPx > 0f
             }
+            .onGloballyPositioned { sheet?.sheetCoordinates = it }
             .background(Color.Black)
             // Drag down anywhere to close (lyrics scroll and the sliders keep their own drags).
             .draggable(
@@ -676,14 +688,20 @@ private fun BigCover(player: MusicPlayerState) {
                 .graphicsLayer {
                     scaleX = scale
                     scaleY = scale
-                    // While the cover flies to or from the mini player, the flying one is shown.
-                    alpha = if (sheet?.flying == true) 0f else 1f
+                    // While the cover flies to or from the mini player, the flying one is shown,
+                    // shadow and all (a hidden cover's shadow was the dark box around it).
+                    val flying = sheet?.flying == true
+                    alpha = if (flying) 0f else 1f
+                    shadowElevation = if (flying) 0f else shadow.toPx()
+                    shape = RoundedCornerShape(12.dp)
                 }
                 .onGloballyPositioned { coordinates ->
-                    // Where it sits when fully open: the sheet's slide taken back out.
-                    if (sheet != null) sheet.bigCover = coordinates.boundsInRoot().translate(0f, -(1f - sheet.openFraction) * sheet.heightPx)
+                    // Where it sits within Now Playing, so the sheet's own slide is left out.
+                    val root = sheet?.sheetCoordinates
+                    if (sheet != null && root != null && root.isAttached && coordinates.isAttached) {
+                        sheet.bigCover = root.localBoundingBoxOf(coordinates, clipBounds = false)
+                    }
                 }
-                .shadow(shadow, RoundedCornerShape(12.dp))
                 .clip(RoundedCornerShape(12.dp))
                 .background(Color(0xFF2C2C2E)),
             contentAlignment = Alignment.Center,
