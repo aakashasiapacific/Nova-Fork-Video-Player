@@ -170,8 +170,14 @@ object UiMappers {
             progress = video.card.progress,
             playVideoId = video.id,
             playLabel = if (video.inProgress) "Resume" else "Play",
+            deleteVideoId = video.id.takeIf { isDeletable(video) },
         )
     }
+
+    /** A file on this phone (device storage or a picked folder), which Delete can remove. */
+    private fun isDeletable(video: IndexedVideo): Boolean =
+        (video.source?.type == SourceType.DEVICE || video.source?.type == SourceType.FOLDER) &&
+            video.video.uri.startsWith("content://")
 
     private fun heroForShow(show: IndexedShow): HeroUi {
         val next = nextUp(show)
@@ -350,8 +356,7 @@ object UiMappers {
             resolutionLabel = resolutionLabel(video.width, video.height),
             sourceLabel = item.source?.let(::sourceLabel).orEmpty(),
             isMatched = meta != null,
-            deletable = (item.source?.type == SourceType.DEVICE || item.source?.type == SourceType.FOLDER) &&
-                video.uri.startsWith("content://"),
+            deletable = isDeletable(item),
         )
     }
 

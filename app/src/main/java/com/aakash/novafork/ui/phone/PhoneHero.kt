@@ -73,6 +73,7 @@ import com.aakash.novafork.ui.common.ArtPlaceholder
 import com.aakash.novafork.ui.common.BackdropArt
 import com.aakash.novafork.ui.common.HeroTitle
 import com.aakash.novafork.ui.common.HeroVideoPreview
+import com.aakash.novafork.ui.common.IosColors
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.PosterArt
 import com.aakash.novafork.ui.common.RatingPill
@@ -81,6 +82,7 @@ import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.Artwork
 import com.aakash.novafork.ui.model.HeroTarget
 import com.aakash.novafork.ui.model.HeroUi
+import com.aakash.novafork.ui.theme.NovaColors
 import kotlinx.coroutines.delay
 
 /** A hero without a preview moves on after this long, like Apple TV's. */
@@ -467,8 +469,9 @@ internal fun heroBelowBackdrop(posterWidth: Dp): Dp =
     posterWidth * 1.5f - PosterOverlap + HeroActionsGap + HeroButtonHeight + HeroDotsGap + DotsRowHeight / 2 + HeroDotsBottom
 
 /**
- * The hero's buttons: the white Play pill, a round star (Favorites) and a round "+"
- * (Watchlist). [fillPlay]: Play takes the row's free width (phone); otherwise a set width.
+ * The hero's buttons: the blue Play pill, a round star (Favorites), a round "+" (Watchlist) and,
+ * for a video file on this phone, a round red bin (Delete). [fillPlay] (phone): Play is as wide
+ * as the poster above it (owner), or takes the row when there is no poster; otherwise a set width.
  */
 @Composable
 private fun HeroActions(
@@ -483,9 +486,14 @@ private fun HeroActions(
         Button(
             onClick = play,
             interactionSource = playPress,
-            modifier = (if (fillPlay) Modifier.weight(1f) else Modifier.widthIn(min = 160.dp, max = 240.dp)).height(50.dp).pressScale(playPress),
-            colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black),
-            contentPadding = PaddingValues(horizontal = 24.dp),
+            modifier = when {
+                !fillPlay -> Modifier.widthIn(min = 160.dp, max = 240.dp)
+                hero.artwork.frameOnly -> Modifier.weight(1f)
+                // Never wider than the row leaves, on a narrow phone.
+                else -> Modifier.weight(1f, fill = false).width(LocalNovaDimens.current.detailPosterWidth)
+            }.height(50.dp).pressScale(playPress),
+            colors = ButtonDefaults.buttonColors(containerColor = NovaColors.IosBlue, contentColor = Color.White),
+            contentPadding = PaddingValues(horizontal = 16.dp),
         ) {
             NovaIcon(R.drawable.ic_play_arrow, contentDescription = null, modifier = Modifier.size(24.dp))
             Text(
@@ -507,11 +515,20 @@ private fun HeroActions(
             description = if (hero.onWatchlist) "Remove from Watchlist" else "Add to Watchlist",
             onClick = { actions.toggleWatchlist(hero.itemKey) },
         )
+        val deleteId = hero.deleteVideoId
+        if (deleteId != null) {
+            RoundHeroButton(
+                icon = R.drawable.ic_delete,
+                description = "Delete ${hero.title}",
+                tint = IosColors.Red,
+                onClick = { actions.deleteVideo(deleteId) },
+            )
+        }
     }
 }
 
 @Composable
-private fun RoundHeroButton(@DrawableRes icon: Int, description: String, onClick: () -> Unit) {
+private fun RoundHeroButton(@DrawableRes icon: Int, description: String, onClick: () -> Unit, tint: Color = Color.White) {
     val press = remember { MutableInteractionSource() }
     IconButton(
         onClick = onClick,
@@ -519,7 +536,7 @@ private fun RoundHeroButton(@DrawableRes icon: Int, description: String, onClick
         modifier = Modifier.size(50.dp).pressScale(press, pressed = 0.9f),
         colors = IconButtonDefaults.iconButtonColors(
             containerColor = Color.White.copy(alpha = 0.18f),
-            contentColor = Color.White,
+            contentColor = tint,
         ),
     ) {
         NovaIcon(icon, contentDescription = description)

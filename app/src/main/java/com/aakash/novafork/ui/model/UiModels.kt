@@ -123,6 +123,8 @@ data class HeroUi(
     val onWatchlist: Boolean = false,
     /** Starred (the hero's star is filled). */
     val favorite: Boolean = false,
+    /** The video Delete removes: a single file on this phone; null hides Delete. */
+    val deleteVideoId: Long? = null,
 ) {
     /** The library item key ("v:<id>" / "s:<showKey>"), which the watchlist stores. */
     val itemKey: String
