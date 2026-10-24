@@ -44,9 +44,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -121,7 +124,25 @@ internal fun BackdropPosterHeader(
                 .fillMaxWidth()
                 .height(backdropHeight)
                 // iOS parallax: as the page scrolls up, the backdrop follows at half the speed.
-                .graphicsLayer { translationY = scrolled() * 0.5f },
+                .graphicsLayer {
+                    translationY = scrolled() * 0.5f
+                    // Over a tinted hero the picture itself fades out at its foot (a mask), so it
+                    // melts into the tint below instead of ending in a line.
+                    if (fadeTo == Color.Transparent) compositingStrategy = CompositingStrategy.Offscreen
+                }
+                .then(
+                    if (fadeTo == Color.Transparent) {
+                        Modifier.drawWithContent {
+                            drawContent()
+                            drawRect(
+                                Brush.verticalGradient(0.5f to Color.Black, 1f to Color.Transparent),
+                                blendMode = BlendMode.DstIn,
+                            )
+                        }
+                    } else {
+                        Modifier
+                    },
+                ),
         ) {
             BackdropArt(artwork = artwork, modifier = Modifier.fillMaxSize().then(if (drift) Modifier.slowZoom() else Modifier))
             StatusBarShade(statusBar)
