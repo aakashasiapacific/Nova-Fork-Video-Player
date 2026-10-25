@@ -77,9 +77,7 @@ import com.aakash.novafork.ui.common.IosButton
 import com.aakash.novafork.ui.common.IosProgressBar
 import com.aakash.novafork.ui.common.IosSpinner
 import com.aakash.novafork.ui.common.LandscapeArt
-import com.aakash.novafork.ui.common.LocalPageHold
 import com.aakash.novafork.ui.common.LocalPagePull
-import com.aakash.novafork.ui.common.LogoPullToRefresh
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.PosterArt
 import com.aakash.novafork.ui.common.ProgressStrip
@@ -157,44 +155,22 @@ internal fun ShowCardUi.subtitleLine(): String = metaLine(
 )
 
 /**
- * Pull-to-refresh with the app's logo (LogoPullToRefresh), held from the pull until the scan it
- * started is over. The page bounces past its top as the phone's do, which brings the logo out.
- * Scans that start on their own only show the scan banner.
+ * A tablet page that bounces past its ends as the phone's do; pulling it down past its top looks
+ * for new videos ([onRefresh]), silently, with a tick when letting go will.
  */
 @Composable
 internal fun TabletPullToRefresh(
-    scanning: Boolean,
     onRefresh: () -> Unit,
     modifier: Modifier = Modifier,
     content: @Composable BoxScope.() -> Unit,
 ) {
-    var pulled by remember { mutableStateOf(false) }
-    val currentScanning by rememberUpdatedState(scanning)
-    if (pulled) {
-        LaunchedEffect(Unit) {
-            // Give the scan a moment to start, then hold until it is over.
-            withTimeoutOrNull(PULL_REFRESH_GRACE_MS) { snapshotFlow { currentScanning }.first { it } }
-            snapshotFlow { currentScanning }.first { !it }
-            pulled = false
-        }
-    }
     val pull = remember { mutableFloatStateOf(0f) }
     val readPull = remember { { pull.floatValue } }
-    val hold = remember { mutableFloatStateOf(0f) }
-    CompositionLocalProvider(LocalPagePull provides readPull, LocalPageHold provides hold) {
-        LogoPullToRefresh(
-            refreshing = pulled,
-            onRefresh = {
-                pulled = true
-                onRefresh()
-            },
-            modifier = modifier.iosOverscroll(pullState = pull, holdState = hold),
-            content = content,
-        )
+    CompositionLocalProvider(LocalPagePull provides readPull) {
+        Box(modifier.iosOverscroll(pullState = pull, onPullRefresh = onRefresh), content = content)
     }
 }
 
-private const val PULL_REFRESH_GRACE_MS = 900L
 
 // ---------------------------------------------------------------------------------------------
 // Buttons and labels

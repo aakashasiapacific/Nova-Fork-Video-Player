@@ -85,10 +85,7 @@ fun PhoneBrowseScreen(
                 }
             },
         )
-        ScanBanner(scan)
-        PhonePullToRefresh(
-            scanning = scan.running,
-            onRefresh = actions::refresh,
+        Box(
             modifier = Modifier.fillMaxSize(),
         ) {
             LazyColumn(

@@ -127,7 +127,6 @@ import com.aakash.novafork.ui.common.Hairline
 import com.aakash.novafork.ui.common.IosColors
 import com.aakash.novafork.ui.common.LocalBottomBarSpace
 import com.aakash.novafork.ui.common.LocalMenuFocus
-import com.aakash.novafork.ui.common.LocalPageHold
 import com.aakash.novafork.ui.common.LocalPagePull
 import com.aakash.novafork.ui.common.LocalTabReselect
 import com.aakash.novafork.ui.common.NovaIcon
@@ -375,15 +374,15 @@ fun PhoneApp(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
                                 // when pulled down from its top, shrinking back toward its poster.
                                 val pull = remember { mutableFloatStateOf(0f) }
                                 val readPull = remember { { pull.floatValue } }
-                                val hold = remember { mutableFloatStateOf(0f) }
-                                CompositionLocalProvider(LocalPagePull provides readPull, LocalPageHold provides hold) {
+                                CompositionLocalProvider(LocalPagePull provides readPull) {
                                     Box(
                                         Modifier
                                             .fillMaxSize()
                                             .iosOverscroll(
                                                 onPullClose = if (route.isTitlePage()) ({ currentActions.back() }) else null,
                                                 pullState = pull,
-                                                holdState = hold,
+                                                // Anywhere else, pulling down past the top looks for new videos, silently.
+                                                onPullRefresh = if (route.isTitlePage()) null else currentActions::refreshQuietly,
                                             )
                                             // Inside the bounce, so it still sees the push past the end.
                                             .nestedScroll(pageEnd),

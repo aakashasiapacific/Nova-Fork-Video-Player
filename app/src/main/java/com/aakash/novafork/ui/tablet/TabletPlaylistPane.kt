@@ -74,7 +74,7 @@ internal fun TabletPlaylistPane(playlist: PlaylistDetailsUi, actions: AppActions
                     contentAlignment = Alignment.Center,
                 ) {
                     EmptyState(
-                        icon = R.drawable.ic_logo,
+                        icon = R.drawable.ic_playlist_add,
                         title = "No videos yet",
                         body = "Long-press a video in a folder, the library or a show and pick Add to playlist.",
                     )

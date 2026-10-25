@@ -15,7 +15,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -48,7 +47,7 @@ import kotlinx.coroutines.launch
 internal fun Modifier.iosOverscroll(
     onPullClose: (() -> Unit)? = null,
     pullState: MutableFloatState? = null,
-    holdState: MutableFloatState? = null,
+    onPullRefresh: (() -> Unit)? = null,
 ): Modifier {
     val scope = rememberCoroutineScope()
     val closePx = with(LocalDensity.current) { 120.dp.toPx() }
@@ -56,23 +55,19 @@ internal fun Modifier.iosOverscroll(
     val haptics = LocalHapticFeedback.current
     val ownPull = remember { mutableFloatStateOf(0f) }
     var pull by (pullState ?: ownPull)
-    // A pull-to-refresh can hold the page down this far (see LocalPageHold) until it lets go.
-    val ownHold = remember { mutableFloatStateOf(0f) }
-    val hold by (holdState ?: ownHold)
+    val refreshPx = with(LocalDensity.current) { RefreshPull.toPx() }
+    val refresh by rememberUpdatedState(onPullRefresh)
     var heightPx by remember { mutableFloatStateOf(1f) }
     val connection = remember {
         object : NestedScrollConnection {
             var settle: Job? = null
 
-            fun springTo(target: Float, velocity: Float) {
+            fun springBack(velocity: Float) {
                 settle?.cancel()
                 settle = scope.launch {
-                    animate(pull, target, velocity, spring(dampingRatio = 0.82f, stiffness = 320f)) { value, _ -> pull = value }
+                    animate(pull, 0f, velocity, spring(dampingRatio = 0.82f, stiffness = 320f)) { value, _ -> pull = value }
                 }
             }
-
-            /** Back to rest, or to the refresh's hold while it holds the page down. */
-            fun springBack(velocity: Float) = springTo(if (pull > 0f) hold else 0f, velocity)
 
             override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
                 if (source != NestedScrollSource.UserInput || pull == 0f) return Offset.Zero
@@ -81,16 +76,20 @@ internal fun Modifier.iosOverscroll(
                 val back = (pull > 0f && available.y < 0f) || (pull < 0f && available.y > 0f)
                 if (!back) return Offset.Zero
                 val next = pull + available.y
-                // A held refresh keeps its gap open; the list scrolls on under it.
-                val clamped = if (pull > 0f) next.coerceAtLeast(hold.coerceAtMost(pull)) else next.coerceAtMost(0f)
+                val clamped = if (pull > 0f) next.coerceAtLeast(0f) else next.coerceAtMost(0f)
                 val used = clamped - pull
                 pull = clamped
-                if (armed && pull <= closePx) armed = false
+                if (armed && pull <= armAt()) armed = false
                 return Offset(0f, used)
             }
 
-            /** Pulled far enough that letting go closes the page: a tick says so. */
+            /**
+             * Pulled far enough that letting go closes the page, or refreshes the library (owner:
+             * stretching refreshes anywhere, silently): a tick says so.
+             */
             var armed = false
+
+            fun armAt(): Float = if (close != null) closePx else refreshPx
 
             override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
                 if (source != NestedScrollSource.UserInput || available.y == 0f) return Offset.Zero
@@ -98,7 +97,7 @@ internal fun Modifier.iosOverscroll(
                 // Rubber band: the further it is pulled, the harder it gets.
                 val resistance = 0.55f / (1f + abs(pull) / (heightPx * 0.2f))
                 pull += available.y * resistance
-                val nowArmed = close != null && pull > closePx
+                val nowArmed = (close != null || refresh != null) && pull > armAt()
                 if (nowArmed != armed) {
                     armed = nowArmed
                     if (armed) haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
@@ -114,6 +113,7 @@ internal fun Modifier.iosOverscroll(
                     onClose()
                     return available
                 }
+                if (onClose == null && pull > refreshPx) refresh?.invoke()
                 springBack(0f)
                 return available
             }
@@ -126,12 +126,6 @@ internal fun Modifier.iosOverscroll(
                 }
                 return Velocity.Zero
             }
-        }
-    }
-    // The refresh holding or letting go of the page moves it there.
-    LaunchedEffect(connection) {
-        snapshotFlow { hold }.collect { target ->
-            if (abs(pull - target) > 0.5f && (target > 0f || pull > 0f)) connection.springTo(target, 0f)
         }
     }
     return this
@@ -155,11 +149,8 @@ internal fun Modifier.iosOverscroll(
  */
 internal val LocalPagePull = staticCompositionLocalOf<() -> Float> { { 0f } }
 
-/**
- * How far a refresh holds the page around pulled down (0 = not held), set by LogoPullToRefresh
- * while the logo fills in the gap; null where the page has no bounce to hold.
- */
-internal val LocalPageHold = staticCompositionLocalOf<MutableFloatState?> { null }
+/** How far a page is pulled down past its top (after its resistance) before letting go refreshes. */
+private val RefreshPull = 96.dp
 
 /**
  * iOS's large title stretch: pulling the page down past its top makes its big title grow a

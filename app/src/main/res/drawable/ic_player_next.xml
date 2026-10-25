@@ -1,15 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Framework7 Icons (forward_end_fill), MIT License, Copyright (c) 2016 Vladimir Kharlampidi, https://github.com/framework7io/framework7-icons -->
+<!-- Next, after One UI's video player: two triangles and a bar. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"
     android:height="24dp"
-    android:viewportWidth="60"
-    android:viewportHeight="60">
-    <group
-        android:translateX="2"
-        android:translateY="2">
-        <path
-            android:fillColor="#FFFFFFFF"
-            android:pathData="M 9.4844 46.3867 C 10.4453 46.3867 11.2422 46.0820 12.1797 45.5195 L 36.0625 31.4805 C 37.3516 30.7071 38.0547 29.8633 38.3125 28.8789 L 38.3125 43.9492 C 38.3125 46.0117 39.3906 47.0898 41.4532 47.0898 L 46.7735 47.0898 C 48.8360 47.0898 49.8906 46.0117 49.8906 43.9492 L 49.8906 12.0273 C 49.8906 9.8945 48.8360 8.9102 46.7735 8.9102 L 41.4532 8.9102 C 39.3906 8.9102 38.3125 9.9883 38.3125 12.0273 L 38.3125 27.0742 C 38.0547 26.1133 37.3516 25.2461 36.0625 24.4961 L 12.1797 10.4336 C 11.2188 9.8711 10.4453 9.5664 9.4844 9.5664 C 7.6563 9.5664 6.1094 10.9727 6.1094 13.5976 L 6.1094 42.3789 C 6.1094 45.0039 7.6563 46.3867 9.4844 46.3867 Z" />
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <group android:pivotX="12" android:scaleX="-1">
+        <group android:translateX="0.6">
+            <path android:strokeColor="#FFFFFFFF" android:strokeWidth="1.8" android:strokeLineCap="round" android:pathData="M3.9,6.3 L3.9,17.7" />
+            <path android:fillColor="#FFFFFFFF" android:strokeColor="#FFFFFFFF" android:strokeWidth="1" android:strokeLineJoin="round" android:pathData="M12.2,6.9 L6.2,11.3 Q5.3,12 6.2,12.7 L12.2,17.1 Q12.9,17.6 12.9,16.7 L12.9,7.3 Q12.9,6.4 12.2,6.9 Z" />
+            <path android:fillColor="#FFFFFFFF" android:strokeColor="#FFFFFFFF" android:strokeWidth="1" android:strokeLineJoin="round" android:pathData="M19.1,6.9 L13.1,11.3 Q12.2,12 13.1,12.7 L19.1,17.1 Q19.8,17.6 19.8,16.7 L19.8,7.3 Q19.8,6.4 19.1,6.9 Z" />
+        </group>
     </group>
 </vector>

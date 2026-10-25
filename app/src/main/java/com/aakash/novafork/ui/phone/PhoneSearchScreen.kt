@@ -167,14 +167,14 @@ fun PhoneSearchScreen(
                     }
                     field.text.isBlank() -> CenteredScrollable(Modifier.padding(bottom = listSpace)) {
                         EmptyState(
-                            icon = R.drawable.ic_logo,
+                            icon = R.drawable.ic_search,
                             title = "Search your library",
                             body = "Find movies, shows, videos, songs, albums and artists.",
                         )
                     }
                     search.isEmpty && query.isNotEmpty() -> CenteredScrollable(Modifier.padding(bottom = listSpace)) {
                         EmptyState(
-                            icon = R.drawable.ic_logo,
+                            icon = R.drawable.ic_search,
                             title = "No Results",
                             body = "Nothing in your library matches “$query”.",
                         )

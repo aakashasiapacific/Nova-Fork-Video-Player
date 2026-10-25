@@ -1,6 +1,13 @@
 package com.aakash.novafork.ui.player
 
 import androidx.annotation.DrawableRes
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -25,8 +32,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
@@ -40,7 +51,6 @@ import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
 import com.aakash.novafork.core.format.Formats
 import com.aakash.novafork.ui.common.IosIconButton
-import com.aakash.novafork.ui.common.IosSpinner
 import com.aakash.novafork.ui.common.NovaDropdownMenu
 import com.aakash.novafork.ui.common.NovaMenuItem
 import com.aakash.novafork.ui.model.PlayerUiState
@@ -103,7 +113,12 @@ internal fun trackLabel(track: TrackUi): String = if (track.id == DISABLED_TRACK
 internal fun subtitlesOn(tracks: List<TrackUi>): Boolean = tracks.any { it.selected && it.id != DISABLED_TRACK_ID }
 
 @DrawableRes
-internal fun RepeatMode.iconRes(): Int = if (this == RepeatMode.ONE) R.drawable.ic_repeat_one else R.drawable.ic_repeat
+internal fun RepeatMode.iconRes(): Int = when (this) {
+    // One UI's play mode button: what happens when this video ends.
+    RepeatMode.OFF -> R.drawable.ic_player_mode_off
+    RepeatMode.ALL -> R.drawable.ic_player_mode_all
+    RepeatMode.ONE -> R.drawable.ic_player_mode_one
+}
 
 internal val RepeatMode.label: String
     get() = when (this) {
@@ -253,7 +268,7 @@ internal fun PlayPauseButton(
             )
         }
         if (buffering) {
-            IosSpinner(modifier = Modifier.fillMaxSize(), color = Color.White, strokeWidth = 3.dp)
+            PlayerSpinner(modifier = Modifier.fillMaxSize())
         }
     }
 }
@@ -371,3 +386,34 @@ internal fun PlayerTitle(state: PlayerUiState, modifier: Modifier = Modifier, la
         }
     }
 }
+
+/**
+ * Samsung's loading ring (owner: not iOS's spokes): a thin white arc turning round a faint ring,
+ * growing and shrinking as it goes, as One UI's progress circle does.
+ */
+@Composable
+internal fun PlayerSpinner(modifier: Modifier = Modifier, strokeWidth: Dp = 3.dp, color: Color = Color.White) {
+    val turning = rememberInfiniteTransition(label = "playerSpinner")
+    val turn by turning.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(tween(SPIN_MS, easing = LinearEasing)),
+        label = "spinnerTurn",
+    )
+    val sweep by turning.animateFloat(
+        initialValue = 30f,
+        targetValue = 270f,
+        animationSpec = infiniteRepeatable(tween(SWEEP_MS, easing = FastOutSlowInEasing), androidx.compose.animation.core.RepeatMode.Reverse),
+        label = "spinnerSweep",
+    )
+    Canvas(modifier) {
+        val stroke = strokeWidth.toPx()
+        val arcSize = Size(size.minDimension - stroke, size.minDimension - stroke)
+        val topLeft = Offset((size.width - arcSize.width) / 2f, (size.height - arcSize.height) / 2f)
+        drawArc(color.copy(alpha = 0.2f), 0f, 360f, useCenter = false, topLeft = topLeft, size = arcSize, style = Stroke(stroke))
+        drawArc(color, turn - 90f, sweep, useCenter = false, topLeft = topLeft, size = arcSize, style = Stroke(stroke, cap = StrokeCap.Round))
+    }
+}
+
+private const val SPIN_MS = 1_100
+private const val SWEEP_MS = 900

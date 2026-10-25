@@ -97,8 +97,7 @@ internal fun TabletHomeScreen(
     modifier: Modifier = Modifier,
 ) {
     TabletPullToRefresh(
-        scanning = scan.running,
-        onRefresh = actions::refresh,
+        onRefresh = actions::refreshQuietly,
         modifier = modifier.fillMaxSize(),
     ) {
         if (home.isEmpty) {
@@ -151,7 +150,6 @@ private fun HomeFeed(home: HomeUi, scan: ScanUi, permission: PermissionUi, layou
             } else {
                 item(key = "header", contentType = "header") {
                     Column(Modifier.statusBarsPadding()) {
-                        ScanBanner(scan)
                         Text(
                             text = "Home",
                             style = MaterialTheme.typography.headlineMedium,
@@ -191,15 +189,6 @@ private fun HomeFeed(home: HomeUi, scan: ScanUi, permission: PermissionUi, layou
             item(key = "library", contentType = "library") {
                 HomeLibraryLinks(actions, Modifier.widthIn(max = 720.dp), counts = home.libraryCounts)
             }
-        }
-        if (home.hero.isNotEmpty()) {
-            ScanBanner(
-                scan = scan,
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .statusBarsPadding()
-                    .padding(top = TabletTopBarSpace),
-            )
         }
     }
 }

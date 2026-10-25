@@ -72,7 +72,6 @@ import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
 import com.aakash.novafork.core.format.Formats
 import com.aakash.novafork.ui.common.IosButton
-import com.aakash.novafork.ui.common.IosSpinner
 import com.aakash.novafork.ui.common.IosTextButton
 import com.aakash.novafork.ui.common.LandscapeArt
 import com.aakash.novafork.ui.model.GestureFeedback
@@ -214,7 +213,7 @@ private fun VolumeTrack(fill: Float, vertical: Boolean) {
 
 @Composable
 internal fun BufferingIndicator(modifier: Modifier = Modifier) {
-    IosSpinner(modifier = modifier.size(48.dp), color = Color.White, strokeWidth = 3.dp)
+    PlayerSpinner(modifier = modifier.size(44.dp))
 }
 
 /** "−10s" / "+20s" halves shown on the side that was double-tapped. */

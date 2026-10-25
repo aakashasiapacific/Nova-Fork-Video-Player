@@ -36,7 +36,6 @@ import com.aakash.novafork.R
 import com.aakash.novafork.ui.common.IosColors
 import com.aakash.novafork.ui.common.IosGrabber
 import com.aakash.novafork.ui.common.IosSheetShape
-import com.aakash.novafork.ui.common.IosSpinner
 import com.aakash.novafork.ui.common.IosTextButton
 import com.aakash.novafork.ui.model.PlayerActions
 import com.aakash.novafork.ui.model.SubtitleResultUi
@@ -111,7 +110,7 @@ internal fun SubtitleSearchContent(search: SubtitleSearchUi, actions: PlayerActi
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                IosSpinner(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                PlayerSpinner(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
                 Spacer(Modifier.width(14.dp))
                 Text(text = "Searching…", style = MaterialTheme.typography.bodyMedium, color = dim)
             }
@@ -198,7 +197,7 @@ private fun SubtitleResultRow(item: SubtitleResultUi, downloading: Boolean, enab
         }
         Spacer(Modifier.width(12.dp))
         when {
-            downloading -> IosSpinner(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+            downloading -> PlayerSpinner(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
             item.downloaded -> Icon(
                 painter = painterResource(R.drawable.ic_check),
                 contentDescription = "Downloaded",

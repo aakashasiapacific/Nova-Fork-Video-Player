@@ -37,11 +37,13 @@ import com.aakash.novafork.NovaApp
 import com.aakash.novafork.ui.adaptive.rememberDeviceLayout
 import com.aakash.novafork.ui.player.PlayerScreen
 import com.aakash.novafork.ui.theme.NovaPlayerTheme
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.videolan.libvlc.util.VLCVideoLayout
 
 /**
@@ -360,6 +362,20 @@ class PlayerActivity : ComponentActivity(), PlayerController.Host {
 
     override fun enterPictureInPicture() {
         pip.enter()
+    }
+
+    override fun captureFrame(onDone: (Boolean) -> Unit) {
+        val layout = videoLayout ?: return onDone(false)
+        FrameCapture.copy(layout) { bitmap ->
+            if (bitmap == null) {
+                onDone(false)
+            } else {
+                lifecycleScope.launch {
+                    val saved = withContext(Dispatchers.IO) { FrameCapture.save(applicationContext, bitmap, controller?.state?.value?.title) }
+                    onDone(saved)
+                }
+            }
+        }
     }
 
     override fun launchSubtitlePicker(): Boolean {

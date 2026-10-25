@@ -115,6 +115,9 @@ class PlayerController(
 
         /** The configuration of the screen the player is shown on. */
         val screenConfiguration: Configuration
+
+        /** Saves the frame on screen to the gallery; [onDone] says whether it did, on the main thread. */
+        fun captureFrame(onDone: (Boolean) -> Unit)
     }
 
     private class NowPlaying(val uri: String, val kind: UriKind, val fileName: String, val entry: VideoWithMeta?) {
@@ -1315,6 +1318,12 @@ class PlayerController(
         userRotated = true
         host.screenOrientation = orientation
         showLabel(label)
+    }
+
+    override fun captureFrame() {
+        val host = host
+        if (released || host == null) return
+        host.captureFrame { saved -> showLabel(if (saved) "Saved to Pictures" else "Couldn't capture this frame") }
     }
 
     override fun enterPictureInPicture() {

@@ -201,7 +201,6 @@ private fun SourcesPane(
                             NovaIcon(R.drawable.ic_refresh, contentDescription = "Rescan all")
                         }
                     }
-                    ScanBanner(scan, Modifier.padding(top = 4.dp))
                 }
             }
 
@@ -616,7 +615,7 @@ private fun BrowseDirPane(
             }
             isEmpty -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 EmptyState(
-                    icon = R.drawable.ic_logo,
+                    icon = R.drawable.ic_folder_open,
                     title = "No videos here",
                     body = "This folder has no videos or subfolders with videos.",
                 )

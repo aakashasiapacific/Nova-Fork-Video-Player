@@ -1,15 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Framework7 Icons (lock_open), MIT License, Copyright (c) 2016 Vladimir Kharlampidi, https://github.com/framework7io/framework7-icons -->
+<!-- Lock, after One UI's video player: a closed padlock. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"
     android:height="24dp"
-    android:viewportWidth="60"
-    android:viewportHeight="60">
-    <group
-        android:translateX="2"
-        android:translateY="2">
-        <path
-            android:fillColor="#FFFFFFFF"
-            android:pathData="M 40.4336 3.1797 C 33.8242 3.1797 27.4492 7.7266 27.4492 17.4063 L 27.4492 24.4844 L 7.7851 24.4844 C 4.2695 24.4844 2.5586 26.2188 2.5586 29.9922 L 2.5586 47.3125 C 2.5586 51.1094 4.2695 52.8203 7.7851 52.8203 L 30.5195 52.8203 C 34.0351 52.8203 35.7461 51.1094 35.7461 47.3125 L 35.7461 29.9922 C 35.7461 26.4766 34.2695 24.7422 31.2227 24.5312 L 31.2227 16.9141 C 31.2227 10.2578 35.5351 6.7656 40.4336 6.7656 C 45.3553 6.7656 49.6681 10.2578 49.6681 16.9141 L 49.6681 22.3047 C 49.6681 23.9688 50.4884 24.6719 51.5665 24.6719 C 52.5976 24.6719 53.4414 24.0391 53.4414 22.3750 L 53.4414 17.4063 C 53.4414 7.7266 47.0430 3.1797 40.4336 3.1797 Z M 30.3555 28.0234 C 31.4570 28.0234 31.9727 28.4922 31.9727 29.7813 L 31.9727 47.5000 C 31.9727 48.8125 31.4570 49.3047 30.3555 49.3047 L 7.9492 49.3047 C 6.8711 49.3047 6.3320 48.8125 6.3320 47.5000 L 6.3320 29.7813 C 6.3320 28.4922 6.8711 28.0234 7.9492 28.0234 Z" />
-    </group>
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path android:strokeColor="#FFFFFFFF" android:strokeWidth="1.7" android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M8.3,10.6 V8 A3.7,3.7 0 0 1 15.7,8 V10.6" />
+    <path android:strokeColor="#FFFFFFFF" android:strokeWidth="1.7" android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M7.4,10.6 H16.6 A2.2,2.2 0 0 1 18.8,12.8 V18 A2.2,2.2 0 0 1 16.6,20.2 H7.4 A2.2,2.2 0 0 1 5.2,18 V12.8 A2.2,2.2 0 0 1 7.4,10.6 Z" />
+    <path android:fillColor="#FFFFFFFF" android:pathData="M12,14.2 m-1.2,0 a1.2,1.2 0 1 0 2.4,0 a1.2,1.2 0 1 0 -2.4,0 Z M11.4,14.6 H12.6 V16.8 H11.4 Z" />
 </vector>

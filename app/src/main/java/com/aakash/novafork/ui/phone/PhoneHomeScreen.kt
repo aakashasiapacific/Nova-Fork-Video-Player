@@ -117,9 +117,7 @@ fun PhoneHomeScreen(
     actions: AppActions,
     modifier: Modifier = Modifier,
 ) {
-    PhonePullToRefresh(
-        scanning = scan.running,
-        onRefresh = actions::refresh,
+    Box(
         modifier = modifier.fillMaxSize(),
     ) {
         if (home.isEmpty) {
@@ -242,12 +240,6 @@ private fun HomeFeed(home: HomeUi, scan: ScanUi, permission: PermissionUi, actio
                         1f to Color.Transparent,
                     ),
                 ),
-        )
-        ScanBanner(
-            scan = scan,
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .statusBarsPadding(),
         )
     }
 }
@@ -416,7 +408,7 @@ private fun HomeOnboarding(scan: ScanUi, permission: PermissionUi, actions: AppA
                     )
                 }
                 EmptyState(
-                    icon = R.drawable.ic_logo,
+                    icon = R.drawable.ic_video_library,
                     title = "Your videos, with posters",
                     body = "Nova Fork finds the videos on your phone, in folders and on network shares, " +
                         "and dresses them up with posters, backdrops and details.",

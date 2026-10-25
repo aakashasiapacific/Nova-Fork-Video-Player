@@ -23,15 +23,9 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -41,7 +35,6 @@ import com.aakash.novafork.data.StoragePermissions
 import com.aakash.novafork.data.backup.BackupManager
 import com.aakash.novafork.player.PlayerIntents
 import com.aakash.novafork.ui.audio.LocalMusicEnabled
-import com.aakash.novafork.ui.common.LaunchLogo
 import com.aakash.novafork.ui.common.LocalHeroPreviewEnabled
 import com.aakash.novafork.ui.common.LocalStatusBarIcons
 import com.aakash.novafork.ui.model.AppActions
@@ -225,16 +218,10 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
-        // Android 12+: the launch screen's white logo is taken over by LaunchLogo, drawn in the
-        // same place, which fills it with colour and fades into Home.
-        val coldStart = savedInstanceState == null
+        // Android 12+: the black launch screen fades into Home instead of cutting (iOS).
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             splashScreen.setOnExitAnimationListener { view ->
-                if (coldStart) {
-                    view.remove()
-                } else {
-                    view.animate().alpha(0f).setDuration(SPLASH_FADE_MS).withEndAction { view.remove() }.start()
-                }
+                view.animate().alpha(0f).setDuration(SPLASH_FADE_MS).withEndAction { view.remove() }.start()
             }
         }
         setContent {
@@ -247,11 +234,7 @@ class MainActivity : ComponentActivity() {
                 LocalHeroPreviewEnabled provides true,
                 LocalMusicEnabled provides true,
             ) {
-                Box(Modifier.fillMaxSize()) {
-                    NovaRoot(state = state, actions = actions)
-                    var launching by rememberSaveable { mutableStateOf(coldStart) }
-                    if (launching) LaunchLogo(onDone = { launching = false })
-                }
+                NovaRoot(state = state, actions = actions)
             }
         }
         lifecycleScope.launch {
@@ -389,6 +372,16 @@ class MainActivity : ComponentActivity() {
             size,
             size / 2,
         ).toBundle()
+    }
+
+    /** The first start is the launch, which refreshes on its own (MainViewModel). */
+    private var started = false
+
+    override fun onStart() {
+        super.onStart()
+        // Every return to the app looks for new videos again, silently, as at launch.
+        if (started) viewModel.onAppReturned()
+        started = true
     }
 
     override fun onResume() {

@@ -42,7 +42,6 @@ import com.aakash.novafork.R
 import com.aakash.novafork.ui.common.IosColors
 import com.aakash.novafork.ui.common.IosGrabber
 import com.aakash.novafork.ui.common.IosSheetShape
-import com.aakash.novafork.ui.common.IosSpinner
 import com.aakash.novafork.ui.common.LandscapeArt
 import com.aakash.novafork.ui.common.NovaChip
 import com.aakash.novafork.ui.model.CastDeviceUi
@@ -246,7 +245,7 @@ private fun CastOptions(state: PlayerUiState, actions: PlayerActions, onDismiss:
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                IosSpinner(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                PlayerSpinner(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
                 Spacer(Modifier.width(14.dp))
                 Text(
                     text = "Looking for Chromecasts and TVs on this Wi-Fi…",

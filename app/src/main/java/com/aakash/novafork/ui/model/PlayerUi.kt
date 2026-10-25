@@ -159,6 +159,9 @@ data class PlayerUiState(
  * Calls are cheap and main-thread safe.
  */
 interface PlayerActions {
+    /** Samsung's Capture: the frame on screen saved as a picture. */
+    fun captureFrame() {}
+
     fun togglePlay()
     fun play()
     fun pause()

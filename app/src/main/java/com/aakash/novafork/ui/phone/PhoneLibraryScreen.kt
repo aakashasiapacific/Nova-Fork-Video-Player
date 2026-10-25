@@ -71,12 +71,9 @@ fun PhoneLibraryScreen(
                 if (library.filter.isChip) SortMenu(current = library.sort, onSelect = actions::setLibrarySort)
             },
         )
-        ScanBanner(scan)
         // The Watchlist and Favorites pages are lists of their own, without the chips.
         if (library.filter.isChip) FilterChipsRow(library = library, onSelect = actions::setLibraryFilter)
-        PhonePullToRefresh(
-            scanning = scan.running,
-            onRefresh = actions::refresh,
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f),
@@ -158,7 +155,7 @@ private class EmptyContent(@DrawableRes val icon: Int, val title: String, val bo
 
 private fun emptyContentFor(filter: LibraryFilter): EmptyContent = when (filter) {
     LibraryFilter.ALL -> EmptyContent(
-        R.drawable.ic_logo,
+        R.drawable.ic_video_library,
         "Nothing here yet",
         "Videos from your device, folders and network shares show up here after a scan.",
     )

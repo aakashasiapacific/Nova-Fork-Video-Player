@@ -77,7 +77,6 @@ import com.aakash.novafork.ui.common.GlassCircle
 import com.aakash.novafork.ui.common.IosSpinner
 import com.aakash.novafork.ui.common.LandscapeArt
 import com.aakash.novafork.ui.common.LocalBottomBarSpace
-import com.aakash.novafork.ui.common.LogoPullToRefresh
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.PosterArt
 import com.aakash.novafork.ui.common.ProgressStrip
@@ -103,9 +102,6 @@ import com.aakash.novafork.ui.theme.NovaColors
 import kotlinx.coroutines.delay
 
 private val ThumbShape = RoundedCornerShape(8.dp)
-
-/** How long a pull waits for the refresh to start a scan before the spinner gives up. */
-private const val PULL_START_GRACE_MS = 1_500L
 
 // ---------------------------------------------------------------------------------------------
 // Labels
@@ -795,42 +791,6 @@ internal fun CenteredScrollable(modifier: Modifier = Modifier, content: @Composa
             content = content,
         )
     }
-}
-
-/**
- * Pull-to-refresh with the app's logo (LogoPullToRefresh) for a refresh the user pulled for, held
- * until that scan finishes. Scans started elsewhere (app start, a new source) are reported by the
- * ScanBanner instead.
- */
-@Composable
-internal fun PhonePullToRefresh(
-    scanning: Boolean,
-    onRefresh: () -> Unit,
-    modifier: Modifier = Modifier,
-    content: @Composable BoxScope.() -> Unit,
-) {
-    var pulled by remember { mutableStateOf(false) }
-    var scanSeen by remember { mutableStateOf(false) }
-    LaunchedEffect(pulled, scanning) {
-        when {
-            !pulled -> scanSeen = false
-            scanning -> scanSeen = true
-            scanSeen -> pulled = false
-            else -> {
-                delay(PULL_START_GRACE_MS)
-                pulled = false
-            }
-        }
-    }
-    LogoPullToRefresh(
-        refreshing = pulled,
-        onRefresh = {
-            pulled = true
-            onRefresh()
-        },
-        modifier = modifier,
-        content = content,
-    )
 }
 
 @Composable

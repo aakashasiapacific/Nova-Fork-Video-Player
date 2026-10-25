@@ -52,7 +52,7 @@ fun PhonePlaylistScreen(
         } else if (playlist.videos.isEmpty()) {
             CenteredScrollable {
                 EmptyState(
-                    icon = R.drawable.ic_logo,
+                    icon = R.drawable.ic_playlist_add,
                     title = "No videos yet",
                     body = "Long-press a video in Browse, Library or a show and pick Add to playlist.",
                 )

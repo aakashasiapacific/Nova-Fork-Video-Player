@@ -304,6 +304,9 @@ interface AppActions {
     fun preview(item: LibraryItemUi)
 
     fun refresh()
+
+    /** The library refresh with nothing shown for it (pulling a page down, coming back to the app). */
+    fun refreshQuietly() = refresh()
     fun requestPermission()
     /** Opens the system "All files access" screen (Android 11+). */
     fun requestAllFilesAccess()

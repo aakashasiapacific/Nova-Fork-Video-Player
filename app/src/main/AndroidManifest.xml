@@ -14,6 +14,8 @@
     <!-- Android 13+: videos, plus images so poster.jpg / fanart.jpg next to a video can be shown -->
     <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <!-- Saving a captured video frame to Pictures needs this before Android 10 only. -->
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
     <!-- Android 13+: music for the Audio tab -->
     <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
     <!-- Android 14+: "Allow limited access" -->

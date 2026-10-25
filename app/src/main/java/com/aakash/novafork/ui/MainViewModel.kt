@@ -407,6 +407,27 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
         launchSafely("Couldn't scan the library") { library.refreshAll() }
     }
 
+    override fun refreshQuietly() {
+        viewModelScope.launch {
+            try {
+                library.refreshAll()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.w(TAG, "A background refresh failed", e)
+            }
+        }
+    }
+
+    /**
+     * Back in the app (owner: every opening rescans, silently): the launch's light refresh again,
+     * which skips folders and shares scanned in the last half hour.
+     */
+    fun onAppReturned() {
+        graph.onMainScreenCreated()
+        refreshQuietly()
+    }
+
     override fun rescanSource(sourceId: Long) {
         if (state.value.browse.sources.any { it.id == sourceId && it.type == SourceType.DEVICE }) {
             val blocked = deviceScanBlocked()

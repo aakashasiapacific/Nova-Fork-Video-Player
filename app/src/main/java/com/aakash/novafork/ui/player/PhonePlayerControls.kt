@@ -33,6 +33,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.aakash.novafork.R
 import com.aakash.novafork.ui.common.rememberEndsAt
 import com.aakash.novafork.ui.model.PlayerActions
@@ -83,6 +84,18 @@ internal fun PhonePlayerControls(
             if (state.error == null) {
                 PhoneTransportRow(state = state, actions = actions, modifier = Modifier.align(Alignment.Center))
             }
+            // Portrait: Samsung's Capture sits under the title, on the left.
+            if (portrait && state.castingTo == null) {
+                PlayerIconButton(
+                    icon = R.drawable.ic_player_capture,
+                    contentDescription = "Capture",
+                    onClick = actions::captureFrame,
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(start = 8.dp, top = PortraitCaptureTop)
+                        .graphicsLayer { translationY = -(1f - shown()) * ControlsSlide.toPx() },
+                )
+            }
             PhoneBottomBar(
                 state = state,
                 actions = actions,
@@ -101,6 +114,9 @@ internal fun PhonePlayerControls(
 
 /** How far the top and bottom bars travel as they come and go. */
 private val ControlsSlide = 36.dp
+
+/** Where Capture sits below the title in portrait, as in Samsung's player. */
+private val PortraitCaptureTop = 76.dp
 
 @Composable
 private fun PhoneTopBar(
@@ -249,31 +265,44 @@ private fun PhoneBottomBar(
             // Landscape keeps them to the right; portrait spreads them across, as Samsung does.
             horizontalArrangement = if (portrait) Arrangement.SpaceEvenly else Arrangement.spacedBy(8.dp, Alignment.End),
         ) {
+            // Landscape: Samsung's Capture at the far left of the row.
+            if (!portrait && state.castingTo == null) {
+                PlayerIconButton(icon = R.drawable.ic_player_capture, contentDescription = "Capture", onClick = actions::captureFrame)
+                Spacer(Modifier.weight(1f))
+            }
             PlayerIconButton(icon = R.drawable.ic_player_fit, contentDescription = "Fit or fill: ${state.aspect.label}", onClick = actions::cycleAspect)
             if (state.canEnterPictureInPicture) {
                 PlayerIconButton(icon = R.drawable.ic_player_popup, contentDescription = "Pop-up play", onClick = actions::enterPictureInPicture)
             }
             SpeedPill(rate = state.rate, onClick = { onOpenPanel(PlayerPanel.SPEED) })
             if (state.canRotate) {
-                PlayerIconButton(icon = R.drawable.ic_screen_rotation, contentDescription = "Rotate", onClick = actions::rotate)
+                PlayerIconButton(icon = R.drawable.ic_player_rotate, contentDescription = "Rotate", onClick = actions::rotate)
             }
             PlayerIconButton(icon = R.drawable.ic_player_lock, contentDescription = "Lock screen", onClick = actions::toggleLock)
         }
     }
 }
 
-/** Samsung's speed button: the rate, "1.0x", in a grey pill. */
+/** Samsung's speed button: the rate, "1.0x", small in a low grey pill, in a full-size touch target. */
 @Composable
 private fun SpeedPill(rate: Float, onClick: () -> Unit) {
     Box(
         Modifier
-            .height(40.dp)
+            .height(48.dp)
             .clip(RoundedCornerShape(percent = 50))
-            .background(Color.White.copy(alpha = 0.18f))
             .clickable(onClickLabel = "Playback speed", role = Role.Button, onClick = onClick)
-            .padding(horizontal = 12.dp),
+            .padding(horizontal = 4.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Text("%.1fx".format(rate), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = Color.White)
+        Box(
+            Modifier
+                .height(28.dp)
+                .clip(RoundedCornerShape(percent = 50))
+                .background(Color.White.copy(alpha = 0.16f))
+                .padding(horizontal = 9.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text("%.1fx".format(rate), fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
+        }
     }
 }

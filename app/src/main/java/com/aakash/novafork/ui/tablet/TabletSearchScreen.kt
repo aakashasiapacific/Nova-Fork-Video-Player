@@ -130,7 +130,7 @@ internal fun TabletSearchScreen(
             )
             query.isBlank() -> SearchMessage {
                 EmptyState(
-                    icon = R.drawable.ic_logo,
+                    icon = R.drawable.ic_search,
                     title = "Search your library",
                     body = "Find movies, shows, episodes, videos, songs, albums and artists.",
                 )
@@ -165,7 +165,7 @@ internal fun TabletSearchScreen(
             // Only claim "no matches" once the results belong to what is typed.
             search.query.trim() == query.trim() -> SearchMessage {
                 EmptyState(
-                    icon = R.drawable.ic_logo,
+                    icon = R.drawable.ic_search,
                     title = "No Matches",
                     body = "Nothing in your library matches “${query.trim()}”.",
                 )
