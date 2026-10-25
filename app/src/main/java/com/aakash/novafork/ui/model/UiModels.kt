@@ -152,6 +152,20 @@ data class HomeUi(
     val videos: List<VideoCardUi> = emptyList(),
     /** True when the library has no videos at all (show onboarding). */
     val isEmpty: Boolean = true,
+    /** How many each Library link leads to, shown beside it. */
+    val libraryCounts: LibraryCounts = LibraryCounts(),
+)
+
+/** The numbers beside Home's Library links; [bin] null while Android's bin hasn't been read. */
+@Immutable
+data class LibraryCounts(
+    val recent: Int = 0,
+    val watchlist: Int = 0,
+    val favorites: Int = 0,
+    val all: Int = 0,
+    val movies: Int = 0,
+    val shows: Int = 0,
+    val bin: Int? = null,
 )
 
 enum class LibraryFilter(val label: String) {

@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -16,7 +17,9 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -36,6 +39,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
@@ -64,11 +68,15 @@ import com.aakash.novafork.ui.common.LocalBottomBarSpace
 import com.aakash.novafork.ui.common.LocalSearchQuery
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.OnTabReselect
+import com.aakash.novafork.ui.common.PosterArt
 import com.aakash.novafork.ui.common.SwipeToDelete
 import com.aakash.novafork.ui.common.glass
 import com.aakash.novafork.ui.common.musicSearchResults
+import com.aakash.novafork.ui.common.searchHighlighted
 import com.aakash.novafork.ui.common.stretchWithPull
 import com.aakash.novafork.ui.model.AppActions
+import com.aakash.novafork.ui.model.Artwork
+import com.aakash.novafork.ui.model.LibraryItemUi
 import com.aakash.novafork.ui.model.SearchUi
 import kotlin.math.abs
 
@@ -161,11 +169,20 @@ fun PhoneSearchScreen(
                             body = "Nothing in your library matches “$query”.",
                         )
                     }
-                    else -> PhoneLibraryGrid(
-                        items = search.results,
-                        actions = actions,
-                        footer = { musicSearchResults(search) { actions.playMusic(it.songIds, it.startIndex) } },
-                    )
+                    else -> {
+                        // Apple Music's Top Hit: the best match first, larger, then the rest.
+                        val topHit = search.results.firstOrNull()
+                        PhoneLibraryGrid(
+                            items = search.results.drop(1),
+                            actions = actions,
+                            header = {
+                                if (topHit != null) {
+                                    item(key = "top:" + topHit.key, span = { GridItemSpan(maxLineSpan) }) { TopHit(topHit, actions) }
+                                }
+                            },
+                            footer = { musicSearchResults(search) { actions.playMusic(it.songIds, it.startIndex) } },
+                        )
+                    }
                 }
             }
         }
@@ -204,6 +221,58 @@ fun PhoneSearchScreen(
         )
     }
 }
+
+/** Search's best match, larger than the rest: its poster, title and what it is, tap to open. */
+@Composable
+private fun TopHit(item: LibraryItemUi, actions: AppActions) {
+    val artwork: Artwork
+    val title: String
+    val caption: String?
+    val open: () -> Unit
+    when (item) {
+        is LibraryItemUi.Video -> {
+            artwork = item.card.artwork
+            title = item.card.displayTitle()
+            caption = item.card.displaySubtitle()
+            open = { actions.openVideo(item.card.id) }
+        }
+        is LibraryItemUi.Show -> {
+            artwork = item.card.artwork
+            title = item.card.title
+            caption = countLabel(item.card.episodeCount, "episode")
+            open = { actions.openShow(item.card.key) }
+        }
+    }
+    Column(Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
+        Text("Top Hit", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(bottom = 10.dp))
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(14.dp))
+                .background(MaterialTheme.colorScheme.surfaceContainer)
+                .clickable(onClickLabel = "Open $title", onClick = open)
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            PosterArt(
+                artwork = artwork,
+                title = title,
+                modifier = Modifier
+                    .width(TopHitPosterWidth)
+                    .aspectRatio(2f / 3f)
+                    .clip(RoundedCornerShape(8.dp)),
+            )
+            Column(Modifier.weight(1f).padding(start = 14.dp)) {
+                Text(searchHighlighted(title), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 3, overflow = TextOverflow.Ellipsis)
+                if (!caption.isNullOrBlank()) {
+                    Text(caption, style = MaterialTheme.typography.bodyMedium, color = IosColors.SecondaryLabel, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp))
+                }
+            }
+        }
+    }
+}
+
+private val TopHitPosterWidth = 84.dp
 
 /** A slim glass capsule: magnifier, one line of text (or a short hint), clear. */
 @Composable

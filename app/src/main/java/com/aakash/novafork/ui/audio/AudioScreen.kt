@@ -48,6 +48,7 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -106,6 +107,7 @@ import com.aakash.novafork.data.music.MusicScanState
 import com.aakash.novafork.music.MusicPlayerState
 import com.aakash.novafork.ui.common.CollapsedTitleBar
 import com.aakash.novafork.ui.common.ContextMenuLift
+import com.aakash.novafork.ui.common.EndOfListGap
 import com.aakash.novafork.ui.common.IosButton
 import com.aakash.novafork.ui.common.IosColors
 import com.aakash.novafork.ui.common.IosGrabber
@@ -122,6 +124,8 @@ import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.NovaMenuItem
 import com.aakash.novafork.ui.common.NovaTextField
 import com.aakash.novafork.ui.common.OnTabReselect
+import com.aakash.novafork.ui.common.iosScrollIndicator
+import com.aakash.novafork.ui.common.rememberRowSnap
 import com.aakash.novafork.ui.common.stretchWithPull
 import com.aakash.novafork.ui.theme.AudioTheme
 import com.aakash.novafork.ui.theme.NovaColors
@@ -174,6 +178,9 @@ private const val ALBUM = "album:"
 private const val ARTIST = "artist:"
 private const val GENRE = "genre:"
 private const val STACK_SEPARATOR = "\u0001"
+
+/** How many albums Recently Played shows. */
+private const val RECENTLY_PLAYED = 10
 
 /** The album page's cover row, which its shrinking as it scrolls away is measured by. */
 private const val ALBUM_COVER_KEY = "cover"
@@ -367,8 +374,9 @@ private fun AudioPage(title: String?, content: LazyGridScope.() -> Unit) {
                 state = gridState,
                 modifier = Modifier
                     .fillMaxSize()
-                    .statusBarsPadding(),
-                contentPadding = PaddingValues(start = Gutter, end = Gutter, bottom = 24.dp + LocalBottomBarSpace.current),
+                    .statusBarsPadding()
+                    .iosScrollIndicator(gridState),
+                contentPadding = PaddingValues(start = Gutter, end = Gutter, bottom = EndOfListGap + LocalBottomBarSpace.current),
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
                 verticalArrangement = Arrangement.spacedBy(0.dp),
                 content = content,
@@ -393,6 +401,14 @@ private fun LibraryHome(
     onRequestAccess: () -> Unit,
     ctx: PageContext,
 ) {
+    // Apple Music's Recently Played: the albums last listened to, newest first.
+    val recentlyPlayed = remember(library) {
+        library.albums
+            .mapNotNull { album -> album.songs.mapNotNull { it.lastPlayedAt }.maxOrNull()?.let { album to it } }
+            .sortedByDescending { it.second }
+            .take(RECENTLY_PLAYED)
+            .map { it.first }
+    }
     AudioPage("Library") {
         row("title") {
             Row(Modifier.padding(top = 20.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -424,6 +440,17 @@ private fun LibraryHome(
         // Apple Music's Library, cut down to what the owner uses: playlists, favorites, albums.
         row("playlists") { CategoryRow(R.drawable.ic_playlist_play, "Playlists") { ctx.onOpen(PLAYLISTS) } }
         row("favorites") { CategoryRow(R.drawable.ic_star, "Favorites", divider = false) { ctx.onOpen(FAVORITES) } }
+        if (recentlyPlayed.isNotEmpty()) {
+            row("recentTitle") { SectionTitle("Recently Played") }
+            row("recent") {
+                val rowState = rememberLazyListState()
+                LazyRow(state = rowState, flingBehavior = rememberRowSnap(rowState), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                    items(recentlyPlayed, key = { it.key }) { album ->
+                        AlbumTile(album, ctx, Modifier.width(150.dp)) { ctx.onOpen(ALBUM + album.key) }
+                    }
+                }
+            }
+        }
         if (library.recentlyAdded.isNotEmpty()) {
             row("albumsTitle") { SectionTitle("Albums") }
             // Newest first.
@@ -642,7 +669,8 @@ private fun AlbumPage(album: Album, ctx: PageContext) {
         if (more.isNotEmpty()) {
             row("moreTitle") { SectionTitle("More by ${album.artist}") }
             row("more") {
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                val rowState = rememberLazyListState()
+                LazyRow(state = rowState, flingBehavior = rememberRowSnap(rowState), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                     items(more, key = { it.key }) { other ->
                         AlbumTile(other, ctx, Modifier.width(150.dp)) { ctx.onOpen(ALBUM + other.key) }
                     }
@@ -736,7 +764,8 @@ private fun ArtistPage(artist: Artist, ctx: PageContext) {
         if (artist.albums.isNotEmpty()) {
             row("albumsTitle") { SectionTitle("Albums") }
             row("albums") {
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                val rowState = rememberLazyListState()
+                LazyRow(state = rowState, flingBehavior = rememberRowSnap(rowState), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                     items(artist.albums, key = { it.key }) { album ->
                         AlbumTile(album, ctx, Modifier.width(150.dp)) { ctx.onOpen(ALBUM + album.key) }
                     }

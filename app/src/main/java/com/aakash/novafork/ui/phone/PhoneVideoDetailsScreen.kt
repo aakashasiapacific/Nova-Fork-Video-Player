@@ -2,6 +2,7 @@ package com.aakash.novafork.ui.phone
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -26,16 +27,22 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
 import com.aakash.novafork.core.format.Formats
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
+import com.aakash.novafork.ui.common.EndOfListGap
 import com.aakash.novafork.ui.common.IosButton
 import com.aakash.novafork.ui.common.IosColors
 import com.aakash.novafork.ui.common.IosTextButton
 import com.aakash.novafork.ui.common.LocalBottomBarSpace
+import com.aakash.novafork.ui.common.LocalHud
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.NovaMenuItem
 import com.aakash.novafork.ui.common.SectionHeader
@@ -63,7 +70,7 @@ fun PhoneVideoDetailsScreen(
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             state = listState,
-            contentPadding = PaddingValues(bottom = dims.sectionSpacing + LocalBottomBarSpace.current),
+            contentPadding = PaddingValues(bottom = EndOfListGap + LocalBottomBarSpace.current),
         ) {
             item(key = "header") {
                 PhoneDetailsHeader(
@@ -288,7 +295,7 @@ private fun FileInfo(details: VideoDetailsUi, modifier: Modifier = Modifier) {
     if (wide.isEmpty() && short.isEmpty()) return
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         SectionHeader(title = "Information")
-        wide.forEach { (label, value) -> Fact(label, value) }
+        wide.forEach { (label, value) -> Fact(label, value, copyable = label == "File") }
         short.chunked(2).forEach { pair ->
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 pair.forEach { (label, value) -> Fact(label, value, Modifier.weight(1f)) }
@@ -298,9 +305,28 @@ private fun FileInfo(details: VideoDetailsUi, modifier: Modifier = Modifier) {
     }
 }
 
+/** A label over its value; a [copyable] one is copied by a long press, with a tick and "Copied". */
 @Composable
-private fun Fact(label: String, value: String, modifier: Modifier = Modifier) {
-    Column(modifier, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+private fun Fact(label: String, value: String, modifier: Modifier = Modifier, copyable: Boolean = false) {
+    val clipboard = LocalClipboardManager.current
+    val haptics = LocalHapticFeedback.current
+    val hud = LocalHud.current
+    val copy = if (copyable) {
+        Modifier
+            .clip(RoundedCornerShape(8.dp))
+            .combinedClickable(
+                onClick = {},
+                onLongClickLabel = "Copy $label",
+                onLongClick = {
+                    clipboard.setText(AnnotatedString(value))
+                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                    hud?.show(R.drawable.ic_check, "Copied")
+                },
+            )
+    } else {
+        Modifier
+    }
+    Column(modifier.then(copy), verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Text(label, style = MaterialTheme.typography.titleSmall)
         Text(value, style = MaterialTheme.typography.bodyMedium, color = IosColors.SecondaryLabel)
     }

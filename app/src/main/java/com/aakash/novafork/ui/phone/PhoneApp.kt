@@ -28,9 +28,12 @@ import androidx.compose.foundation.LocalOverscrollConfiguration
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -100,6 +103,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.Role
@@ -118,6 +122,7 @@ import com.aakash.novafork.ui.audio.MiniPlayerDockedHeight
 import com.aakash.novafork.ui.audio.NowPlayingSheet
 import com.aakash.novafork.ui.audio.ShellNowPlaying
 import com.aakash.novafork.ui.audio.rememberMusicShell
+import com.aakash.novafork.ui.common.EndOfListGap
 import com.aakash.novafork.ui.common.Hairline
 import com.aakash.novafork.ui.common.IosColors
 import com.aakash.novafork.ui.common.LocalBottomBarSpace
@@ -174,6 +179,23 @@ fun PhoneApp(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
     val statusBarTop = WindowInsets.statusBars.getTop(LocalDensity.current).toFloat()
     val statusFade = state.route != Route.Home
     val tabReselect = remember { TabReselect() }
+    // iOS 15's scroll edge: at the very end of a page the bars turn clear (their line goes too);
+    // as soon as content scrolls back under them they are dark again.
+    var atPageEnd by remember { mutableStateOf(false) }
+    LaunchedEffect(state.route) { atPageEnd = false }
+    val pageEnd = remember {
+        object : NestedScrollConnection {
+            override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
+                when {
+                    // Pushed on past the end: nothing more below.
+                    available.y < 0f -> atPageEnd = true
+                    consumed.y != 0f -> atPageEnd = false
+                }
+                return Offset.Zero
+            }
+        }
+    }
+    val barClear by animateFloatAsState(if (atPageEnd) 1f else 0f, tween(220), label = "barClear")
     val currentActions by rememberUpdatedState(actions)
     // The page transition is keyed by route alone, so the pages read the newest state through
     // this rather than being rebuilt with each change; a page that is not the current one (going
@@ -359,7 +381,9 @@ fun PhoneApp(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
                                             .iosOverscroll(
                                                 onPullClose = if (route.isTitlePage()) ({ currentActions.back() }) else null,
                                                 pullState = pull,
-                                            ),
+                                            )
+                                            // Inside the bounce, so it still sees the push past the end.
+                                            .nestedScroll(pageEnd),
                                     ) {
                                         PhonePage(state = stateFor(route), actions = currentActions)
                                     }
@@ -381,8 +405,34 @@ fun PhoneApp(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
                     enter = slideInVertically(spring(dampingRatio = 0.9f, stiffness = 500f)) { it } + fadeIn(tween(160)),
                     exit = slideOutVertically(tween(220)) { it } + fadeOut(tween(160)),
                 ) {
-                    Column(Modifier.fillMaxWidth().background(DockColor)) {
-                        Box(Modifier.fillMaxWidth().height(Hairline).background(IosColors.Separator))
+                    // Pulled up, it opens Now Playing with the finger (Apple Music); let go early
+                    // and it settles back.
+                    val screenPx = with(LocalDensity.current) { LocalConfiguration.current.screenHeightDp.dp.toPx() }
+                    val pullScope = rememberCoroutineScope()
+                    val pullState = rememberDraggableState { delta ->
+                        nowPlayingSheet.pull = (nowPlayingSheet.pull - delta / screenPx).coerceIn(0f, 1f)
+                    }
+                    Column(
+                        Modifier
+                            .fillMaxWidth()
+                            .draggable(
+                                state = pullState,
+                                orientation = Orientation.Vertical,
+                                onDragStopped = { velocity ->
+                                    if (nowPlayingSheet.pull > MiniPullOpen || velocity < -MiniFlingVelocity) {
+                                        nowPlayingOpen = true
+                                    } else {
+                                        pullScope.launch {
+                                            animate(nowPlayingSheet.pull, 0f, animationSpec = spring(dampingRatio = 1f, stiffness = 500f)) { value, _ ->
+                                                nowPlayingSheet.pull = value
+                                            }
+                                        }
+                                    }
+                                },
+                            )
+                            .drawBehind { drawRect(DockColor.copy(alpha = DockColor.alpha * (1f - barClear))) },
+                    ) {
+                        Box(Modifier.fillMaxWidth().height(Hairline).graphicsLayer { alpha = 1f - barClear }.background(IosColors.Separator))
                         MiniPlayerBar(
                             player = musicState,
                             actions = viewModel,
@@ -396,6 +446,7 @@ fun PhoneApp(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
             }
             // Over the mini player, so it slides up from behind the bar.
             PhoneNavigationBar(
+                clear = { barClear },
                 selected = top,
                 // The selected tab tapped again (iOS): from a page opened on it, back to its first
                 // page; on its first page, up to the top.
@@ -485,7 +536,7 @@ private fun PhonePage(state: AppUiState, actions: AppActions) {
             actions = actions,
             layout = DeviceLayout.PHONE,
             modifier = pageModifier.statusBarsPadding(),
-            contentPadding = PaddingValues(bottom = 16.dp + LocalBottomBarSpace.current),
+            contentPadding = PaddingValues(bottom = EndOfListGap + LocalBottomBarSpace.current),
         )
     }
 }
@@ -500,15 +551,17 @@ private fun PhoneNavigationBar(
     selected: TopDestination,
     onSelect: (TopDestination) -> Unit,
     modifier: Modifier = Modifier,
+    /** 0 dark (content under it) to 1 clear (at the end of the page). */
+    clear: () -> Float = { 0f },
 ) {
     val haptics = LocalHapticFeedback.current
     val scope = rememberCoroutineScope()
     Column(
         modifier
             .fillMaxWidth()
-            .background(DockColor),
+            .drawBehind { drawRect(DockColor.copy(alpha = DockColor.alpha * (1f - clear()))) },
     ) {
-        Box(Modifier.fillMaxWidth().height(Hairline).background(IosColors.Separator))
+        Box(Modifier.fillMaxWidth().height(Hairline).graphicsLayer { alpha = 1f - clear() }.background(IosColors.Separator))
         Row(Modifier.fillMaxWidth().height(TabBarHeight)) {
             TopDestination.entries.forEach { tab ->
                 val active = tab == selected
@@ -644,10 +697,13 @@ private fun Modifier.swipePages(
         val tracker = VelocityTracker()
         // Which way it goes is known only once the finger has moved.
         var deciding = false
+        // Past the point where letting go finishes it: a tick says so (and again if it goes back).
+        var armed = false
         detectHorizontalDragGestures(
             onDragStart = {
                 tracker.resetTracking()
                 deciding = canStart && swipe.from == null
+                armed = false
             },
             onDragEnd = {
                 deciding = false
@@ -702,6 +758,10 @@ private fun Modifier.swipePages(
             val reach = swipe.width * swipe.sign
             swipe.offset = (swipe.offset + amount).let { if (swipe.sign > 0) it.coerceIn(0f, reach) else it.coerceIn(reach, 0f) }
             val fraction = swipe.progress
+            if ((fraction > SwipeCommitFraction) != armed) {
+                armed = !armed
+                if (armed) haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+            }
             scope.launch { transition.seekTo(fraction, to) }
         }
     }
@@ -726,6 +786,10 @@ private val StatusFade = 14.dp
 private const val StatusFadeStrength = 0.6f
 
 private val TabBarHeight = 52.dp
+
+/** Pulled up past this share of the screen (or flicked), the mini player opens Now Playing. */
+private const val MiniPullOpen = 0.18f
+private const val MiniFlingVelocity = 900f
 
 /** How small a tapped tab's icon dips before it springs back. */
 private const val TabBounceFrom = 0.8f

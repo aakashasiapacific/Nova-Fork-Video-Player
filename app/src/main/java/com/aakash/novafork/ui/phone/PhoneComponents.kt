@@ -44,7 +44,9 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -56,11 +58,15 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -68,6 +74,7 @@ import com.aakash.novafork.R
 import com.aakash.novafork.core.format.Formats
 import com.aakash.novafork.data.db.SourceType
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
+import com.aakash.novafork.ui.common.EndOfListGap
 import com.aakash.novafork.ui.common.GlassCircle
 import com.aakash.novafork.ui.common.IosSpinner
 import com.aakash.novafork.ui.common.LandscapeArt
@@ -78,6 +85,7 @@ import com.aakash.novafork.ui.common.ProgressStrip
 import com.aakash.novafork.ui.common.RatingPill
 import com.aakash.novafork.ui.common.VideoMenuBox
 import com.aakash.novafork.ui.common.WatchedBadge
+import com.aakash.novafork.ui.common.iosScrollIndicator
 import com.aakash.novafork.ui.common.metaLine
 import com.aakash.novafork.ui.common.pressDim
 import com.aakash.novafork.ui.common.pressScale
@@ -92,6 +100,7 @@ import com.aakash.novafork.ui.model.MediaKind
 import com.aakash.novafork.ui.model.ShowCardUi
 import com.aakash.novafork.ui.model.TimelineMonth
 import com.aakash.novafork.ui.model.VideoCardUi
+import com.aakash.novafork.ui.theme.NovaColors
 import kotlinx.coroutines.delay
 
 private val ThumbShape = RoundedCornerShape(8.dp)
@@ -455,13 +464,17 @@ private fun GreyActionPill(@DrawableRes icon: Int, label: String, onClick: () ->
     }
 }
 
-/** Episode in a season list: still with progress, code and title, duration, then a short overview. */
+/**
+ * Episode in a season list: still with progress, code and title, duration, then a short
+ * overview. The one to watch next ([upNext]) says so in blue above its title.
+ */
 @Composable
 internal fun PhoneEpisodeRow(
     episode: EpisodeUi,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
     modifier: Modifier = Modifier,
+    upNext: Boolean = false,
 ) {
     val dims = LocalNovaDimens.current
     Column(
@@ -486,9 +499,15 @@ internal fun PhoneEpisodeRow(
             Column(Modifier.weight(1f)) {
                 // Apple TV's small grey caps above an episode's title: "EPISODE 3".
                 val label = if (episode.episode > 0) "EPISODE ${episode.episode}" else episode.code.uppercase()
-                if (label.isNotBlank()) {
+                if (label.isNotBlank() || upNext) {
                     Text(
-                        text = label,
+                        text = buildAnnotatedString {
+                            if (upNext) {
+                                withStyle(SpanStyle(color = NovaColors.IosBlue)) { append("UP NEXT") }
+                                if (label.isNotBlank()) append(" · ")
+                            }
+                            append(label)
+                        },
                         style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold, letterSpacing = 0.3.sp),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -533,17 +552,20 @@ internal fun PhoneLibraryGrid(
     state: LazyGridState = rememberLazyGridState(),
     /** More full-width content after the cards (search's music results). */
     footer: LazyGridScope.() -> Unit = {},
+    /** Full-width content before the cards (search's Top Hit). */
+    header: LazyGridScope.() -> Unit = {},
 ) {
     val dims = LocalNovaDimens.current
     val seen = remember { mutableSetOf<Any>() }
     LazyVerticalGrid(
         columns = GridCells.Adaptive(pinchedCell ?: dims.gridMinCell),
-        modifier = modifier.fillMaxSize().pinchColumns(state),
+        modifier = modifier.fillMaxSize().pinchColumns(state).iosScrollIndicator(state),
         state = state,
-        contentPadding = PaddingValues(start = dims.gutter, end = dims.gutter, top = 8.dp, bottom = dims.sectionSpacing + LocalBottomBarSpace.current),
+        contentPadding = PaddingValues(start = dims.gutter, end = dims.gutter, top = 8.dp, bottom = EndOfListGap + LocalBottomBarSpace.current),
         horizontalArrangement = Arrangement.spacedBy(dims.rowSpacing),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        header()
         itemsIndexed(items, key = { _, item -> item.key }) { index, item ->
             val appear = Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null).staggeredAppear(item.key, index, seen)
             when (item) {
@@ -573,31 +595,74 @@ internal fun PhoneTimelineGrid(
 ) {
     val dims = LocalNovaDimens.current
     val seen = remember { mutableSetOf<Any>() }
-    LazyVerticalGrid(
-        columns = GridCells.Adaptive(pinchedCell ?: dims.gridMinCell),
-        modifier = modifier.fillMaxSize().pinchColumns(state),
-        state = state,
-        contentPadding = PaddingValues(start = dims.gutter, end = dims.gutter, top = 0.dp, bottom = dims.sectionSpacing + LocalBottomBarSpace.current),
-        horizontalArrangement = Arrangement.spacedBy(dims.rowSpacing),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        months.forEach { month ->
-            item(key = "month:" + month.title, span = { GridItemSpan(maxLineSpan) }) {
-                Text(
-                    month.title,
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(top = 12.dp),
-                )
-            }
-            itemsIndexed(month.cards, key = { _, card -> "v:" + card.id }) { index, card ->
-                val appear = Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null).staggeredAppear("v:" + card.id, index, seen)
-                VideoMenuBox(videoId = card.id, title = card.displayTitle(), actions = actions, showDetails = false, modifier = appear) { openMenu ->
-                    PhonePosterCard(card, onClick = { actions.openVideo(card.id) }, onLongClick = openMenu)
+    // Where each month's heading sits in the grid, to know which month is under the top edge.
+    val headings = remember(months) {
+        var index = 0
+        months.map { month -> index.also { index += 1 + month.cards.size } }
+    }
+    Box(modifier.fillMaxSize()) {
+        LazyVerticalGrid(
+            columns = GridCells.Adaptive(pinchedCell ?: dims.gridMinCell),
+            modifier = Modifier.fillMaxSize().pinchColumns(state).iosScrollIndicator(state),
+            state = state,
+            contentPadding = PaddingValues(start = dims.gutter, end = dims.gutter, top = 0.dp, bottom = EndOfListGap + LocalBottomBarSpace.current),
+            horizontalArrangement = Arrangement.spacedBy(dims.rowSpacing),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            months.forEach { month ->
+                item(key = "month:" + month.title, span = { GridItemSpan(maxLineSpan) }) {
+                    Text(
+                        month.title,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(top = 12.dp),
+                    )
+                }
+                itemsIndexed(month.cards, key = { _, card -> "v:" + card.id }) { index, card ->
+                    val appear = Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null).staggeredAppear("v:" + card.id, index, seen)
+                    VideoMenuBox(videoId = card.id, title = card.displayTitle(), actions = actions, showDetails = false, modifier = appear) { openMenu ->
+                        PhonePosterCard(card, onClick = { actions.openVideo(card.id) }, onLongClick = openMenu)
+                    }
                 }
             }
         }
+        PinnedMonth(months, headings, state)
     }
+}
+
+/**
+ * The month being scrolled through stays pinned at the top, as Photos does; the next month's
+ * heading pushes it up and off as it arrives.
+ */
+@Composable
+private fun PinnedMonth(months: List<TimelineMonth>, headings: List<Int>, state: LazyGridState) {
+    val dims = LocalNovaDimens.current
+    val current by remember(headings) {
+        derivedStateOf {
+            val first = state.firstVisibleItemIndex
+            // At rest on the first heading the heading itself shows; nothing to pin yet.
+            if (first == 0 && state.firstVisibleItemScrollOffset == 0) -1 else headings.indexOfLast { it <= first }
+        }
+    }
+    val month = months.getOrNull(current) ?: return
+    var height by remember { mutableIntStateOf(0) }
+    Text(
+        month.title,
+        style = MaterialTheme.typography.titleLarge,
+        fontWeight = FontWeight.Bold,
+        modifier = Modifier
+            .fillMaxWidth()
+            .onSizeChanged { height = it.height }
+            .graphicsLayer {
+                // The next heading, once it reaches the pinned one, pushes it up.
+                val next = headings.getOrNull(current + 1)
+                val arriving = next?.let { index -> state.layoutInfo.visibleItemsInfo.firstOrNull { it.index == index } }
+                translationY = arriving?.let { (it.offset.y - height).coerceAtMost(0).toFloat() } ?: 0f
+            }
+            .background(MaterialTheme.colorScheme.background)
+            .padding(horizontal = dims.gutter)
+            .padding(top = 12.dp, bottom = 6.dp),
+    )
 }
 
 /**

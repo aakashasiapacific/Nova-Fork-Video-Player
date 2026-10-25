@@ -3,6 +3,7 @@ package com.aakash.novafork.ui.audio
 import androidx.activity.compose.BackHandler
 import androidx.annotation.DrawableRes
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.animateDpAsState
@@ -25,6 +26,7 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -153,12 +155,18 @@ fun NowPlayingHost(
     var drag by remember { mutableFloatStateOf(0f) }
     val scope = rememberCoroutineScope()
     LaunchedEffect(visible) {
+        // Opened by pulling the mini player up: it carries on from where the finger left it.
+        val pulled = sheet?.pull ?: 0f
+        if (visible && pulled > 0f) {
+            progress.snapTo(pulled)
+            sheet?.pull = 0f
+        }
         progress.animateTo(
             if (visible) 1f else 0f,
             if (visible) spring(dampingRatio = 0.86f, stiffness = 300f) else spring(dampingRatio = 1f, stiffness = 380f),
         )
     }
-    val fraction = (progress.value - drag).coerceIn(0f, 1f)
+    val fraction = (progress.value - drag + (sheet?.pull ?: 0f)).coerceIn(0f, 1f)
     SideEffect { sheet?.openFraction = fraction }
     DisposableEffect(sheet) { onDispose { sheet?.openFraction = 0f } }
     if (fraction > 0f || visible) {
@@ -194,6 +202,9 @@ fun NowPlayingHost(
 @Stable
 class NowPlayingSheet {
     var openFraction by mutableFloatStateOf(0f)
+
+    /** How far the mini player is being pulled up toward Now Playing (0 to 1), by the finger. */
+    var pull by mutableFloatStateOf(0f)
 
     /** Now Playing's height, which its slide is measured in. */
     var heightPx by mutableFloatStateOf(0f)
@@ -262,6 +273,9 @@ fun CoverFlight(artUri: String?) {
             },
     )
 }
+
+/** How long the mini player takes to fade from one song to the next. */
+private const val MINI_FADE_MS = 280
 
 /** What the big cover shows, and where in the queue, so a skip knows which way to slide. */
 private data class CoverSlide(val artUri: String?, val songId: Long?, val index: Int)
@@ -428,7 +442,10 @@ fun MiniPlayerBar(
                 .graphicsLayer { alpha = if (sheet != null && sheet.openFraction > 0f && sheet.bigCover != null) 0f else 1f },
             contentAlignment = Alignment.Center,
         ) {
-            Cover(now?.artUri, size = coverSize, corner = coverCorner)
+            // A new song's cover and name fade in over the old ones rather than switching.
+            Crossfade(targetState = now?.artUri, animationSpec = tween(MINI_FADE_MS), label = "miniCover") { art ->
+                Cover(art, size = coverSize, corner = coverCorner)
+            }
             // Little bars over the cover: dancing while it plays, still when paused.
             if (now != null) {
                 Box(
@@ -449,14 +466,16 @@ fun MiniPlayerBar(
                 .graphicsLayer { alpha = 1f - (kotlin.math.abs(swipe) / (skipPx * 2.2f)).coerceIn(0f, 0.7f) }
                 .padding(horizontal = 12.dp),
         ) {
-            Text(
-                now?.title ?: "Loading…",
-                style = androidx.compose.material3.MaterialTheme.typography.bodyLarge,
-                fontWeight = if (docked) FontWeight.Normal else FontWeight.SemiBold,
-                color = Color.White,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            Crossfade(targetState = now?.title ?: "Loading…", animationSpec = tween(MINI_FADE_MS), label = "miniTitle") { title ->
+                Text(
+                    title,
+                    style = androidx.compose.material3.MaterialTheme.typography.bodyLarge,
+                    fontWeight = if (docked) FontWeight.Normal else FontWeight.SemiBold,
+                    color = Color.White,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
             // The old docked one names only the song, unless something went wrong.
             if (!docked || player.error != null) {
                 Text(
@@ -1080,15 +1099,23 @@ private fun Scrubber(player: MusicPlayerState, actions: AudioActions) {
                     transformOrigin = TransformOrigin(0f, 0f)
                 },
         )
+        // A tap switches it between the time left and the song's whole length (Apple Music).
+        var showLength by rememberSaveable { mutableStateOf(false) }
         Text(
-            "-" + formatTime((player.durationMs - shownMs).coerceAtLeast(0)),
+            if (showLength) formatTime(player.durationMs.coerceAtLeast(0)) else "-" + formatTime((player.durationMs - shownMs).coerceAtLeast(0)),
             fontSize = 12.sp,
             color = Color.White.copy(alpha = timeAlpha),
-            modifier = Modifier.graphicsLayer {
-                scaleX = grow
-                scaleY = grow
-                transformOrigin = TransformOrigin(1f, 0f)
-            },
+            modifier = Modifier
+                .graphicsLayer {
+                    scaleX = grow
+                    scaleY = grow
+                    transformOrigin = TransformOrigin(1f, 0f)
+                }
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClickLabel = if (showLength) "Show time left" else "Show song length",
+                ) { showLength = !showLength },
         )
     }
 }

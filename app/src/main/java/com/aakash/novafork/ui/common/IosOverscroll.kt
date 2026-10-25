@@ -20,11 +20,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import kotlin.math.abs
@@ -46,6 +48,7 @@ internal fun Modifier.iosOverscroll(onPullClose: (() -> Unit)? = null, pullState
     val scope = rememberCoroutineScope()
     val closePx = with(LocalDensity.current) { 120.dp.toPx() }
     val close by rememberUpdatedState(onPullClose)
+    val haptics = LocalHapticFeedback.current
     val ownPull = remember { mutableFloatStateOf(0f) }
     var pull by (pullState ?: ownPull)
     var heightPx by remember { mutableFloatStateOf(1f) }
@@ -70,8 +73,12 @@ internal fun Modifier.iosOverscroll(onPullClose: (() -> Unit)? = null, pullState
                 val clamped = if (pull > 0f) next.coerceAtLeast(0f) else next.coerceAtMost(0f)
                 val used = clamped - pull
                 pull = clamped
+                if (armed && pull <= closePx) armed = false
                 return Offset(0f, used)
             }
+
+            /** Pulled far enough that letting go closes the page: a tick says so. */
+            var armed = false
 
             override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
                 if (source != NestedScrollSource.UserInput || available.y == 0f) return Offset.Zero
@@ -79,10 +86,16 @@ internal fun Modifier.iosOverscroll(onPullClose: (() -> Unit)? = null, pullState
                 // Rubber band: the further it is pulled, the harder it gets.
                 val resistance = 0.55f / (1f + abs(pull) / (heightPx * 0.2f))
                 pull += available.y * resistance
+                val nowArmed = close != null && pull > closePx
+                if (nowArmed != armed) {
+                    armed = nowArmed
+                    if (armed) haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                }
                 return Offset(0f, available.y)
             }
 
             override suspend fun onPreFling(available: Velocity): Velocity {
+                armed = false
                 if (pull == 0f) return Velocity.Zero
                 val onClose = close
                 if (onClose != null && pull > closePx) {

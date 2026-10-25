@@ -37,6 +37,7 @@ import com.aakash.novafork.data.db.SourceType
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
 import com.aakash.novafork.ui.common.DeviceAccessCard
 import com.aakash.novafork.ui.common.DeviceAccessNotice
+import com.aakash.novafork.ui.common.EndOfListGap
 import com.aakash.novafork.ui.common.Hairline
 import com.aakash.novafork.ui.common.IosColors
 import com.aakash.novafork.ui.common.IosIconButton
@@ -92,7 +93,7 @@ fun PhoneBrowseScreen(
         ) {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(bottom = dims.sectionSpacing + LocalBottomBarSpace.current),
+                contentPadding = PaddingValues(bottom = EndOfListGap + LocalBottomBarSpace.current),
             ) {
                 browseItems(
                     browse = browse,

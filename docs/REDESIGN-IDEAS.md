@@ -568,3 +568,21 @@ The owner asked for Apple Music to be copied more precisely, with less clutter. 
 - **Build 118 (owner: tab changes stuttered):**
   - Leaving Home stopped the hero's video preview on the main thread, and libVLC's stop waits for its decoders, so the page change hitched as it began. The preview now lets go of its surface at once and is stopped and freed in the background.
   - Swiping between tabs no longer snaps the page back before the next tab slides in: the swipe now drives the page change itself, so the two tabs move side by side with the finger, and letting go finishes (or undoes) the move from where it is, as the swipe back does.
+- **Build 119 (owner, all in one go):**
+  - No empty space at the end of pages: every list now ends a small gap above the tab bar instead of a section's worth, so Home's Library links sit lower and the last row reaches the bar.
+  - Home's Library links show their counts in grey before the chevron, as Apple TV does; Recently Deleted hides itself while the bin is empty.
+  - Home's Watchlist title opens the whole list ("Watchlist ›").
+  - Home: the status bar sits on solid black and fades into the page below it.
+  - Rows of posters and albums come to rest on a card's edge instead of halfway through one.
+  - Pull to close and the swipe back tick when letting go will act.
+  - Now Playing: a tap on the time left switches it to the song's length and back.
+  - Audio: Recently Played, the albums played last, before Albums.
+  - Search: the best match shows first as one larger Top Hit, then the rest.
+  - Video details: hold the file name to copy it.
+  - Show pages: the next episode to watch says UP NEXT in blue.
+  - Recently Added: the month being scrolled through stays pinned at the top until the next month pushes it off.
+  - Long grids (All Videos, Recently Added, Audio) show a thin scroll indicator while scrolling.
+  - At the very end of a page the tab bar and mini player lose their background, so the page shows through.
+  - Mini player: swipe it up to open Now Playing; the cover and title crossfade when the song changes.
+  - Action sheets: the dim behind fades in with the sheet.
+  - Already there: the next card peeks at a row's edge, Preferences' icon squares, and the version in About.

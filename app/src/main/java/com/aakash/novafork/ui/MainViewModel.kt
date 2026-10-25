@@ -46,9 +46,9 @@ import com.aakash.novafork.ui.model.AppUiState
 import com.aakash.novafork.ui.model.BackupUi
 import com.aakash.novafork.ui.model.BrowseDirUi
 import com.aakash.novafork.ui.model.DialogUi
-import com.aakash.novafork.ui.model.withRecentSearch
 import com.aakash.novafork.ui.model.IdentifyResultUi
 import com.aakash.novafork.ui.model.KeyStatus
+import com.aakash.novafork.ui.model.LibraryCounts
 import com.aakash.novafork.ui.model.LibraryFilter
 import com.aakash.novafork.ui.model.LibraryItemUi
 import com.aakash.novafork.ui.model.LibrarySort
@@ -66,6 +66,7 @@ import com.aakash.novafork.ui.model.SmbForm
 import com.aakash.novafork.ui.model.SourceUi
 import com.aakash.novafork.ui.model.TopDestination
 import com.aakash.novafork.ui.model.UpnpServerUi
+import com.aakash.novafork.ui.model.withRecentSearch
 import java.io.FileNotFoundException
 import java.io.IOException
 import java.io.OutputStream
@@ -125,6 +126,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
         /** Folders of network sources (other than SMB) listed live, most recently updated last. */
         val listings: Map<ListingKey, RemoteListing> = emptyMap(),
         val recentSearches: List<String> = emptyList(),
+        /** Videos in Android's bin; null until read. */
+        val binCount: Int? = null,
     )
 
     /** Search's recent searches, kept across launches (they never leave the device). */
@@ -295,22 +298,33 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
             ?: previewKey?.takeIf { it.startsWith("s:") }?.removePrefix("s:")
         val browse = UiMappers.browse(index, scan, lists.all)
         val openPlaylist = lists.open
+        val home = if (saved.isEmpty() && starred.isEmpty()) {
+            index.home
+        } else {
+            val keys = saved.toHashSet()
+            val stars = starred.toHashSet()
+            index.home.copy(
+                hero = index.home.hero.map { hero ->
+                    hero.copy(onWatchlist = hero.itemKey in keys, favorite = hero.itemKey in stars)
+                },
+                watchlist = watchlistMemo[index to saved],
+            )
+        }
         return AppUiState(
             route = route,
             canGoBack = user.backStack.size > 1,
             previousRoute = user.backStack.getOrNull(user.backStack.size - 2),
-            home = if (saved.isEmpty() && starred.isEmpty()) {
-                index.home
-            } else {
-                val keys = saved.toHashSet()
-                val stars = starred.toHashSet()
-                index.home.copy(
-                    hero = index.home.hero.map { hero ->
-                        hero.copy(onWatchlist = hero.itemKey in keys, favorite = hero.itemKey in stars)
-                    },
-                    watchlist = watchlistMemo[index to saved],
-                )
-            },
+            home = home.copy(
+                libraryCounts = LibraryCounts(
+                    recent = index.videos.size,
+                    watchlist = if (saved.isEmpty()) 0 else watchlistMemo[index to saved].size,
+                    favorites = if (starred.isEmpty()) 0 else favoritesMemo[index to starred].size,
+                    all = index.movies.size + index.shows.size + index.otherVideos.size,
+                    movies = index.movies.size,
+                    shows = index.shows.size,
+                    bin = user.binCount,
+                ),
+            ),
             library = when (user.filter) {
                 LibraryFilter.WATCHLIST -> LibraryUi(filter = user.filter, sort = user.sort, items = watchlistMemo[index to saved])
                 LibraryFilter.FAVORITES -> LibraryUi(filter = user.filter, sort = user.sort, items = favoritesMemo[index to starred])
@@ -602,6 +616,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
                 )
             }
         }
+    }
+
+    /** How many videos Android's bin holds (Home's Recently Deleted shows only when some do). */
+    fun setBinCount(count: Int) {
+        local.update { it.copy(binCount = count) }
     }
 
     /** A video came back from the bin: device storage is scanned so it shows again. */

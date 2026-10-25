@@ -1,6 +1,7 @@
 package com.aakash.novafork.ui.common
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -21,11 +22,15 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -33,6 +38,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.window.DialogWindowProvider
 import com.aakash.novafork.ui.theme.NovaColors
 
 /**
@@ -51,9 +57,15 @@ fun IosActionSheet(
 ) {
     val shown = remember { MutableTransitionState(false) }.apply { targetState = true }
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        // The window's own dim appears at once; ours fades in with the sheet instead.
+        val window = (LocalView.current.parent as? DialogWindowProvider)?.window
+        SideEffect { window?.setDimAmount(0f) }
+        val scrim = remember { Animatable(0f) }
+        LaunchedEffect(Unit) { scrim.animateTo(SCRIM_ALPHA, tween(250)) }
         Box(
             Modifier
                 .fillMaxSize()
+                .drawBehind { drawRect(Color.Black.copy(alpha = scrim.value)) }
                 .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onDismiss),
             contentAlignment = Alignment.BottomCenter,
         ) {
@@ -107,6 +119,7 @@ private fun SheetButton(label: String, color: Color, bold: Boolean, onClick: () 
 }
 
 private val SheetShape = RoundedCornerShape(14.dp)
+private const val SCRIM_ALPHA = 0.45f
 
 /** iOS's dark action sheet material. */
 private val SheetColor = Color(0xFF2C2C2E)

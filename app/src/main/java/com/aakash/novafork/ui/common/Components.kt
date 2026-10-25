@@ -2,6 +2,9 @@ package com.aakash.novafork.ui.common
 
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.FlingBehavior
+import androidx.compose.foundation.gestures.snapping.SnapPosition
+import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,6 +16,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
@@ -193,3 +197,10 @@ fun ScanBanner(scan: ScanUi, modifier: Modifier = Modifier) {
         }
     }
 }
+
+/**
+ * A poster row's fling that always comes to rest with a card lined up at the row's start (after
+ * its padding), never cut in half.
+ */
+@Composable
+fun rememberRowSnap(state: LazyListState): FlingBehavior = rememberSnapFlingBehavior(state, SnapPosition.Start)

@@ -82,7 +82,11 @@ class MainActivity : ComponentActivity() {
     private val restorePrompt = registerForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
         if (result.resultCode != RESULT_OK) return@registerForActivityResult
         viewModel.onVideoRestored()
-        lifecycleScope.launch { viewModel.showDialog(DialogUi.RecentlyDeleted(trashedVideos())) }
+        lifecycleScope.launch {
+            val trashed = trashedVideos()
+            viewModel.setBinCount(trashed.size)
+            viewModel.showDialog(DialogUi.RecentlyDeleted(trashed))
+        }
     }
 
     /** The video whose deletion waits on Android's prompt. */
@@ -95,6 +99,7 @@ class MainActivity : ComponentActivity() {
         // Android 11 and later bin it on "Allow"; Android 10 only granted the right, so try again.
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             viewModel.onVideoDeleted(videoId, target.title, toBin = true)
+            refreshBinCount()
         } else {
             deleteFile(videoId, target)
         }
@@ -233,6 +238,10 @@ class MainActivity : ComponentActivity() {
             }
         }
         lifecycleScope.launch {
+            // What Android's bin holds, read again each time the app comes back (it changes outside it).
+            repeatOnLifecycle(Lifecycle.State.STARTED) { viewModel.setBinCount(trashedVideos().size) }
+        }
+        lifecycleScope.launch {
             // The app icon's "Continue" shortcut follows the first Continue Watching video.
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.state
@@ -257,6 +266,10 @@ class MainActivity : ComponentActivity() {
         if (savedInstanceState == null && !askedOnce && !StoragePermissions.hasAnyVideoAccess(this)) {
             requestStoragePermission()
         }
+    }
+
+    private fun refreshBinCount() {
+        lifecycleScope.launch { viewModel.setBinCount(trashedVideos().size) }
     }
 
     override fun onNewIntent(intent: Intent) {

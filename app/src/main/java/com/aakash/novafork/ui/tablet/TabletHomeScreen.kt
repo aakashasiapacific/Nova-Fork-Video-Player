@@ -188,7 +188,7 @@ private fun HomeFeed(home: HomeUi, scan: ScanUi, permission: PermissionUi, layou
                 }
             }
             item(key = "library", contentType = "library") {
-                HomeLibraryLinks(actions, Modifier.widthIn(max = 720.dp))
+                HomeLibraryLinks(actions, Modifier.widthIn(max = 720.dp), counts = home.libraryCounts)
             }
         }
         if (home.hero.isNotEmpty()) {

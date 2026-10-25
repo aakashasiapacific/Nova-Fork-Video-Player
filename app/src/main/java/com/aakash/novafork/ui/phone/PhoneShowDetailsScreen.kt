@@ -40,6 +40,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
+import com.aakash.novafork.ui.common.EndOfListGap
 import com.aakash.novafork.ui.common.IosButton
 import com.aakash.novafork.ui.common.LocalBottomBarSpace
 import com.aakash.novafork.ui.common.NovaDropdownMenu
@@ -81,7 +82,7 @@ fun PhoneShowDetailsScreen(
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             state = listState,
-            contentPadding = PaddingValues(bottom = dims.sectionSpacing + LocalBottomBarSpace.current),
+            contentPadding = PaddingValues(bottom = EndOfListGap + LocalBottomBarSpace.current),
         ) {
             item(key = "header") {
                 PhoneDetailsHeader(
@@ -226,6 +227,7 @@ fun PhoneShowDetailsScreen(
                             episode = episode,
                             onClick = { actions.play(episode.videoId) },
                             onLongClick = openMenu,
+                            upNext = episode.videoId == nextUp?.videoId,
                         )
                     }
                 }

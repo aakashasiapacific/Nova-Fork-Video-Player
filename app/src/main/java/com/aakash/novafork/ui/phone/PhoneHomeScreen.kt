@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
@@ -32,6 +33,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -66,7 +68,9 @@ import com.aakash.novafork.ui.adaptive.LocalNovaDimens
 import com.aakash.novafork.ui.common.BackdropArt
 import com.aakash.novafork.ui.common.DeviceAccessCard
 import com.aakash.novafork.ui.common.EmptyState
+import com.aakash.novafork.ui.common.EndOfListGap
 import com.aakash.novafork.ui.common.HomeLibraryLinks
+import com.aakash.novafork.ui.common.IosColors
 import com.aakash.novafork.ui.common.IosFilledTonalButton
 import com.aakash.novafork.ui.common.LocalBottomBarSpace
 import com.aakash.novafork.ui.common.LocalHeroPreviewEnabled
@@ -81,6 +85,7 @@ import com.aakash.novafork.ui.common.VideoMenuBox
 import com.aakash.novafork.ui.common.bottomScrim
 import com.aakash.novafork.ui.common.deviceAccessNotice
 import com.aakash.novafork.ui.common.metaLine
+import com.aakash.novafork.ui.common.rememberRowSnap
 import com.aakash.novafork.ui.common.rememberTopBrightness
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.DialogUi
@@ -164,7 +169,7 @@ private fun HomeFeed(home: HomeUi, scan: ScanUi, permission: PermissionUi, actio
         LazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(bottom = dims.sectionSpacing + LocalBottomBarSpace.current),
+            contentPadding = PaddingValues(bottom = EndOfListGap + LocalBottomBarSpace.current),
         ) {
             if (hasHero) {
                 item(key = "hero", contentType = "hero") {
@@ -208,28 +213,33 @@ private fun HomeFeed(home: HomeUi, scan: ScanUi, permission: PermissionUi, actio
             }
             if (home.watchlist.isNotEmpty()) {
                 item(key = "watchlist", contentType = "landscapeRow") {
-                    HomeSection(title = "Watchlist", topPadding = if (home.continueWatching.isEmpty()) 4.dp else null) {
+                    HomeSection(
+                        title = "Watchlist",
+                        topPadding = if (home.continueWatching.isEmpty()) 4.dp else null,
+                        onOpen = { actions.openLibrary(LibraryFilter.WATCHLIST) },
+                    ) {
                         WatchlistRow(home.watchlist, actions)
                     }
                 }
             }
             item(key = "library", contentType = "library") {
-                HomeLibraryLinks(actions)
+                HomeLibraryLinks(actions, counts = home.libraryCounts)
             }
         }
-        // Once the page scrolls, a dark fade sits behind the status bar so the rows passing
-        // under the clock and icons don't clash with them.
+        // Once the page scrolls, the rows passing under the clock and icons disappear behind
+        // solid black there and fade out just below it (owner: headings ran into the clock).
         val shade by animateFloatAsState(if (scrolled) 1f else 0f, label = "statusShade")
+        val solid = statusBar / (statusBar + StatusFadeDepth)
         Box(
             Modifier
                 .align(Alignment.TopCenter)
                 .fillMaxWidth()
-                .height(statusBar + 16.dp)
+                .height(statusBar + StatusFadeDepth)
                 .graphicsLayer { alpha = shade }
                 .background(
                     Brush.verticalGradient(
-                        0f to Color.Black.copy(alpha = 0.92f),
-                        0.6f to Color.Black.copy(alpha = 0.7f),
+                        0f to Color.Black,
+                        solid to Color.Black,
                         1f to Color.Transparent,
                     ),
                 ),
@@ -268,18 +278,39 @@ private fun HomeSection(
     onSeeAll: (() -> Unit)? = null,
     /** Space above the title; null = the usual gap between sections. */
     topPadding: Dp? = null,
+    /** The whole list behind the row: the title then reads "Watchlist ›" and opens it (Apple TV). */
+    onOpen: (() -> Unit)? = null,
     content: @Composable () -> Unit,
 ) {
     val dims = LocalNovaDimens.current
     Column(Modifier.fillMaxWidth().padding(top = topPadding ?: dims.sectionSpacing)) {
-        SectionHeader(
-            title = title,
-            modifier = Modifier
-                .padding(start = dims.gutter, end = 4.dp)
-                .padding(bottom = if (onSeeAll == null) 10.dp else 0.dp),
-            actionLabel = if (onSeeAll != null) "See all" else null,
-            onAction = onSeeAll,
-        )
+        if (onOpen != null) {
+            Row(
+                Modifier
+                    .padding(start = dims.gutter - 4.dp, bottom = 6.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable(onClickLabel = "Open $title", onClick = onOpen)
+                    .padding(horizontal = 4.dp, vertical = 2.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(title, style = MaterialTheme.typography.titleLarge, maxLines = 1)
+                NovaIcon(
+                    R.drawable.ic_chevron_right,
+                    contentDescription = null,
+                    tint = IosColors.SecondaryLabel,
+                    modifier = Modifier.padding(start = 2.dp).size(20.dp),
+                )
+            }
+        } else {
+            SectionHeader(
+                title = title,
+                modifier = Modifier
+                    .padding(start = dims.gutter, end = 4.dp)
+                    .padding(bottom = if (onSeeAll == null) 10.dp else 0.dp),
+                actionLabel = if (onSeeAll != null) "See all" else null,
+                onAction = onSeeAll,
+            )
+        }
         content()
     }
 }
@@ -288,7 +319,10 @@ private fun HomeSection(
 @Composable
 private fun WatchlistRow(items: List<LibraryItemUi>, actions: AppActions) {
     val dims = LocalNovaDimens.current
+    val rowState = rememberLazyListState()
     LazyRow(
+        state = rowState,
+        flingBehavior = rememberRowSnap(rowState),
         contentPadding = PaddingValues(horizontal = dims.gutter),
         horizontalArrangement = Arrangement.spacedBy(dims.rowSpacing),
     ) {
@@ -310,7 +344,10 @@ private fun continueCaption(card: VideoCardUi): String? {
 @Composable
 private fun LandscapeRow(cards: List<VideoCardUi>, actions: AppActions) {
     val dims = LocalNovaDimens.current
+    val rowState = rememberLazyListState()
     LazyRow(
+        state = rowState,
+        flingBehavior = rememberRowSnap(rowState),
         contentPadding = PaddingValues(horizontal = dims.gutter),
         horizontalArrangement = Arrangement.spacedBy(dims.rowSpacing),
     ) {
@@ -411,3 +448,6 @@ private fun HomeOnboarding(scan: ScanUi, permission: PermissionUi, actions: AppA
         )
     }
 }
+
+/** How far below the status bar Home's scrolled shade fades out. */
+private val StatusFadeDepth = 18.dp
