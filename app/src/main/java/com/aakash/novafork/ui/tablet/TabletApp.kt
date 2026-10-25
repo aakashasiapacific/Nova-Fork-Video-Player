@@ -202,7 +202,8 @@ private fun TabletPage(state: AppUiState, actions: AppActions, layout: DeviceLay
             modifier = pageModifier,
         )
         Route.Audio -> AudioScreen(modifier = pageModifier)
-        Route.Settings -> SettingsScreen(
+        // A tablet shows every section beside the list on the one page.
+        Route.Settings, is Route.SettingsPage -> SettingsScreen(
             state = state.settings,
             actions = actions,
             layout = layout,

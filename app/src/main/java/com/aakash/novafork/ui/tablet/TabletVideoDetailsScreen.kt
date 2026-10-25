@@ -213,17 +213,6 @@ private fun VideoBody(details: VideoDetailsUi, actions: AppActions) {
                             actions.addToPlaylist(listOf(details.id), details.title)
                         },
                     )
-                    if (details.deletable) {
-                        NovaMenuItem(
-                            text = { Text("Delete") },
-                            destructive = true,
-                            leadingIcon = { NovaIcon(R.drawable.ic_delete, contentDescription = null) },
-                            onClick = {
-                                menuOpen = false
-                                actions.deleteVideo(details.id)
-                            },
-                        )
-                    }
                 }
             }
         }

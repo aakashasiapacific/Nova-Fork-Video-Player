@@ -128,8 +128,6 @@ data class HeroUi(
     val onWatchlist: Boolean = false,
     /** Starred (the hero's star is filled). */
     val favorite: Boolean = false,
-    /** The video Delete removes: a single file on this phone; null hides Delete. */
-    val deleteVideoId: Long? = null,
 ) {
     /** The library item key ("v:<id>" / "s:<showKey>"), which the watchlist stores. */
     val itemKey: String
@@ -156,16 +154,12 @@ data class HomeUi(
     val libraryCounts: LibraryCounts = LibraryCounts(),
 )
 
-/** The numbers beside Home's Library links; [bin] null while Android's bin hasn't been read. */
+/** The numbers beside Home's Library links. */
 @Immutable
 data class LibraryCounts(
-    val recent: Int = 0,
     val watchlist: Int = 0,
     val favorites: Int = 0,
     val all: Int = 0,
-    val movies: Int = 0,
-    val shows: Int = 0,
-    val bin: Int? = null,
 )
 
 enum class LibraryFilter(val label: String) {
@@ -242,8 +236,6 @@ data class VideoDetailsUi(
     val sourceLabel: String = "",
     /** True when the info came from TMDB. */
     val isMatched: Boolean = false,
-    /** A file on this phone (device storage or a picked folder) that Delete can remove. */
-    val deletable: Boolean = false,
 )
 
 @Immutable
@@ -391,16 +383,16 @@ data class SearchUi(
     val artists: List<MusicResultUi> = emptyList(),
     /** Searches the user ran, newest first, shown while the field is empty. */
     val recent: List<String> = emptyList(),
-    /** The library's biggest genres, as tiles to browse by while the field is empty (Apple TV). */
-    val genres: List<GenreTileUi> = emptyList(),
+    /** While the field is empty: posters to browse, each title once (Apple TV's search page). */
+    val browseMovies: List<VideoCardUi> = emptyList(),
+    val browseShows: List<ShowCardUi> = emptyList(),
+    val browseAlbums: List<MusicResultUi> = emptyList(),
 ) {
+    val hasBrowse: Boolean get() = browseMovies.isNotEmpty() || browseShows.isNotEmpty() || browseAlbums.isNotEmpty()
+
     val hasMusic: Boolean get() = songs.isNotEmpty() || albums.isNotEmpty() || artists.isNotEmpty()
     val isEmpty: Boolean get() = results.isEmpty() && !hasMusic
 }
-
-/** A genre to browse by in Search: its name, how many titles, and one of their backdrops. */
-@Immutable
-data class GenreTileUi(val name: String, val count: Int, val artwork: Artwork)
 
 /** A song, album or artist in search results; tapping it plays [songIds] from [startIndex]. */
 @Immutable

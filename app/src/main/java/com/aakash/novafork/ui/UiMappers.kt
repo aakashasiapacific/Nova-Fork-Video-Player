@@ -17,7 +17,6 @@ import com.aakash.novafork.ui.model.BrowseUi
 import com.aakash.novafork.ui.model.Crumb
 import com.aakash.novafork.ui.model.EpisodeUi
 import com.aakash.novafork.ui.model.FolderUi
-import com.aakash.novafork.ui.model.GenreTileUi
 import com.aakash.novafork.ui.model.HeroTarget
 import com.aakash.novafork.ui.model.HeroUi
 import com.aakash.novafork.ui.model.HomeUi
@@ -56,7 +55,7 @@ object UiMappers {
     /** Newest movies and shows considered for the hero before the backdrop preference is applied. */
     private const val HERO_RECENT_CANDIDATES = 12
     private const val SEARCH_LIMIT = 60
-    private const val GENRE_TILES = 8
+    private const val BROWSE_ROW = 20
     /** Folders deep a media server's breadcrumb trail goes. */
     private const val MAX_REMOTE_TRAIL = 12
 
@@ -182,14 +181,8 @@ object UiMappers {
             progress = video.card.progress,
             playVideoId = video.id,
             playLabel = if (video.inProgress) "Resume" else "Play",
-            deleteVideoId = video.id.takeIf { isDeletable(video) },
         )
     }
-
-    /** A file on this phone (device storage or a picked folder), which Delete can remove. */
-    private fun isDeletable(video: IndexedVideo): Boolean =
-        (video.source?.type == SourceType.DEVICE || video.source?.type == SourceType.FOLDER) &&
-            video.video.uri.startsWith("content://")
 
     private fun heroForShow(show: IndexedShow): HeroUi {
         val next = nextUp(show)
@@ -380,7 +373,6 @@ object UiMappers {
             resolutionLabel = resolutionLabel(video.width, video.height),
             sourceLabel = item.source?.let(::sourceLabel).orEmpty(),
             isMatched = meta != null,
-            deletable = isDeletable(item),
         )
     }
 
@@ -720,32 +712,30 @@ object UiMappers {
 
     // Search
 
-    /** Title, show title and file name, case-insensitive; episodes show up as their show. */
-    /** A genre tile (or typing a genre's whole name) finds that genre's titles. */
+    /** Typing a genre's whole name finds that genre's titles. */
     private fun genreMatch(meta: MetadataEntity?, needle: String): Boolean =
         genresOf(meta).any { it.equals(needle, ignoreCase = true) }
 
-    /** The genres with the most movies and shows, each with a backdrop from one of them. */
-    private fun genreTiles(index: LibraryIndex): List<GenreTileUi> {
-        val counts = LinkedHashMap<String, Int>()
-        val art = HashMap<String, Artwork>()
-        fun add(meta: MetadataEntity?, artwork: Artwork) {
-            for (genre in genresOf(meta)) {
-                counts[genre] = (counts[genre] ?: 0) + 1
-                if (art[genre]?.backdropUrl == null && artwork.backdropUrl != null) art[genre] = artwork
-            }
-        }
-        index.movies.forEach { add(it.meta, it.card.artwork) }
-        index.shows.forEach { add(it.meta, it.card.artwork) }
-        return counts.entries
-            .sortedByDescending { it.value }
-            .take(GENRE_TILES)
-            .map { (name, count) -> GenreTileUi(name, count, art[name] ?: Artwork()) }
-    }
+    /** Search with nothing typed: the newest movies, series and albums, as posters to browse. */
+    private fun browse(query: String, index: LibraryIndex, music: MusicLibraryData): SearchUi = SearchUi(
+        query = query,
+        browseMovies = index.movies.sortedByDescending { it.video.dateAdded }.take(BROWSE_ROW).map { it.card },
+        browseShows = index.shows.sortedByDescending { it.latestAdded }.take(BROWSE_ROW).map { it.card },
+        browseAlbums = music.recentlyAdded.take(BROWSE_ROW).map { album ->
+            MusicResultUi(
+                key = "album:${album.key}",
+                title = album.title,
+                subtitle = album.artist,
+                artUri = album.artUri,
+                songIds = album.songs.map { it.id },
+            )
+        },
+    )
 
+    /** Title, show title and file name, case-insensitive; episodes show up as their show. */
     fun search(index: LibraryIndex, query: String, music: MusicLibraryData = MusicLibraryData()): SearchUi {
         val needle = query.trim()
-        if (needle.isEmpty()) return SearchUi(query = query, genres = genreTiles(index))
+        if (needle.isEmpty()) return browse(query, index, music)
         val found = MusicSearch.search(music, needle)
         val songIds = found.songs.map { it.id }
         val entries = ArrayList<Entry>()

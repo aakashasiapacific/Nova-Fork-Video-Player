@@ -726,6 +726,9 @@ object FakeScreens {
 
     fun settingsPage(): AppUiState = app(Route.Settings)
 
+    /** One section of Preferences on its own page (phone). */
+    fun settingsSection(section: String): AppUiState = app(Route.SettingsPage(section))
+
     /** Adding a share from Browse, details typed in. */
     fun smbDialog(): AppUiState = browse().copy(
         dialog = DialogUi.SmbServer(

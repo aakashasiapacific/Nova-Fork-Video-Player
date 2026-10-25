@@ -126,8 +126,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
         /** Folders of network sources (other than SMB) listed live, most recently updated last. */
         val listings: Map<ListingKey, RemoteListing> = emptyMap(),
         val recentSearches: List<String> = emptyList(),
-        /** Videos in Android's bin; null until read. */
-        val binCount: Int? = null,
     )
 
     /** Search's recent searches, kept across launches (they never leave the device). */
@@ -316,13 +314,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
             previousRoute = user.backStack.getOrNull(user.backStack.size - 2),
             home = home.copy(
                 libraryCounts = LibraryCounts(
-                    recent = index.videos.size,
                     watchlist = if (saved.isEmpty()) 0 else watchlistMemo[index to saved].size,
                     favorites = if (starred.isEmpty()) 0 else favoritesMemo[index to starred].size,
                     all = index.movies.size + index.shows.size + index.otherVideos.size,
-                    movies = index.movies.size,
-                    shows = index.shows.size,
-                    bin = user.binCount,
                 ),
             ),
             library = when (user.filter) {
@@ -610,44 +604,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
 
     fun showMessage(text: String) {
         local.update { it.copy(message = text) }
-    }
-
-    // Deleting a video (MainActivity does the deleting, as Android's prompt needs the activity)
-
-    /** What deleting a video needs: its file, whether MediaStore holds it, and a name to show. */
-    class DeleteTarget(val uri: String, val mediaStore: Boolean, val title: String)
-
-    suspend fun deleteTarget(videoId: Long): DeleteTarget? {
-        val row = library.video(videoId) ?: return null
-        val uri = row.video.uri.takeIf { it.startsWith("content://") } ?: return null
-        val title = row.meta?.title?.takeIf { it.isNotBlank() } ?: row.video.parsedTitle
-        return DeleteTarget(uri, mediaStore = uri.startsWith("content://media/"), title = title)
-    }
-
-    /** The file is gone (or in the bin): the video leaves the library and its page closes. */
-    fun onVideoDeleted(videoId: Long, title: String, toBin: Boolean) {
-        launchSafely("Couldn't update the library") {
-            library.forgetDeletedVideo(videoId)
-            local.update { state ->
-                val stack = state.backStack.filterNot { it is Route.VideoDetails && it.videoId == videoId }
-                state.copy(
-                    backStack = stack.ifEmpty { listOf(Route.Home) },
-                    dialog = state.dialog.takeUnless { it is DialogUi.ConfirmDeleteVideo },
-                    message = if (toBin) "Moved $title to Recently Deleted" else "Deleted $title",
-                )
-            }
-        }
-    }
-
-    /** How many videos Android's bin holds (Home's Recently Deleted shows only when some do). */
-    fun setBinCount(count: Int) {
-        local.update { it.copy(binCount = count) }
-    }
-
-    /** A video came back from the bin: device storage is scanned so it shows again. */
-    fun onVideoRestored() {
-        showMessage("Restored. It shows again once the library updates.")
-        refresh()
     }
 
     override fun consumeMessage() {

@@ -1,5 +1,7 @@
 package com.aakash.novafork.ui.settings
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -34,18 +37,24 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.aakash.novafork.R
 import com.aakash.novafork.ui.adaptive.DeviceLayout
 import com.aakash.novafork.ui.common.CollapsedTitleBar
+import com.aakash.novafork.ui.common.Hairline
 import com.aakash.novafork.ui.common.IosColors
+import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.OnTabReselect
 import com.aakash.novafork.ui.common.stretchWithPull
 import com.aakash.novafork.ui.model.AppActions
+import com.aakash.novafork.ui.model.Route
 import com.aakash.novafork.ui.model.SettingsUi
+import com.aakash.novafork.ui.phone.PhoneTopBar
 
 private val PhoneMargin = 16.dp
 private val TabletListWidth = 300.dp
@@ -67,25 +76,23 @@ fun SettingsScreen(
     if (layout.isTablet) {
         TabletSettings(state, actions, modifier, contentPadding)
     } else {
-        PhoneSettings(state, actions, modifier, contentPadding)
+        PhoneSettings(actions, modifier, contentPadding)
     }
 }
 
+/**
+ * iOS Settings (owner: one long page was too dense): the top page is a short list of the
+ * sections, icon and name only, each opening its own page ([SettingsSectionScreen]).
+ */
 @Composable
-private fun PhoneSettings(state: SettingsUi, actions: AppActions, modifier: Modifier, contentPadding: PaddingValues) {
-    val sections = remember(state, actions) {
-        SettingsSection.entries.map { section -> section to settingsGroups(section, state, actions) }
-    }
+private fun PhoneSettings(actions: AppActions, modifier: Modifier, contentPadding: PaddingValues) {
     // iOS's large title: "Preferences" scrolls away and comes back small in a bar at the top.
     val listState = rememberLazyListState()
     OnTabReselect { listState.animateScrollToItem(0) }
     val collapsed by remember { derivedStateOf { listState.firstVisibleItemIndex > 0 } }
     Box(modifier.fillMaxSize()) {
         LazyColumn(
-            // imePadding keeps the TMDB key field above the keyboard: the window does not resize edge-to-edge.
-            modifier = Modifier
-                .fillMaxSize()
-                .imePadding(),
+            modifier = Modifier.fillMaxSize(),
             state = listState,
             contentPadding = contentPadding.extend(horizontal = PhoneMargin, top = 8.dp, bottom = 16.dp),
         ) {
@@ -96,21 +103,104 @@ private fun PhoneSettings(state: SettingsUi, actions: AppActions, modifier: Modi
                     modifier = Modifier.padding(start = 4.dp, top = 16.dp, bottom = 4.dp).stretchWithPull(),
                 )
             }
-            for ((section, groups) in sections) {
-                groups.forEachIndexed { index, group ->
-                    item(key = "${section.name}/${group.key}") {
-                        SettingsGroupBlock(
-                            group = group,
-                            title = if (index == 0) section.title else group.title,
-                            modifier = Modifier.padding(top = if (index == 0 || group.title != null) 8.dp else GroupGap),
-                        )
-                    }
+            PhoneSectionCards.forEachIndexed { index, sections ->
+                item(key = "sections:$index") {
+                    SectionCard(
+                        sections = sections,
+                        onOpen = { actions.navigate(Route.SettingsPage(it.name)) },
+                        modifier = Modifier.padding(top = if (index == 0) 16.dp else SectionCardGap),
+                    )
                 }
             }
         }
         CollapsedTitleBar(visible = collapsed, title = "Preferences")
     }
 }
+
+/** The top page's cards: what the library is made of, then the app itself. */
+private val PhoneSectionCards = listOf(
+    listOf(SettingsSection.LIBRARY, SettingsSection.ARTWORK, SettingsSection.PLAYER),
+    listOf(SettingsSection.APPEARANCE, SettingsSection.ABOUT),
+)
+private val SectionCardGap = 32.dp
+
+/** One card of section rows: icon tile, name and chevron, hairlines inset under the names. */
+@Composable
+private fun SectionCard(sections: List<SettingsSection>, onOpen: (SettingsSection) -> Unit, modifier: Modifier = Modifier) {
+    Column(
+        modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(20.dp))
+            .background(IosColors.GroupedCard),
+    ) {
+        sections.forEachIndexed { index, section ->
+            if (index > 0) {
+                Box(
+                    Modifier
+                        .padding(start = SectionRowInset)
+                        .fillMaxWidth()
+                        .height(Hairline)
+                        .background(IosColors.Separator),
+                )
+            }
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .clickable(onClickLabel = "Open ${section.title}") { onOpen(section) }
+                    .heightIn(min = 58.dp)
+                    .padding(start = 16.dp, end = 12.dp, top = 12.dp, bottom = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                IconTile(section.icon, tileColor(section.icon))
+                Text(section.title, style = MaterialTheme.typography.bodyLarge, maxLines = 1, modifier = Modifier.weight(1f))
+                NovaIcon(R.drawable.ic_chevron_right, contentDescription = null, tint = IosColors.TertiaryLabel)
+            }
+        }
+    }
+}
+
+/** Where the hairlines between section rows start: under the names, past the icon tiles. */
+private val SectionRowInset = 16.dp + 29.dp + 14.dp
+
+/**
+ * One section of Preferences on its own page (phone), opened from the top page as iOS Settings
+ * opens its rows: a bar with the way back and the section's name, then its groups, well apart.
+ */
+@Composable
+fun SettingsSectionScreen(
+    section: String,
+    state: SettingsUi,
+    actions: AppActions,
+    modifier: Modifier = Modifier,
+    contentPadding: PaddingValues = PaddingValues(),
+) {
+    val shown = SettingsSection.entries.firstOrNull { it.name == section } ?: SettingsSection.LIBRARY
+    val groups = remember(shown, state, actions) { settingsGroups(shown, state, actions) }
+    Column(modifier.fillMaxSize()) {
+        PhoneTopBar(title = shown.title, onBack = actions::back)
+        LazyColumn(
+            // imePadding keeps the TMDB key field above the keyboard: the window does not resize edge-to-edge.
+            modifier = Modifier
+                .fillMaxSize()
+                .imePadding(),
+            contentPadding = contentPadding.extend(horizontal = PhoneMargin, top = 4.dp, bottom = 16.dp),
+        ) {
+            groups.forEachIndexed { index, group ->
+                item(key = group.key) {
+                    SettingsGroupBlock(
+                        group = group,
+                        title = group.title,
+                        modifier = Modifier.padding(top = if (index == 0) 8.dp else SectionGroupGap),
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** Room between a section page's groups (iOS leaves about this much). */
+private val SectionGroupGap = 24.dp
 
 @Composable
 private fun TabletSettings(state: SettingsUi, actions: AppActions, modifier: Modifier, contentPadding: PaddingValues) {

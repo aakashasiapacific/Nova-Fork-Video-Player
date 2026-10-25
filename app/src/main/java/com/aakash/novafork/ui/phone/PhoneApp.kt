@@ -141,6 +141,7 @@ import com.aakash.novafork.ui.model.Route
 import com.aakash.novafork.ui.model.TopDestination
 import com.aakash.novafork.ui.model.top
 import com.aakash.novafork.ui.settings.SettingsScreen
+import com.aakash.novafork.ui.settings.SettingsSectionScreen
 import com.aakash.novafork.ui.theme.NovaColors
 import kotlinx.coroutines.launch
 
@@ -543,6 +544,13 @@ private fun PhonePage(state: AppUiState, actions: AppActions) {
             actions = actions,
             layout = DeviceLayout.PHONE,
             modifier = pageModifier.statusBarsPadding(),
+            contentPadding = PaddingValues(bottom = EndOfListGap + LocalBottomBarSpace.current),
+        )
+        is Route.SettingsPage -> SettingsSectionScreen(
+            section = route.section,
+            state = state.settings,
+            actions = actions,
+            modifier = pageModifier,
             contentPadding = PaddingValues(bottom = EndOfListGap + LocalBottomBarSpace.current),
         )
     }

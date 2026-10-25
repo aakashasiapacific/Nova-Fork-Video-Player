@@ -40,7 +40,6 @@ import com.aakash.novafork.ui.common.LocalStatusBarIcons
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.DialogUi
 import com.aakash.novafork.ui.model.TopDestination
-import com.aakash.novafork.ui.model.TrashedVideoUi
 import java.time.LocalDate
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.distinctUntilChangedBy
@@ -77,32 +76,6 @@ class MainActivity : ComponentActivity() {
 
     private val backupOpener = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) viewModel.readBackup(uri)
-    }
-
-    private val restorePrompt = registerForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
-        if (result.resultCode != RESULT_OK) return@registerForActivityResult
-        viewModel.onVideoRestored()
-        lifecycleScope.launch {
-            val trashed = trashedVideos()
-            viewModel.setBinCount(trashed.size)
-            viewModel.showDialog(DialogUi.RecentlyDeleted(trashed))
-        }
-    }
-
-    /** The video whose deletion waits on Android's prompt. */
-    private var pendingDelete: Pair<Long, MainViewModel.DeleteTarget>? = null
-
-    private val deletePrompt = registerForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
-        val (videoId, target) = pendingDelete ?: return@registerForActivityResult
-        pendingDelete = null
-        if (result.resultCode != RESULT_OK) return@registerForActivityResult
-        // Android 11 and later bin it on "Allow"; Android 10 only granted the right, so try again.
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            viewModel.onVideoDeleted(videoId, target.title, toBin = true)
-            refreshBinCount()
-        } else {
-            deleteFile(videoId, target)
-        }
     }
 
     private val actions: AppActions by lazy {
@@ -167,44 +140,6 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
-            // Always our own question first: some phones grant Android's request without asking
-            // (owner: videos went with no prompt), so it never is the only safeguard.
-            override fun deleteVideo(videoId: Long) {
-                lifecycleScope.launch {
-                    val target = viewModel.deleteTarget(videoId) ?: return@launch
-                    viewModel.showDialog(DialogUi.ConfirmDeleteVideo(videoId, target.title, toBin = canBin(target)))
-                }
-            }
-
-            override fun confirmDeleteVideo(videoId: Long) {
-                viewModel.dismissDialog()
-                lifecycleScope.launch {
-                    val target = viewModel.deleteTarget(videoId) ?: return@launch
-                    if (canBin(target) && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                        // Into Android's bin, not deleted: restorable for 30 days.
-                        val request = MediaStore.createTrashRequest(contentResolver, listOf(Uri.parse(target.uri)), true)
-                        askToDelete(videoId, target, request.intentSender)
-                    } else {
-                        deleteFile(videoId, target)
-                    }
-                }
-            }
-
-            override fun showRecentlyDeleted() {
-                viewModel.showDialog(DialogUi.RecentlyDeleted())
-                lifecycleScope.launch { viewModel.showDialog(DialogUi.RecentlyDeleted(trashedVideos())) }
-            }
-
-            override fun restoreVideo(uri: String) {
-                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return
-                val request = MediaStore.createTrashRequest(contentResolver, listOf(Uri.parse(uri)), false)
-                try {
-                    restorePrompt.launch(IntentSenderRequest.Builder(request.intentSender).build())
-                } catch (e: ActivityNotFoundException) {
-                    viewModel.showMessage("Couldn't restore this video")
-                }
-            }
-
             override fun importBackup() {
                 try {
                     backupOpener.launch(BackupManager.OPEN_MIME_TYPES)
@@ -238,10 +173,6 @@ class MainActivity : ComponentActivity() {
             }
         }
         lifecycleScope.launch {
-            // What Android's bin holds, read again each time the app comes back (it changes outside it).
-            repeatOnLifecycle(Lifecycle.State.STARTED) { viewModel.setBinCount(trashedVideos().size) }
-        }
-        lifecycleScope.launch {
             // The app icon's "Continue" shortcut follows the first Continue Watching video.
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.state
@@ -268,10 +199,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun refreshBinCount() {
-        lifecycleScope.launch { viewModel.setBinCount(trashedVideos().size) }
-    }
-
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         openShortcut(intent)
@@ -280,74 +207,6 @@ class MainActivity : ComponentActivity() {
     /** The app icon's Search shortcut opens the Search tab. */
     private fun openShortcut(intent: Intent?) {
         if (intent?.action == AppShortcuts.ACTION_SEARCH) actions.selectTab(TopDestination.SEARCH)
-    }
-
-    private fun askToDelete(videoId: Long, target: MainViewModel.DeleteTarget, sender: IntentSender) {
-        pendingDelete = videoId to target
-        try {
-            deletePrompt.launch(IntentSenderRequest.Builder(sender).build())
-        } catch (e: ActivityNotFoundException) {
-            pendingDelete = null
-            viewModel.showMessage("Couldn't delete this video")
-        }
-    }
-
-    /** Deletes the file itself: a picked folder's document, or (Android 10 and older) a MediaStore row. */
-    private fun deleteFile(videoId: Long, target: MainViewModel.DeleteTarget) {
-        lifecycleScope.launch {
-            val uri = Uri.parse(target.uri)
-            val result = withContext(Dispatchers.IO) {
-                runCatching {
-                    if (target.mediaStore) contentResolver.delete(uri, null, null) > 0 else DocumentsContract.deleteDocument(contentResolver, uri)
-                }
-            }
-            val error = result.exceptionOrNull()
-            when {
-                result.getOrDefault(false) -> viewModel.onVideoDeleted(videoId, target.title, toBin = false)
-                // Android 10: a video another app made needs the user's yes first.
-                Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && error is RecoverableSecurityException ->
-                    askToDelete(videoId, target, error.userAction.actionIntent.intentSender)
-                else -> viewModel.showMessage(
-                    if (target.mediaStore) "Couldn't delete this video" else "Couldn't delete this video. Add its folder again to allow changes.",
-                )
-            }
-        }
-    }
-
-    /** Android 11 and later keep MediaStore videos in a bin for 30 days; picked folders have none. */
-    private fun canBin(target: MainViewModel.DeleteTarget): Boolean =
-        target.mediaStore && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R
-
-    /** The videos in Android's bin, soonest gone last. Empty before Android 11. */
-    private suspend fun trashedVideos(): List<TrashedVideoUi> {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return emptyList()
-        return withContext(Dispatchers.IO) {
-            val collection = MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL)
-            val args = Bundle().apply {
-                putInt(MediaStore.QUERY_ARG_MATCH_TRASHED, MediaStore.MATCH_ONLY)
-                putString(ContentResolver.QUERY_ARG_SQL_SORT_ORDER, "${MediaStore.MediaColumns.DATE_EXPIRES} DESC")
-            }
-            val projection = arrayOf(MediaStore.MediaColumns._ID, MediaStore.MediaColumns.DISPLAY_NAME, MediaStore.MediaColumns.DATE_EXPIRES)
-            val now = System.currentTimeMillis() / 1000
-            runCatching {
-                contentResolver.query(collection, projection, args, null)?.use { c ->
-                    buildList {
-                        while (c.moveToNext()) {
-                            val id = c.getLong(0)
-                            val expires = if (c.isNull(2)) null else c.getLong(2)
-                            add(
-                                TrashedVideoUi(
-                                    uri = ContentUris.withAppendedId(collection, id).toString(),
-                                    // Android names a binned file ".trashed-<time>-name.mp4".
-                                    name = c.getString(1).orEmpty().replace(Regex("^\\.trashed-\\d+-"), ""),
-                                    daysLeft = expires?.let { ((it - now + 86_399) / 86_400).toInt().coerceAtLeast(0) },
-                                ),
-                            )
-                        }
-                    }
-                }
-            }.getOrNull().orEmpty()
-        }
     }
 
     /** Where the last touch went down, for the player to grow out of. */
@@ -460,7 +319,6 @@ class MainActivity : ComponentActivity() {
         lifecycleScope.launch {
             val name = withContext(Dispatchers.IO) {
                 try {
-                    // Write too, when the picker gave it, so a video can be deleted from the app.
                     try {
                         contentResolver.takePersistableUriPermission(
                             treeUri,

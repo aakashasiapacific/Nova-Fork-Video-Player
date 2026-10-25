@@ -34,14 +34,15 @@ import kotlin.math.abs
 import kotlinx.coroutines.launch
 
 /**
- * iOS's swipe actions on a song (owner): swiped right it shows a blue Play Next, swiped left a red
- * Delete, each under the row as it slides; past [Trigger] a tick says letting go will do it, and
- * the row springs back either way. A swipe starting at the left edge is left to going back.
+ * iOS's swipe actions on a song (owner): swiped right it shows a blue Play Next and, in a playlist
+ * ([onRemove]), swiped left a red Remove, each under the row as it slides; past [Trigger] a tick
+ * says letting go will do it, and the row springs back either way. A swipe starting at the left
+ * edge is left to going back.
  */
 @Composable
 internal fun SwipeActionsRow(
     onPlayNext: () -> Unit,
-    onDelete: () -> Unit,
+    onRemove: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
     content: @Composable BoxScope.() -> Unit,
 ) {
@@ -49,12 +50,12 @@ internal fun SwipeActionsRow(
     val scope = rememberCoroutineScope()
     val haptics = LocalHapticFeedback.current
     val playNext by rememberUpdatedState(onPlayNext)
-    val delete by rememberUpdatedState(onDelete)
+    val remove by rememberUpdatedState(onRemove)
     Box(modifier) {
         val shown = offset.value
         if (shown != 0f) {
             SwipeAction(
-                icon = if (shown > 0f) R.drawable.ic_play_next else R.drawable.ic_delete,
+                icon = if (shown > 0f) R.drawable.ic_play_next else R.drawable.ic_remove_circle,
                 color = if (shown > 0f) NovaColors.IosBlue else IosColors.Red,
                 alignment = if (shown > 0f) Alignment.CenterStart else Alignment.CenterEnd,
             )
@@ -78,6 +79,8 @@ internal fun SwipeActionsRow(
                             change.consume()
                             // Past the trigger it follows with resistance, as iOS's rows do.
                             x += change.positionChange().x
+                            // Nothing waits under a left swipe outside a playlist.
+                            if (remove == null) x = x.coerceAtLeast(0f)
                             val travel = if (abs(x) > trigger) (abs(x) - trigger) * 0.35f + trigger else abs(x)
                             scope.launch { offset.snapTo(if (x < 0f) -travel else travel) }
                             val nowArmed = abs(x) > trigger
@@ -87,7 +90,7 @@ internal fun SwipeActionsRow(
                             }
                         }
                         if (armed) {
-                            if (x > 0f) playNext() else delete()
+                            if (x > 0f) playNext() else remove?.invoke()
                         }
                         scope.launch { offset.animateTo(0f, spring(dampingRatio = 0.8f, stiffness = 500f)) }
                     }

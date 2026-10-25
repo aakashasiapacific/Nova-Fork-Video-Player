@@ -83,6 +83,10 @@ class PhoneScreensTest {
 
     @Test fun settings() = capture("settings", FakeScreens.settingsPage())
 
+    @Test fun settingsSources() = capture("settings_sources", FakeScreens.settingsSection("LIBRARY"))
+
+    @Test fun settingsPlayer() = capture("settings_player", FakeScreens.settingsSection("PLAYER"))
+
     @Test fun smbDialog() = capture("dialog_smb", FakeScreens.smbDialog(), wholeScreen = true)
 
     @Test fun identifyDialog() = capture("dialog_identify", FakeScreens.identifyDialog(), wholeScreen = true)

@@ -191,12 +191,11 @@ fun PhoneVideoDetailsScreen(
 private fun PlaySection(details: VideoDetailsUi, actions: AppActions, modifier: Modifier = Modifier) {
     val inProgress = (details.progress ?: 0f) > 0f
     Column(modifier.fillMaxWidth()) {
-        // A blue Play as wide as the poster above it, and Delete in the rest of the row (owner).
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             IosButton(
                 onClick = { actions.play(details.id) },
                 modifier = Modifier
-                    .then(if (details.deletable) Modifier.width(LocalNovaDimens.current.detailPosterWidth) else Modifier.weight(1f))
+                    .weight(1f)
                     .height(52.dp)
                     // How far it was watched shows in the button itself, as on Apple TV.
                     .resumeFill(details.progress),
@@ -206,28 +205,11 @@ private fun PlaySection(details: VideoDetailsUi, actions: AppActions, modifier: 
                 NovaIcon(R.drawable.ic_play_arrow, contentDescription = null, modifier = Modifier.size(24.dp))
                 Spacer(Modifier.width(ButtonDefaults.IconSpacing))
                 Text(
-                    // "Resume from 1:05:12" does not fit beside Delete; the time left shows below.
-                    if (details.deletable) (if (inProgress) "Resume" else "Play") else details.playLabel,
+                    details.playLabel,
                     style = MaterialTheme.typography.titleSmall,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-            }
-            if (details.deletable) {
-                Row(
-                    Modifier
-                        .weight(1f)
-                        .height(52.dp)
-                        .clip(RoundedCornerShape(percent = 50))
-                        .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                        .clickable(onClickLabel = "Delete ${details.title}", role = Role.Button) { actions.deleteVideo(details.id) },
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    NovaIcon(R.drawable.ic_delete, contentDescription = null, tint = IosColors.Red, modifier = Modifier.size(20.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text("Delete", style = MaterialTheme.typography.titleSmall, color = IosColors.Red)
-                }
             }
         }
         val progress = details.progress

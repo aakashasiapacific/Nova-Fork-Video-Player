@@ -230,7 +230,6 @@ fun AudioContent(
         stackText = ""
     }
     var addingSong by remember { mutableStateOf<SongEntity?>(null) }
-    var deleting by remember { mutableStateOf<SongDeleteRequest?>(null) }
     BackHandler(enabled = stack.isNotEmpty() || openPlaylist != null) { back() }
 
     val page = if (openPlaylist != null) "playlist:${openPlaylist.id}" else stack.lastOrNull() ?: HOME
@@ -250,7 +249,6 @@ fun AudioContent(
         onAdd = { addingSong = it },
         favorites = favorites.toSet(),
         isPlaying = player.isPlaying,
-        onDelete = { songs, label -> deleting = SongDeleteRequest(songs, label) },
     )
     // On a page opened over Library a swipe right goes back, as on iOS (and is not taken for a
     // tab change).
@@ -306,8 +304,6 @@ fun AudioContent(
         }
     }
 
-    // Always composed: it carries on through Android's own prompt after its question closes.
-    SongDeleteDialog(request = deleting, actions = actions, onClose = { deleting = null })
     addingSong?.let { song ->
         AddToPlaylistDialog(
             song = song,
@@ -335,8 +331,6 @@ private class PageContext(
     val favorites: Set<Long> = emptySet(),
     /** The playing song's bars move only while it plays. */
     val isPlaying: Boolean = false,
-    /** Asks to delete these songs' files, [label] naming them ("“Song”", "the album “Album”"). */
-    val onDelete: (songs: List<SongEntity>, label: String) -> Unit = { _, _ -> },
 )
 
 private fun pageTitle(page: String, library: MusicLibraryData): String = when {
@@ -1012,15 +1006,6 @@ private fun AlbumTile(album: Album, ctx: PageContext, modifier: Modifier = Modif
                     ctx.onOpen(ARTIST + album.artistKey)
                 },
             )
-            NovaMenuItem(
-                text = { Text("Delete Album") },
-                destructive = true,
-                leadingIcon = { NovaIcon(R.drawable.ic_delete, contentDescription = null) },
-                onClick = {
-                    close()
-                    ctx.onDelete(album.songs, "the album “${album.title}”")
-                },
-            )
         }
     }
 }
@@ -1113,14 +1098,13 @@ private fun SongRow(song: SongEntity, ctx: PageContext, onClick: () -> Unit, onR
     val hud = LocalHud.current
     Box {
         ContextMenuLift(open = menuOpen && pressed, grow = 1.03f, copyBackground = RowLiftColor) { _ ->
-            // Swiped right: Play Next; swiped left: Delete (asks first).
+            // Swiped right: Play Next; in a playlist, swiped left: out of the playlist, as its menu does.
             SwipeActionsRow(
                 onPlayNext = {
                     ctx.actions.enqueue(listOf(song), next = true)
                     hud?.show(R.drawable.ic_play_next, "Playing Next")
                 },
-                // In a playlist the swipe takes it out of the playlist, as its menu does.
-                onDelete = { if (onRemove != null) onRemove() else ctx.onDelete(listOf(song), "“${song.title}”") },
+                onRemove = onRemove,
             ) {
                 Column(
                     Modifier.combinedClickable(
@@ -1197,13 +1181,12 @@ private fun TrackRow(song: SongEntity, ctx: PageContext, onClick: () -> Unit) {
     val hud = LocalHud.current
     Box {
         ContextMenuLift(open = menuOpen && pressed, grow = 1.03f, copyBackground = RowLiftColor) { _ ->
-            // Swiped right: Play Next; swiped left: Delete (asks first).
+            // Swiped right: Play Next.
             SwipeActionsRow(
                 onPlayNext = {
                     ctx.actions.enqueue(listOf(song), next = true)
                     hud?.show(R.drawable.ic_play_next, "Playing Next")
                 },
-                onDelete = { ctx.onDelete(listOf(song), "“${song.title}”") },
             ) {
                 Column(
                     Modifier.combinedClickable(
@@ -1325,20 +1308,10 @@ private fun SongMenu(
             NovaMenuItem(
                 text = { Text("Remove from Playlist") },
                 destructive = true,
-                leadingIcon = { NovaIcon(R.drawable.ic_delete, contentDescription = null) },
+                leadingIcon = { NovaIcon(R.drawable.ic_remove_circle, contentDescription = null) },
                 onClick = {
                     onDismiss()
                     onRemove()
-                },
-            )
-        } else {
-            NovaMenuItem(
-                text = { Text("Delete") },
-                destructive = true,
-                leadingIcon = { NovaIcon(R.drawable.ic_delete, contentDescription = null) },
-                onClick = {
-                    onDismiss()
-                    ctx.onDelete(listOf(song), "“${song.title}”")
                 },
             )
         }

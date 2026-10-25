@@ -521,8 +521,8 @@ internal fun heroBelowBackdrop(posterWidth: Dp): Dp =
     posterWidth * 1.5f - PosterOverlap + HeroActionsGap + HeroButtonHeight + HeroDotsGap + DotsRowHeight / 2 + HeroDotsBottom
 
 /**
- * The hero's buttons: the blue Play pill, a round star (Favorites), a round "+" (Watchlist) and,
- * for a video file on this phone, a round red bin (Delete). [fillPlay] (phone): Play is as wide
+ * The hero's buttons: the blue Play pill, a round star (Favorites) and a round "+" (Watchlist).
+ * [fillPlay] (phone): Play is as wide
  * as the poster above it (owner), or takes the row when there is no poster; otherwise a set width.
  */
 @Composable
@@ -573,15 +573,6 @@ private fun HeroActions(
             fill = if (hero.onWatchlist) NovaColors.IosBlue else null,
             turn = true,
         )
-        val deleteId = hero.deleteVideoId
-        if (deleteId != null) {
-            RoundHeroButton(
-                icon = R.drawable.ic_delete,
-                description = "Delete ${hero.title}",
-                tint = IosColors.Red,
-                onClick = { actions.deleteVideo(deleteId) },
-            )
-        }
     }
 }
 

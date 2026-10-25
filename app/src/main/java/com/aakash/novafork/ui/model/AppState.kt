@@ -36,6 +36,9 @@ sealed interface Route {
 
     /** Everything left partway, from Home's "Continue Watching ›". */
     data object ContinueWatching : Route
+
+    /** One section of Preferences on its own page (phone), as iOS Settings opens its rows. */
+    data class SettingsPage(val section: String) : Route
 }
 
 /** The tab a route belongs to (for highlighting the nav bar / rail). */
@@ -44,7 +47,7 @@ val Route.top: TopDestination
         Route.Home, Route.Library, Route.ContinueWatching, is Route.VideoDetails, is Route.ShowDetails, is Route.Playlist ->
             TopDestination.VIDEO
         // Sources are under Settings.
-        Route.Browse, is Route.BrowseDir, Route.Settings -> TopDestination.SETTINGS
+        Route.Browse, is Route.BrowseDir, Route.Settings, is Route.SettingsPage -> TopDestination.SETTINGS
         Route.Audio -> TopDestination.AUDIO
         Route.Search -> TopDestination.SEARCH
     }
@@ -203,15 +206,6 @@ sealed interface DialogUi {
     data class RenamePlaylist(val playlistId: Long, val name: String) : DialogUi
 
     data class ConfirmDeletePlaylist(val playlistId: Long, val name: String) : DialogUi
-
-    /**
-     * Asked before any video goes: into Android's bin ([toBin], Android 11 and later, restorable
-     * for 30 days from Recently Deleted) or, where there is no bin (a picked folder), for good.
-     */
-    data class ConfirmDeleteVideo(val videoId: Long, val title: String, val toBin: Boolean) : DialogUi
-
-    /** Videos in Android's bin, restorable until they expire; [items] is null while loading. */
-    data class RecentlyDeleted(val items: List<TrashedVideoUi>? = null) : DialogUi
 
     /**
      * Settings › About › Library diagnostics: a plain-text report to copy or share; [report] is
@@ -419,17 +413,6 @@ interface AppActions {
 
     fun deletePlaylist(playlistId: Long) {}
 
-    /** Asks first ([DialogUi.ConfirmDeleteVideo]); [confirmDeleteVideo] then bins or deletes it. */
-    fun deleteVideo(videoId: Long) {}
-
-    fun confirmDeleteVideo(videoId: Long) {}
-
-    /** Lists the videos in Android's bin ([DialogUi.RecentlyDeleted]). */
-    fun showRecentlyDeleted() {}
-
-    /** Takes a video out of Android's bin, back into the library. */
-    fun restoreVideo(uri: String) {}
-
     fun removeFromPlaylist(playlistId: Long, videoId: Long) {}
 
     /** Moves the playlist's video at index [from] to index [to] (indices of [PlaylistDetailsUi.videos]). */
@@ -528,6 +511,3 @@ open class NoOpAppActions : AppActions {
     override fun dismissCrashReport() {}
 }
 
-/** A video in Android's bin: its MediaStore uri, file name and days until it is gone for good. */
-@Immutable
-data class TrashedVideoUi(val uri: String, val name: String, val daysLeft: Int?)

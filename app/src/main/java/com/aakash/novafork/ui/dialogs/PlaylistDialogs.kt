@@ -41,7 +41,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import com.aakash.novafork.R
-import com.aakash.novafork.ui.common.IosActionSheet
 import com.aakash.novafork.ui.common.IosColors
 import com.aakash.novafork.ui.common.IosGrabber
 import com.aakash.novafork.ui.common.IosSheetShape
@@ -55,7 +54,6 @@ import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.Artwork
 import com.aakash.novafork.ui.model.DialogUi
 import com.aakash.novafork.ui.model.PlaylistUi
-import com.aakash.novafork.ui.model.TrashedVideoUi
 
 /** Playlist names are short labels; longer input is cut rather than refused. */
 private const val MAX_NAME_LENGTH = 80
@@ -184,22 +182,6 @@ internal fun PlaylistNameDialog(
 }
 
 @Composable
-internal fun ConfirmDeleteVideoDialog(title: String, toBin: Boolean, onConfirm: () -> Unit, onDismiss: () -> Unit) {
-    // iOS asks from the bottom, in thumb reach (owner).
-    IosActionSheet(
-        title = "Delete $title?",
-        message = if (toBin) {
-            "It moves to Recently Deleted (Home › Library), where you can restore it for 30 days."
-        } else {
-            "Videos in picked folders have no bin: the file is deleted for good."
-        },
-        actionLabel = if (toBin) "Delete" else "Delete for Good",
-        onAction = onConfirm,
-        onDismiss = onDismiss,
-    )
-}
-
-@Composable
 internal fun ConfirmDeletePlaylistDialog(name: String, onConfirm: () -> Unit, onDismiss: () -> Unit) {
     NovaAlertDialog(
         onDismissRequest = onDismiss,
@@ -211,44 +193,6 @@ internal fun ConfirmDeletePlaylistDialog(name: String, onConfirm: () -> Unit, on
         },
         dismissButton = {
             IosTextButton(onClick = onDismiss) { Text("Cancel") }
-        },
-    )
-}
-
-/** Recently Deleted: Android's bin, each video with the days it has left and Restore. */
-@Composable
-internal fun RecentlyDeletedDialog(items: List<TrashedVideoUi>?, onRestore: (String) -> Unit, onDismiss: () -> Unit) {
-    NovaAlertDialog(
-        form = true,
-        onDismissRequest = onDismiss,
-        title = { Text("Recently Deleted") },
-        text = {
-            when {
-                items == null -> Box(Modifier.fillMaxWidth().padding(vertical = 24.dp), contentAlignment = Alignment.Center) {
-                    IosSpinner(Modifier.size(24.dp))
-                }
-                items.isEmpty() -> Text("Nothing here. Deleted videos stay for 30 days before they are gone for good.")
-                else -> Column(Modifier.verticalScroll(rememberScrollState())) {
-                    items.forEach { item ->
-                        Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Column(Modifier.weight(1f)) {
-                                Text(item.name, style = MaterialTheme.typography.bodyLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                                item.daysLeft?.let { days ->
-                                    Text(
-                                        if (days == 1) "1 day left" else "$days days left",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = IosColors.SecondaryLabel,
-                                    )
-                                }
-                            }
-                            IosTextButton(onClick = { onRestore(item.uri) }) { Text("Restore") }
-                        }
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            IosTextButton(onClick = onDismiss) { Text("Done") }
         },
     )
 }

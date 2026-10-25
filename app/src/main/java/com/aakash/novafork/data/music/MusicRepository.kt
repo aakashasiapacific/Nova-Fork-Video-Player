@@ -334,11 +334,6 @@ class MusicRepository(
 
     suspend fun deletePlaylist(playlistId: Long) = playlistDao.delete(playlistId)
 
-    /** Songs whose files were deleted (or binned) leave the library until they show up again. */
-    suspend fun forgetDeletedSongs(ids: List<Long>) {
-        for (chunk in ids.chunked(SQL_CHUNK)) songDao.markMissing(chunk)
-    }
-
     // Watchlist (the hero's "+" button)
 
     fun observeWatchlist(): Flow<List<String>> = watchlistDao.observe().map { rows -> rows.map { it.itemKey } }

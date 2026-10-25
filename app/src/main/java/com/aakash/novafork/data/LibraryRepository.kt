@@ -99,8 +99,6 @@ interface LibraryRepository {
 
     suspend fun video(id: Long): VideoWithMeta?
 
-    /** The video's file was deleted: it leaves the library now instead of at the next scan. */
-    suspend fun forgetDeletedVideo(id: Long) {}
     suspend fun source(id: Long): SourceEntity?
     suspend fun findByUri(uri: String): VideoWithMeta?
 
