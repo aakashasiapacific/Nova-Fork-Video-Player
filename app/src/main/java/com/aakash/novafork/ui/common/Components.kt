@@ -1,10 +1,13 @@
 package com.aakash.novafork.ui.common
 
 import androidx.annotation.DrawableRes
+import androidx.compose.animation.core.AnimationState
+import androidx.compose.animation.core.DecayAnimationSpec
+import androidx.compose.animation.core.animateDecay
+import androidx.compose.animation.rememberSplineBasedDecay
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.FlingBehavior
-import androidx.compose.foundation.gestures.snapping.SnapPosition
-import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
+import androidx.compose.foundation.gestures.ScrollScope
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,6 +27,7 @@ import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -38,6 +42,8 @@ import com.aakash.novafork.ui.common.IosProgressBar
 import com.aakash.novafork.ui.model.ScanUi
 import com.aakash.novafork.ui.theme.NovaColors
 import java.util.Locale
+import kotlin.math.abs
+import kotlin.math.roundToInt
 
 /** Icon from res/drawable (Framework7 Icons, MIT: see docs/ARCHITECTURE.md for the list). */
 @Composable
@@ -199,8 +205,53 @@ fun ScanBanner(scan: ScanUi, modifier: Modifier = Modifier) {
 }
 
 /**
- * A poster row's fling that always comes to rest with a card lined up at the row's start (after
- * its padding), never cut in half.
+ * A poster row's fling (owner: stopping card by card felt like friction): the row glides as far as
+ * the flick sends it, as any list does, and comes to rest with a card lined up at the row's start
+ * (after its padding) in that same one motion, never a glide and then a second snap.
  */
 @Composable
-fun rememberRowSnap(state: LazyListState): FlingBehavior = rememberSnapFlingBehavior(state, SnapPosition.Start)
+fun rememberRowSnap(state: LazyListState): FlingBehavior {
+    val decay = rememberSplineBasedDecay<Float>()
+    return remember(state, decay) { RowGlide(state, decay) }
+}
+
+private class RowGlide(private val state: LazyListState, private val decay: DecayAnimationSpec<Float>) : FlingBehavior {
+    override suspend fun ScrollScope.performFling(initialVelocity: Float): Float {
+        val info = state.layoutInfo
+        val cards = info.visibleItemsInfo
+        if (cards.isEmpty() || info.totalItemsCount == 0) return initialVelocity
+        // Where the flick would glide to, and the card edge nearest that.
+        val glide = decay.calculateTargetValue(0f, initialVelocity)
+        val stride = cards.sumOf { it.size }.toFloat() / cards.size + info.mainAxisItemSpacing
+        val first = cards.first()
+        val index = (first.index + ((glide - first.offset) / stride).roundToInt()).coerceIn(0, info.totalItemsCount - 1)
+        val target = cards.firstOrNull { it.index == index }?.offset?.toFloat()
+            ?: (first.offset + (index - first.index) * stride)
+        if (abs(target) < 1f) return 0f
+        // The flick's own glide, at the speed that ends it exactly there.
+        val velocity = velocityFor(target)
+        var moved = 0f
+        var blocked = false
+        AnimationState(0f, velocity).animateDecay(decay) {
+            val used = scrollBy(value - moved)
+            blocked = abs(value - moved - used) > 0.5f
+            moved += used
+            if (blocked) cancelAnimation()
+        }
+        if (!blocked) scrollBy(target - moved)
+        return 0f
+    }
+
+    /** The fling speed whose glide covers [distance] (the glide grows with the speed). */
+    private fun velocityFor(distance: Float): Float {
+        val goal = abs(distance)
+        var high = 1_000f
+        while (abs(decay.calculateTargetValue(0f, high)) < goal && high < 1e6f) high *= 2f
+        var low = 0f
+        repeat(24) {
+            val mid = (low + high) / 2f
+            if (abs(decay.calculateTargetValue(0f, mid)) < goal) low = mid else high = mid
+        }
+        return if (distance < 0f) -high else high
+    }
+}

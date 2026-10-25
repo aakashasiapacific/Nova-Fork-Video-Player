@@ -33,12 +33,16 @@ sealed interface Route {
     data class ShowDetails(val showKey: String) : Route
     data class BrowseDir(val sourceId: Long, val path: String) : Route
     data class Playlist(val playlistId: Long) : Route
+
+    /** Everything left partway, from Home's "Continue Watching ›". */
+    data object ContinueWatching : Route
 }
 
 /** The tab a route belongs to (for highlighting the nav bar / rail). */
 val Route.top: TopDestination
     get() = when (this) {
-        Route.Home, Route.Library, is Route.VideoDetails, is Route.ShowDetails, is Route.Playlist -> TopDestination.VIDEO
+        Route.Home, Route.Library, Route.ContinueWatching, is Route.VideoDetails, is Route.ShowDetails, is Route.Playlist ->
+            TopDestination.VIDEO
         // Sources are under Settings.
         Route.Browse, is Route.BrowseDir, Route.Settings -> TopDestination.SETTINGS
         Route.Audio -> TopDestination.AUDIO

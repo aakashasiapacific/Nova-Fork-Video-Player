@@ -40,8 +40,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
-import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -79,6 +77,7 @@ import com.aakash.novafork.ui.common.GlassCircle
 import com.aakash.novafork.ui.common.IosSpinner
 import com.aakash.novafork.ui.common.LandscapeArt
 import com.aakash.novafork.ui.common.LocalBottomBarSpace
+import com.aakash.novafork.ui.common.LogoPullToRefresh
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.PosterArt
 import com.aakash.novafork.ui.common.ProgressStrip
@@ -797,20 +796,17 @@ internal fun CenteredScrollable(modifier: Modifier = Modifier, content: @Composa
 }
 
 /**
- * Pull-to-refresh that spins only for a refresh the user pulled for, until that scan finishes.
- * Scans started elsewhere (app start, a new source) are reported by the ScanBanner instead: a
- * spinner pinned over the page for a long poster fetch would just be noise.
+ * Pull-to-refresh with the app's logo (LogoPullToRefresh) for a refresh the user pulled for, held
+ * until that scan finishes. Scans started elsewhere (app start, a new source) are reported by the
+ * ScanBanner instead.
  */
 @Composable
 internal fun PhonePullToRefresh(
     scanning: Boolean,
     onRefresh: () -> Unit,
     modifier: Modifier = Modifier,
-    indicatorModifier: Modifier = Modifier,
     content: @Composable BoxScope.() -> Unit,
 ) {
-    val state = rememberPullToRefreshState()
-    val haptics = LocalHapticFeedback.current
     var pulled by remember { mutableStateOf(false) }
     var scanSeen by remember { mutableStateOf(false) }
     LaunchedEffect(pulled, scanning) {
@@ -824,36 +820,13 @@ internal fun PhonePullToRefresh(
             }
         }
     }
-    PullToRefreshBox(
-        isRefreshing = pulled,
+    LogoPullToRefresh(
+        refreshing = pulled,
         onRefresh = {
             pulled = true
             onRefresh()
         },
         modifier = modifier,
-        state = state,
-        // iOS's refresh control: as the page is pulled its spokes appear one by one and turn
-        // with the finger, a tick says letting go will refresh, and it spins while the scan runs.
-        indicator = {
-            val fraction = state.distanceFraction.coerceIn(0f, 1f)
-            val armed = state.distanceFraction >= 1f
-            LaunchedEffect(armed) { if (armed && !pulled) haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove) }
-            if (pulled || fraction > 0f) {
-                IosSpinner(
-                    modifier = Modifier
-                        .align(Alignment.TopCenter)
-                        .then(indicatorModifier)
-                        .padding(top = 18.dp)
-                        .size(26.dp)
-                        .graphicsLayer {
-                            alpha = if (pulled) 1f else 0.4f + 0.6f * fraction
-                            rotationZ = if (pulled) 0f else fraction * 180f
-                        },
-                    color = Color.White.copy(alpha = 0.8f),
-                    reveal = if (pulled) null else fraction,
-                )
-            }
-        },
         content = content,
     )
 }

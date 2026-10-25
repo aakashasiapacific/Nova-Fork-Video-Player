@@ -49,7 +49,7 @@ import java.util.Locale
  * Pure Kotlin, so every rule here can be unit-tested without Android.
  */
 object UiMappers {
-    private const val CONTINUE_WATCHING_LIMIT = 20
+    private const val CONTINUE_WATCHING_LIMIT = 60
     private const val RECENTLY_ADDED_LIMIT = 30
     private const val HERO_LIMIT = 6
     /** Newest movies and shows considered for the hero before the backdrop preference is applied. */

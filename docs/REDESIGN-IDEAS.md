@@ -586,3 +586,9 @@ The owner asked for Apple Music to be copied more precisely, with less clutter. 
   - Mini player: swipe it up to open Now Playing; the cover and title crossfade when the song changes.
   - Action sheets: the dim behind fades in with the sheet.
   - Already there: the next card peeks at a row's edge, Preferences' icon squares, and the version in About.
+- **Build 120 (owner):**
+  - Pull to refresh after X's: the iOS spinner is gone. Pulling a page down past its top brings the app's logo out in white in the gap, growing with the pull and stretching once letting go will refresh (with a tick); let go and it rides back up with the page. When the refresh is over the logo drops in for a moment and fills with its blue from the bottom up, then goes. On every page that refreshes (Home, Library, Sources; tablet too).
+  - Home's rows no longer stop card by card (owner: it felt like friction): a flick glides as far as it sends the row and comes to rest on a card's edge in that same one motion.
+  - "Continue Watching ›" opens its own page: everything left partway, last played first, as wide cards with the time left; tablets get "See all" for it and for the Watchlist.
+  - The Watchlist bookmark is drawn as heavy as the other line icons.
+  - Video player, closer to Samsung's (owner's recording): a lighter shade over the picture; smaller previous and next discs either side of a larger play disc; while the seek bar is dragged its knob goes, the bar swells into a thick white-filled bar and the time it points at shows large above it.

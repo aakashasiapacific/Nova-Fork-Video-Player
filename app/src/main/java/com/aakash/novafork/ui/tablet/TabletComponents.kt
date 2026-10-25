@@ -45,12 +45,12 @@ import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
-import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -77,12 +77,15 @@ import com.aakash.novafork.ui.common.IosButton
 import com.aakash.novafork.ui.common.IosProgressBar
 import com.aakash.novafork.ui.common.IosSpinner
 import com.aakash.novafork.ui.common.LandscapeArt
+import com.aakash.novafork.ui.common.LocalPagePull
+import com.aakash.novafork.ui.common.LogoPullToRefresh
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.PosterArt
 import com.aakash.novafork.ui.common.ProgressStrip
 import com.aakash.novafork.ui.common.RatingPill
 import com.aakash.novafork.ui.common.WatchedBadge
 import com.aakash.novafork.ui.common.bottomScrim
+import com.aakash.novafork.ui.common.iosOverscroll
 import com.aakash.novafork.ui.common.metaLine
 import com.aakash.novafork.ui.common.startScrim
 import com.aakash.novafork.ui.model.Artwork
@@ -153,8 +156,9 @@ internal fun ShowCardUi.subtitleLine(): String = metaLine(
 )
 
 /**
- * Pull-to-refresh whose spinner shows from the pull until the scan it started is over. Scans that
- * start on their own only show the scan banner, not this spinner.
+ * Pull-to-refresh with the app's logo (LogoPullToRefresh), held from the pull until the scan it
+ * started is over. The page bounces past its top as the phone's do, which brings the logo out.
+ * Scans that start on their own only show the scan banner.
  */
 @Composable
 internal fun TabletPullToRefresh(
@@ -167,41 +171,25 @@ internal fun TabletPullToRefresh(
     val currentScanning by rememberUpdatedState(scanning)
     if (pulled) {
         LaunchedEffect(Unit) {
-            // Give the scan a moment to start, then keep spinning until it is over.
+            // Give the scan a moment to start, then hold until it is over.
             withTimeoutOrNull(PULL_REFRESH_GRACE_MS) { snapshotFlow { currentScanning }.first { it } }
             snapshotFlow { currentScanning }.first { !it }
             pulled = false
         }
     }
-    val refreshState = rememberPullToRefreshState()
-    PullToRefreshBox(
-        isRefreshing = pulled,
-        onRefresh = {
-            pulled = true
-            onRefresh()
-        },
-        modifier = modifier,
-        state = refreshState,
-        // iOS's refresh control: the spinner fades in with the pull and spins while the scan runs.
-        indicator = {
-            val fraction = refreshState.distanceFraction.coerceIn(0f, 1f)
-            if (pulled || fraction > 0f) {
-                IosSpinner(
-                    modifier = Modifier
-                        .align(Alignment.TopCenter)
-                        .statusBarsPadding()
-                        .padding(top = 18.dp)
-                        .size(28.dp)
-                        .graphicsLayer {
-                            alpha = if (pulled) 1f else fraction
-                            rotationZ = if (pulled) 0f else fraction * 180f
-                        },
-                    color = Color.White.copy(alpha = 0.8f),
-                )
-            }
-        },
-        content = content,
-    )
+    val pull = remember { mutableFloatStateOf(0f) }
+    val readPull = remember { { pull.floatValue } }
+    CompositionLocalProvider(LocalPagePull provides readPull) {
+        LogoPullToRefresh(
+            refreshing = pulled,
+            onRefresh = {
+                pulled = true
+                onRefresh()
+            },
+            modifier = modifier.iosOverscroll(pullState = pull),
+            content = content,
+        )
+    }
 }
 
 private const val PULL_REFRESH_GRACE_MS = 900L

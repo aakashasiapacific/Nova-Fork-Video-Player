@@ -59,7 +59,8 @@ internal fun PhonePlayerControls(
     BoxWithConstraints(
         modifier
             .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.45f)),
+            // Samsung only shades the picture lightly under its controls.
+            .background(Color.Black.copy(alpha = 0.3f)),
     ) {
         val portrait = maxHeight > maxWidth
         Box(
@@ -160,7 +161,8 @@ private fun PhoneTransportRow(state: PlayerUiState, actions: PlayerActions, modi
     Row(
         modifier = modifier,
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(56.dp),
+        // Samsung's sizes: small discs either side of a larger play disc, 96dp centre to centre.
+        horizontalArrangement = Arrangement.spacedBy(40.dp),
     ) {
         // With nothing before it, previous goes back to the start, as Samsung's does.
         DiscButton(
@@ -172,7 +174,7 @@ private fun PhoneTransportRow(state: PlayerUiState, actions: PlayerActions, modi
             isPlaying = state.isPlaying,
             buffering = state.isBuffering,
             onClick = actions::togglePlay,
-            size = 72.dp,
+            size = 58.dp,
         )
         DiscButton(
             icon = R.drawable.ic_player_next,
@@ -188,7 +190,7 @@ private fun PhoneTransportRow(state: PlayerUiState, actions: PlayerActions, modi
 private fun DiscButton(icon: Int, description: String, onClick: () -> Unit, enabled: Boolean = true) {
     Box(
         Modifier
-            .size(48.dp)
+            .size(42.dp)
             .clip(CircleShape)
             .background(Color.Black.copy(alpha = 0.3f))
             .clickable(enabled = enabled, onClickLabel = description, role = Role.Button, onClick = onClick),
@@ -198,7 +200,7 @@ private fun DiscButton(icon: Int, description: String, onClick: () -> Unit, enab
             painterResource(icon),
             contentDescription = description,
             tint = Color.White.copy(alpha = if (enabled) 1f else 0.35f),
-            modifier = Modifier.size(26.dp),
+            modifier = Modifier.size(20.dp),
         )
     }
 }

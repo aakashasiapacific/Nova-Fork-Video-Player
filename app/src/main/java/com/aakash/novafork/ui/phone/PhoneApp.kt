@@ -501,6 +501,11 @@ private fun PhonePage(state: AppUiState, actions: AppActions) {
             modifier = pageModifier,
             permission = state.permission,
         )
+        Route.ContinueWatching -> PhoneContinueWatchingScreen(
+            cards = state.home.continueWatching,
+            actions = actions,
+            modifier = pageModifier,
+        )
         is Route.Playlist -> PhonePlaylistScreen(
             playlist = state.playlist?.takeIf { it.id == route.playlistId },
             actions = actions,

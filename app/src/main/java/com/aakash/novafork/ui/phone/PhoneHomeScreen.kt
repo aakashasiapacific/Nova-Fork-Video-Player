@@ -121,7 +121,6 @@ fun PhoneHomeScreen(
         scanning = scan.running,
         onRefresh = actions::refresh,
         modifier = modifier.fillMaxSize(),
-        indicatorModifier = Modifier.statusBarsPadding(),
     ) {
         if (home.isEmpty) {
             HomeOnboarding(scan = scan, permission = permission, actions = actions)
@@ -206,7 +205,7 @@ private fun HomeFeed(home: HomeUi, scan: ScanUi, permission: PermissionUi, actio
             if (home.continueWatching.isNotEmpty()) {
                 item(key = "continue", contentType = "landscapeRow") {
                     // Right under the hero's dots (owner: no empty band before it).
-                    HomeSection(title = "Continue Watching", topPadding = 4.dp) {
+                    HomeSection(title = "Continue Watching", topPadding = 4.dp, onOpen = { actions.navigate(Route.ContinueWatching) }) {
                         LandscapeRow(home.continueWatching, actions)
                     }
                 }
@@ -336,7 +335,7 @@ private fun WatchlistRow(items: List<LibraryItemUi>, actions: AppActions) {
 }
 
 /** A Continue Watching card's caption. */
-private fun continueCaption(card: VideoCardUi): String? {
+internal fun continueCaption(card: VideoCardUi): String? {
     val left = remainingLabel(card) ?: return card.displaySubtitle()
     return if (card.kind == MediaKind.EPISODE) metaLine(card.displaySubtitle(), left).ifEmpty { null } else left
 }
@@ -351,33 +350,44 @@ private fun LandscapeRow(cards: List<VideoCardUi>, actions: AppActions) {
         contentPadding = PaddingValues(horizontal = dims.gutter),
         horizontalArrangement = Arrangement.spacedBy(dims.rowSpacing),
     ) {
-        items(cards) { card ->
-            VideoMenuBox(
-                videoId = card.id,
-                title = card.displayTitle(),
-                actions = actions,
-                // Apple TV's "Remove from Up Next": it forgets where it was left, so it leaves the row.
-                extraItems = { close ->
-                    NovaMenuItem(
-                        text = { Text("Remove from Continue Watching") },
-                        destructive = true,
-                        leadingIcon = { NovaIcon(R.drawable.ic_close, contentDescription = null) },
-                        onClick = {
-                            close()
-                            actions.setWatched(card.id, false)
-                        },
-                    )
+        items(cards) { card -> ContinueWatchingCard(card, actions) }
+    }
+}
+
+/** A video left partway: plays on from there; its menu can take it off Continue Watching. */
+@Composable
+internal fun ContinueWatchingCard(
+    card: VideoCardUi,
+    actions: AppActions,
+    modifier: Modifier = Modifier,
+    width: Dp = LocalNovaDimens.current.landscapeCardWidth,
+) {
+    VideoMenuBox(
+        videoId = card.id,
+        title = card.displayTitle(),
+        actions = actions,
+        modifier = modifier,
+        // Apple TV's "Remove from Up Next": it forgets where it was left, so it leaves the row.
+        extraItems = { close ->
+            NovaMenuItem(
+                text = { Text("Remove from Continue Watching") },
+                destructive = true,
+                leadingIcon = { NovaIcon(R.drawable.ic_close, contentDescription = null) },
+                onClick = {
+                    close()
+                    actions.setWatched(card.id, false)
                 },
-            ) { openMenu ->
-                PhoneLandscapeCard(
-                    card = card,
-                    onClick = { actions.play(card.id) },
-                    onLongClick = openMenu,
-                    // Apple TV's caption: what is left ("42m left"); an episode keeps its "S1 · E3".
-                    subtitle = continueCaption(card),
-                )
-            }
-        }
+            )
+        },
+    ) { openMenu ->
+        PhoneLandscapeCard(
+            card = card,
+            onClick = { actions.play(card.id) },
+            onLongClick = openMenu,
+            // Apple TV's caption: what is left ("42m left"); an episode keeps its "S1 · E3".
+            subtitle = continueCaption(card),
+            width = width,
+        )
     }
 }
 

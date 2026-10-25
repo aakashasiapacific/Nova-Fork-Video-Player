@@ -77,6 +77,7 @@ import com.aakash.novafork.ui.model.LibraryFilter
 import com.aakash.novafork.ui.model.LibraryItemUi
 import com.aakash.novafork.ui.model.MediaKind
 import com.aakash.novafork.ui.model.PermissionUi
+import com.aakash.novafork.ui.model.Route
 import com.aakash.novafork.ui.model.ScanUi
 import com.aakash.novafork.ui.model.ShowCardUi
 import com.aakash.novafork.ui.model.VideoCardUi
@@ -175,14 +176,14 @@ private fun HomeFeed(home: HomeUi, scan: ScanUi, permission: PermissionUi, layou
             }
             if (home.continueWatching.isNotEmpty()) {
                 item(key = "continue", contentType = "landscapeRow") {
-                    HomeSection(title = "Continue Watching") {
+                    HomeSection(title = "Continue Watching", onSeeAll = { actions.navigate(Route.ContinueWatching) }) {
                         ContinueWatchingRow(home.continueWatching, actions)
                     }
                 }
             }
             if (home.watchlist.isNotEmpty()) {
                 item(key = "watchlist", contentType = "landscapeRow") {
-                    HomeSection(title = "Watchlist") {
+                    HomeSection(title = "Watchlist", onSeeAll = { actions.openLibrary(LibraryFilter.WATCHLIST) }) {
                         WatchlistRow(home.watchlist, actions)
                     }
                 }
