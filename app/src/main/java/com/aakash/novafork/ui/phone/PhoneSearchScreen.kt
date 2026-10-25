@@ -2,10 +2,12 @@ package com.aakash.novafork.ui.phone
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.aspectRatio
@@ -19,6 +21,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -43,6 +46,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
@@ -64,6 +68,7 @@ import com.aakash.novafork.ui.common.Hairline
 import com.aakash.novafork.ui.common.IosColors
 import com.aakash.novafork.ui.common.IosIconButton
 import com.aakash.novafork.ui.common.IosTextButton
+import com.aakash.novafork.ui.common.LandscapeArt
 import com.aakash.novafork.ui.common.LocalBottomBarSpace
 import com.aakash.novafork.ui.common.LocalSearchQuery
 import com.aakash.novafork.ui.common.NovaIcon
@@ -76,6 +81,7 @@ import com.aakash.novafork.ui.common.searchHighlighted
 import com.aakash.novafork.ui.common.stretchWithPull
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.Artwork
+import com.aakash.novafork.ui.model.GenreTileUi
 import com.aakash.novafork.ui.model.LibraryItemUi
 import com.aakash.novafork.ui.model.SearchUi
 import kotlin.math.abs
@@ -143,28 +149,32 @@ fun PhoneSearchScreen(
             // Lists end above the field; results show what was typed in bold.
             CompositionLocalProvider(LocalBottomBarSpace provides listSpace, LocalSearchQuery provides field.text) {
                 when {
-                    field.text.isBlank() && search.recent.isNotEmpty() -> RecentSearches(
-                        recent = search.recent,
-                        onPick = { picked ->
+                    field.text.isBlank() && (search.recent.isNotEmpty() || search.genres.isNotEmpty()) -> {
+                        val pick: (String) -> Unit = { picked ->
                             field = TextFieldValue(picked, TextRange(picked.length))
                             actions.search(picked)
                             actions.rememberSearch(picked)
                             keyboard?.hide()
-                        },
-                        onClear = actions::clearRecentSearches,
-                        bottomSpace = listSpace,
-                        onForget = actions::forgetSearch,
-                    )
+                        }
+                        RecentSearches(
+                            recent = search.recent,
+                            onPick = pick,
+                            onClear = actions::clearRecentSearches,
+                            bottomSpace = listSpace,
+                            onForget = actions::forgetSearch,
+                            footer = { genreTiles(search.genres, onPick = pick) },
+                        )
+                    }
                     field.text.isBlank() -> CenteredScrollable(Modifier.padding(bottom = listSpace)) {
                         EmptyState(
-                            icon = R.drawable.ic_search,
+                            icon = R.drawable.ic_logo,
                             title = "Search your library",
                             body = "Find movies, shows, videos, songs, albums and artists.",
                         )
                     }
                     search.isEmpty && query.isNotEmpty() -> CenteredScrollable(Modifier.padding(bottom = listSpace)) {
                         EmptyState(
-                            icon = R.drawable.ic_search,
+                            icon = R.drawable.ic_logo,
                             title = "No Results",
                             body = "Nothing in your library matches “$query”.",
                         )
@@ -343,13 +353,15 @@ internal fun RecentSearches(
     onClear: () -> Unit,
     bottomSpace: Dp,
     onForget: (String) -> Unit = {},
+    /** More below the searches (Search's genre tiles). */
+    footer: LazyListScope.() -> Unit = {},
 ) {
     val dims = LocalNovaDimens.current
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(start = dims.gutter, end = dims.gutter, top = 8.dp, bottom = bottomSpace),
     ) {
-        item(key = "header") {
+        if (recent.isNotEmpty()) item(key = "header") {
             Row(Modifier.fillMaxWidth().padding(bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text("Recent Searches", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
                 IosTextButton(onClick = onClear) { Text("Clear") }
@@ -373,5 +385,57 @@ internal fun RecentSearches(
                 }
             }
         }
+        footer()
+    }
+}
+
+/**
+ * Apple TV's "Browse Categories": the library's biggest genres as picture tiles, two to a row,
+ * each a backdrop from that genre darkened at the foot under its name; a tap searches the genre.
+ */
+private fun LazyListScope.genreTiles(genres: List<GenreTileUi>, onPick: (String) -> Unit) {
+    if (genres.isEmpty()) return
+    item(key = "genresTitle") {
+        Text(
+            "Browse Categories",
+            style = MaterialTheme.typography.titleLarge,
+            modifier = Modifier.padding(top = 20.dp, bottom = 10.dp),
+        )
+    }
+    items(genres.chunked(2), key = { row -> "genres:" + row.joinToString { it.name } }) { row ->
+        Row(Modifier.fillMaxWidth().padding(bottom = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            row.forEach { genre -> GenreTile(genre, onClick = { onPick(genre.name) }, modifier = Modifier.weight(1f)) }
+            if (row.size == 1) Spacer(Modifier.weight(1f))
+        }
+    }
+}
+
+@Composable
+private fun GenreTile(genre: GenreTileUi, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val shape = RoundedCornerShape(12.dp)
+    Box(
+        modifier
+            .aspectRatio(16f / 10f)
+            .clip(shape)
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            .clickable(onClickLabel = "Browse ${genre.name}", onClick = onClick),
+    ) {
+        LandscapeArt(artwork = genre.artwork, title = genre.name, modifier = Modifier.fillMaxSize())
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(Brush.verticalGradient(0.35f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.8f))),
+        )
+        Text(
+            genre.name,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = Color.White,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .padding(10.dp),
+        )
     }
 }

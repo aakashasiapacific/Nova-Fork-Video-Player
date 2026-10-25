@@ -616,7 +616,7 @@ private fun BrowseDirPane(
             }
             isEmpty -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 EmptyState(
-                    icon = R.drawable.ic_folder_open,
+                    icon = R.drawable.ic_logo,
                     title = "No videos here",
                     body = "This folder has no videos or subfolders with videos.",
                 )

@@ -278,7 +278,15 @@ fun CoverFlight(artUri: String?) {
 private const val MINI_FADE_MS = 280
 
 /** What the big cover shows, and where in the queue, so a skip knows which way to slide. */
-private data class CoverSlide(val artUri: String?, val songId: Long?, val index: Int)
+/** [ranOut]: the song before played to its end (an album playing through), not skipped. */
+private data class CoverSlide(val artUri: String?, val songId: Long?, val index: Int, val ranOut: Boolean = false)
+
+/** Whether the song before the current one played to its end, kept per song. */
+private class SongChange {
+    var songId: Long? = null
+    var nearEnd = false
+    var ranOut = false
+}
 
 /** How long lyrics scrolled by hand stay lit and unfollowed after the finger lifts. */
 private const val LYRICS_BROWSE_MS = 3_000L
@@ -784,13 +792,25 @@ private fun BigCover(player: MusicPlayerState) {
             NovaIcon(R.drawable.ic_music_notes, contentDescription = null, tint = Color.White.copy(alpha = 0.4f), modifier = Modifier.size(side / 3))
             // Skipping slides the old cover out and the new one in from the side it comes from
             // (next from the right, previous from the left), as Apple Music does.
+            val change = remember { SongChange() }
+            val songId = player.nowPlaying?.songId
+            if (songId != change.songId) {
+                change.ranOut = change.songId != null && change.nearEnd
+                change.songId = songId
+            }
+            change.nearEnd = player.durationMs > 0 && player.positionMs >= player.durationMs - RAN_OUT_MARGIN_MS
             AnimatedContent(
-                targetState = CoverSlide(player.nowPlaying?.artUri, player.nowPlaying?.songId, player.queueIndex),
+                targetState = CoverSlide(player.nowPlaying?.artUri, songId, player.queueIndex, change.ranOut),
                 transitionSpec = {
-                    val forward = targetState.index >= initialState.index
-                    val slide = spring<IntOffset>(dampingRatio = 0.9f, stiffness = 420f)
-                    (slideInHorizontally(slide) { if (forward) it else -it } + fadeIn(tween(160))) togetherWith
-                        (slideOutHorizontally(slide) { if (forward) -it else it } + fadeOut(tween(160)))
+                    // Played through into the next song: a slow crossfade (one album into the next).
+                    if (targetState.ranOut) {
+                        fadeIn(tween(ALBUM_FADE_MS)) togetherWith fadeOut(tween(ALBUM_FADE_MS))
+                    } else {
+                        val forward = targetState.index >= initialState.index
+                        val slide = spring<IntOffset>(dampingRatio = 0.9f, stiffness = 420f)
+                        (slideInHorizontally(slide) { if (forward) it else -it } + fadeIn(tween(160))) togetherWith
+                            (slideOutHorizontally(slide) { if (forward) -it else it } + fadeOut(tween(160)))
+                    }
                 },
                 contentKey = { it.songId },
                 modifier = Modifier.fillMaxSize(),
@@ -806,6 +826,10 @@ private fun BigCover(player: MusicPlayerState) {
         }
     }
 }
+
+/** How close to its end a song counts as played through when the next one starts. */
+private const val RAN_OUT_MARGIN_MS = 2_500L
+private const val ALBUM_FADE_MS = 600
 
 /**
  * Big, bold lyric lines; synced ones light up as the song plays and a tap jumps to them (with a

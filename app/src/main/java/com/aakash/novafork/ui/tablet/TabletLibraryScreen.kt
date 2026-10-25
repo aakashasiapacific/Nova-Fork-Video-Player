@@ -300,7 +300,7 @@ private fun LibraryEmpty(filter: LibraryFilter, actions: AppActions, modifier: M
     Box(modifier, contentAlignment = Alignment.Center) {
         if (filter == LibraryFilter.ALL) {
             EmptyState(
-                icon = R.drawable.ic_video_library,
+                icon = R.drawable.ic_logo,
                 title = "Your library is empty",
                 body = "Add a folder or a network share, or allow access to the videos on this tablet.",
                 actionLabel = "Add a Folder",
@@ -317,7 +317,7 @@ private fun LibraryEmpty(filter: LibraryFilter, actions: AppActions, modifier: M
                 LibraryFilter.FAVORITES -> "No favorites yet"
             }
             EmptyState(
-                icon = R.drawable.ic_filter_list,
+                icon = R.drawable.ic_logo,
                 title = title,
                 body = "Nothing in your library falls into this group yet.",
                 actionLabel = "Show everything",

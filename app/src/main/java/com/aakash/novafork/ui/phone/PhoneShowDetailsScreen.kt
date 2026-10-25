@@ -5,6 +5,8 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -36,6 +38,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChange
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
@@ -52,6 +58,7 @@ import com.aakash.novafork.ui.common.metaLine
 import com.aakash.novafork.ui.common.resumeFill
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.ShowDetailsUi
+import kotlin.math.abs
 
 @Composable
 fun PhoneShowDetailsScreen(
@@ -67,6 +74,7 @@ fun PhoneShowDetailsScreen(
     }
     val seasonIndex = seasons.indexOfFirst { it.number == selectedSeason }.coerceAtLeast(0)
     val season = seasons.getOrNull(seasonIndex)
+    val haptics = LocalHapticFeedback.current
     // Lazy keys must be unique; a file listed twice in a season must not crash the list.
     val episodes = remember(season) { season?.episodes.orEmpty().distinctBy { it.videoId } }
     val episodeCount = remember(seasons) { seasons.sumOf { it.episodes.size } }
@@ -221,7 +229,17 @@ fun PhoneShowDetailsScreen(
                         title = metaLine(details.title, episode.code, episode.title),
                         actions = actions,
                         // Another season's episodes fade in as it is picked.
-                        modifier = Modifier.animateItem(fadeInSpec = tween(260), placementSpec = null, fadeOutSpec = null),
+                        modifier = Modifier
+                            .animateItem(fadeInSpec = tween(260), placementSpec = null, fadeOutSpec = null)
+                            .swipeSeasons(
+                                hasPrevious = seasonIndex > 0,
+                                hasNext = seasonIndex < seasons.lastIndex,
+                            ) { step ->
+                                seasons.getOrNull(seasonIndex + step)?.let {
+                                    haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    selectedSeason = it.number
+                                }
+                            },
                     ) { openMenu ->
                         PhoneEpisodeRow(
                             episode = episode,
@@ -263,3 +281,40 @@ fun PhoneShowDetailsScreen(
         )
     }
 }
+
+/**
+ * Swiping sideways across the episodes changes season: left to the next, right to the one before,
+ * with a tick. A swipe with no season that way is left alone, so a swipe right on the first
+ * season still takes the page back; up and down still scroll.
+ */
+private fun Modifier.swipeSeasons(hasPrevious: Boolean, hasNext: Boolean, onSwipe: (step: Int) -> Unit): Modifier =
+    pointerInput(hasPrevious, hasNext) {
+        val slop = viewConfiguration.touchSlop
+        val commit = SeasonSwipeCommit.toPx()
+        awaitEachGesture {
+            val down = awaitFirstDown(requireUnconsumed = false)
+            var dx = 0f
+            var dy = 0f
+            var step = 0
+            while (true) {
+                val change = awaitPointerEvent().changes.firstOrNull { it.id == down.id } ?: break
+                if (!change.pressed) break
+                val delta = change.positionChange()
+                dx += delta.x
+                dy += delta.y
+                if (step == 0) {
+                    // A scroll, or a swipe this way with no season to go to: not ours.
+                    if (abs(dy) > slop && abs(dy) >= abs(dx)) return@awaitEachGesture
+                    if (abs(dx) > slop && abs(dx) > abs(dy)) {
+                        val way = if (dx < 0f) 1 else -1
+                        if ((way > 0 && hasNext) || (way < 0 && hasPrevious)) step = way else return@awaitEachGesture
+                    }
+                }
+                if (step != 0) change.consume()
+            }
+            if (step != 0 && abs(dx) > commit) onSwipe(step)
+        }
+    }
+
+/** How far a swipe across the episodes must go to change season. */
+private val SeasonSwipeCommit = 64.dp

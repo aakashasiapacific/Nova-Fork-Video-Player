@@ -15,6 +15,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -44,24 +45,34 @@ import kotlinx.coroutines.launch
  * [pullState] shares how far it is pulled (down positive) with the page (see [LocalPagePull]).
  */
 @Composable
-internal fun Modifier.iosOverscroll(onPullClose: (() -> Unit)? = null, pullState: MutableFloatState? = null): Modifier {
+internal fun Modifier.iosOverscroll(
+    onPullClose: (() -> Unit)? = null,
+    pullState: MutableFloatState? = null,
+    holdState: MutableFloatState? = null,
+): Modifier {
     val scope = rememberCoroutineScope()
     val closePx = with(LocalDensity.current) { 120.dp.toPx() }
     val close by rememberUpdatedState(onPullClose)
     val haptics = LocalHapticFeedback.current
     val ownPull = remember { mutableFloatStateOf(0f) }
     var pull by (pullState ?: ownPull)
+    // A pull-to-refresh can hold the page down this far (see LocalPageHold) until it lets go.
+    val ownHold = remember { mutableFloatStateOf(0f) }
+    val hold by (holdState ?: ownHold)
     var heightPx by remember { mutableFloatStateOf(1f) }
     val connection = remember {
         object : NestedScrollConnection {
             var settle: Job? = null
 
-            fun springBack(velocity: Float) {
+            fun springTo(target: Float, velocity: Float) {
                 settle?.cancel()
                 settle = scope.launch {
-                    animate(pull, 0f, velocity, spring(dampingRatio = 0.82f, stiffness = 320f)) { value, _ -> pull = value }
+                    animate(pull, target, velocity, spring(dampingRatio = 0.82f, stiffness = 320f)) { value, _ -> pull = value }
                 }
             }
+
+            /** Back to rest, or to the refresh's hold while it holds the page down. */
+            fun springBack(velocity: Float) = springTo(if (pull > 0f) hold else 0f, velocity)
 
             override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
                 if (source != NestedScrollSource.UserInput || pull == 0f) return Offset.Zero
@@ -70,7 +81,8 @@ internal fun Modifier.iosOverscroll(onPullClose: (() -> Unit)? = null, pullState
                 val back = (pull > 0f && available.y < 0f) || (pull < 0f && available.y > 0f)
                 if (!back) return Offset.Zero
                 val next = pull + available.y
-                val clamped = if (pull > 0f) next.coerceAtLeast(0f) else next.coerceAtMost(0f)
+                // A held refresh keeps its gap open; the list scrolls on under it.
+                val clamped = if (pull > 0f) next.coerceAtLeast(hold.coerceAtMost(pull)) else next.coerceAtMost(0f)
                 val used = clamped - pull
                 pull = clamped
                 if (armed && pull <= closePx) armed = false
@@ -116,6 +128,12 @@ internal fun Modifier.iosOverscroll(onPullClose: (() -> Unit)? = null, pullState
             }
         }
     }
+    // The refresh holding or letting go of the page moves it there.
+    LaunchedEffect(connection) {
+        snapshotFlow { hold }.collect { target ->
+            if (abs(pull - target) > 0.5f && (target > 0f || pull > 0f)) connection.springTo(target, 0f)
+        }
+    }
     return this
         .onSizeChanged { heightPx = it.height.toFloat().coerceAtLeast(1f) }
         .nestedScroll(connection)
@@ -136,6 +154,12 @@ internal fun Modifier.iosOverscroll(onPullClose: (() -> Unit)? = null, pullState
  * for headers that stretch into the gap; read it in a draw or layer block.
  */
 internal val LocalPagePull = staticCompositionLocalOf<() -> Float> { { 0f } }
+
+/**
+ * How far a refresh holds the page around pulled down (0 = not held), set by LogoPullToRefresh
+ * while the logo fills in the gap; null where the page has no bounce to hold.
+ */
+internal val LocalPageHold = staticCompositionLocalOf<MutableFloatState?> { null }
 
 /**
  * iOS's large title stretch: pulling the page down past its top makes its big title grow a

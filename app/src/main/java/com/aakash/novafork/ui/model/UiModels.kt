@@ -391,10 +391,16 @@ data class SearchUi(
     val artists: List<MusicResultUi> = emptyList(),
     /** Searches the user ran, newest first, shown while the field is empty. */
     val recent: List<String> = emptyList(),
+    /** The library's biggest genres, as tiles to browse by while the field is empty (Apple TV). */
+    val genres: List<GenreTileUi> = emptyList(),
 ) {
     val hasMusic: Boolean get() = songs.isNotEmpty() || albums.isNotEmpty() || artists.isNotEmpty()
     val isEmpty: Boolean get() = results.isEmpty() && !hasMusic
 }
+
+/** A genre to browse by in Search: its name, how many titles, and one of their backdrops. */
+@Immutable
+data class GenreTileUi(val name: String, val count: Int, val artwork: Artwork)
 
 /** A song, album or artist in search results; tapping it plays [songIds] from [startIndex]. */
 @Immutable

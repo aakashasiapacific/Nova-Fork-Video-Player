@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The app's logo (the launcher icon's glyph) on its own, as an icon: empty pages show it. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="52"
+    android:viewportHeight="52">
+    <group
+        android:translateX="-28"
+        android:translateY="-28">
+    <path android:fillType="evenOdd" android:fillColor="#FFFFFFFF" android:pathData="M36.72,37.44H71.28A4.32,4.32 0,0 1,75.6,41.76V61.2A4.32,4.32 0,0 1,71.28,65.52H36.72A4.32,4.32 0,0 1,32.4,61.2V41.76A4.32,4.32 0,0 1,36.72,37.44ZM36.94,40.68H71.06A1.3,1.3 0,0 1,72.36,41.98V60.98A1.3,1.3 0,0 1,71.06,62.28H36.94A1.3,1.3 0,0 1,35.64,60.98V41.98A1.3,1.3 0,0 1,36.94,40.68Z" />
+        <path android:fillColor="#FFFFFFFF" android:pathData="M46.62,69.84H61.38A1.26,1.26 0,0 1,62.64,71.1V71.1A1.26,1.26 0,0 1,61.38,72.36H46.62A1.26,1.26 0,0 1,45.36,71.1V71.1A1.26,1.26 0,0 1,46.62,69.84Z" />
+        <group
+            android:pivotX="58.25"
+            android:pivotY="52"
+            android:scaleX="0.3155"
+            android:scaleY="0.3155"
+            android:translateX="-3.37"
+            android:translateY="-0.52">
+            <path android:fillColor="#FFFFFFFF" android:pathData="M42,36.5C42,33.4 45.4,31.5 48,33.1L72.6,48.6C75.1,50.2 75.1,53.8 72.6,55.4L48,70.9C45.4,72.5 42,70.6 42,67.5Z" />
+        </group>
+    </group>
+</vector>

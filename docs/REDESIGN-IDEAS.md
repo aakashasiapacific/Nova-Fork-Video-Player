@@ -592,3 +592,13 @@ The owner asked for Apple Music to be copied more precisely, with less clutter. 
   - "Continue Watching ›" opens its own page: everything left partway, last played first, as wide cards with the time left; tablets get "See all" for it and for the Watchlist.
   - The Watchlist bookmark is drawn as heavy as the other line icons.
   - Video player, closer to Samsung's (owner's recording): a lighter shade over the picture; smaller previous and next discs either side of a larger play disc; while the seek bar is dragged its knob goes, the bar swells into a thick white-filled bar and the time it points at shows large above it.
+- **Build 122 (owner):**
+  - Refresh, fixed (owner: the colour came in over the backdrop, too late): letting go now holds the page down by the logo's height, and the logo's blue rises inside that gap while the refresh runs, full once it is over (or after three seconds at most), then the page springs back and the logo goes with the gap. The logo never leaves the gap.
+  - Video player: "Ends at 10:42 PM" under the title while the controls show (at the speed it plays); play and pause give a light tick.
+  - Movie and episode pages: "Ends at 10:42 PM" under Play, or after the time left when partly watched.
+  - Show pages: finished episodes step back (dimmed) unless up next; swiping sideways across the episodes changes season (left the next, right the one before, with a tick; a swipe right on the first season still goes back).
+  - Now Playing: when a song plays through into the next, the cover crossfades slowly instead of sliding (one album into the next).
+  - The app opens on its white logo, which fills with its blue and fades into Home (the system launch screen shows the same white logo in the same place).
+  - Empty pages show the app's logo instead of a generic symbol; error pages keep theirs.
+  - Search: with the field empty, "Browse Categories" tiles for the library's biggest genres under the recent searches; a tile searches its genre (typing a genre's whole name does too).
+  - Already there: the fit/fill name in the player, Resume's progress inside the button, the lyrics blur, days left in Recently Deleted, and the blur behind a long-pressed card. Not done: rotating the video smoothly, since libVLC draws on a surface the app's animations cannot turn.

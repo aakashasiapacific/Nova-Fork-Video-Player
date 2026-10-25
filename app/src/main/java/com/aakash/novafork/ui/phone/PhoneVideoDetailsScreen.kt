@@ -47,6 +47,7 @@ import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.NovaMenuItem
 import com.aakash.novafork.ui.common.SectionHeader
 import com.aakash.novafork.ui.common.metaLine
+import com.aakash.novafork.ui.common.rememberEndsAt
 import com.aakash.novafork.ui.common.resumeFill
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.MediaKind
@@ -230,13 +231,15 @@ private fun PlaySection(details: VideoDetailsUi, actions: AppActions, modifier: 
             }
         }
         val progress = details.progress
+        val duration = details.durationMs
+        // Apple TV's "Ends at 10:42 PM": when it would finish if played now.
+        val endsAt = rememberEndsAt(duration?.takeIf { it > 0 }?.let { it - if (inProgress) details.positionMs else 0L })
         if (progress != null && progress > 0f) {
             Spacer(Modifier.height(6.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
-                val duration = details.durationMs
                 Text(
                     text = if (duration != null && duration > 0) {
-                        Formats.remaining(details.positionMs, duration)
+                        metaLine(Formats.remaining(details.positionMs, duration), endsAt)
                     } else {
                         "${(progress.coerceIn(0f, 1f) * 100).roundToInt()}% watched"
                     },
@@ -250,6 +253,13 @@ private fun PlaySection(details: VideoDetailsUi, actions: AppActions, modifier: 
                     Text("Start Over")
                 }
             }
+        } else if (endsAt != null) {
+            Text(
+                endsAt,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 8.dp),
+            )
         }
     }
 }

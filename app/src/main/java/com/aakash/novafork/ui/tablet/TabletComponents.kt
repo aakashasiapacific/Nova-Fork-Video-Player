@@ -77,6 +77,7 @@ import com.aakash.novafork.ui.common.IosButton
 import com.aakash.novafork.ui.common.IosProgressBar
 import com.aakash.novafork.ui.common.IosSpinner
 import com.aakash.novafork.ui.common.LandscapeArt
+import com.aakash.novafork.ui.common.LocalPageHold
 import com.aakash.novafork.ui.common.LocalPagePull
 import com.aakash.novafork.ui.common.LogoPullToRefresh
 import com.aakash.novafork.ui.common.NovaIcon
@@ -179,14 +180,15 @@ internal fun TabletPullToRefresh(
     }
     val pull = remember { mutableFloatStateOf(0f) }
     val readPull = remember { { pull.floatValue } }
-    CompositionLocalProvider(LocalPagePull provides readPull) {
+    val hold = remember { mutableFloatStateOf(0f) }
+    CompositionLocalProvider(LocalPagePull provides readPull, LocalPageHold provides hold) {
         LogoPullToRefresh(
             refreshing = pulled,
             onRefresh = {
                 pulled = true
                 onRefresh()
             },
-            modifier = modifier.iosOverscroll(pullState = pull),
+            modifier = modifier.iosOverscroll(pullState = pull, holdState = hold),
             content = content,
         )
     }

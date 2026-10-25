@@ -416,7 +416,7 @@ private fun HomeOnboarding(scan: ScanUi, permission: PermissionUi, actions: AppA
                     )
                 }
                 EmptyState(
-                    icon = R.drawable.ic_video_library,
+                    icon = R.drawable.ic_logo,
                     title = "Your videos, with posters",
                     body = "Nova Fork finds the videos on your phone, in folders and on network shares, " +
                         "and dresses them up with posters, backdrops and details.",

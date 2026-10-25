@@ -39,7 +39,7 @@ internal fun PhoneContinueWatchingScreen(
         if (cards.isEmpty()) {
             CenteredScrollable {
                 EmptyState(
-                    icon = R.drawable.ic_history,
+                    icon = R.drawable.ic_logo,
                     title = "Nothing in progress",
                     body = "Videos you stop partway through show up here.",
                 )

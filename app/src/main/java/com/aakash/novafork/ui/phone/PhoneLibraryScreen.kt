@@ -158,7 +158,7 @@ private class EmptyContent(@DrawableRes val icon: Int, val title: String, val bo
 
 private fun emptyContentFor(filter: LibraryFilter): EmptyContent = when (filter) {
     LibraryFilter.ALL -> EmptyContent(
-        R.drawable.ic_video_library,
+        R.drawable.ic_logo,
         "Nothing here yet",
         "Videos from your device, folders and network shares show up here after a scan.",
     )

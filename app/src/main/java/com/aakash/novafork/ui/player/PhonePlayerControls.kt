@@ -25,13 +25,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
+import com.aakash.novafork.ui.common.rememberEndsAt
 import com.aakash.novafork.ui.model.PlayerActions
 import com.aakash.novafork.ui.model.PlayerUiState
 
@@ -114,15 +117,21 @@ private fun PhoneTopBar(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         // No back arrow, as in Samsung's player: the system back gesture closes it.
-        Text(
-            text = state.title,
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Bold,
-            color = Color.White,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f),
-        )
+        Column(Modifier.weight(1f)) {
+            Text(
+                text = state.title,
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                color = Color.White,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            // Apple TV's "Ends at 10:42 PM", at the speed it is playing.
+            val left = if (state.durationMs > 0L) ((state.durationMs - state.positionMs) / state.rate.coerceAtLeast(0.1f)).toLong() else null
+            rememberEndsAt(left)?.let { endsAt ->
+                Text(endsAt, style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.7f), maxLines = 1)
+            }
+        }
         // Cast shows here only while casting, so where the picture went is never hidden.
         if (state.castingTo != null) CastButton(castingTo = state.castingTo, onClick = { onOpenSheet(PlayerSheet.CAST) })
         PlayerIconButton(icon = state.repeatMode.iconRes(), contentDescription = state.repeatMode.label, onClick = actions::cycleRepeat)
@@ -170,10 +179,15 @@ private fun PhoneTransportRow(state: PlayerUiState, actions: PlayerActions, modi
             description = if (state.hasPrevious) "Previous" else "Start over",
             onClick = { if (state.hasPrevious) actions.playPrevious() else actions.seekTo(0L) },
         )
+        val haptics = LocalHapticFeedback.current
         PlayPauseButton(
             isPlaying = state.isPlaying,
             buffering = state.isBuffering,
-            onClick = actions::togglePlay,
+            // A light tick with each play and pause.
+            onClick = {
+                haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                actions.togglePlay()
+            },
             size = 58.dp,
         )
         DiscButton(

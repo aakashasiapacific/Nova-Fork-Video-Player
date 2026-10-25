@@ -480,7 +480,9 @@ internal fun PhoneEpisodeRow(
         modifier
             .fillMaxWidth()
             .combinedClickable(onClick = onClick, onLongClick = onLongClick)
-            .padding(horizontal = dims.gutter, vertical = 10.dp),
+            .padding(horizontal = dims.gutter, vertical = 10.dp)
+            // Finished episodes step back a little, so the ones still to watch stand out.
+            .graphicsLayer { alpha = if (episode.watched && !upNext) WatchedEpisodeAlpha else 1f },
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(
@@ -845,3 +847,6 @@ internal fun RowScope.ButtonContent(@DrawableRes icon: Int, label: String) {
     Spacer(Modifier.width(ButtonDefaults.IconSpacing))
     Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis)
 }
+
+/** How far a finished episode's row fades back. */
+private const val WatchedEpisodeAlpha = 0.55f
