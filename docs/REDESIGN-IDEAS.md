@@ -565,3 +565,6 @@ The owner asked for Apple Music to be copied more precisely, with less clutter. 
   - At the end of an episode, Play Now's icon sits in a ring that fills smoothly through the countdown.
   - A recent search can be swiped away on its own.
   - The playing album's cover carries the mini player's bars in its corner.
+- **Build 118 (owner: tab changes stuttered):**
+  - Leaving Home stopped the hero's video preview on the main thread, and libVLC's stop waits for its decoders, so the page change hitched as it began. The preview now lets go of its surface at once and is stopped and freed in the background.
+  - Swiping between tabs no longer snaps the page back before the next tab slides in: the swipe now drives the page change itself, so the two tabs move side by side with the finger, and letting go finishes (or undoes) the move from where it is, as the swipe back does.

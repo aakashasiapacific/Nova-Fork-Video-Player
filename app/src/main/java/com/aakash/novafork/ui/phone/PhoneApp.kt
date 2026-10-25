@@ -69,6 +69,7 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -127,7 +128,6 @@ import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.TabReselect
 import com.aakash.novafork.ui.common.activeColor
 import com.aakash.novafork.ui.common.iosOverscroll
-import com.aakash.novafork.ui.common.swipeBetweenTabs
 import com.aakash.novafork.ui.common.tabIconRes
 import com.aakash.novafork.ui.common.tabSlide
 import com.aakash.novafork.ui.model.AppActions
@@ -262,16 +262,18 @@ fun PhoneApp(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
                             if (open > 0f) drawRect(Color.Black.copy(alpha = 0.4f * open))
                         }
                         // On a tab's first page a sideways swipe changes tab; on a page opened from
-                        // it, a swipe right goes back.
-                        .swipeBetweenTabs(top, enabled = isTabRoot, onSelect = actions::selectTab)
-                        .swipeBack(
+                        // it, a swipe right goes back. Either way both pages follow the finger.
+                        .swipePages(
                             swipe = backSwipe,
                             route = state.route,
+                            top = top,
+                            tabs = isTabRoot,
                             previous = state.previousRoute,
-                            allowed = !isTabRoot && state.canGoBack && state.previousRoute != null,
+                            allowed = isTabRoot || (state.canGoBack && state.previousRoute != null),
                             ready = transitionIdle,
                             transition = routeState,
                             onBack = actions::back,
+                            onSelectTab = actions::selectTab,
                         )
                         .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)),
                 ) {
@@ -285,6 +287,16 @@ fun PhoneApp(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
                                 // iOS's swipe back, driven by the finger: the page slides off to the
                                 // right over the one it goes back to, which comes in from a little to
                                 // the left, shaded at first.
+                                // Swiping between tabs: the pages move side by side with the finger,
+                                // the next one coming in from the side it lies on.
+                                from == backSwipe.from && to == backSwipe.to && backSwipe.tab != null -> {
+                                    val side = -backSwipe.sign
+                                    ContentTransform(
+                                        targetContentEnter = slideInHorizontally(tween(SwipeMs, easing = LinearEasing)) { it * side },
+                                        initialContentExit = slideOutHorizontally(tween(SwipeMs, easing = LinearEasing)) { -it * side },
+                                        sizeTransform = null,
+                                    )
+                                }
                                 from == backSwipe.from && to == backSwipe.to -> ContentTransform(
                                     targetContentEnter = slideInHorizontally(tween(SwipeMs, easing = LinearEasing)) { -(it * UnderlayLag).toInt() } +
                                         fadeIn(tween(SwipeMs, easing = LinearEasing), initialAlpha = 1f - UnderlayShade),
@@ -308,6 +320,7 @@ fun PhoneApp(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
                         },
                     ) { route ->
                         val swiped = backSwipe.from == route
+                        val swipedBack = swiped && backSwipe.tab == null
                         Box(
                             Modifier
                                 .fillMaxSize()
@@ -316,6 +329,7 @@ fun PhoneApp(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
                                         // The page being swiped away is solid, with a soft shadow down its left edge.
                                         Modifier
                                             .drawBehind {
+                                                if (!swipedBack) return@drawBehind
                                                 val edge = SwipeShadow.toPx()
                                                 drawRect(
                                                     Brush.horizontalGradient(
@@ -549,14 +563,17 @@ private fun PhoneNavigationBar(
 }
 
 /**
- * A swipe back in progress: the page being swiped away ([from]) toward [to], and how far the
- * finger has moved it ([offset], px, of [width]); [committed] once it went far enough and back
- * was asked for.
+ * A page swipe in progress: the page being swiped away ([from]) toward [to], and how far the
+ * finger has moved it ([offset], px, of [width], in the direction [sign]: 1 right, -1 left);
+ * [tab] when it goes to another tab rather than back; [committed] once it went far enough and
+ * the change was asked for.
  */
 @Stable
 private class BackSwipe {
     var from by mutableStateOf<Route?>(null)
     var to by mutableStateOf<Route?>(null)
+    var tab by mutableStateOf<TopDestination?>(null)
+    var sign by mutableIntStateOf(1)
     var offset by mutableFloatStateOf(0f)
     var width by mutableFloatStateOf(1f)
     var committed by mutableStateOf(false)
@@ -564,11 +581,13 @@ private class BackSwipe {
     /** Let go: springing back or carrying on, no longer following the finger. */
     var settling by mutableStateOf(false)
 
-    val progress: Float get() = (offset / width).coerceIn(0f, 1f)
+    val progress: Float get() = (offset * sign / width).coerceIn(0f, 1f)
 
     fun reset() {
         from = null
         to = null
+        tab = null
+        sign = 1
         offset = 0f
         committed = false
         settling = false
@@ -576,27 +595,34 @@ private class BackSwipe {
 }
 
 /**
- * Swiping right on a page opened from a tab takes it back, as on iOS: the page transition is
- * seeked with the finger ([transition]), so the page follows it with the one it goes back to
- * underneath; letting go past a third of the width (or with a flick) finishes it and goes back,
- * otherwise it springs back into place. Anything that scrolls sideways itself (poster rows,
- * sliders) takes the swipe first. Only listens while [allowed], so on a tab's first page the
- * swipe is left to changing tabs; [ready] is false while another page change is running.
+ * Page swipes, driven by the finger through the page transition ([transition] is seeked):
+ * on a tab's first page ([tabs]) a sideways swipe brings in the next or previous tab beside it,
+ * like pages; on a page opened from a tab a swipe right takes it back, as on iOS, with the page
+ * it goes back to underneath. Letting go past a third of the width (or with a flick) finishes
+ * it, otherwise it springs back; nothing jumps either way. Anything that scrolls sideways itself
+ * (poster rows, sliders) takes the swipe first. [ready] is false while another page change runs.
  */
 @Composable
-private fun Modifier.swipeBack(
+private fun Modifier.swipePages(
     swipe: BackSwipe,
     route: Route,
+    top: TopDestination,
+    tabs: Boolean,
     previous: Route?,
     allowed: Boolean,
     ready: Boolean,
     transition: SeekableTransitionState<Route>,
     onBack: () -> Unit,
+    onSelectTab: (TopDestination) -> Unit,
 ): Modifier {
     val scope = rememberCoroutineScope()
+    val haptics = LocalHapticFeedback.current
     val currentRoute by rememberUpdatedState(route)
+    val currentTop by rememberUpdatedState(top)
+    val onTabs by rememberUpdatedState(tabs)
     val currentPrevious by rememberUpdatedState(previous)
     val back by rememberUpdatedState(onBack)
+    val selectTab by rememberUpdatedState(onSelectTab)
     val canStart by rememberUpdatedState(ready)
     fun following() = swipe.from == currentRoute && !swipe.committed && !swipe.settling
     fun springBack() {
@@ -616,39 +642,65 @@ private fun Modifier.swipeBack(
     return pointerInput(allowed) {
         if (!allowed) return@pointerInput
         val tracker = VelocityTracker()
+        // Which way it goes is known only once the finger has moved.
+        var deciding = false
         detectHorizontalDragGestures(
             onDragStart = {
                 tracker.resetTracking()
-                val to = currentPrevious
-                if (canStart && swipe.from == null && to != null) {
-                    swipe.from = currentRoute
-                    swipe.to = to
-                    swipe.width = size.width.toFloat().coerceAtLeast(1f)
-                    swipe.offset = 0f
-                }
+                deciding = canStart && swipe.from == null
             },
             onDragEnd = {
+                deciding = false
                 if (!following()) return@detectHorizontalDragGestures
                 val to = swipe.to ?: return@detectHorizontalDragGestures
-                val velocity = tracker.calculateVelocity().x
-                if (swipe.progress > SwipeCommitFraction || (velocity > SwipeFlingVelocity && swipe.offset > 0f)) {
+                val velocity = tracker.calculateVelocity().x * swipe.sign
+                if (swipe.progress > SwipeCommitFraction || (velocity > SwipeFlingVelocity && swipe.progress > 0f)) {
                     swipe.settling = true
+                    val tab = swipe.tab
+                    if (tab != null) haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                     scope.launch {
                         transition.animateTo(to, tween(SwipeFinishMs, easing = LinearOutSlowInEasing))
                         swipe.committed = true
-                        back()
+                        if (tab != null) selectTab(tab) else back()
                     }
                 } else {
                     springBack()
                 }
             },
-            onDragCancel = { if (following()) springBack() },
+            onDragCancel = {
+                deciding = false
+                if (following()) springBack()
+            },
         ) { change, amount ->
+            if (deciding && amount != 0f) {
+                deciding = false
+                val sign = if (amount < 0f) -1 else 1
+                if (onTabs) {
+                    // Left brings in the next tab, right the one before.
+                    val entries = TopDestination.entries
+                    val tab = entries.getOrNull(entries.indexOf(currentTop) - sign)
+                    if (tab != null) {
+                        swipe.tab = tab
+                        swipe.to = rootOf(tab)
+                    }
+                } else if (sign > 0) {
+                    swipe.to = currentPrevious
+                }
+                if (swipe.to != null) {
+                    swipe.from = currentRoute
+                    swipe.sign = sign
+                    swipe.width = size.width.toFloat().coerceAtLeast(1f)
+                    swipe.offset = 0f
+                } else {
+                    swipe.reset()
+                }
+            }
             if (!following()) return@detectHorizontalDragGestures
             val to = swipe.to ?: return@detectHorizontalDragGestures
             change.consume()
             tracker.addPosition(change.uptimeMillis, change.position)
-            swipe.offset = (swipe.offset + amount).coerceIn(0f, swipe.width)
+            val reach = swipe.width * swipe.sign
+            swipe.offset = (swipe.offset + amount).let { if (swipe.sign > 0) it.coerceIn(0f, reach) else it.coerceIn(reach, 0f) }
             val fraction = swipe.progress
             scope.launch { transition.seekTo(fraction, to) }
         }

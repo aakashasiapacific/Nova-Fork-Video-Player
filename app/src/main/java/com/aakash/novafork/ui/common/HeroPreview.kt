@@ -31,11 +31,14 @@ import com.aakash.novafork.player.MediaSource
 import com.aakash.novafork.player.OpenedMedia
 import com.aakash.novafork.player.VlcEngine
 import com.aakash.novafork.player.closeQuietly
+import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.videolan.libvlc.MediaPlayer
-import java.util.concurrent.atomic.AtomicReference
 
 /**
  * A muted (or, with the hero's mute button, audible) loop of a local video, cropped to fill
@@ -61,7 +64,10 @@ internal fun HeroVideoPreview(uri: String, startMs: Long, muted: Boolean, modifi
     )
 }
 
-/** One preview's libVLC player. Main thread only. */
+/** Where finished previews are stopped and freed, away from the main thread. */
+private val ReleaseScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+/** One preview's libVLC player. Main thread only (its release finishes in the background). */
 private class PreviewPlayer(private val context: Context) {
     private var player: MediaPlayer? = null
     private var descriptor: ParcelFileDescriptor? = null
@@ -147,17 +153,29 @@ private class PreviewPlayer(private val context: Context) {
         player?.setVolume(if (on) 0 else FULL_VOLUME)
     }
 
+    /**
+     * Lets go of the surface here, then stops and frees the player off the main thread: libVLC's
+     * stop waits for its decoders, and doing that on the main thread stuttered the page change
+     * that took the hero away (owner: tab switches stuttered).
+     */
     fun release() {
         released = true
-        player?.let {
-            it.setEventListener(null)
-            it.stop()
-        }
+        player?.setEventListener(null)
         unbindSurface()
-        player?.release()
+        val gone = player
+        val file = descriptor
         player = null
-        descriptor.closeQuietly()
         descriptor = null
+        if (gone == null && file == null) return
+        ReleaseScope.launch {
+            try {
+                gone?.stop()
+                gone?.release()
+            } catch (e: RuntimeException) {
+                Log.w(TAG, "The hero preview couldn't be released", e)
+            }
+            file.closeQuietly()
+        }
     }
 
     /** Gives libVLC the surface (once both exist), cropped to fill it. */
