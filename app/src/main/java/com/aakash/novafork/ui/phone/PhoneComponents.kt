@@ -589,12 +589,14 @@ internal fun PhoneTimelineGrid(
     actions: AppActions,
     modifier: Modifier = Modifier,
     state: LazyGridState = rememberLazyGridState(),
+    /** Full-width content above the first month (Search's recent searches). */
+    header: (@Composable () -> Unit)? = null,
 ) {
     val dims = LocalNovaDimens.current
     val seen = remember { mutableSetOf<Any>() }
     // Where each month's heading sits in the grid, to know which month is under the top edge.
-    val headings = remember(months) {
-        var index = 0
+    val headings = remember(months, header != null) {
+        var index = if (header != null) 1 else 0
         months.map { month -> index.also { index += 1 + month.cards.size } }
     }
     Box(modifier.fillMaxSize()) {
@@ -606,6 +608,7 @@ internal fun PhoneTimelineGrid(
             horizontalArrangement = Arrangement.spacedBy(dims.rowSpacing),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            if (header != null) item(key = "header", span = { GridItemSpan(maxLineSpan) }) { header() }
             months.forEach { month ->
                 item(key = "month:" + month.title, span = { GridItemSpan(maxLineSpan) }) {
                     Text(
@@ -637,8 +640,9 @@ private fun PinnedMonth(months: List<TimelineMonth>, headings: List<Int>, state:
     val current by remember(headings) {
         derivedStateOf {
             val first = state.firstVisibleItemIndex
-            // At rest on the first heading the heading itself shows; nothing to pin yet.
-            if (first == 0 && state.firstVisibleItemScrollOffset == 0) -1 else headings.indexOfLast { it <= first }
+            val top = headings.firstOrNull() ?: 0
+            // At rest on the first heading the heading itself shows (and above it, nothing to pin).
+            if (first < top || (first == top && state.firstVisibleItemScrollOffset == 0)) -1 else headings.indexOfLast { it <= first }
         }
     }
     val month = months.getOrNull(current) ?: return

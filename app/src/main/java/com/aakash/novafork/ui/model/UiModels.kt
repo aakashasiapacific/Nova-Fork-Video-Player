@@ -383,13 +383,9 @@ data class SearchUi(
     val artists: List<MusicResultUi> = emptyList(),
     /** Searches the user ran, newest first, shown while the field is empty. */
     val recent: List<String> = emptyList(),
-    /** While the field is empty: posters to browse, each title once (Apple TV's search page). */
-    val browseMovies: List<VideoCardUi> = emptyList(),
-    val browseShows: List<ShowCardUi> = emptyList(),
-    val browseAlbums: List<MusicResultUi> = emptyList(),
+    /** While the field is empty: every video, newest first, by the month it arrived. */
+    val browse: List<TimelineMonth> = emptyList(),
 ) {
-    val hasBrowse: Boolean get() = browseMovies.isNotEmpty() || browseShows.isNotEmpty() || browseAlbums.isNotEmpty()
-
     val hasMusic: Boolean get() = songs.isNotEmpty() || albums.isNotEmpty() || artists.isNotEmpty()
     val isEmpty: Boolean get() = results.isEmpty() && !hasMusic
 }

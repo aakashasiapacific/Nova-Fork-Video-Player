@@ -55,7 +55,6 @@ object UiMappers {
     /** Newest movies and shows considered for the hero before the backdrop preference is applied. */
     private const val HERO_RECENT_CANDIDATES = 12
     private const val SEARCH_LIMIT = 60
-    private const val BROWSE_ROW = 20
     /** Folders deep a media server's breadcrumb trail goes. */
     private const val MAX_REMOTE_TRAIL = 12
 
@@ -716,26 +715,23 @@ object UiMappers {
     private fun genreMatch(meta: MetadataEntity?, needle: String): Boolean =
         genresOf(meta).any { it.equals(needle, ignoreCase = true) }
 
-    /** Search with nothing typed: the newest movies, series and albums, as posters to browse. */
-    private fun browse(query: String, index: LibraryIndex, music: MusicLibraryData): SearchUi = SearchUi(
-        query = query,
-        browseMovies = index.movies.sortedByDescending { it.video.dateAdded }.take(BROWSE_ROW).map { it.card },
-        browseShows = index.shows.sortedByDescending { it.latestAdded }.take(BROWSE_ROW).map { it.card },
-        browseAlbums = music.recentlyAdded.take(BROWSE_ROW).map { album ->
-            MusicResultUi(
-                key = "album:${album.key}",
-                title = album.title,
-                subtitle = album.artist,
-                artUri = album.artUri,
-                songIds = album.songs.map { it.id },
-            )
-        },
-    )
+    /**
+     * Search with nothing typed (owner): one long scroll of every video, newest first, under the
+     * month it arrived, as Recently Added shows it.
+     */
+    private fun browse(query: String, index: LibraryIndex, now: Long, zone: ZoneId): SearchUi =
+        SearchUi(query = query, browse = timeline(index, now, zone))
 
     /** Title, show title and file name, case-insensitive; episodes show up as their show. */
-    fun search(index: LibraryIndex, query: String, music: MusicLibraryData = MusicLibraryData()): SearchUi {
+    fun search(
+        index: LibraryIndex,
+        query: String,
+        music: MusicLibraryData = MusicLibraryData(),
+        now: Long = System.currentTimeMillis(),
+        zone: ZoneId = ZoneId.systemDefault(),
+    ): SearchUi {
         val needle = query.trim()
-        if (needle.isEmpty()) return browse(query, index, music)
+        if (needle.isEmpty()) return browse(query, index, now, zone)
         val found = MusicSearch.search(music, needle)
         val songIds = found.songs.map { it.id }
         val entries = ArrayList<Entry>()

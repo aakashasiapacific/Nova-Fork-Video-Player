@@ -611,3 +611,6 @@ The owner asked for Apple Music to be copied more precisely, with less clutter. 
   - Home's Library: Watchlist, Favorites, All Videos and "Network, streams and playlists" (Recently Added, Movies and TV Shows are gone).
   - Search with nothing typed: rows of posters, the newest Movies, Web Series and Songs (album covers), each title once, instead of genre tiles (a title can be in several genres).
   - Preferences, as iOS Settings (owner: too dense): the top page is two short cards of sections, icon and name only (Sources, Artwork & metadata, Player; Appearance, About), each opening its own page with its groups set well apart. Swipe back and back work as on other pages.
+- **Build 125 (owner):**
+  - Search with nothing typed is one long scroll (owner: the moving rows were clutter): every video, newest first, under the month it arrived (as Recently Added, with the month pinned while scrolling), recent searches above it when there are some.
+  - Home's hero: Play stretches across the row up to the star and "+" at its right end (owner: empty space beside them since Delete went), and those two are iOS 18's glass buttons, a pale see-through disc with a fine light rim and a slightly larger glyph. The band under the hero is tighter: the dots sit closer under Play and Continue Watching closer under the dots.

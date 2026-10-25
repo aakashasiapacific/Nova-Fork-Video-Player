@@ -203,7 +203,7 @@ private fun HomeFeed(home: HomeUi, scan: ScanUi, permission: PermissionUi, actio
             if (home.continueWatching.isNotEmpty()) {
                 item(key = "continue", contentType = "landscapeRow") {
                     // Right under the hero's dots (owner: no empty band before it).
-                    HomeSection(title = "Continue Watching", topPadding = 4.dp, onOpen = { actions.navigate(Route.ContinueWatching) }) {
+                    HomeSection(title = "Continue Watching", topPadding = 0.dp, onOpen = { actions.navigate(Route.ContinueWatching) }) {
                         LandscapeRow(home.continueWatching, actions)
                     }
                 }
@@ -212,7 +212,7 @@ private fun HomeFeed(home: HomeUi, scan: ScanUi, permission: PermissionUi, actio
                 item(key = "watchlist", contentType = "landscapeRow") {
                     HomeSection(
                         title = "Watchlist",
-                        topPadding = if (home.continueWatching.isEmpty()) 4.dp else null,
+                        topPadding = if (home.continueWatching.isEmpty()) 0.dp else null,
                         onOpen = { actions.openLibrary(LibraryFilter.WATCHLIST) },
                     ) {
                         WatchlistRow(home.watchlist, actions)

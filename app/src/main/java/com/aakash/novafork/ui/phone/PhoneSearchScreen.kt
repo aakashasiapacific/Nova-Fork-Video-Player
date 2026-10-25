@@ -21,11 +21,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyListScope
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
@@ -38,6 +35,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -53,8 +51,6 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.TextRange
@@ -64,7 +60,6 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import coil.compose.AsyncImage
 import com.aakash.novafork.R
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
 import com.aakash.novafork.ui.common.EmptyState
@@ -80,13 +75,11 @@ import com.aakash.novafork.ui.common.PosterArt
 import com.aakash.novafork.ui.common.SwipeToDelete
 import com.aakash.novafork.ui.common.glass
 import com.aakash.novafork.ui.common.musicSearchResults
-import com.aakash.novafork.ui.common.rememberRowSnap
 import com.aakash.novafork.ui.common.searchHighlighted
 import com.aakash.novafork.ui.common.stretchWithPull
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.Artwork
 import com.aakash.novafork.ui.model.LibraryItemUi
-import com.aakash.novafork.ui.model.MusicResultUi
 import com.aakash.novafork.ui.model.SearchUi
 import kotlin.math.abs
 
@@ -153,21 +146,39 @@ fun PhoneSearchScreen(
             // Lists end above the field; results show what was typed in bold.
             CompositionLocalProvider(LocalBottomBarSpace provides listSpace, LocalSearchQuery provides field.text) {
                 when {
-                    field.text.isBlank() && (search.recent.isNotEmpty() || search.hasBrowse) -> {
+                    field.text.isBlank() && (search.recent.isNotEmpty() || search.browse.isNotEmpty()) -> {
                         val pick: (String) -> Unit = { picked ->
                             field = TextFieldValue(picked, TextRange(picked.length))
                             actions.search(picked)
                             actions.rememberSearch(picked)
                             keyboard?.hide()
                         }
-                        RecentSearches(
-                            recent = search.recent,
-                            onPick = pick,
-                            onClear = actions::clearRecentSearches,
-                            bottomSpace = listSpace,
-                            onForget = actions::forgetSearch,
-                            footer = { browseRows(search, actions) },
-                        )
+                        // Nothing typed (owner): every video in one long scroll, newest first,
+                        // under the month it arrived; recent searches, if any, above it.
+                        val recent: (@Composable () -> Unit)? = if (search.recent.isEmpty()) {
+                            null
+                        } else {
+                            {
+                                RecentSearchesBlock(
+                                    recent = search.recent,
+                                    onPick = pick,
+                                    onClear = actions::clearRecentSearches,
+                                    onForget = actions::forgetSearch,
+                                    modifier = Modifier.padding(top = 8.dp),
+                                )
+                            }
+                        }
+                        if (search.browse.isEmpty()) {
+                            RecentSearches(
+                                recent = search.recent,
+                                onPick = pick,
+                                onClear = actions::clearRecentSearches,
+                                bottomSpace = listSpace,
+                                onForget = actions::forgetSearch,
+                            )
+                        } else {
+                            PhoneTimelineGrid(months = search.browse, actions = actions, header = recent)
+                        }
                     }
                     field.text.isBlank() -> CenteredScrollable(Modifier.padding(bottom = listSpace)) {
                         EmptyState(
@@ -347,8 +358,8 @@ private fun SearchField(
 private val SearchFieldHeight = 52.dp
 
 /**
- * iOS's recent searches: a header with Clear, then each search, tap to run it again or swipe it
- * left to take just that one away.
+ * iOS's recent searches as a page of their own: a header with Clear, then each search, tap to run
+ * it again or swipe it left to take just that one away.
  */
 @Composable
 internal fun RecentSearches(
@@ -357,123 +368,49 @@ internal fun RecentSearches(
     onClear: () -> Unit,
     bottomSpace: Dp,
     onForget: (String) -> Unit = {},
-    /** More below the searches (Search's genre tiles). */
-    footer: LazyListScope.() -> Unit = {},
 ) {
     val dims = LocalNovaDimens.current
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(start = dims.gutter, end = dims.gutter, top = 8.dp, bottom = bottomSpace),
     ) {
-        if (recent.isNotEmpty()) item(key = "header") {
-            Row(Modifier.fillMaxWidth().padding(bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("Recent Searches", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
-                IosTextButton(onClick = onClear) { Text("Clear") }
-            }
+        item(key = "recent") { RecentSearchesBlock(recent, onPick, onClear, onForget) }
+    }
+}
+
+/** The recent searches themselves: "Recent Searches" with Clear, then a row for each. */
+@Composable
+internal fun RecentSearchesBlock(
+    recent: List<String>,
+    onPick: (String) -> Unit,
+    onClear: () -> Unit,
+    onForget: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier.fillMaxWidth()) {
+        Row(Modifier.fillMaxWidth().padding(bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text("Recent Searches", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+            IosTextButton(onClick = onClear) { Text("Clear") }
         }
-        items(recent, key = { it }) { query ->
-            SwipeToDelete(onDelete = { onForget(query) }, label = "Remove", modifier = Modifier.animateItem()) {
-                Column(Modifier.clickable { onPick(query) }) {
-                    Row(Modifier.padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                        NovaIcon(R.drawable.ic_search, contentDescription = null, tint = IosColors.SecondaryLabel, modifier = Modifier.size(18.dp))
-                        Text(
-                            query,
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.primary,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.padding(start = 12.dp),
-                        )
+        recent.forEach { query ->
+            key(query) {
+                SwipeToDelete(onDelete = { onForget(query) }, label = "Remove") {
+                    Column(Modifier.clickable { onPick(query) }) {
+                        Row(Modifier.padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                            NovaIcon(R.drawable.ic_search, contentDescription = null, tint = IosColors.SecondaryLabel, modifier = Modifier.size(18.dp))
+                            Text(
+                                query,
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.primary,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.padding(start = 12.dp),
+                            )
+                        }
+                        Box(Modifier.fillMaxWidth().height(Hairline).background(IosColors.Separator))
                     }
-                    Box(Modifier.fillMaxWidth().height(Hairline).background(IosColors.Separator))
-                }
-            }
-        }
-        footer()
-    }
-}
-
-/**
- * Apple TV's search page with nothing typed: the newest movies, web series and albums, each in its
- * own row of posters (each title once), a tap opening it (an album plays).
- */
-private fun LazyListScope.browseRows(search: SearchUi, actions: AppActions) {
-    if (search.browseMovies.isNotEmpty()) {
-        item(key = "browseMovies") {
-            BrowseRow("Movies") {
-                items(search.browseMovies, key = { it.id }) { card ->
-                    PhonePosterCard(card, onClick = { actions.openVideo(card.id) }, modifier = Modifier.width(BrowsePosterWidth))
-                }
-            }
-        }
-    }
-    if (search.browseShows.isNotEmpty()) {
-        item(key = "browseShows") {
-            BrowseRow("Web Series") {
-                items(search.browseShows, key = { it.key }) { show ->
-                    PhoneShowCard(show, onClick = { actions.openShow(show.key) }, modifier = Modifier.width(BrowsePosterWidth))
-                }
-            }
-        }
-    }
-    if (search.browseAlbums.isNotEmpty()) {
-        item(key = "browseAlbums") {
-            BrowseRow("Songs") {
-                items(search.browseAlbums, key = { it.key }) { album ->
-                    AlbumCover(album, onClick = { actions.playMusic(album.songIds, album.startIndex) })
                 }
             }
         }
     }
 }
-
-/** A titled row of posters running to the screen's edges (the list's own side padding undone). */
-@Composable
-private fun BrowseRow(title: String, content: LazyListScope.() -> Unit) {
-    val dims = LocalNovaDimens.current
-    val rowState = rememberLazyListState()
-    Column(Modifier.padding(top = 20.dp).layout { measurable, constraints ->
-        // Out to the screen's edges, past the list's gutter.
-        val gutter = dims.gutter.roundToPx()
-        val placeable = measurable.measure(constraints.copy(maxWidth = constraints.maxWidth + 2 * gutter, minWidth = constraints.maxWidth + 2 * gutter))
-        layout(constraints.maxWidth, placeable.height) { placeable.place(-gutter, 0) }
-    }) {
-        Text(title, style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(start = dims.gutter, bottom = 10.dp))
-        LazyRow(
-            state = rowState,
-            flingBehavior = rememberRowSnap(rowState),
-            contentPadding = PaddingValues(horizontal = dims.gutter),
-            horizontalArrangement = Arrangement.spacedBy(dims.rowSpacing),
-            content = content,
-        )
-    }
-}
-
-/** An album's square cover with its title and artist below, as Apple Music's search shows it. */
-@Composable
-private fun AlbumCover(album: MusicResultUi, onClick: () -> Unit) {
-    Column(
-        Modifier
-            .width(BrowsePosterWidth)
-            .clip(RoundedCornerShape(8.dp))
-            .clickable(onClickLabel = "Play ${album.title}", onClick = onClick),
-    ) {
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .aspectRatio(1f)
-                .clip(RoundedCornerShape(8.dp))
-                .background(MaterialTheme.colorScheme.surfaceContainerHigh),
-            contentAlignment = Alignment.Center,
-        ) {
-            NovaIcon(R.drawable.ic_music_notes, contentDescription = null, tint = IosColors.SecondaryLabel)
-            album.artUri?.let { uri ->
-                AsyncImage(model = uri, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-            }
-        }
-        Text(album.title, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 6.dp))
-        Text(album.subtitle, style = MaterialTheme.typography.bodySmall, color = IosColors.SecondaryLabel, maxLines = 1, overflow = TextOverflow.Ellipsis)
-    }
-}
-
-private val BrowsePosterWidth = 128.dp

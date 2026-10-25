@@ -90,6 +90,7 @@ import com.aakash.novafork.ui.audio.coverColors
 import com.aakash.novafork.ui.common.ArtImage
 import com.aakash.novafork.ui.common.ArtPlaceholder
 import com.aakash.novafork.ui.common.BackdropArt
+import com.aakash.novafork.ui.common.Hairline
 import com.aakash.novafork.ui.common.HeroTitle
 import com.aakash.novafork.ui.common.HeroVideoPreview
 import com.aakash.novafork.ui.common.IosButton
@@ -117,7 +118,7 @@ internal const val HERO_PREVIEW_DWELL_MS = 30_000L
 internal const val HERO_PREVIEW_DELAY_MS = 2_500L
 
 /** The dot row and the mute button sit this far above the hero's bottom edge. */
-private val HeroDotsBottom = 4.dp
+private val HeroDotsBottom = 0.dp
 private val HeroContentBottom = 52.dp
 private val DotsRowHeight = 44.dp
 
@@ -508,8 +509,8 @@ private fun HeroClip(hero: HeroUi, preview: Boolean, muted: Boolean) {
 private val HeroActionsGap = 18.dp
 private val HeroButtonHeight = 50.dp
 
-/** The dots sit this far under the Play row. */
-private val HeroDotsGap = 26.dp
+/** The dots sit this far under the Play row (owner: no empty band under the hero). */
+private val HeroDotsGap = 16.dp
 
 /**
  * How tall the phone hero is below its 16:9 backdrop, sized to what is in it and no more: the
@@ -522,8 +523,8 @@ internal fun heroBelowBackdrop(posterWidth: Dp): Dp =
 
 /**
  * The hero's buttons: the blue Play pill, a round star (Favorites) and a round "+" (Watchlist).
- * [fillPlay] (phone): Play is as wide
- * as the poster above it (owner), or takes the row when there is no poster; otherwise a set width.
+ * [fillPlay] (phone): Play stretches across the row up to the round buttons at its right end, so
+ * the row is full (owner: no empty space beside them); otherwise it has a set width.
  */
 @Composable
 private fun HeroActions(
@@ -538,12 +539,10 @@ private fun HeroActions(
         IosButton(
             onClick = play,
             interactionSource = playPress,
-            modifier = when {
-                !fillPlay -> Modifier.widthIn(min = 160.dp, max = 240.dp)
-                hero.artwork.frameOnly -> Modifier.weight(1f)
-                // Never wider than the row leaves, on a narrow phone.
-                else -> Modifier.weight(1f, fill = false).width(LocalNovaDimens.current.detailPosterWidth)
-            }.height(50.dp).pressScale(playPress).resumeFill(hero.progress),
+            modifier = (if (fillPlay) Modifier.weight(1f) else Modifier.widthIn(min = 160.dp, max = 240.dp))
+                .height(50.dp)
+                .pressScale(playPress)
+                .resumeFill(hero.progress),
             colors = ButtonDefaults.buttonColors(containerColor = NovaColors.IosBlue, contentColor = Color.White),
             contentPadding = PaddingValues(horizontal = 16.dp),
         ) {
@@ -592,14 +591,20 @@ private fun RoundHeroButton(
 ) {
     val press = remember { MutableInteractionSource() }
     val haptics = LocalHapticFeedback.current
-    val container by animateColorAsState(fill ?: Color.White.copy(alpha = 0.18f), tween(220), label = "heroButtonFill")
+    // iOS 18's glass buttons: a pale see-through disc with a fine light rim, the glyph on it.
+    val container by animateColorAsState(fill ?: Color.White.copy(alpha = 0.14f), tween(220), label = "heroButtonFill")
+    val rim by animateColorAsState(if (fill == null) Color.White.copy(alpha = 0.22f) else Color.Transparent, tween(220), label = "heroButtonRim")
     IosIconButton(
         onClick = {
             haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
             onClick()
         },
         interactionSource = press,
-        modifier = Modifier.size(50.dp).pressScale(press, pressed = 0.9f).semantics { contentDescription = description },
+        modifier = Modifier
+            .size(50.dp)
+            .pressScale(press, pressed = 0.9f)
+            .border(Hairline * 2, rim, CircleShape)
+            .semantics { contentDescription = description },
         colors = IconButtonDefaults.iconButtonColors(
             containerColor = container,
             contentColor = tint,
@@ -617,7 +622,7 @@ private fun RoundHeroButton(
                 transitionSpec = { spring(dampingRatio = 0.6f, stiffness = 420f) },
                 label = "heroButtonTurn",
             ) { if (turn && it != EnterExitState.Visible) -90f else 0f }
-            NovaIcon(shownIcon, contentDescription = null, modifier = Modifier.graphicsLayer { rotationZ = angle })
+            NovaIcon(shownIcon, contentDescription = null, modifier = Modifier.size(22.dp).graphicsLayer { rotationZ = angle })
         }
     }
 }
