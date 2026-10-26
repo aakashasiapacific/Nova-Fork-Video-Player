@@ -23,9 +23,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -41,9 +39,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import com.aakash.novafork.R
-import com.aakash.novafork.ui.common.IosColors
-import com.aakash.novafork.ui.common.IosGrabber
-import com.aakash.novafork.ui.common.IosSheetShape
+import com.aakash.novafork.ui.common.IosSheet
 import com.aakash.novafork.ui.common.IosSpinner
 import com.aakash.novafork.ui.common.IosTextButton
 import com.aakash.novafork.ui.common.LandscapeArt
@@ -61,32 +57,9 @@ private const val MAX_NAME_LENGTH = 80
 /** "Add to Playlist": every playlist (most recently changed first) and New playlist on top. */
 @Composable
 internal fun AddToPlaylistSheet(dialog: DialogUi.AddToPlaylist, playlists: List<PlaylistUi>, actions: AppActions) {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    ModalBottomSheet(
-        onDismissRequest = actions::dismissDialog,
-        sheetState = sheetState,
-        containerColor = IosColors.GroupedCard,
-        shape = IosSheetShape,
-        dragHandle = { IosGrabber() },
-    ) {
-        // Centred like an iOS sheet's title, with what is being added under it.
-        Column(
-            Modifier
-                .fillMaxWidth()
-                .padding(start = 24.dp, end = 24.dp, bottom = 8.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Text("Add to Playlist", style = MaterialTheme.typography.titleMedium)
-            if (dialog.label.isNotBlank()) {
-                Text(
-                    text = dialog.label,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-        }
+    // Centred like an iOS sheet's title, with what is being added under it; picking a playlist
+    // (or swiping the sheet away) closes it, so no tick.
+    IosSheet(onDismissRequest = actions::dismissDialog, title = "Add to Playlist", subtitle = dialog.label, done = false) {
         LazyColumn(contentPadding = PaddingValues(bottom = 24.dp)) {
             item(key = "new") {
                 ListItem(

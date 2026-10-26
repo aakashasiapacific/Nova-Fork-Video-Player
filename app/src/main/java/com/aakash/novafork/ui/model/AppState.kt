@@ -338,6 +338,18 @@ interface AppActions {
     /** The hero's star: adds the item to Favorites, or takes it out. */
     fun toggleFavorite(itemKey: String) {}
 
+    /**
+     * The watchlist/favorites key a video's long-press menu saves: its show for an episode (the
+     * library lists shows, not episodes), the video itself otherwise; null when it can't be saved.
+     */
+    fun saveKeyFor(videoId: Long): String? = null
+
+    /** Whether [itemKey] is in Favorites right now (read as a menu opens). */
+    fun isFavorite(itemKey: String): Boolean = false
+
+    /** Whether [itemKey] is on the watchlist right now (read as a menu opens). */
+    fun isOnWatchlist(itemKey: String): Boolean = false
+
     /** Plays songs from search results (see [MusicResultUi]). */
     fun playMusic(songIds: List<Long>, startIndex: Int) {}
 

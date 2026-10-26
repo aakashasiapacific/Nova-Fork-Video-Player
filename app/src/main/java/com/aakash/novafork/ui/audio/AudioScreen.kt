@@ -119,6 +119,7 @@ import com.aakash.novafork.ui.common.IosButton
 import com.aakash.novafork.ui.common.IosColors
 import com.aakash.novafork.ui.common.IosGrabber
 import com.aakash.novafork.ui.common.IosIconButton
+import com.aakash.novafork.ui.common.IosSheet
 import com.aakash.novafork.ui.common.IosSheetShape
 import com.aakash.novafork.ui.common.IosSpinner
 import com.aakash.novafork.ui.common.IosTextButton
@@ -1474,32 +1475,10 @@ internal fun AddToPlaylistDialog(
 ) {
     var naming by rememberSaveable { mutableStateOf(false) }
     var name by rememberSaveable { mutableStateOf("") }
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val songsById = remember(library) { library.songs.associateBy { it.id } }
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        containerColor = IosColors.GroupedCard,
-        shape = IosSheetShape,
-        dragHandle = { IosGrabber() },
-    ) {
-        Column(Modifier.padding(horizontal = Gutter).padding(bottom = 24.dp)) {
-            Text(
-                "Add to Playlist",
-                fontSize = 17.sp,
-                fontWeight = FontWeight.SemiBold,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Text(
-                song.title,
-                fontSize = 13.sp,
-                color = Color.White.copy(alpha = 0.55f),
-                textAlign = TextAlign.Center,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
-            )
+    // Picking a playlist (or swiping the sheet away) closes it, so no tick.
+    IosSheet(onDismissRequest = onDismiss, title = "Add to Playlist", subtitle = song.title, done = false) {
+        Column(Modifier.padding(horizontal = Gutter).padding(top = 4.dp, bottom = 24.dp)) {
             if (naming) {
                 Row(Modifier.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                     NovaTextField(

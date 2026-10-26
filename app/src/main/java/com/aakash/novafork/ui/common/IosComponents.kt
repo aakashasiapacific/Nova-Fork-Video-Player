@@ -348,62 +348,6 @@ private val AlertCorner = 34.dp
 private val AlertButtonHeight = 48.dp
 private val AlertButtonGrey = Color(0xFF3A3A3C)
 
-/**
- * iOS's context menu in place of Material's DropdownMenu: a wide, rounded, dark popover with
- * 17pt rows. Pair with [NovaMenuItem].
- */
-@Composable
-fun NovaDropdownMenu(
-    expanded: Boolean,
-    onDismissRequest: () -> Unit,
-    modifier: Modifier = Modifier,
-    offset: DpOffset = DpOffset(0.dp, 0.dp),
-    content: @Composable ColumnScope.() -> Unit,
-) {
-    DropdownMenu(
-        expanded = expanded,
-        onDismissRequest = onDismissRequest,
-        modifier = modifier.widthIn(min = 250.dp),
-        offset = offset,
-        shape = RoundedCornerShape(16.dp),
-        containerColor = IosColors.Popover,
-        tonalElevation = 0.dp,
-        shadowElevation = 16.dp,
-        content = content,
-    )
-}
-
-/** A row of [NovaDropdownMenu]: 17pt label, white glyph, red when [destructive]. */
-@Composable
-fun NovaMenuItem(
-    text: @Composable () -> Unit,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    leadingIcon: (@Composable () -> Unit)? = null,
-    trailingIcon: (@Composable () -> Unit)? = null,
-    enabled: Boolean = true,
-    destructive: Boolean = false,
-) {
-    val tint = if (destructive) IosColors.Red else Color.White
-    // iOS's grey row highlight while pressed (the ripple is off).
-    val press = remember { MutableInteractionSource() }
-    DropdownMenuItem(
-        text = { ProvideTextStyle(MaterialTheme.typography.bodyLarge) { text() } },
-        onClick = onClick,
-        modifier = modifier.heightIn(min = 44.dp).indication(press, LocalIndication.current),
-        interactionSource = press,
-        leadingIcon = leadingIcon,
-        trailingIcon = trailingIcon,
-        enabled = enabled,
-        colors = MenuDefaults.itemColors(
-            textColor = tint,
-            leadingIconColor = tint,
-            trailingIconColor = tint,
-        ),
-        contentPadding = PaddingValues(horizontal = 16.dp),
-    )
-}
-
 /** iOS's sheet grabber: a 36×5 grey capsule. */
 @Composable
 fun IosGrabber() {

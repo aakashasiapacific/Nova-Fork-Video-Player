@@ -53,6 +53,7 @@ import com.aakash.novafork.ui.model.LibraryFilter
 import com.aakash.novafork.ui.model.LibraryItemUi
 import com.aakash.novafork.ui.model.LibrarySort
 import com.aakash.novafork.ui.model.LibraryUi
+import com.aakash.novafork.ui.model.MediaKind
 import com.aakash.novafork.ui.model.NetworkSourceForm
 import com.aakash.novafork.ui.model.PermissionUi
 import com.aakash.novafork.ui.model.PlexServerUi
@@ -156,6 +157,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
     private val searchMemo = Memo<Triple<LibraryIndex, String, MusicLibraryData>, SearchUi> { (index, query, music) ->
         UiMappers.search(index, query, music)
     }
+
+    /** The library as last shown, for what a long-press menu saves (an episode saves its show). */
+    @Volatile private var latestIndex: LibraryIndex? = null
 
     /** Watchlist keys, most recently added first. */
     private val watchlist: StateFlow<List<String>> =
@@ -287,6 +291,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
         saved: List<String>,
         starred: List<String>,
     ): AppUiState {
+        latestIndex = index
         val route = user.backStack.lastOrNull() ?: Route.Home
         val previewKey = user.previewKey
         // Details follow the route; on a tablet's library page they follow the preview pane.
@@ -552,6 +557,15 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
             if (on) graph.music.removeFromWatchlist(itemKey) else graph.music.addToWatchlist(itemKey)
         }
     }
+
+    override fun saveKeyFor(videoId: Long): String? {
+        val video = latestIndex?.videosById?.get(videoId) ?: return null
+        return if (video.kind == MediaKind.EPISODE) video.showKey?.let { "s:$it" } else "v:$videoId"
+    }
+
+    override fun isFavorite(itemKey: String): Boolean = itemKey in videoFavorites.value
+
+    override fun isOnWatchlist(itemKey: String): Boolean = itemKey in watchlist.value
 
     override fun playMusic(songIds: List<Long>, startIndex: Int) {
         if (songIds.isNotEmpty()) graph.musicPlayer.playSongs(songIds, startIndex)

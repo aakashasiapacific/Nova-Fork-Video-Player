@@ -19,10 +19,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -33,9 +31,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
-import com.aakash.novafork.ui.common.IosColors
-import com.aakash.novafork.ui.common.IosGrabber
-import com.aakash.novafork.ui.common.IosSheetShape
+import com.aakash.novafork.ui.common.IosSheet
 import com.aakash.novafork.ui.common.IosTextButton
 import com.aakash.novafork.ui.model.PlayerActions
 import com.aakash.novafork.ui.model.SubtitleResultUi
@@ -67,22 +63,10 @@ internal fun DownloadSubtitlesRow(onClick: () -> Unit, modifier: Modifier = Modi
     }
 }
 
-/** Phone: the subtitle download list in a modal bottom sheet; closing it closes the search. */
+/** Phone: the subtitle download list in a floating sheet; closing it closes the search. */
 @Composable
 internal fun SubtitleSearchSheet(search: SubtitleSearchUi, actions: PlayerActions) {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    ModalBottomSheet(
-        onDismissRequest = actions::dismissSubtitleSearch,
-        sheetState = sheetState,
-        containerColor = IosColors.GroupedCard,
-        shape = IosSheetShape,
-        dragHandle = { IosGrabber() },
-    ) {
-        Text(
-            text = SUBTITLE_SEARCH_TITLE,
-            style = MaterialTheme.typography.titleLarge,
-            modifier = Modifier.padding(start = 24.dp, end = 24.dp, bottom = 4.dp),
-        )
+    IosSheet(onDismissRequest = actions::dismissSubtitleSearch, title = SUBTITLE_SEARCH_TITLE) {
         SubtitleSearchContent(search = search, actions = actions)
     }
 }

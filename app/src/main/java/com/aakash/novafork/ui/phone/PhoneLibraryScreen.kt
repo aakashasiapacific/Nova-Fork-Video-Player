@@ -97,13 +97,7 @@ private fun SortMenu(current: LibrarySort, onSelect: (LibrarySort) -> Unit) {
         IosIconButton(onClick = { expanded = true }) {
             NovaIcon(R.drawable.ic_sort, contentDescription = "Sort")
         }
-        NovaDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            Text(
-                text = "Sort by",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-            )
+        NovaDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }, title = "Sort by") {
             LibrarySort.entries.forEach { sort ->
                 NovaMenuItem(
                     text = { Text(sort.label) },
@@ -111,11 +105,7 @@ private fun SortMenu(current: LibrarySort, onSelect: (LibrarySort) -> Unit) {
                         expanded = false
                         onSelect(sort)
                     },
-                    trailingIcon = if (sort == current) {
-                        { NovaIcon(R.drawable.ic_check, contentDescription = "Selected", tint = MaterialTheme.colorScheme.primary) }
-                    } else {
-                        null
-                    },
+                    checked = sort == current,
                 )
             }
         }
