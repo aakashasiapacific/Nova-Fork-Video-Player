@@ -107,7 +107,6 @@ private fun GlassPreview(tint: Float) {
         Box(
             Modifier
                 .size(width = 150.dp, height = 44.dp)
-                .shadow(8.dp, CircleShape)
                 .clip(CircleShape)
                 .background(PreviewGlass.copy(alpha = previewAlpha(tint)))
                 .border(0.5.dp, Color.White.copy(alpha = 0.22f), CircleShape),
@@ -224,7 +223,7 @@ internal fun IosSlider(
                     scaleX = knobScale
                     scaleY = knobScale
                 }
-                .shadow(4.dp, CircleShape)
+                .shadow(if (held) 0.dp else 4.dp, CircleShape)
                 .background(knobColor, CircleShape)
                 .border(0.5.dp, Color.White.copy(alpha = if (held) 0.7f else 0f), CircleShape),
         )

@@ -178,8 +178,10 @@ internal fun GlassCircle(onClick: () -> Unit, description: String, size: Dp, mod
 @Composable
 internal fun Modifier.glass(shape: Shape, minTint: Float = 0f): Modifier {
     val tint = LocalGlassTint.current.coerceIn(0f, 1f).coerceAtLeast(minTint)
+    // A shadow is drawn under the whole shape, so through clearer glass it would show as a dark
+    // blot inside it: it fades with the tint and is gone at Clear.
     return this
-        .shadow(elevation = 12.dp, shape = shape, ambientColor = Color.Black, spotColor = Color.Black)
+        .shadow(elevation = 12.dp * tint, shape = shape, ambientColor = Color.Black, spotColor = Color.Black)
         .clip(shape)
         .background(GlassFill.copy(alpha = glassAlpha(tint)))
         .glassRim(shape)
