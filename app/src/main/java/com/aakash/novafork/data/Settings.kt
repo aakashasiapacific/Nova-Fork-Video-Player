@@ -68,6 +68,11 @@ data class Settings(
     val subtitleLanguages: String = "",
     /** Download the best subtitle (once per video) when a video has none in the first of those languages. */
     val autoDownloadSubtitles: Boolean = false,
+    /**
+     * How tinted the app's glass buttons and bars are, 0 (clear) to 1 (tinted), as iOS 27's
+     * Liquid Glass slider sets it. The default is iOS 27's (ui.common.DEFAULT_GLASS_TINT).
+     */
+    val glassTint: Float = 0.6f,
 )
 
 interface SettingsStore {

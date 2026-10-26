@@ -25,6 +25,7 @@ import com.aakash.novafork.ui.common.HudState
 import com.aakash.novafork.ui.common.IosHudHost
 import com.aakash.novafork.ui.common.IosTextButton
 import com.aakash.novafork.ui.common.IosToastHost
+import com.aakash.novafork.ui.common.LocalGlassTint
 import com.aakash.novafork.ui.common.LocalHud
 import com.aakash.novafork.ui.common.NovaAlertDialog
 import com.aakash.novafork.ui.dialogs.NovaDialogs
@@ -48,6 +49,7 @@ fun NovaRoot(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
             LocalDeviceLayout provides layout,
             LocalNovaDimens provides dimensFor(layout),
             LocalHud provides hud,
+            LocalGlassTint provides settings.glassTint,
         ) {
             Surface(modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                 Box(Modifier.fillMaxSize()) {
