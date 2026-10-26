@@ -53,6 +53,7 @@ import com.aakash.novafork.core.format.Formats
 import com.aakash.novafork.ui.common.IosIconButton
 import com.aakash.novafork.ui.common.NovaDropdownMenu
 import com.aakash.novafork.ui.common.NovaMenuItem
+import com.aakash.novafork.ui.common.playerGlass
 import com.aakash.novafork.ui.model.PlayerUiState
 import com.aakash.novafork.ui.model.RepeatMode
 import com.aakash.novafork.ui.model.TrackUi
@@ -258,9 +259,9 @@ internal fun PlayPauseButton(
         Box(
             Modifier
                 .size(size)
-                .clip(CircleShape)
-                // A dark see-through disc behind the glyph, as Samsung's player draws it.
-                .background(Color.Black.copy(alpha = 0.3f))
+                // A dark see-through disc behind the glyph, as Samsung's player draws it, in iOS
+                // 27's tinted glass so it holds up over bright scenes.
+                .playerGlass(CircleShape)
                 .clickable(role = Role.Button, onClick = onClick),
             contentAlignment = Alignment.Center,
         ) {

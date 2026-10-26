@@ -47,6 +47,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
@@ -63,6 +64,7 @@ import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
 import com.aakash.novafork.ui.model.TopDestination
 import com.aakash.novafork.ui.theme.NovaColors
+import kotlin.math.sqrt
 import kotlinx.coroutines.launch
 
 /**
@@ -168,12 +170,20 @@ internal fun GlassCircle(onClick: () -> Unit, description: String, size: Dp, mod
     ) { content() }
 }
 
-/** iOS's dark glass: a translucent dark-grey fill, a hairline light edge and a soft shadow. */
-internal fun Modifier.glass(shape: Shape): Modifier = this
-    .shadow(elevation = 12.dp, shape = shape, ambientColor = Color.Black, spotColor = Color.Black)
-    .clip(shape)
-    .background(GlassColor)
-    .border(0.5.dp, Color.White.copy(alpha = 0.10f), shape)
+/**
+ * iOS 27's dark glass: a dark-grey fill as see-through as Preferences' Glass slider asks
+ * ([LocalGlassTint]; [minTint] keeps it at least that tinted), the iOS 27 edge ([glassRim]) and a
+ * soft shadow.
+ */
+@Composable
+internal fun Modifier.glass(shape: Shape, minTint: Float = 0f): Modifier {
+    val tint = LocalGlassTint.current.coerceIn(0f, 1f).coerceAtLeast(minTint)
+    return this
+        .shadow(elevation = 12.dp, shape = shape, ambientColor = Color.Black, spotColor = Color.Black)
+        .clip(shape)
+        .background(GlassFill.copy(alpha = glassAlpha(tint)))
+        .glassRim(shape)
+}
 
 /**
  * The glass of the controls that float over the pages (the mini player, round buttons). The real
@@ -183,8 +193,43 @@ internal fun Modifier.glass(shape: Shape): Modifier = this
 @Composable
 internal fun Modifier.frostedGlass(shape: Shape): Modifier = glass(shape)
 
+/**
+ * The video player's round buttons: a darker, never-clear glass (at least [PlayerMinTint] of
+ * the slider) with the iOS 27 edge, so they stay readable over snow or a white wall while the
+ * picture still shows through, as Samsung's discs let it.
+ */
+@Composable
+internal fun Modifier.playerGlass(shape: Shape): Modifier {
+    val tint = LocalGlassTint.current.coerceIn(0f, 1f).coerceAtLeast(PlayerMinTint)
+    return this
+        .clip(shape)
+        .background(Color.Black.copy(alpha = 0.3f + 0.35f * tint))
+        .glassRim(shape)
+}
+
+/**
+ * iOS 27's glass edge: a fine rim that is bright along the top, where the light falls, and fades
+ * round to the bottom, with a faint dark line outside it so the glass stands off bright pictures.
+ * [strength] (0 to 1) fades it, for a button that fills in with colour.
+ */
+internal fun Modifier.glassRim(shape: Shape, strength: Float = 1f): Modifier = this
+    .border(Hairline, Color.Black.copy(alpha = 0.35f * strength), shape)
+    .border(
+        RimWidth,
+        Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.30f * strength), Color.White.copy(alpha = 0.06f * strength))),
+        shape,
+    )
+
+/**
+ * The fill's opacity for a slider setting: from 0.45 (clear) to 0.97 (tinted), eased so the
+ * middle of the slider still reads as glass rather than a hole in the page.
+ */
+internal fun glassAlpha(tint: Float): Float = 0.45f + 0.52f * sqrt(tint.coerceIn(0f, 1f))
+
 private val PillInset = 5.dp
-private val GlassColor = Color(0xF21C1C1E)
+private val GlassFill = Color(0xFF1C1C1E)
+private val RimWidth = 1.dp
+private const val PlayerMinTint = 0.8f
 private val SelectedPillColor = Color(0xFF3A3A3C)
 
 /**

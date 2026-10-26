@@ -35,6 +35,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aakash.novafork.R
+import com.aakash.novafork.ui.common.playerGlass
 import com.aakash.novafork.ui.common.rememberEndsAt
 import com.aakash.novafork.ui.model.PlayerActions
 import com.aakash.novafork.ui.model.PlayerUiState
@@ -216,14 +217,16 @@ private fun PhoneTransportRow(state: PlayerUiState, actions: PlayerActions, modi
     }
 }
 
-/** A white glyph on a dark see-through disc: Samsung's previous and next. */
+/**
+ * A white glyph on a dark see-through disc: Samsung's previous and next, in iOS 27's tinted glass
+ * so they hold up over bright scenes.
+ */
 @Composable
 private fun DiscButton(icon: Int, description: String, onClick: () -> Unit, enabled: Boolean = true) {
     Box(
         Modifier
             .size(42.dp)
-            .clip(CircleShape)
-            .background(Color.Black.copy(alpha = 0.3f))
+            .playerGlass(CircleShape)
             .clickable(enabled = enabled, onClickLabel = description, role = Role.Button, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
@@ -298,8 +301,7 @@ private fun SpeedPill(rate: Float, onClick: () -> Unit) {
         Box(
             Modifier
                 .height(28.dp)
-                .clip(RoundedCornerShape(percent = 50))
-                .background(Color.White.copy(alpha = 0.16f))
+                .playerGlass(RoundedCornerShape(percent = 50))
                 .padding(horizontal = 9.dp),
             contentAlignment = Alignment.Center,
         ) {

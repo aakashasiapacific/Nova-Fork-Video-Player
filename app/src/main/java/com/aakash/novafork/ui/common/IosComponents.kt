@@ -4,6 +4,7 @@ import androidx.annotation.DrawableRes
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
@@ -30,12 +31,14 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -64,8 +67,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -74,14 +79,21 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -93,6 +105,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
@@ -126,12 +139,22 @@ object IosColors {
 val Hairline = 0.5.dp
 
 /**
- * iOS's switch: a 51×31 green pill with a white knob that slides across, with a light tick each
- * time it flips. [onCheckedChange] null means the row around it does the toggling (as SwitchRow
- * does) and the switch only shows state.
+ * iOS 26/27's Liquid Glass switch: a long, slim track in the accent blue (owner: blue, not
+ * green) with a white pill-shaped knob, and a light tick each time it flips. While it is held,
+ * and while it slides, the knob turns to clear glass, grows a little past the track and
+ * stretches the way it travels (its leading end races ahead, the trailing end follows a beat
+ * later), then settles back into the solid white pill. [onCheckedChange] null means the row
+ * around it does the toggling (as SwitchRow does) and the switch only shows state; such a row can
+ * pass its [interactionSource] so holding the row turns the knob to glass too.
  */
 @Composable
-fun IosSwitch(checked: Boolean, onCheckedChange: ((Boolean) -> Unit)?, modifier: Modifier = Modifier, enabled: Boolean = true) {
+fun IosSwitch(
+    checked: Boolean,
+    onCheckedChange: ((Boolean) -> Unit)?,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    interactionSource: MutableInteractionSource? = null,
+) {
     val haptics = LocalHapticFeedback.current
     var shownChecked by remember { mutableStateOf(checked) }
     LaunchedEffect(checked) {
@@ -140,38 +163,98 @@ fun IosSwitch(checked: Boolean, onCheckedChange: ((Boolean) -> Unit)?, modifier:
             haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
         }
     }
-    val track by animateColorAsState(if (checked) IosColors.Green else IosColors.SwitchOff, label = "switchTrack")
-    val knobX by animateDpAsState(
-        targetValue = if (checked) 22.dp else 2.dp,
-        animationSpec = spring(dampingRatio = 0.75f, stiffness = 700f),
-        label = "switchKnob",
+    val source = interactionSource ?: remember { MutableInteractionSource() }
+    val pressed by source.collectIsPressedAsState()
+    val track by animateColorAsState(if (checked) MaterialTheme.colorScheme.primary else IosColors.SwitchOff, label = "switchTrack")
+    // Where each end of the knob is along its travel, 0 (off) to 1 (on), each on its own spring.
+    val target = if (checked) 1f else 0f
+    val lead = spring<Float>(dampingRatio = 0.72f, stiffness = 900f)
+    val follow = spring<Float>(dampingRatio = 0.8f, stiffness = 320f)
+    val startEnd by animateFloatAsState(target, animationSpec = if (checked) follow else lead, label = "switchKnobStart")
+    val endEnd by animateFloatAsState(target, animationSpec = if (checked) lead else follow, label = "switchKnobEnd")
+    val sliding = kotlin.math.abs(startEnd - target) > 0.02f || kotlin.math.abs(endEnd - target) > 0.02f
+    val glass by animateFloatAsState(
+        targetValue = if (enabled && (pressed || sliding)) 1f else 0f,
+        animationSpec = spring(dampingRatio = 0.8f, stiffness = 600f),
+        label = "switchGlass",
     )
     val toggle = if (onCheckedChange != null) {
-        Modifier.toggleable(value = checked, enabled = enabled, role = Role.Switch, onValueChange = onCheckedChange)
+        Modifier.toggleable(
+            value = checked,
+            interactionSource = source,
+            indication = null,
+            enabled = enabled,
+            role = Role.Switch,
+            onValueChange = onCheckedChange,
+        )
     } else {
         Modifier
     }
     Box(
         modifier
             .then(toggle)
-            .size(width = 51.dp, height = 31.dp)
-            .background(if (enabled) track else track.copy(alpha = 0.5f), CircleShape),
-    ) {
-        Box(
-            Modifier
-                .offset(x = knobX, y = 2.dp)
-                .size(27.dp)
-                .shadow(3.dp, CircleShape)
-                .background(Color.White, CircleShape),
-        )
-    }
+            .size(width = SwitchWidth, height = SwitchHeight)
+            .drawBehind {
+                val trackRadius = CornerRadius(size.height / 2f, size.height / 2f)
+                drawRoundRect(color = if (enabled) track else track.copy(alpha = track.alpha * 0.5f), cornerRadius = trackRadius)
+                val inset = KnobInset.toPx()
+                val knobWidth = KnobWidth.toPx()
+                val travel = size.width - knobWidth - inset * 2f
+                // Glass grows the knob past the track's edges, as iOS's does.
+                val grow = KnobGlassGrow.toPx() * glass
+                val left = inset + startEnd * travel - grow
+                val right = inset + knobWidth + endEnd * travel + grow
+                val top = inset - grow
+                val bottom = size.height - inset + grow
+                val knobSize = Size(right - left, bottom - top)
+                val knobRadius = CornerRadius(knobSize.height / 2f, knobSize.height / 2f)
+                val topLeft = Offset(left, top)
+                // A soft shadow under the solid knob, gone once it is glass.
+                val shadow = (1f - glass) * 0.22f
+                if (shadow > 0f) {
+                    drawRoundRect(
+                        color = Color.Black.copy(alpha = shadow),
+                        topLeft = topLeft + Offset(0f, 1.dp.toPx()),
+                        size = knobSize,
+                        cornerRadius = knobRadius,
+                    )
+                }
+                drawRoundRect(
+                    color = Color.White.copy(alpha = if (enabled) 1f - 0.72f * glass else 0.7f),
+                    topLeft = topLeft,
+                    size = knobSize,
+                    cornerRadius = knobRadius,
+                )
+                if (glass > 0f) {
+                    // The glass's edge: bright along the top where the light falls, dimmer below.
+                    drawRoundRect(
+                        brush = Brush.verticalGradient(
+                            listOf(Color.White.copy(alpha = 0.9f * glass), Color.White.copy(alpha = 0.3f * glass)),
+                            startY = top,
+                            endY = bottom,
+                        ),
+                        topLeft = topLeft,
+                        size = knobSize,
+                        cornerRadius = knobRadius,
+                        style = Stroke(width = 1.dp.toPx()),
+                    )
+                }
+            },
+    )
 }
 
+private val SwitchWidth = 64.dp
+private val SwitchHeight = 28.dp
+private val KnobWidth = 38.dp
+private val KnobInset = 2.dp
+private val KnobGlassGrow = 3.dp
+
 /**
- * An iOS alert in place of Material's AlertDialog (same parameters, so call sites only change
- * the name): centred bold title, centred message, and the buttons as full-width cells under a
- * hairline, Cancel on the left. [icon] is accepted and not drawn, since iOS alerts have none.
- * Set [form] when [text] holds text fields so their text stays start-aligned.
+ * An iOS 26/27 alert in place of Material's AlertDialog (same parameters, so call sites only
+ * change the name): a rounder card, the title and message set from the left, and the buttons as
+ * capsules side by side under them, Cancel (grey) on the left and the action (accent blue) on the
+ * right; a lone button is a grey capsule across the card. [icon] is accepted and not drawn, since
+ * iOS alerts have none. Set [form] when [text] holds text fields.
  */
 @Composable
 fun NovaAlertDialog(
@@ -183,10 +266,10 @@ fun NovaAlertDialog(
     title: (@Composable () -> Unit)? = null,
     text: (@Composable () -> Unit)? = null,
     properties: DialogProperties = DialogProperties(),
-    form: Boolean = false,
+    @Suppress("UNUSED_PARAMETER") form: Boolean = false,
 ) {
     BasicAlertDialog(onDismissRequest = onDismissRequest, modifier = modifier, properties = properties) {
-        Surface(shape = RoundedCornerShape(24.dp), color = IosColors.Popover, contentColor = Color.White) {
+        Surface(shape = RoundedCornerShape(AlertCorner), color = IosColors.Popover, contentColor = Color.White) {
             Column {
                 // Weighted like Material's alert so a tall body (a form, a list) scrolls inside
                 // the dialog and never pushes the buttons off screen.
@@ -194,54 +277,76 @@ fun NovaAlertDialog(
                     Modifier
                         .weight(1f, fill = false)
                         .fillMaxWidth()
-                        .padding(start = 20.dp, end = 20.dp, top = 22.dp, bottom = 18.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
+                        .padding(start = 22.dp, end = 22.dp, top = 22.dp, bottom = 18.dp),
+                    horizontalAlignment = Alignment.Start,
                 ) {
                     if (title != null) {
-                        ProvideTextStyle(MaterialTheme.typography.titleMedium.copy(textAlign = TextAlign.Center)) { title() }
+                        ProvideTextStyle(MaterialTheme.typography.titleMedium.copy(textAlign = TextAlign.Start)) { title() }
                     }
                     if (text != null) {
                         if (title != null) Spacer(Modifier.height(6.dp))
-                        val style = if (form) {
-                            MaterialTheme.typography.bodyMedium
-                        } else {
-                            MaterialTheme.typography.bodyMedium.copy(textAlign = TextAlign.Center)
-                        }
                         Box(
                             Modifier
                                 .weight(1f, fill = false)
                                 .fillMaxWidth(),
-                            contentAlignment = if (form) Alignment.TopStart else Alignment.TopCenter,
+                            contentAlignment = Alignment.TopStart,
                         ) {
-                            ProvideTextStyle(style) { text() }
+                            ProvideTextStyle(MaterialTheme.typography.bodyMedium.copy(textAlign = TextAlign.Start)) { text() }
                         }
                     }
                 }
-                Box(Modifier.fillMaxWidth().height(Hairline).background(IosColors.Separator))
-                Row(Modifier.fillMaxWidth().heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
                     if (dismissButton != null) {
-                        AlertCell(bold = false, content = dismissButton)
-                        Box(Modifier.width(Hairline).height(48.dp).background(IosColors.Separator))
+                        AlertCapsule(preferred = false, content = dismissButton)
+                        AlertCapsule(preferred = true, content = confirmButton)
+                    } else {
+                        AlertCapsule(preferred = false, content = confirmButton)
                     }
-                    AlertCell(bold = true, content = confirmButton)
                 }
             }
         }
     }
 }
 
+/**
+ * One of the alert's capsules: accent blue for the [preferred] action, grey otherwise. The call
+ * sites hand in Material text buttons, whose label takes the theme's primary colour and its
+ * labelLarge style, so the white 17pt label goes in through the theme (semibold for the action,
+ * medium for Cancel), and the button is laid out over the whole capsule so all of it takes the
+ * tap.
+ */
 @Composable
-private fun RowScope.AlertCell(bold: Boolean, content: @Composable () -> Unit) {
-    // Material's TextButton sets labelLarge itself, so the alert's 17pt button text goes in
-    // through the theme: semibold for the default action, regular for Cancel, as on iOS.
+private fun RowScope.AlertCapsule(preferred: Boolean, content: @Composable () -> Unit) {
+    val scheme = MaterialTheme.colorScheme
     val typography = MaterialTheme.typography
-    val label = typography.bodyLarge.copy(fontWeight = if (bold) FontWeight.SemiBold else FontWeight.Normal)
-    Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
-        MaterialTheme(colorScheme = MaterialTheme.colorScheme, typography = typography.copy(labelLarge = label)) {
-            content()
+    val label = typography.bodyLarge.copy(fontWeight = if (preferred) FontWeight.SemiBold else FontWeight.Medium)
+    Box(
+        Modifier
+            .weight(1f)
+            .height(AlertButtonHeight)
+            .clip(CircleShape)
+            .background(if (preferred) scheme.primary else AlertButtonGrey),
+        contentAlignment = Alignment.Center,
+    ) {
+        MaterialTheme(colorScheme = scheme.copy(primary = Color.White), typography = typography.copy(labelLarge = label)) {
+            Layout(content = content) { measurables, constraints ->
+                val width = constraints.maxWidth
+                val height = constraints.maxHeight
+                val placeables = measurables.map { it.measure(Constraints.fixed(width, height)) }
+                layout(width, height) { placeables.forEach { it.place(0, 0) } }
+            }
         }
     }
 }
+
+private val AlertCorner = 34.dp
+private val AlertButtonHeight = 48.dp
+private val AlertButtonGrey = Color(0xFF3A3A3C)
 
 /**
  * iOS's context menu in place of Material's DropdownMenu: a wide, rounded, dark popover with
@@ -387,7 +492,11 @@ fun IosSpinner(
     }
 }
 
-/** iOS's segmented control: a grey track with the chosen segment raised in a lighter grey. */
+/**
+ * iOS 26/27's segmented control: a dark capsule track with the chosen segment on a glass pill.
+ * Choosing another slides the pill across, stretching as it goes (the edge in front races ahead,
+ * the one behind follows a beat later) and settling with a small bounce, as the tab bar's does.
+ */
 @Composable
 fun IosSegmentedControl(
     options: List<String>,
@@ -395,35 +504,64 @@ fun IosSegmentedControl(
     onSelect: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Row(
+    BoxWithConstraints(
         modifier
-            .heightIn(min = 34.dp)
-            .background(Color(0xFF1C1C1E), RoundedCornerShape(10.dp))
-            .padding(2.dp),
+            .heightIn(min = 36.dp)
+            .background(SegmentTrack, CircleShape)
+            .padding(SegmentInset),
     ) {
-        options.forEachIndexed { index, option ->
-            val selected = index == selectedIndex
-            Box(
-                Modifier
-                    .weight(1f)
-                    .heightIn(min = 30.dp)
-                    .background(if (selected) Color(0xFF636366) else Color.Transparent, RoundedCornerShape(8.dp))
-                    .selectable(selected = selected, role = Role.Tab, onClick = { onSelect(index) })
-                    .padding(horizontal = 8.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = option,
-                    style = MaterialTheme.typography.bodySmall.copy(
-                        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
-                    ),
-                    color = Color.White,
-                    maxLines = 1,
+        val slot = maxWidth / options.size.coerceAtLeast(1)
+        val index = selectedIndex.coerceAtMost(options.lastIndex)
+        val shownIndex = index.coerceAtLeast(0)
+        var lastIndex by remember { mutableIntStateOf(shownIndex) }
+        val forward = shownIndex >= lastIndex
+        SideEffect { lastIndex = shownIndex }
+        val lead = spring<Dp>(dampingRatio = 0.62f, stiffness = Spring.StiffnessMedium)
+        val follow = spring<Dp>(dampingRatio = 0.8f, stiffness = Spring.StiffnessLow)
+        val left by animateDpAsState(slot * shownIndex, animationSpec = if (forward) follow else lead, label = "segmentPillLeft")
+        val right by animateDpAsState(slot * (shownIndex + 1), animationSpec = if (forward) lead else follow, label = "segmentPillRight")
+        if (index >= 0) {
+            Box(Modifier.matchParentSize()) {
+                Box(
+                    Modifier
+                        .offset(x = left)
+                        .width((right - left).coerceAtLeast(slot * 0.5f))
+                        .fillMaxHeight()
+                        .shadow(4.dp, CircleShape)
+                        .background(SegmentPill, CircleShape)
+                        .glassRim(CircleShape),
                 )
+            }
+        }
+        Row(Modifier.fillMaxWidth()) {
+            options.forEachIndexed { optionIndex, option ->
+                val selected = optionIndex == index
+                Box(
+                    Modifier
+                        .weight(1f)
+                        .heightIn(min = 32.dp)
+                        .clip(CircleShape)
+                        .selectable(selected = selected, role = Role.Tab, onClick = { onSelect(optionIndex) })
+                        .padding(horizontal = 8.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = option,
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                        ),
+                        color = Color.White,
+                        maxLines = 1,
+                    )
+                }
             }
         }
     }
 }
+
+private val SegmentInset = 2.dp
+private val SegmentTrack = Color(0xFF1C1C1E)
+private val SegmentPill = Color(0xFF5A5A5E)
 
 /** iOS's selection circle for picking several items: blue with a white check when chosen. */
 @Composable
@@ -652,9 +790,10 @@ fun IosProgressBar(
 }
 
 /**
- * iOS's swipe to delete: swiping a row left uncovers a red Delete button; letting go past most of
- * the row deletes at once. A tap on Delete deletes; a swipe back or a short swipe hides it.
- * [background] fills the row so the red stays behind it.
+ * iOS's swipe to delete, in iOS 26/27's form: swiping a row left uncovers a red capsule with
+ * Delete in it, set in from the row's edges and growing with the swipe; letting go past most of
+ * the row deletes at once. A tap on the capsule deletes; a swipe back or a short swipe hides it.
+ * [background] fills the row so the capsule stays behind it.
  */
 @Composable
 fun SwipeToDelete(
@@ -684,24 +823,43 @@ fun SwipeToDelete(
             .onSizeChanged { width = it.width.toFloat() }
             .clipToBounds(),
     ) {
+        // The capsule fills the gap the row leaves as it slides, less a margin all round.
+        val gapPx = with(LocalDensity.current) { SwipePillGap.toPx() }
+        val pillWidthPx = (-offset - gapPx * 2f).coerceAtLeast(0f)
         Box(
             Modifier
                 .matchParentSize()
-                .background(IosColors.Red)
-                .clickable(enabled = offset < 0f, onClickLabel = label, role = Role.Button) {
-                    settle(-width) {
-                        onDelete()
-                        offset = 0f
-                    }
-                },
+                .padding(vertical = SwipePillGap, horizontal = SwipePillGap),
             contentAlignment = Alignment.CenterEnd,
         ) {
-            Text(
-                label,
-                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
-                color = Color.White,
-                modifier = Modifier.padding(end = 20.dp),
-            )
+            if (pillWidthPx > 0f) {
+                Box(
+                    Modifier
+                        .layout { measurable, constraints ->
+                            val pillWidth = pillWidthPx.toInt().coerceAtMost(constraints.maxWidth)
+                            val placeable = measurable.measure(Constraints.fixed(pillWidth, constraints.maxHeight))
+                            layout(pillWidth, constraints.maxHeight) { placeable.place(0, 0) }
+                        }
+                        .clip(CircleShape)
+                        .background(IosColors.Red)
+                        .clickable(enabled = offset < 0f, onClickLabel = label, role = Role.Button) {
+                            settle(-width) {
+                                onDelete()
+                                offset = 0f
+                            }
+                        },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        label,
+                        style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
+                        color = Color.White,
+                        maxLines = 1,
+                        softWrap = false,
+                        modifier = Modifier.graphicsLayer { alpha = (pillWidthPx / revealPx).coerceIn(0f, 1f) },
+                    )
+                }
+            }
         }
         Box(
             Modifier
@@ -727,6 +885,9 @@ fun SwipeToDelete(
 
 /** How far along its width a row must be swiped for letting go to delete it. */
 private const val FullSwipe = 0.6f
+
+/** The margin round a swipe action's capsule. */
+private val SwipePillGap = 6.dp
 
 /**
  * iOS's collapsed large title: once a page's big title has scrolled away, the title shows small
