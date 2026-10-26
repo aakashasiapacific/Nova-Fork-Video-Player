@@ -73,6 +73,7 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
             putString(KEY_OPENSUBTITLES_PASSWORD, s.opensubtitlesPassword)
             putString(KEY_SUBTITLE_LANGUAGES, s.subtitleLanguages)
             putBoolean(KEY_AUTO_DOWNLOAD_SUBTITLES, s.autoDownloadSubtitles)
+            putFloat(KEY_GLASS_TINT, s.glassTint)
         }
     }
 
@@ -107,6 +108,7 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
         const val KEY_OPENSUBTITLES_PASSWORD = "opensubtitles_password"
         const val KEY_SUBTITLE_LANGUAGES = "subtitle_languages"
         const val KEY_AUTO_DOWNLOAD_SUBTITLES = "auto_download_subtitles"
+        const val KEY_GLASS_TINT = "glass_tint"
 
         /**
          * The type [write] stores each key with. A restored backup's entry of another type is
@@ -137,6 +139,7 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
             KEY_OPENSUBTITLES_PASSWORD to SettingType.STRING,
             KEY_SUBTITLE_LANGUAGES to SettingType.STRING,
             KEY_AUTO_DOWNLOAD_SUBTITLES to SettingType.BOOLEAN,
+            KEY_GLASS_TINT to SettingType.FLOAT,
         )
 
         /**
@@ -185,6 +188,7 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
                 opensubtitlesPassword = prefs.string(KEY_OPENSUBTITLES_PASSWORD) ?: defaults.opensubtitlesPassword,
                 subtitleLanguages = prefs.string(KEY_SUBTITLE_LANGUAGES) ?: defaults.subtitleLanguages,
                 autoDownloadSubtitles = prefs.boolean(KEY_AUTO_DOWNLOAD_SUBTITLES, defaults.autoDownloadSubtitles),
+                glassTint = prefs.float(KEY_GLASS_TINT, defaults.glassTint).coerceIn(0f, 1f),
             )
         }
 
@@ -209,6 +213,13 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
         private fun SharedPreferences.int(key: String, default: Int): Int =
             try {
                 getInt(key, default)
+            } catch (e: ClassCastException) {
+                default
+            }
+
+        private fun SharedPreferences.float(key: String, default: Float): Float =
+            try {
+                getFloat(key, default)
             } catch (e: ClassCastException) {
                 default
             }

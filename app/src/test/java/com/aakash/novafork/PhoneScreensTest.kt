@@ -87,6 +87,9 @@ class PhoneScreensTest {
 
     @Test fun settingsPlayer() = capture("settings_player", FakeScreens.settingsSection("PLAYER"))
 
+    /** Layout and the iOS 27 glass slider. */
+    @Test fun settingsAppearance() = capture("settings_appearance", FakeScreens.settingsSection("APPEARANCE"))
+
     @Test fun smbDialog() = capture("dialog_smb", FakeScreens.smbDialog(), wholeScreen = true)
 
     @Test fun identifyDialog() = capture("dialog_identify", FakeScreens.identifyDialog(), wholeScreen = true)

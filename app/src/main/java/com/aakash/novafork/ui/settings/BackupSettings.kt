@@ -34,6 +34,7 @@ import com.aakash.novafork.ui.common.IosTextButton
 import com.aakash.novafork.ui.common.NovaAlertDialog
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.RestorePreviewUi
+import com.aakash.novafork.ui.theme.IosPalette
 import java.text.DateFormat
 import java.util.Date
 
@@ -45,23 +46,25 @@ internal fun backupGroup(actions: AppActions): SettingsGroup = SettingsGroup(
     key = "backup",
     title = "Backup & restore",
     rows = listOf(
-        SettingsRow("backup-save") { shape -> BackupRow(shape, actions) },
-        SettingsRow("backup-restore") { shape -> RestoreRow(shape, actions) },
+        SettingsRow("backup-save", "Back Up", R.drawable.ic_storage, IosPalette.Green) { shape -> BackupRow(shape, actions) },
+        SettingsRow("backup-restore", "Restore", R.drawable.ic_restart_alt) { shape -> RestoreRow(shape, actions) },
     ),
-    footer = "Settings, sources, watch history, manual matches and playlists. Restoring adds to what is " +
-        "here; videos not found yet get their history once their source is scanned.",
+    footer = "Back Up saves settings, sources, watch history, manual matches and playlists to a file you can " +
+        "keep or move to another device. Restoring adds to what is here; videos not found yet get their " +
+        "history once their source is scanned.",
 )
 
+/** "Back Up", with the day of the last backup in grey (or a spinner while one is made). */
 @Composable
 private fun BackupRow(shape: Shape, actions: AppActions) {
     val backup by actions.backupState().collectAsState()
     var asking by remember { mutableStateOf(false) }
     val last = backup.lastBackupAt
-    val lastText = remember(last) { if (last == null) "No backup made on this device yet" else "Last backup ${dateTime(last)}" }
+    val lastText = remember(last) { if (last == null) "Never" else date(last) }
     RowSurface(shape = shape, onClick = { if (!backup.working) asking = true }) {
-        RowIcon(R.drawable.ic_storage)
-        RowTexts("Back Up", lastText, Modifier.weight(1f), note = "Saves a file you can keep or move to another device")
-        if (backup.working) IosSpinner(Modifier.size(20.dp), strokeWidth = 2.dp)
+        RowIcon(R.drawable.ic_storage, IosPalette.Green)
+        RowTitle("Back Up", Modifier.weight(1f))
+        if (backup.working) IosSpinner(Modifier.size(20.dp), strokeWidth = 2.dp) else RowValue(lastText)
     }
     if (asking) {
         BackupDialog(
@@ -127,16 +130,9 @@ private fun RestoreRow(shape: Shape, actions: AppActions) {
     val waiting = backup.waiting
     RowSurface(shape = shape, onClick = { if (!backup.working) actions.importBackup() }) {
         RowIcon(R.drawable.ic_restart_alt)
-        RowTexts(
-            title = "Restore",
-            summary = "Bring back a backup file",
-            modifier = Modifier.weight(1f),
-            note = when {
-                waiting == 1 -> "1 item waits for its video to be scanned"
-                waiting > 1 -> "$waiting items wait for their videos to be scanned"
-                else -> null
-            },
-        )
+        RowTitle("Restore", Modifier.weight(1f))
+        // Restored history still waiting for its videos to be scanned.
+        if (waiting > 0) RowValue("$waiting waiting")
     }
     val confirm = backup.confirm
     if (confirm != null) {
@@ -202,3 +198,5 @@ private fun count(n: Int, one: String, many: String): String = if (n == 1) "1 $o
 
 private fun dateTime(epochMs: Long): String =
     DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(epochMs))
+
+private fun date(epochMs: Long): String = DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(epochMs))

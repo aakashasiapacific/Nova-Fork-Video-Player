@@ -21,6 +21,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toAndroidRect
@@ -35,6 +36,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import com.aakash.novafork.NovaApp
 import com.aakash.novafork.ui.adaptive.rememberDeviceLayout
+import com.aakash.novafork.ui.common.LocalGlassTint
 import com.aakash.novafork.ui.player.PlayerScreen
 import com.aakash.novafork.ui.theme.NovaPlayerTheme
 import kotlinx.coroutines.Dispatchers
@@ -121,28 +123,31 @@ class PlayerActivity : ComponentActivity(), PlayerController.Host {
         setContent {
             val controller by connected.collectAsStateWithLifecycle()
             val settings by graph.settings.settings.collectAsStateWithLifecycle()
+            // The player's glass is as tinted as Preferences › Appearance › Glass sets the app's.
             NovaPlayerTheme {
-                // Until the service is bound (a moment) the window's black background shows.
-                val current = controller
-                if (current != null) {
-                    val state by current.state.collectAsStateWithLifecycle()
-                    PlayerScreen(
-                        state = state,
-                        actions = current,
-                        layout = rememberDeviceLayout(settings.layoutMode),
-                        copyFrame = { onCopied ->
-                            val layout = videoLayout
-                            if (layout == null) onCopied(null) else FrameCapture.copy(layout, onCopied)
-                        },
-                    ) {
-                        AndroidView(
-                            factory = { context -> VLCVideoLayout(context).also { onVideoLayoutCreated(it) } },
-                            modifier = Modifier
-                                .fillMaxSize()
-                                // For a smooth shrink into the pop-up window (PipController).
-                                .onGloballyPositioned { pip.videoBounds = it.boundsInWindow().toAndroidRect() },
-                            onRelease = { layout -> onVideoLayoutReleased(layout) },
-                        )
+                CompositionLocalProvider(LocalGlassTint provides settings.glassTint) {
+                    // Until the service is bound (a moment) the window's black background shows.
+                    val current = controller
+                    if (current != null) {
+                        val state by current.state.collectAsStateWithLifecycle()
+                        PlayerScreen(
+                            state = state,
+                            actions = current,
+                            layout = rememberDeviceLayout(settings.layoutMode),
+                            copyFrame = { onCopied ->
+                                val layout = videoLayout
+                                if (layout == null) onCopied(null) else FrameCapture.copy(layout, onCopied)
+                            },
+                        ) {
+                            AndroidView(
+                                factory = { context -> VLCVideoLayout(context).also { onVideoLayoutCreated(it) } },
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    // For a smooth shrink into the pop-up window (PipController).
+                                    .onGloballyPositioned { pip.videoBounds = it.boundsInWindow().toAndroidRect() },
+                                onRelease = { layout -> onVideoLayoutReleased(layout) },
+                            )
+                        }
                     }
                 }
             }
