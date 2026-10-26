@@ -108,6 +108,7 @@ import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.Artwork
 import com.aakash.novafork.ui.model.HeroTarget
 import com.aakash.novafork.ui.model.HeroUi
+import com.aakash.novafork.ui.theme.IosPalette
 import com.aakash.novafork.ui.theme.NovaColors
 import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
@@ -580,7 +581,7 @@ private fun HeroActions(
             icon = if (hero.favorite) R.drawable.ic_star else R.drawable.ic_star_outline,
             description = if (hero.favorite) "Remove from Favorites" else "Add to Favorites",
             onClick = { actions.toggleFavorite(hero.itemKey) },
-            fill = if (hero.favorite) NovaColors.AppleMusicRed else null,
+            fill = if (hero.favorite) IosPalette.Red else null,
         )
         RoundHeroButton(
             icon = if (hero.onWatchlist) R.drawable.ic_bookmark_fill else R.drawable.ic_add,

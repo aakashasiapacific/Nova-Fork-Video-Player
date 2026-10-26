@@ -98,13 +98,14 @@ import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import com.aakash.novafork.R
+import com.aakash.novafork.ui.theme.IosPalette
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /** iOS dark-mode system colours the iOS-style controls below are drawn with. */
 object IosColors {
-    /** systemGreen: an "on" switch. */
-    val Green = Color(0xFF30D158)
+    /** systemGreen. */
+    val Green = IosPalette.Green
     /** An "off" switch track (systemFill, dark). */
     val SwitchOff = Color(0xFF39393D)
     /** secondarySystemGroupedBackground: grouped list cards, sheets. */
@@ -118,7 +119,7 @@ object IosColors {
     /** tertiaryLabel: chevrons. */
     val TertiaryLabel = Color(0xFF5A5A5F)
     /** systemRed: destructive actions. */
-    val Red = Color(0xFFFF453A)
+    val Red = IosPalette.Red
 }
 
 /** The 0.5pt line iOS draws between rows. */

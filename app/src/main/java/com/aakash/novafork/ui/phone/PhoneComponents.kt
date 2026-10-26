@@ -85,7 +85,6 @@ import com.aakash.novafork.ui.common.LocalBottomBarSpace
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.PosterArt
 import com.aakash.novafork.ui.common.ProgressStrip
-import com.aakash.novafork.ui.common.RatingPill
 import com.aakash.novafork.ui.common.VideoMenuBox
 import com.aakash.novafork.ui.common.WatchedBadge
 import com.aakash.novafork.ui.common.iosScrollIndicator
@@ -157,7 +156,10 @@ internal fun SourceType.iconRes(): Int = when (this) {
 // Cards
 // ---------------------------------------------------------------------------------------------
 
-/** 2:3 poster with rating, watched badge and progress on the art, then title and subtitle. */
+/**
+ * 2:3 poster with the watched badge and progress on the art, then title and subtitle. No rating
+ * on posters: Apple TV keeps it for the title's own page (owner).
+ */
 @Composable
 private fun PosterCardLayout(
     title: String,
@@ -165,7 +167,6 @@ private fun PosterCardLayout(
     artwork: Artwork,
     onClick: () -> Unit,
     modifier: Modifier,
-    rating: Float?,
     progress: Float?,
     watched: Boolean,
     onLongClick: (() -> Unit)?,
@@ -189,7 +190,6 @@ private fun PosterCardLayout(
                 .pressDim(press),
         ) {
             PosterArt(artwork = artwork, title = title, modifier = Modifier.fillMaxSize())
-            RatingPill(rating, Modifier.align(Alignment.TopStart).padding(6.dp), onImage = true)
             if (watched) WatchedBadge(Modifier.align(Alignment.TopEnd).padding(6.dp))
             ProgressStrip(progress, Modifier.align(Alignment.BottomStart))
         }
@@ -226,7 +226,6 @@ internal fun PhonePosterCard(
         artwork = card.artwork,
         onClick = onClick,
         modifier = modifier,
-        rating = card.rating,
         progress = card.progress,
         watched = card.watched,
         onLongClick = onLongClick,
@@ -246,7 +245,6 @@ internal fun PhoneShowCard(
         artwork = show.artwork,
         onClick = onClick,
         modifier = modifier,
-        rating = show.rating,
         progress = null,
         watched = show.episodeCount > 0 && show.unwatchedCount == 0,
         onLongClick = null,

@@ -188,14 +188,11 @@ private val GlassColor = Color(0xF21C1C1E)
 private val SelectedPillColor = Color(0xFF3A3A3C)
 
 /**
- * The selected tab's colour, as the owner chose: Video and Preferences iOS blue, Audio Apple
- * Music red, Search white.
+ * The selected tab's colour: iOS blue for every tab (owner: Audio dropped Apple Music's red when
+ * Music itself went blue in iOS 27.2).
  */
-internal fun TopDestination.activeColor(): Color = when (this) {
-    TopDestination.VIDEO, TopDestination.SETTINGS -> NovaColors.IosBlue
-    TopDestination.AUDIO -> NovaColors.AppleMusicRed
-    TopDestination.SEARCH -> Color.White
-}
+@Suppress("UnusedReceiverParameter")
+internal fun TopDestination.activeColor(): Color = NovaColors.IosBlue
 
 /** A tab's icon; the selected one pops in with a short spring. */
 @Composable

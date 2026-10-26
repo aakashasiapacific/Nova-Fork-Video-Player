@@ -81,7 +81,6 @@ import com.aakash.novafork.ui.common.LocalPagePull
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.PosterArt
 import com.aakash.novafork.ui.common.ProgressStrip
-import com.aakash.novafork.ui.common.RatingPill
 import com.aakash.novafork.ui.common.WatchedBadge
 import com.aakash.novafork.ui.common.bottomScrim
 import com.aakash.novafork.ui.common.iosOverscroll
@@ -291,7 +290,6 @@ internal fun TabletPosterCard(
     modifier: Modifier = Modifier,
     onLongClick: (() -> Unit)? = null,
     onLongClickLabel: String? = null,
-    rating: Float? = null,
     progress: Float? = null,
     watched: Boolean = false,
     badge: String? = null,
@@ -324,7 +322,6 @@ internal fun TabletPosterCard(
                 .indication(interactionSource, LocalIndication.current),
         ) {
             PosterArt(artwork = artwork, title = title, modifier = Modifier.fillMaxSize())
-            RatingPill(rating, onImage = true, modifier = Modifier.align(Alignment.TopStart).padding(8.dp))
             when {
                 watched -> WatchedBadge(Modifier.align(Alignment.TopEnd).padding(8.dp))
                 badge != null -> ImageLabel(badge, Modifier.align(Alignment.TopEnd).padding(8.dp), emphasized = true)
@@ -368,7 +365,6 @@ internal fun TabletVideoPosterCard(
         onLongClick = { if (stream) onOpen(card.id) else onPlay(card.id) },
         onLongClickLabel = if (stream) "Details" else "Play",
         modifier = modifier,
-        rating = card.rating,
         progress = card.progress,
         watched = card.watched,
         selected = selected,
@@ -391,7 +387,6 @@ internal fun TabletShowPosterCard(
         onLongClick = onLongClick,
         onLongClickLabel = if (onLongClick != null) "Details" else null,
         modifier = modifier,
-        rating = card.rating,
         watched = card.episodeCount > 0 && card.unwatchedCount == 0,
         badge = if (card.unwatchedCount > 0) "${card.unwatchedCount} new" else null,
         selected = selected,
@@ -417,7 +412,6 @@ internal fun TabletLibraryItemCard(
             onLongClick = onLongClick,
             onLongClickLabel = onLongClickLabel,
             modifier = modifier,
-            rating = item.card.rating,
             progress = item.card.progress,
             watched = item.card.watched,
             selected = selected,
@@ -430,7 +424,6 @@ internal fun TabletLibraryItemCard(
             onLongClick = onLongClick,
             onLongClickLabel = onLongClickLabel,
             modifier = modifier,
-            rating = item.card.rating,
             watched = item.card.episodeCount > 0 && item.card.unwatchedCount == 0,
             badge = if (item.card.unwatchedCount > 0) "${item.card.unwatchedCount} new" else null,
             selected = selected,

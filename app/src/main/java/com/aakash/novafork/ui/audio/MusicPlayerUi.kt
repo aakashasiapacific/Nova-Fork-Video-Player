@@ -107,6 +107,7 @@ import com.aakash.novafork.data.db.SongEntity
 import com.aakash.novafork.data.music.MusicLibrary
 import com.aakash.novafork.music.MusicPlayerState
 import com.aakash.novafork.music.SleepTimer
+import com.aakash.novafork.ui.common.IosColors
 import com.aakash.novafork.ui.common.IosIconButton
 import com.aakash.novafork.ui.common.NovaDropdownMenu
 import com.aakash.novafork.ui.common.NovaIcon
@@ -430,7 +431,7 @@ fun MiniPlayerBar(
                         val duration = player.durationMs
                         if (duration > 0L) {
                             val done = (player.positionMs.toFloat() / duration).coerceIn(0f, 1f)
-                            drawRect(NovaColors.AppleMusicRed, size = Size(size.width * done, MiniProgressHeight.toPx()))
+                            drawRect(NovaColors.IosBlue, size = Size(size.width * done, MiniProgressHeight.toPx()))
                         }
                     }
                 } else {
@@ -497,7 +498,7 @@ fun MiniPlayerBar(
                 Text(
                     player.error ?: now?.artist.orEmpty(),
                     style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
-                    color = if (player.error != null) NovaColors.AppleMusicRed else Color.White.copy(alpha = 0.6f),
+                    color = if (player.error != null) IosColors.Red else Color.White.copy(alpha = 0.6f),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -694,7 +695,7 @@ private fun SongTitles(player: MusicPlayerState, modifier: Modifier = Modifier, 
         Text(
             error ?: listOfNotNull(now?.artist, now?.album.takeUnless { small }).joinToString(" — "),
             fontSize = if (small) 15.sp else 18.sp,
-            color = if (error != null) NovaColors.AppleMusicRed else Color.White.copy(alpha = 0.6f),
+            color = if (error != null) IosColors.Red else Color.White.copy(alpha = 0.6f),
             maxLines = 1,
             overflow = if (error != null) TextOverflow.Ellipsis else TextOverflow.Clip,
             modifier = if (error != null) Modifier else Modifier.basicMarquee(initialDelayMillis = 2_000),
@@ -1068,7 +1069,7 @@ private fun QueuePane(player: MusicPlayerState, actions: AudioActions, upNext: L
         item(key = "stop") {
             Text(
                 "Stop Playing",
-                color = NovaColors.AppleMusicRed,
+                color = NovaColors.IosBlue,
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier
                     .padding(top = 16.dp)
