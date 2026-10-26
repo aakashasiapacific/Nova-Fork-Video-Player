@@ -10,6 +10,7 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -18,7 +19,6 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsDraggedAsState
@@ -92,16 +92,17 @@ import com.aakash.novafork.ui.audio.coverColors
 import com.aakash.novafork.ui.common.ArtImage
 import com.aakash.novafork.ui.common.ArtPlaceholder
 import com.aakash.novafork.ui.common.BackdropArt
-import com.aakash.novafork.ui.common.Hairline
 import com.aakash.novafork.ui.common.HeroTitle
 import com.aakash.novafork.ui.common.HeroVideoPreview
 import com.aakash.novafork.ui.common.IosButton
 import com.aakash.novafork.ui.common.IosColors
 import com.aakash.novafork.ui.common.IosIconButton
+import com.aakash.novafork.ui.common.LocalGlassTint
 import com.aakash.novafork.ui.common.LocalPagePull
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.PosterArt
 import com.aakash.novafork.ui.common.RatingPill
+import com.aakash.novafork.ui.common.glassRim
 import com.aakash.novafork.ui.common.pressScale
 import com.aakash.novafork.ui.common.resumeFill
 import com.aakash.novafork.ui.model.AppActions
@@ -609,9 +610,11 @@ private fun RoundHeroButton(
 ) {
     val press = remember { MutableInteractionSource() }
     val haptics = LocalHapticFeedback.current
-    // iOS 18's glass buttons: a pale see-through disc with a fine light rim, the glyph on it.
-    val container by animateColorAsState(fill ?: Color.White.copy(alpha = 0.14f), tween(220), label = "heroButtonFill")
-    val rim by animateColorAsState(if (fill == null) Color.White.copy(alpha = 0.22f) else Color.Transparent, tween(220), label = "heroButtonRim")
+    // iOS 27's glass buttons: a pale see-through disc, as clear as Preferences' Glass slider
+    // says, with the bright-topped iOS 27 rim; a colour fill (an "on" state) hides the rim.
+    val glassTint = LocalGlassTint.current.coerceIn(0f, 1f)
+    val container by animateColorAsState(fill ?: Color.White.copy(alpha = 0.08f + 0.16f * glassTint), tween(220), label = "heroButtonFill")
+    val rim by animateFloatAsState(if (fill == null) 1f else 0f, tween(220), label = "heroButtonRim")
     IosIconButton(
         onClick = {
             haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
@@ -621,7 +624,7 @@ private fun RoundHeroButton(
         modifier = Modifier
             .size(50.dp)
             .pressScale(press, pressed = 0.9f)
-            .border(Hairline * 2, rim, CircleShape)
+            .glassRim(CircleShape, strength = rim)
             .semantics { contentDescription = description },
         colors = IconButtonDefaults.iconButtonColors(
             containerColor = container,
