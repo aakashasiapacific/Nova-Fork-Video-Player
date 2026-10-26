@@ -25,8 +25,9 @@ import com.aakash.novafork.ui.model.Route
 import com.aakash.novafork.ui.theme.NovaColors
 
 /**
- * The way into the whole library, at the end of Home (phone and tablet): Watchlist, Favorites,
- * All videos (A–Z), then network shares, streams and playlists. Laid out like the Library list
+ * The way into the whole library, at the end of Home (phone and tablet): Favorites, All videos
+ * (A–Z), then network shares, streams and playlists. The Watchlist has its own row above
+ * (owner: listed here as well it showed twice). Laid out like the Library list
  * in Apple's TV and Music apps: blue icons, grey chevrons and hairlines inset to the labels
  * between the rows, with how many each holds in grey before the chevron ([counts]).
  */
@@ -38,7 +39,6 @@ fun HomeLibraryLinks(actions: AppActions, modifier: Modifier = Modifier, counts:
             title = "Library",
             modifier = Modifier.padding(start = dims.gutter, end = 4.dp, bottom = 4.dp),
         )
-        LibraryLink(R.drawable.ic_bookmark, "Watchlist", count = counts.watchlist) { actions.openLibrary(LibraryFilter.WATCHLIST) }
         LibraryLink(R.drawable.ic_star, "Favorites", count = counts.favorites) { actions.openLibrary(LibraryFilter.FAVORITES) }
         LibraryLink(R.drawable.ic_video_library, "All Videos", count = counts.all) {
             actions.openLibrary(LibraryFilter.ALL)

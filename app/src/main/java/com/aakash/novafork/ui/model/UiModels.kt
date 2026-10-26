@@ -157,7 +157,6 @@ data class HomeUi(
 /** The numbers beside Home's Library links. */
 @Immutable
 data class LibraryCounts(
-    val watchlist: Int = 0,
     val favorites: Int = 0,
     val all: Int = 0,
 )

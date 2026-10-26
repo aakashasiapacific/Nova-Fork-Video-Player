@@ -63,15 +63,18 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.runtime.withFrameMillis
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -90,6 +93,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
@@ -105,6 +109,8 @@ import com.aakash.novafork.data.music.MusicLibrary
 import com.aakash.novafork.data.music.MusicLibraryData
 import com.aakash.novafork.data.music.MusicScanState
 import com.aakash.novafork.music.MusicPlayerState
+import com.aakash.novafork.music.SongPulse
+import com.aakash.novafork.music.SongPulses
 import com.aakash.novafork.ui.common.CollapsedTitleBar
 import com.aakash.novafork.ui.common.ContextMenuLift
 import com.aakash.novafork.ui.common.EndOfListGap
@@ -1319,39 +1325,71 @@ private fun SongMenu(
 }
 
 /**
- * Apple Music's "now playing" bars: four thin bars that bounce while the song plays and rest
+ * Apple Music's "now playing" bars: four thin bars that move with the song while it plays (owner:
+ * in time with it), each following one band of its sound, bass to treble, as read from the file
+ * ([SongPulses]); until that is read, or when it can't be, they bounce on their own. They rest
  * low while it is paused.
  */
 @Composable
-internal fun PlayingBars(playing: Boolean, color: Color, modifier: Modifier = Modifier) {
-    val transition = rememberInfiniteTransition(label = "bars")
-    val phases = listOf(0, 180, 90, 270)
+internal fun PlayingBars(playing: Boolean, color: Color, modifier: Modifier = Modifier, barWidth: Dp = 3.dp) {
+    val pulse by SongPulses.current.collectAsState()
+    val shown = pulse
     Row(
         modifier.height(14.dp),
-        horizontalArrangement = Arrangement.spacedBy(2.dp),
+        horizontalArrangement = Arrangement.spacedBy(barWidth * 2 / 3),
         verticalAlignment = Alignment.Bottom,
     ) {
-        phases.forEachIndexed { index, phase ->
-            val bounce by transition.animateFloat(
-                initialValue = 0.25f,
-                targetValue = 1f,
-                animationSpec = infiniteRepeatable(
-                    tween(durationMillis = 420 + index * 70, easing = FastOutSlowInEasing),
-                    repeatMode = RepeatMode.Reverse,
-                    initialStartOffset = StartOffset(phase),
-                ),
-                label = "bar$index",
-            )
-            Box(
-                Modifier
-                    .width(3.dp)
-                    .fillMaxHeight(if (playing) bounce else 0.25f)
-                    .clip(RoundedCornerShape(1.dp))
-                    .background(color),
-            )
+        if (playing && shown != null) {
+            val heights = remember { mutableStateListOf(*Array(SongPulse.BANDS) { BarRest }) }
+            LaunchedEffect(shown) {
+                val levels = FloatArray(SongPulse.BANDS)
+                while (true) {
+                    withFrameMillis { }
+                    SongPulses.levelsNow(shown, levels)
+                    for (bar in 0 until SongPulse.BANDS) {
+                        val target = BarRest + (1f - BarRest) * levels[BarBands[bar]]
+                        val current = heights[bar]
+                        // Up at once with a beat, down a little slower, as a level meter falls.
+                        heights[bar] = if (target > current) current + (target - current) * 0.7f else current + (target - current) * 0.22f
+                    }
+                }
+            }
+            heights.forEach { height -> Bar(height, color, barWidth) }
+        } else {
+            val transition = rememberInfiniteTransition(label = "bars")
+            listOf(0, 180, 90, 270).forEachIndexed { index, phase ->
+                val bounce by transition.animateFloat(
+                    initialValue = BarRest,
+                    targetValue = 1f,
+                    animationSpec = infiniteRepeatable(
+                        tween(durationMillis = 420 + index * 70, easing = FastOutSlowInEasing),
+                        repeatMode = RepeatMode.Reverse,
+                        initialStartOffset = StartOffset(phase),
+                    ),
+                    label = "bar$index",
+                )
+                Bar(if (playing) bounce else BarRest, color, barWidth)
+            }
         }
     }
 }
+
+@Composable
+private fun Bar(height: Float, color: Color, width: Dp) {
+    Box(
+        Modifier
+            .width(width)
+            .fillMaxHeight(height.coerceIn(BarRest, 1f))
+            .clip(RoundedCornerShape(1.dp))
+            .background(color),
+    )
+}
+
+/** A bar at rest (paused, or a quiet moment). */
+private const val BarRest = 0.25f
+
+/** Which band each bar follows, left to right: low mids, bass, treble, high mids. */
+private val BarBands = intArrayOf(1, 0, 3, 2)
 
 /** "12 songs, 48 minutes" under an album. */
 @Composable

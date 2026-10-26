@@ -314,7 +314,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
             previousRoute = user.backStack.getOrNull(user.backStack.size - 2),
             home = home.copy(
                 libraryCounts = LibraryCounts(
-                    watchlist = if (saved.isEmpty()) 0 else watchlistMemo[index to saved].size,
                     favorites = if (starred.isEmpty()) 0 else favoritesMemo[index to starred].size,
                     all = index.movies.size + index.shows.size + index.otherVideos.size,
                 ),

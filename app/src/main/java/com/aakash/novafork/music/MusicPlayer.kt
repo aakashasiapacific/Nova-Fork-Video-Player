@@ -320,6 +320,7 @@ class MusicPlayer(
         descriptor = null
         queue.clear()
         audio.release()
+        SongPulses.clear()
         ended = false
         _state.value = MusicPlayerState(shuffle = _state.value.shuffle, repeat = _state.value.repeat)
     }
@@ -364,6 +365,8 @@ class MusicPlayer(
                     lyrics = null,
                 ).withQueue()
             }
+            // The bars follow this song's own rhythm, read from its file in the background.
+            SongPulses.prepare(appContext, scope, song.id, song.uri)
             lyricsJob = scope.launch {
                 val lyrics = music.lyrics(song)
                 if (_state.value.nowPlaying?.songId == song.id) _state.update { it.copy(lyrics = lyrics) }
@@ -461,6 +464,7 @@ class MusicPlayer(
                 onFailed(null, "Can't play this song", songId)
             }
         }
+        _state.value.let { SongPulses.report(it.positionMs, it.isPlaying) }
     }
 
     private fun saveDuration(length: Long) {

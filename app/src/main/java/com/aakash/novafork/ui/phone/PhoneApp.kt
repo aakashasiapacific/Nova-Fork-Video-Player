@@ -120,6 +120,7 @@ import com.aakash.novafork.ui.audio.LocalNowPlayingSheet
 import com.aakash.novafork.ui.audio.MiniPlayerBar
 import com.aakash.novafork.ui.audio.MiniPlayerDockedHeight
 import com.aakash.novafork.ui.audio.NowPlayingSheet
+import com.aakash.novafork.ui.audio.PlayingBars
 import com.aakash.novafork.ui.audio.ShellNowPlaying
 import com.aakash.novafork.ui.audio.rememberMusicShell
 import com.aakash.novafork.ui.common.EndOfListGap
@@ -163,8 +164,9 @@ fun PhoneApp(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
     val music = rememberMusicShell()
     val player = music?.second
     // The mini player, as in Apple Music: docked just above the tab bar whenever there is a
-    // queue, playing or paused; a queue brought back after the app was closed only on the Audio tab.
-    val hasQueue = player != null && player.active && (!player.restored || top == TopDestination.AUDIO)
+    // queue, playing or paused, on the Audio tab only (owner); elsewhere the Audio tab's icon
+    // moves with the song instead.
+    val hasQueue = player != null && player.active && top == TopDestination.AUDIO
     val miniAboveBar = hasQueue
     var nowPlayingOpen by rememberSaveable { mutableStateOf(false) }
     val nowPlayingSheet = remember { NowPlayingSheet() }
@@ -451,6 +453,7 @@ fun PhoneApp(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
             PhoneNavigationBar(
                 clear = { barClear },
                 selected = top,
+                musicPlaying = player?.isPlaying == true,
                 // The selected tab tapped again (iOS): from a page opened on it, back to its first
                 // page; on its first page, up to the top.
                 onSelect = { tab ->
@@ -568,6 +571,8 @@ private fun PhoneNavigationBar(
     modifier: Modifier = Modifier,
     /** 0 dark (content under it) to 1 clear (at the end of the page). */
     clear: () -> Float = { 0f },
+    /** A song plays: the Audio tab's icon becomes the "now playing" bars, moving with it. */
+    musicPlaying: Boolean = false,
 ) {
     val haptics = LocalHapticFeedback.current
     val scope = rememberCoroutineScope()
@@ -604,17 +609,19 @@ private fun PhoneNavigationBar(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center,
                 ) {
-                    NovaIcon(
-                        tab.tabIconRes(),
-                        contentDescription = null,
-                        tint = tint,
-                        modifier = Modifier
-                            .size(25.dp)
-                            .graphicsLayer {
-                                scaleX = bounce.value
-                                scaleY = bounce.value
-                            },
-                    )
+                    val iconModifier = Modifier
+                        .size(25.dp)
+                        .graphicsLayer {
+                            scaleX = bounce.value
+                            scaleY = bounce.value
+                        }
+                    if (tab == TopDestination.AUDIO && musicPlaying) {
+                        Box(iconModifier, contentAlignment = Alignment.Center) {
+                            PlayingBars(playing = true, color = tint, modifier = Modifier.height(20.dp), barWidth = 3.5.dp)
+                        }
+                    } else {
+                        NovaIcon(tab.tabIconRes(), contentDescription = null, tint = tint, modifier = iconModifier)
+                    }
                     Text(
                         tab.label,
                         style = MaterialTheme.typography.labelSmall,

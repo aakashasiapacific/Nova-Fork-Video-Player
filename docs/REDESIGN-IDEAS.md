@@ -614,3 +614,7 @@ The owner asked for Apple Music to be copied more precisely, with less clutter. 
 - **Build 125 (owner):**
   - Search with nothing typed is one long scroll (owner: the moving rows were clutter): every video, newest first, under the month it arrived (as Recently Added, with the month pinned while scrolling), recent searches above it when there are some.
   - Home's hero: Play stretches across the row up to the star and "+" at its right end (owner: empty space beside them since Delete went), and those two are iOS 18's glass buttons, a pale see-through disc with a fine light rim and a slightly larger glyph. The band under the hero is tighter: the dots sit closer under Play and Continue Watching closer under the dots.
+- **Build 126 (owner):**
+  - Home's Library no longer lists the Watchlist (it has its own row above; it showed twice).
+  - The "now playing" bars move with the song itself: each follows one band of its sound (bass, low and high mids, treble), read once from the file in the background (no microphone access needed), and kept in time with where the song is.
+  - The mini player shows on the Audio tab only; on the other tabs the Audio tab's icon turns into those bars while a song plays.
