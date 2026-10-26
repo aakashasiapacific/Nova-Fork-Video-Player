@@ -629,3 +629,19 @@ The owner asked for Apple Music to be copied more precisely, with less clutter. 
   - A video played to the end with nothing after it stays on its last frame with the controls up and Replay in the middle, as Samsung's player does, instead of closing.
   - Holding a title's poster, or an album's cover on its page, shows it large over the blurred page; a tap puts it back.
   - The pinned month heading (Search, Recently Added) has a hairline under it.
+- **Build 130 (owner, iOS 27, all in one go):**
+  - iOS 26/27's system colours throughout, and blue everywhere, the Audio tab included (owner: Apple Music itself turned blue in iOS 27.2); the Library links in Audio have plain white icons, as iOS 27.2's Music. The favourite heart stays red.
+  - No IMDb rating on posters (Apple TV keeps it for the title's own page), on phone and tablet.
+  - Preferences as iOS 27 Settings (owner: it looked ugly): a search field that finds any setting, the app's own card (icon, name, version), one-line rows of the same height with the explanations as grey notes under each group, and icon tiles coloured by meaning in the new palette, slightly lighter at the top with a fine bright edge.
+  - Appearance › Glass: iOS 27's slider from Clear to Tinted, with a live preview; the app's glass buttons and bars follow it.
+  - iOS 26/27's switch: a long, slim blue track and a pill-shaped knob that turns to clear glass and stretches while it is held and slides.
+  - Glass with iOS 27's edge (bright along the top, a faint dark line outside); the video player's round buttons get a darker glass that stays readable over bright scenes.
+  - Segmented controls slide a glass pill between their parts; alerts are set from the left with capsule buttons side by side; swipe actions are rounded pills.
+  - Menus grow out of the button they came from and shrink back into it, with a heading where they pick a value (Sleep Timer, Seasons, Sort by) and a tick on the current choice. Long-pressed videos open on round Play, Favorite, Watchlist and Details buttons; the lifted card sits on a glass platter with matching corners.
+  - Sheets float as rounded glass cards in from the screen's edges (with the screen's own corners) and go full width when tall; Done is a round blue tick; the page behind sinks back a little while a sheet is up.
+  - The tab bar slides a soft pill to the chosen tab and, while scrolling down, tucks its names away and gets shorter (still docked); scrolling up brings them back.
+  - Top bars fade the page out softly under them, without a hard line; the large titles (Preferences, Search) shrink up into the small title as the page scrolls.
+  - Poster rows on Home fade out at their right edge instead of cutting the next card.
+  - Numbers roll when they change (player times, Ends at, Continue Watching's time left, Now Playing's times, the sleep timer); play and pause swap with a quick shrink-and-grow, the star and bookmark pop when set, and the sleep timer's moon rises and sets.
+  - Now Playing: a slow, soft glow in the cover's colours over black (still when paused or with the phone's animations off); while the scrubber is held, its point turns into a glass pill under the finger.
+  - Not done: the tilt-following glass shine (owner: battery), which iOS 27 itself dropped.
