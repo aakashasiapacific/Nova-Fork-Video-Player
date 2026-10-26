@@ -835,27 +835,14 @@ private val SwipePillGap = 6.dp
 
 /**
  * iOS's collapsed large title: once a page's big title has scrolled away, the title shows small
- * and centred in a dark bar under the status bar, fading in and out.
+ * and centred under the status bar, fading in and out, over iOS 26/27's soft scroll edge (the
+ * content fades out beneath it; no solid band, no hairline). A page whose big title shrinks into
+ * it uses the [LargeTitleState] one instead.
  */
 @Composable
 fun CollapsedTitleBar(visible: Boolean, title: String, modifier: Modifier = Modifier) {
-    AnimatedVisibility(visible = visible, modifier = modifier, enter = fadeIn(tween(160)), exit = fadeOut(tween(160))) {
-        Column(Modifier.fillMaxWidth().background(Color.Black.copy(alpha = 0.92f))) {
-            Text(
-                title,
-                style = MaterialTheme.typography.titleMedium,
-                color = Color.White,
-                textAlign = TextAlign.Center,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .statusBarsPadding()
-                    .padding(horizontal = 56.dp, vertical = 12.dp),
-            )
-            Box(Modifier.fillMaxWidth().height(Hairline).background(IosColors.Separator))
-        }
-    }
+    val edge by animateFloatAsState(if (visible) 1f else 0f, tween(200), label = "collapsedTitleEdge")
+    ScrollEdgeTitleBar(title = title, showTitle = visible, edge = { edge }, modifier = modifier)
 }
 
 /** iOS 26's press: the button shrinks a little while held and springs back on release. */

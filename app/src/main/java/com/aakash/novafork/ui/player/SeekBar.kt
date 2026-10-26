@@ -46,6 +46,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.aakash.novafork.core.format.Formats
+import com.aakash.novafork.ui.common.RollingText
 import com.aakash.novafork.ui.model.GestureFeedback
 import com.aakash.novafork.ui.model.PlayerActions
 import com.aakash.novafork.ui.model.PlayerUiState
@@ -99,12 +100,15 @@ internal fun PlayerSeekBar(
         .merge(TextStyle(fontFeatureSettings = "tnum"))
     val labelWidth = if (large) 64.dp else 52.dp
 
+    // The times' digits roll as they change (iOS), except while the bar is dragged, when they
+    // follow the finger.
+    val rolling = dragging == null
     val elapsed: @Composable () -> Unit = {
-        Text(
+        TimeLabel(
             text = Formats.clock(shownMs),
             style = labelStyle,
-            color = Color.White,
-            textAlign = if (stacked) TextAlign.Start else TextAlign.Center,
+            rolling = rolling,
+            alignment = if (stacked) Alignment.CenterStart else Alignment.Center,
             modifier = if (stacked) Modifier else Modifier.widthIn(min = labelWidth),
         )
     }
@@ -112,11 +116,11 @@ internal fun PlayerSeekBar(
         if (live) {
             LiveBadge(large = large, modifier = Modifier.widthIn(min = labelWidth))
         } else {
-            Text(
+            TimeLabel(
                 text = if (showRemaining) formatRemaining(shownMs, duration) else Formats.clock(duration),
                 style = labelStyle,
-                color = Color.White,
-                textAlign = TextAlign.Center,
+                rolling = rolling,
+                alignment = Alignment.Center,
                 modifier = Modifier
                     .then(if (stacked) Modifier else Modifier.widthIn(min = labelWidth))
                     .clip(RoundedCornerShape(6.dp))
@@ -189,6 +193,18 @@ internal fun PlayerSeekBar(
             }
         }
         bigTimeLabel()
+    }
+}
+
+/** A time beside the seek bar, white; with [rolling] its digits roll as they change. */
+@Composable
+private fun TimeLabel(text: String, style: TextStyle, rolling: Boolean, alignment: Alignment, modifier: Modifier = Modifier) {
+    Box(modifier, contentAlignment = alignment) {
+        if (rolling) {
+            RollingText(text, style = style, color = Color.White)
+        } else {
+            Text(text, style = style, color = Color.White, maxLines = 1)
+        }
     }
 }
 

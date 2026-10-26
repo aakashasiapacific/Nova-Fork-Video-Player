@@ -26,6 +26,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalClipboardManager
@@ -45,6 +46,7 @@ import com.aakash.novafork.ui.common.LocalBottomBarSpace
 import com.aakash.novafork.ui.common.LocalHud
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.NovaMenuItem
+import com.aakash.novafork.ui.common.RollingText
 import com.aakash.novafork.ui.common.SectionHeader
 import com.aakash.novafork.ui.common.metaLine
 import com.aakash.novafork.ui.common.rememberEndsAt
@@ -221,7 +223,8 @@ private fun PlaySection(details: VideoDetailsUi, actions: AppActions, modifier: 
         if (progress != null && progress > 0f) {
             Spacer(Modifier.height(6.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
+                // Its digits roll as the clock moves the end time on.
+                RollingText(
                     text = if (duration != null && duration > 0) {
                         metaLine(Formats.remaining(details.positionMs, duration), endsAt)
                     } else {
@@ -229,7 +232,7 @@ private fun PlaySection(details: VideoDetailsUi, actions: AppActions, modifier: 
                     },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.weight(1f).clipToBounds(),
                 )
                 IosTextButton(onClick = { actions.play(details.id, startOver = true) }) {
                     NovaIcon(R.drawable.ic_restart_alt, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -238,7 +241,7 @@ private fun PlaySection(details: VideoDetailsUi, actions: AppActions, modifier: 
                 }
             }
         } else if (endsAt != null) {
-            Text(
+            RollingText(
                 endsAt,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,

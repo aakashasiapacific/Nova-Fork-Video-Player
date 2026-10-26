@@ -62,6 +62,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
+import com.aakash.novafork.ui.common.CollapsedTitleBar
 import com.aakash.novafork.ui.common.EmptyState
 import com.aakash.novafork.ui.common.Hairline
 import com.aakash.novafork.ui.common.IosColors
@@ -73,8 +74,11 @@ import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.OnTabReselect
 import com.aakash.novafork.ui.common.PosterArt
 import com.aakash.novafork.ui.common.SwipeToDelete
+import com.aakash.novafork.ui.common.collapsingHeader
 import com.aakash.novafork.ui.common.glass
+import com.aakash.novafork.ui.common.largeTitle
 import com.aakash.novafork.ui.common.musicSearchResults
+import com.aakash.novafork.ui.common.rememberCollapsingTitle
 import com.aakash.novafork.ui.common.searchHighlighted
 import com.aakash.novafork.ui.common.stretchWithPull
 import com.aakash.novafork.ui.model.AppActions
@@ -131,16 +135,21 @@ fun PhoneSearchScreen(
             }
         }
     }
+    // iOS 27's large title: scrolling the results shrinks "Search" into a small title at the top,
+    // the results moving up with it; scrolling back to the top brings it back.
+    val searchTitle = rememberCollapsingTitle()
     Box(modifier.fillMaxSize()) {
-        Column(Modifier.fillMaxSize().nestedScroll(hideOnScroll)) {
+        Column(Modifier.fillMaxSize().nestedScroll(hideOnScroll).nestedScroll(searchTitle.connection)) {
             Text(
                 "Search",
                 style = MaterialTheme.typography.headlineLarge,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier
+                    .collapsingHeader(searchTitle)
                     .statusBarsPadding()
                     .padding(start = dims.gutter, end = dims.gutter, top = 16.dp, bottom = 8.dp)
-                    .stretchWithPull(),
+                    .stretchWithPull()
+                    .largeTitle(searchTitle.state),
             )
             val query = search.query.trim()
             // Lists end above the field; results show what was typed in bold.
@@ -211,6 +220,7 @@ fun PhoneSearchScreen(
                 }
             }
         }
+        CollapsedTitleBar(state = searchTitle.state, title = "Search")
         // Putting the keyboard away (its arrow, or back) ends typing, so the cursor goes too.
         val keyboardUp = imeBottom > 0.dp
         var keyboardWasUp by remember { mutableStateOf(false) }
@@ -273,10 +283,11 @@ private fun TopHit(item: LibraryItemUi, actions: AppActions) {
         Row(
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(14.dp))
+                // iOS 27's concentric corners: the card's is its poster's plus the space between.
+                .clip(RoundedCornerShape(TopHitPosterCorner + TopHitPadding))
                 .background(MaterialTheme.colorScheme.surfaceContainer)
                 .clickable(onClickLabel = "Open $title", onClick = open)
-                .padding(12.dp),
+                .padding(TopHitPadding),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             PosterArt(
@@ -285,7 +296,7 @@ private fun TopHit(item: LibraryItemUi, actions: AppActions) {
                 modifier = Modifier
                     .width(TopHitPosterWidth)
                     .aspectRatio(2f / 3f)
-                    .clip(RoundedCornerShape(8.dp)),
+                    .clip(RoundedCornerShape(TopHitPosterCorner)),
             )
             Column(Modifier.weight(1f).padding(start = 14.dp)) {
                 Text(searchHighlighted(title), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 3, overflow = TextOverflow.Ellipsis)
@@ -298,6 +309,8 @@ private fun TopHit(item: LibraryItemUi, actions: AppActions) {
 }
 
 private val TopHitPosterWidth = 84.dp
+private val TopHitPosterCorner = 8.dp
+private val TopHitPadding = 12.dp
 
 /** A slim glass capsule: magnifier, one line of text (or a short hint), clear. */
 @Composable

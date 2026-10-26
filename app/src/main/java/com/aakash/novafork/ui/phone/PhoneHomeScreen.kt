@@ -84,6 +84,7 @@ import com.aakash.novafork.ui.common.SectionHeader
 import com.aakash.novafork.ui.common.VideoMenuBox
 import com.aakash.novafork.ui.common.bottomScrim
 import com.aakash.novafork.ui.common.deviceAccessNotice
+import com.aakash.novafork.ui.common.fadeEndEdge
 import com.aakash.novafork.ui.common.metaLine
 import com.aakash.novafork.ui.common.rememberRowSnap
 import com.aakash.novafork.ui.common.rememberTopBrightness
@@ -314,6 +315,8 @@ private fun WatchlistRow(items: List<LibraryItemUi>, actions: AppActions) {
     LazyRow(
         state = rowState,
         flingBehavior = rememberRowSnap(rowState),
+        // The card peeking in at the end fades into the page (iOS 27).
+        modifier = Modifier.fadeEndEdge(rowState),
         contentPadding = PaddingValues(horizontal = dims.gutter),
         horizontalArrangement = Arrangement.spacedBy(dims.rowSpacing),
     ) {
@@ -339,6 +342,8 @@ private fun LandscapeRow(cards: List<VideoCardUi>, actions: AppActions) {
     LazyRow(
         state = rowState,
         flingBehavior = rememberRowSnap(rowState),
+        // The card peeking in at the end fades into the page (iOS 27).
+        modifier = Modifier.fadeEndEdge(rowState),
         contentPadding = PaddingValues(horizontal = dims.gutter),
         horizontalArrangement = Arrangement.spacedBy(dims.rowSpacing),
     ) {
@@ -379,6 +384,7 @@ internal fun ContinueWatchingCard(
             // Apple TV's caption: what is left ("42m left"); an episode keeps its "S1 · E3".
             subtitle = continueCaption(card),
             width = width,
+            rollingSubtitle = true,
         )
     }
 }

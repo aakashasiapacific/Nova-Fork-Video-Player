@@ -87,9 +87,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
@@ -104,6 +106,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -137,6 +140,7 @@ import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.TabReselect
 import com.aakash.novafork.ui.common.activeColor
 import com.aakash.novafork.ui.common.iosOverscroll
+import com.aakash.novafork.ui.common.rememberScreenCornerRadius
 import com.aakash.novafork.ui.common.tabIconRes
 import com.aakash.novafork.ui.common.tabSlide
 import com.aakash.novafork.ui.model.AppActions
@@ -147,6 +151,7 @@ import com.aakash.novafork.ui.model.top
 import com.aakash.novafork.ui.settings.SettingsScreen
 import com.aakash.novafork.ui.settings.SettingsSectionScreen
 import com.aakash.novafork.ui.theme.NovaColors
+import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
 
 /**
@@ -188,20 +193,39 @@ fun PhoneApp(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
     // iOS 15's scroll edge: at the very end of a page the bars turn clear (their line goes too);
     // as soon as content scrolls back under them they are dark again.
     var atPageEnd by remember { mutableStateOf(false) }
-    LaunchedEffect(state.route) { atPageEnd = false }
+    // iOS 26/27: scrolling down a page tucks the tab names away (icons only, a shorter bar);
+    // scrolling back up, or reaching the end, brings them back.
+    var barCompact by remember { mutableStateOf(false) }
+    LaunchedEffect(state.route) {
+        atPageEnd = false
+        barCompact = false
+    }
     val pageEnd = remember {
         object : NestedScrollConnection {
             override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
                 when {
                     // Pushed on past the end: nothing more below.
-                    available.y < 0f -> atPageEnd = true
-                    consumed.y != 0f -> atPageEnd = false
+                    available.y < 0f -> {
+                        atPageEnd = true
+                        barCompact = false
+                    }
+                    consumed.y != 0f -> {
+                        atPageEnd = false
+                        if (consumed.y < -CompactScrollPx) barCompact = true else if (consumed.y > CompactScrollPx) barCompact = false
+                    }
                 }
                 return Offset.Zero
             }
         }
     }
     val barClear by animateFloatAsState(if (atPageEnd) 1f else 0f, tween(220), label = "barClear")
+    val barShrink by animateFloatAsState(
+        targetValue = if (barCompact) 1f else 0f,
+        animationSpec = spring(dampingRatio = 0.9f, stiffness = 500f),
+        label = "barShrink",
+    )
+    // The sunk page's corners follow the screen's own (iOS 27's concentric corners).
+    val screenCorner = rememberScreenCornerRadius()
     val currentActions by rememberUpdatedState(actions)
     // The page transition is keyed by route alone, so the pages read the newest state through
     // this rather than being rebuilt with each change; a page that is not the current one (going
@@ -268,7 +292,7 @@ fun PhoneApp(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
                             val scale = 1f - 0.07f * open
                             scaleX = scale
                             scaleY = scale
-                            shape = RoundedCornerShape(16.dp.toPx() * open)
+                            shape = RoundedCornerShape(screenCorner.toPx() * open)
                             clip = open > 0f
                         }
                         .drawWithContent {
@@ -411,7 +435,9 @@ fun PhoneApp(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
                     visible = miniAboveBar,
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
-                        .padding(bottom = navBar + TabBarHeight),
+                        .padding(bottom = navBar + TabBarHeight)
+                        // Down with the bar while its names are tucked away.
+                        .graphicsLayer { translationY = (TabBarHeight - CompactTabBarHeight).toPx() * barShrink },
                     enter = slideInVertically(spring(dampingRatio = 0.9f, stiffness = 500f)) { it } + fadeIn(tween(160)),
                     exit = slideOutVertically(tween(220)) { it } + fadeOut(tween(160)),
                 ) {
@@ -457,6 +483,7 @@ fun PhoneApp(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
             // Over the mini player, so it slides up from behind the bar.
             PhoneNavigationBar(
                 clear = { barClear },
+                shrink = { barShrink },
                 selected = top,
                 musicPlaying = player?.isPlaying == true,
                 onHoldAudio = if (player != null && player.active) ({ nowPlayingOpen = true }) else null,
@@ -568,7 +595,8 @@ private fun PhonePage(state: AppUiState, actions: AppActions) {
 /**
  * The classic iOS tab bar (owner: the floating capsule was not appealing): docked full width along
  * the bottom edge over the page's foot, dark and see-through with a hairline on top, each tab an
- * icon over its name, the selected one in the accent blue.
+ * icon over its name, the selected one in the accent blue on a soft glass pill (iOS 26/27) that
+ * slides to the next selected tab, stretching on the way.
  */
 @Composable
 private fun PhoneNavigationBar(
@@ -577,6 +605,8 @@ private fun PhoneNavigationBar(
     modifier: Modifier = Modifier,
     /** 0 dark (content under it) to 1 clear (at the end of the page). */
     clear: () -> Float = { 0f },
+    /** 0 full to 1 compact: the names tucked away and the bar shorter, while a page scrolls down. */
+    shrink: () -> Float = { 0f },
     /** A song plays: the Audio tab's icon becomes the "now playing" bars, moving with it. */
     musicPlaying: Boolean = false,
     /** Holding the Audio tab opens Now Playing from any tab (null: nothing is queued). */
@@ -584,14 +614,50 @@ private fun PhoneNavigationBar(
 ) {
     val haptics = LocalHapticFeedback.current
     val scope = rememberCoroutineScope()
+    val tabs = TopDestination.entries
+    // iOS 26's liquid pill: the edge in front races to the new tab, the one behind follows a beat
+    // later, so the pill stretches as it travels and settles back into shape. In tab slots.
+    val index = tabs.indexOf(selected)
+    var lastIndex by remember { mutableIntStateOf(index) }
+    val forward = index >= lastIndex
+    SideEffect { lastIndex = index }
+    val fast = spring<Float>(dampingRatio = 0.72f, stiffness = Spring.StiffnessMedium)
+    val slow = spring<Float>(dampingRatio = 0.8f, stiffness = Spring.StiffnessLow)
+    val pillLeft by animateFloatAsState(index.toFloat(), animationSpec = if (forward) slow else fast, label = "tabPillLeft")
+    val pillRight by animateFloatAsState(index + 1f, animationSpec = if (forward) fast else slow, label = "tabPillRight")
     Column(
         modifier
             .fillMaxWidth()
             .drawBehind { drawRect(DockColor.copy(alpha = DockColor.alpha * (1f - clear()))) },
     ) {
         Box(Modifier.fillMaxWidth().height(Hairline).graphicsLayer { alpha = 1f - clear() }.background(IosColors.Separator))
-        Row(Modifier.fillMaxWidth().height(TabBarHeight)) {
-            TopDestination.entries.forEach { tab ->
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .layout { measurable, constraints ->
+                    val full = TabBarHeight.toPx()
+                    val height = (full + (CompactTabBarHeight.toPx() - full) * shrink()).roundToInt()
+                    val placeable = measurable.measure(constraints.copy(minHeight = height, maxHeight = height))
+                    layout(placeable.width, height) { placeable.place(0, 0) }
+                }
+                .clipToBounds()
+                .drawBehind {
+                    val slot = size.width / tabs.size
+                    val inset = TabPillInset.toPx()
+                    val top = TabPillInsetVertical.toPx()
+                    val pillHeight = size.height - top * 2
+                    val pillWidth = (pillRight - pillLeft) * slot - inset * 2
+                    if (pillHeight > 0f && pillWidth > 0f) {
+                        drawRoundRect(
+                            color = TabPillColor,
+                            topLeft = Offset(pillLeft * slot + inset, top),
+                            size = Size(pillWidth, pillHeight),
+                            cornerRadius = CornerRadius(pillHeight / 2f, pillHeight / 2f),
+                        )
+                    }
+                },
+        ) {
+            tabs.forEach { tab ->
                 val active = tab == selected
                 val tint = if (active) tab.activeColor() else IosColors.SecondaryLabel
                 // iOS 17's symbol bounce: the tapped tab's icon dips and springs back.
@@ -626,9 +692,11 @@ private fun PhoneNavigationBar(
                             },
                         ),
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center,
+                    // From the top, so the icon stays put as the bar shortens under its name.
+                    verticalArrangement = Arrangement.Top,
                 ) {
                     val iconModifier = Modifier
+                        .padding(top = TabIconTop)
                         .size(25.dp)
                         .graphicsLayer {
                             scaleX = bounce.value
@@ -648,7 +716,13 @@ private fun PhoneNavigationBar(
                         fontWeight = FontWeight.Medium,
                         color = tint,
                         maxLines = 1,
-                        modifier = Modifier.padding(top = 2.dp),
+                        modifier = Modifier
+                            .padding(top = 2.dp)
+                            .graphicsLayer {
+                                val tucked = shrink()
+                                alpha = 1f - tucked
+                                translationY = TabLabelDrop.toPx() * tucked
+                            },
                     )
                 }
             }
@@ -828,6 +902,23 @@ private val StatusFade = 14.dp
 private const val StatusFadeStrength = 0.6f
 
 private val TabBarHeight = 52.dp
+
+/** The tab bar with its names tucked away (icons only), while a page scrolls down. */
+private val CompactTabBarHeight = 38.dp
+
+/** Scrolled this far in one step (px), the tab bar tucks its names away or brings them back. */
+private const val CompactScrollPx = 2f
+
+/** Where a tab's icon sits from the bar's top, the same full or compact. */
+private val TabIconTop = 6.dp
+
+/** How far a tab's name sinks as it fades away. */
+private val TabLabelDrop = 6.dp
+
+/** The selected tab's glass pill: inset from its slot's sides and from the bar's top and bottom. */
+private val TabPillInset = 8.dp
+private val TabPillInsetVertical = 4.dp
+private val TabPillColor = Color.White.copy(alpha = 0.1f)
 
 /** Pulled up past this share of the screen (or flicked), the mini player opens Now Playing. */
 private const val MiniPullOpen = 0.18f

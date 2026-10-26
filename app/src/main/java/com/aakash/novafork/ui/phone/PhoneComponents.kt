@@ -51,6 +51,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -85,6 +86,7 @@ import com.aakash.novafork.ui.common.LocalBottomBarSpace
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.PosterArt
 import com.aakash.novafork.ui.common.ProgressStrip
+import com.aakash.novafork.ui.common.RollingText
 import com.aakash.novafork.ui.common.VideoMenuBox
 import com.aakash.novafork.ui.common.WatchedBadge
 import com.aakash.novafork.ui.common.iosScrollIndicator
@@ -261,6 +263,8 @@ internal fun PhoneLandscapeCard(
     title: String = card.displayTitle(),
     subtitle: String? = card.displaySubtitle(),
     width: Dp = LocalNovaDimens.current.landscapeCardWidth,
+    /** The caption's digits roll when it changes (Continue Watching's time left). */
+    rollingSubtitle: Boolean = false,
 ) {
     WideCardLayout(
         title = title,
@@ -273,6 +277,7 @@ internal fun PhoneLandscapeCard(
         width = width,
         progress = card.progress,
         watched = card.watched,
+        rollingSubtitle = rollingSubtitle,
     )
 }
 
@@ -331,6 +336,7 @@ private fun WideCardLayout(
     watched: Boolean,
     onLongClick: (() -> Unit)? = null,
     width: Dp = LocalNovaDimens.current.landscapeCardWidth,
+    rollingSubtitle: Boolean = false,
 ) {
     val shape = RoundedCornerShape(LocalNovaDimens.current.cardRadius)
     val press = remember { MutableInteractionSource() }
@@ -361,13 +367,23 @@ private fun WideCardLayout(
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
-        Text(
-            text = subtitle.orEmpty(),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-        )
+        if (rollingSubtitle) {
+            // iOS's rolling digits: "42m left" counts down to "30m left" on coming back from playing.
+            RollingText(
+                text = subtitle.orEmpty(),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.fillMaxWidth().clipToBounds(),
+            )
+        } else {
+            Text(
+                text = subtitle.orEmpty(),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
         Spacer(Modifier.height(4.dp))
     }
 }
@@ -451,7 +467,8 @@ private fun GreyActionPill(@DrawableRes icon: Int, label: String, onClick: () ->
     Row(
         modifier
             .height(46.dp)
-            .clip(RoundedCornerShape(12.dp))
+            // Capsules, as iOS 26/27 draws its buttons.
+            .clip(RoundedCornerShape(percent = 50))
             .background(MaterialTheme.colorScheme.surfaceContainer)
             .clickable(role = Role.Button, onClick = onClick),
         horizontalArrangement = Arrangement.Center,
