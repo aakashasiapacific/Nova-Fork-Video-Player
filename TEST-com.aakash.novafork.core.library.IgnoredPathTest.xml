@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.aakash.novafork.core.library.IgnoredPathTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-10-26T08:15:58.451Z" hostname="runnervmtai0g" time="0.001">
+  <properties/>
+  <testcase name="messagingAppVideosUnderAndroidMediaAreKept" classname="com.aakash.novafork.core.library.IgnoredPathTest" time="0.001"/>
+  <testcase name="theAndroidFolderItselfCanBeWalked" classname="com.aakash.novafork.core.library.IgnoredPathTest" time="0.0"/>
+  <testcase name="hiddenAndSampleFoldersStaySkippedEverywhere" classname="com.aakash.novafork.core.library.IgnoredPathTest" time="0.0"/>
+  <testcase name="cameraAndOrdinaryFoldersAreKept" classname="com.aakash.novafork.core.library.IgnoredPathTest" time="0.0"/>
+  <testcase name="restOfAndroidStaysSkipped" classname="com.aakash.novafork.core.library.IgnoredPathTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

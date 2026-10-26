@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.aakash.novafork.core.jellyfin.ServerHttpTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-10-26T08:15:58.448Z" hostname="runnervmtai0g" time="0.001">
+  <properties/>
+  <testcase name="aFailedSecureConnectionNeverSuggestsGoingUnencrypted" classname="com.aakash.novafork.core.jellyfin.ServerHttpTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

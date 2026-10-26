@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.aakash.novafork.core.audio.AudioFilesTest" tests="8" skipped="0" failures="0" errors="0" timestamp="2026-10-26T08:15:56.863Z" hostname="runnervmtai0g" time="0.012">
+  <properties/>
+  <testcase name="findsLyricsWithTheSongsName" classname="com.aakash.novafork.core.audio.AudioFilesTest" time="0.001"/>
+  <testcase name="splitsMediaStoreTrackNumbers" classname="com.aakash.novafork.core.audio.AudioFilesTest" time="0.001"/>
+  <testcase name="readsTrackDiscAndYear" classname="com.aakash.novafork.core.audio.AudioFilesTest" time="0.001"/>
+  <testcase name="picksTheCoverByName" classname="com.aakash.novafork.core.audio.AudioFilesTest" time="0.002"/>
+  <testcase name="cleansTags" classname="com.aakash.novafork.core.audio.AudioFilesTest" time="0.0"/>
+  <testcase name="titlesFromFileNames" classname="com.aakash.novafork.core.audio.AudioFilesTest" time="0.0"/>
+  <testcase name="recognisesAudioFiles" classname="com.aakash.novafork.core.audio.AudioFilesTest" time="0.001"/>
+  <testcase name="aLoneImageIsTheCover" classname="com.aakash.novafork.core.audio.AudioFilesTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

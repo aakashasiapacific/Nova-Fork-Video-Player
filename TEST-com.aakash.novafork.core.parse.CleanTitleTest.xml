@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.aakash.novafork.core.parse.CleanTitleTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-10-26T08:16:00.483Z" hostname="runnervmtai0g" time="0.032">
+  <properties/>
+  <testcase name="dropsReleaseJunkAndDecorationYears" classname="com.aakash.novafork.core.parse.CleanTitleTest" time="0.019"/>
+  <testcase name="resolutionTokens" classname="com.aakash.novafork.core.parse.CleanTitleTest" time="0.002"/>
+  <testcase name="fallsBackToTheInputWhenNothingIsLeft" classname="com.aakash.novafork.core.parse.CleanTitleTest" time="0.001"/>
+  <testcase name="stripsSceneGroupSuffix" classname="com.aakash.novafork.core.parse.CleanTitleTest" time="0.0"/>
+  <testcase name="keepsYearsThatArePartOfTheTitle" classname="com.aakash.novafork.core.parse.CleanTitleTest" time="0.002"/>
+  <testcase name="keepsAbbreviationsAndCapitalisation" classname="com.aakash.novafork.core.parse.CleanTitleTest" time="0.005"/>
+  <testcase name="replacesDotsAndUnderscores" classname="com.aakash.novafork.core.parse.CleanTitleTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

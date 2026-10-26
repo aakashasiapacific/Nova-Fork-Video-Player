@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.aakash.novafork.core.tmdb.ServerImageUrlTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-10-26T08:16:01.591Z" hostname="runnervmtai0g" time="0.01">
+  <properties/>
+  <testcase name="fullUrlsPassThroughUnchanged" classname="com.aakash.novafork.core.tmdb.ServerImageUrlTest" time="0.01"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

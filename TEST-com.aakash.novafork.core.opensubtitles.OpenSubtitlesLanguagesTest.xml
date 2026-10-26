@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.aakash.novafork.core.opensubtitles.OpenSubtitlesLanguagesTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-10-26T08:16:00.410Z" hostname="runnervmtai0g" time="0.058">
+  <properties/>
+  <testcase name="codesAndNamesBecomeIso6391" classname="com.aakash.novafork.core.opensubtitles.OpenSubtitlesLanguagesTest" time="0.056"/>
+  <testcase name="settingIsParsedInOrderWithoutRepeats" classname="com.aakash.novafork.core.opensubtitles.OpenSubtitlesLanguagesTest" time="0.001"/>
+  <testcase name="deviceLocales" classname="com.aakash.novafork.core.opensubtitles.OpenSubtitlesLanguagesTest" time="0.0"/>
+  <testcase name="regionalCodesMatchTheirLanguage" classname="com.aakash.novafork.core.opensubtitles.OpenSubtitlesLanguagesTest" time="0.0"/>
+  <testcase name="queryValueIsSortedLowerCaseAndCommaSeparated" classname="com.aakash.novafork.core.opensubtitles.OpenSubtitlesLanguagesTest" time="0.001"/>
+  <testcase name="portugueseAndChineseKeepTheirRegion" classname="com.aakash.novafork.core.opensubtitles.OpenSubtitlesLanguagesTest" time="0.0"/>
+  <testcase name="displayNames" classname="com.aakash.novafork.core.opensubtitles.OpenSubtitlesLanguagesTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

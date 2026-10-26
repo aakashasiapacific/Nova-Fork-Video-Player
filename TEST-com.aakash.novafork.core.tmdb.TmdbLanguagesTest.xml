@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.aakash.novafork.core.tmdb.TmdbLanguagesTest" tests="8" skipped="0" failures="0" errors="0" timestamp="2026-10-26T08:16:04.882Z" hostname="runnervmtai0g" time="0.002">
+  <properties/>
+  <testcase name="otherCountriesUseTheLanguagesTag" classname="com.aakash.novafork.core.tmdb.TmdbLanguagesTest" time="0.001"/>
+  <testcase name="retiredAndAlternativeCodesAreUnderstood" classname="com.aakash.novafork.core.tmdb.TmdbLanguagesTest" time="0.001"/>
+  <testcase name="chineseFollowsScriptAndRegion" classname="com.aakash.novafork.core.tmdb.TmdbLanguagesTest" time="0.0"/>
+  <testcase name="indianEnglishStaysIndianEnglish" classname="com.aakash.novafork.core.tmdb.TmdbLanguagesTest" time="0.0"/>
+  <testcase name="deviceTagIsKeptWhenTmdbHasIt" classname="com.aakash.novafork.core.tmdb.TmdbLanguagesTest" time="0.0"/>
+  <testcase name="firstLanguageTmdbHasWins" classname="com.aakash.novafork.core.tmdb.TmdbLanguagesTest" time="0.0"/>
+  <testcase name="noKnownLanguageFallsBackToUsEnglish" classname="com.aakash.novafork.core.tmdb.TmdbLanguagesTest" time="0.0"/>
+  <testcase name="unknownLanguagesGiveNull" classname="com.aakash.novafork.core.tmdb.TmdbLanguagesTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

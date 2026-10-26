@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.aakash.novafork.core.tmdb.TmdbRateLimiterTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-10-26T08:16:04.885Z" hostname="runnervmtai0g" time="0.049">
+  <properties/>
+  <testcase name="zeroTurnsTheLimitOff" classname="com.aakash.novafork.core.tmdb.TmdbRateLimiterTest" time="0.035"/>
+  <testcase name="requestWaitsForTheOldestToLeaveTheWindow" classname="com.aakash.novafork.core.tmdb.TmdbRateLimiterTest" time="0.004"/>
+  <testcase name="concurrentCallersShareTheLimit" classname="com.aakash.novafork.core.tmdb.TmdbRateLimiterTest" time="0.008"/>
+  <testcase name="spacedRequestsNeverWait" classname="com.aakash.novafork.core.tmdb.TmdbRateLimiterTest" time="0.002"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

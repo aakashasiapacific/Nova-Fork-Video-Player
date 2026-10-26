@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.aakash.novafork.core.audio.MusicKeysTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-10-26T08:15:56.910Z" hostname="runnervmtai0g" time="0.028">
+  <properties/>
+  <testcase name="taggedAlbumsStayTogetherAcrossFolders" classname="com.aakash.novafork.core.audio.MusicKeysTest" time="0.025"/>
+  <testcase name="artistIsTheAlbumArtistFirst" classname="com.aakash.novafork.core.audio.MusicKeysTest" time="0.0"/>
+  <testcase name="albumArtistOfManyArtistsIsVarious" classname="com.aakash.novafork.core.audio.MusicKeysTest" time="0.0"/>
+  <testcase name="untaggedAlbumsAreSplitByFolder" classname="com.aakash.novafork.core.audio.MusicKeysTest" time="0.0"/>
+  <testcase name="normalizeFoldsCaseAccentsAndSpaces" classname="com.aakash.novafork.core.audio.MusicKeysTest" time="0.001"/>
+  <testcase name="sortKeyIgnoresALeadingThe" classname="com.aakash.novafork.core.audio.MusicKeysTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
