@@ -601,7 +601,7 @@ private fun PhoneNavigationBar(
                         .weight(1f)
                         .fillMaxHeight()
                         .semantics {
-                            selected = active
+                            this.selected = active
                             role = Role.Tab
                         }
                         .combinedClickable(
