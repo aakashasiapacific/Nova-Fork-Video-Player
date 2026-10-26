@@ -18,6 +18,7 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
@@ -53,6 +54,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -78,6 +80,7 @@ import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
@@ -94,6 +97,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -112,7 +116,11 @@ import com.aakash.novafork.ui.common.IosIconButton
 import com.aakash.novafork.ui.common.NovaDropdownMenu
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.NovaMenuItem
+import com.aakash.novafork.ui.common.RollingText
+import com.aakash.novafork.ui.common.SymbolSwap
 import com.aakash.novafork.ui.common.frostedGlass
+import com.aakash.novafork.ui.common.popOnChange
+import com.aakash.novafork.ui.common.rememberScreenCornerRadius
 import com.aakash.novafork.ui.model.RepeatMode
 import com.aakash.novafork.ui.theme.AudioTheme
 import com.aakash.novafork.ui.theme.NovaColors
@@ -505,7 +513,8 @@ fun MiniPlayerBar(
             }
         }
         IosIconButton(onClick = actions::togglePlay) {
-            NovaIcon(
+            // Play and pause swap the way SF Symbols replace one another.
+            SymbolSwap(
                 if (player.isPlaying) R.drawable.ic_pause else R.drawable.ic_play_arrow,
                 contentDescription = if (player.isPlaying) "Pause" else "Play",
                 tint = Color.White,
@@ -562,6 +571,8 @@ fun NowPlayingScreen(
     var heightPx by remember { mutableFloatStateOf(0f) }
     val sheet = LocalNowPlayingSheet.current
     val offsetPx = (1f - progress) * heightPx
+    // Its top corners round into the screen's own as it leaves (iOS 27's concentric corners).
+    val screenCorner = rememberScreenCornerRadius()
     val dragState = rememberDraggableState { delta -> if (heightPx > 0f) onDragBy(delta / heightPx) }
     Box(
         modifier
@@ -573,7 +584,7 @@ fun NowPlayingScreen(
             .graphicsLayer {
                 translationY = offsetPx
                 alpha = (progress / 0.3f).coerceIn(0f, 1f)
-                val corner = (offsetPx / dismissPx).coerceIn(0f, 1f) * 28.dp.toPx()
+                val corner = (offsetPx / dismissPx).coerceIn(0f, 1f) * screenCorner.toPx()
                 shape = RoundedCornerShape(topStart = corner, topEnd = corner)
                 clip = offsetPx > 0f
             }
@@ -589,7 +600,7 @@ fun NowPlayingScreen(
                 },
             ),
     ) {
-        CoverGradient(now?.artUri)
+        CoverGradient(now?.artUri, drifting = player.isPlaying)
         Column(
             Modifier
                 .fillMaxSize()
@@ -741,11 +752,14 @@ private fun FavoriteButton(favorite: Boolean, onClick: () -> Unit) {
             .clickable(onClickLabel = label, role = Role.Button, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
+        // Starred or not, the star pops (SF Symbols' bounce).
         NovaIcon(
             if (favorite) R.drawable.ic_star else R.drawable.ic_star_outline,
             contentDescription = label,
             tint = Color.White,
-            modifier = Modifier.size(18.dp),
+            modifier = Modifier
+                .size(18.dp)
+                .popOnChange(favorite),
         )
     }
 }
@@ -1119,27 +1133,25 @@ private fun Scrubber(player: MusicPlayerState, actions: AudioActions) {
     val haptics = LocalHapticFeedback.current
     val atEnd = scrubbing?.let { it <= 0f || it >= 1f } == true
     LaunchedEffect(atEnd) { if (atEnd) haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove) }
+    // The times' digits roll as they change (iOS's numeric transition).
+    val timeStyle = LocalTextStyle.current.copy(fontSize = 12.sp)
     Row(Modifier.fillMaxWidth().padding(top = 6.dp)) {
         val shownMs = (fraction * duration).toLong()
-        Text(
-            formatTime(shownMs),
-            fontSize = 12.sp,
-            color = Color.White.copy(alpha = timeAlpha),
-            modifier = Modifier
+        Box(
+            Modifier
                 .weight(1f)
                 .graphicsLayer {
                     scaleX = grow
                     scaleY = grow
                     transformOrigin = TransformOrigin(0f, 0f)
                 },
-        )
+        ) {
+            RollingText(formatTime(shownMs), style = timeStyle, color = Color.White.copy(alpha = timeAlpha))
+        }
         // A tap switches it between the time left and the song's whole length (Apple Music).
         var showLength by rememberSaveable { mutableStateOf(false) }
-        Text(
-            if (showLength) formatTime(player.durationMs.coerceAtLeast(0)) else "-" + formatTime((player.durationMs - shownMs).coerceAtLeast(0)),
-            fontSize = 12.sp,
-            color = Color.White.copy(alpha = timeAlpha),
-            modifier = Modifier
+        Box(
+            Modifier
                 .graphicsLayer {
                     scaleX = grow
                     scaleY = grow
@@ -1150,11 +1162,21 @@ private fun Scrubber(player: MusicPlayerState, actions: AudioActions) {
                     indication = null,
                     onClickLabel = if (showLength) "Show time left" else "Show song length",
                 ) { showLength = !showLength },
-        )
+        ) {
+            RollingText(
+                if (showLength) formatTime(player.durationMs.coerceAtLeast(0)) else "-" + formatTime((player.durationMs - shownMs).coerceAtLeast(0)),
+                style = timeStyle,
+                color = Color.White.copy(alpha = timeAlpha),
+            )
+        }
     }
 }
 
-/** A thin white track that thickens while dragged; tap or drag anywhere along it. */
+/**
+ * A thin white track that thickens while dragged; tap or drag anywhere along it. Held, a clear
+ * glass pill grows over the point being dragged (iOS 26/27's Liquid Glass thumb) and shrinks
+ * away on release.
+ */
 @Composable
 private fun ThinSlider(
     value: Float,
@@ -1165,6 +1187,7 @@ private fun ThinSlider(
 ) {
     var held by remember { mutableStateOf(false) }
     val thickness by animateDpAsState(if (held) 10.dp else 6.dp, label = "sliderThickness")
+    val knob by animateFloatAsState(if (held) 1f else 0f, spring(dampingRatio = 0.6f, stiffness = 500f), label = "glassKnob")
     BoxWithConstraints(
         modifier
             .fillMaxWidth()
@@ -1216,13 +1239,41 @@ private fun ThinSlider(
                     .background(Color.White.copy(alpha = if (held) 1f else 0.75f)),
             )
         }
+        if (knob > 0.01f) GlassThumb(value = value, trackWidthPx = constraints.maxWidth.toFloat(), grown = knob)
     }
 }
 
+/**
+ * The glass pill over a held slider: see-through white with a bright rim along its top, centred
+ * on [value] of the track, [grown] (0 to 1, springing past 1) of its full size.
+ */
+@Composable
+private fun GlassThumb(value: Float, trackWidthPx: Float, grown: Float) {
+    Box(
+        Modifier
+            .offset { IntOffset((trackWidthPx * value.coerceIn(0f, 1f) - GlassThumbWidth.toPx() / 2f).roundToInt(), 0) }
+            .size(GlassThumbWidth, GlassThumbHeight)
+            .graphicsLayer {
+                scaleX = grown
+                scaleY = grown
+                alpha = grown.coerceIn(0f, 1f)
+                shadowElevation = 6.dp.toPx()
+                shape = CircleShape
+                clip = true
+            }
+            .background(Color.White.copy(alpha = 0.22f))
+            .border(1.dp, Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.9f), Color.White.copy(alpha = 0.25f))), CircleShape),
+    )
+}
+
+private val GlassThumbWidth: Dp = 38.dp
+private val GlassThumbHeight: Dp = 24.dp
+
+/** A transport button; a new glyph (play to pause) replaces the old one the SF Symbols way. */
 @Composable
 private fun BigControl(@DrawableRes icon: Int, description: String, size: Int, enabled: Boolean = true, onClick: () -> Unit) {
     IosIconButton(onClick = onClick, enabled = enabled, modifier = Modifier.size((size + 20).dp)) {
-        NovaIcon(
+        SymbolSwap(
             icon,
             contentDescription = description,
             tint = Color.White.copy(alpha = if (enabled) 1f else 0.35f),
@@ -1233,14 +1284,43 @@ private fun BigControl(@DrawableRes icon: Int, description: String, size: Int, e
 
 /**
  * The sleep timer (owner): a moon that opens a menu of when to stop (15 to 60 minutes, or the end
- * of the song); filled in while one runs, the minutes left under it.
+ * of the song); filled in while one runs, the minutes left under it. Set, the moon rises into its
+ * circle; run out or turned off, it sets below the circle's edge and comes back plain.
  */
 @Composable
 private fun SleepButton(sleep: SleepTimer?, actions: AudioActions) {
     var open by remember { mutableStateOf(false) }
+    val running = sleep != null
+    // How far the moon has sunk (1: below the circle's edge) and how much of it shows.
+    val moonDrop = remember { Animatable(0f) }
+    val moonAlpha = remember { Animatable(1f) }
+    var wasRunning by remember { mutableStateOf(running) }
+    LaunchedEffect(running) {
+        if (running == wasRunning) return@LaunchedEffect
+        wasRunning = running
+        if (running) {
+            moonDrop.snapTo(1f)
+            moonAlpha.snapTo(0f)
+            launch { moonAlpha.animateTo(1f, tween(MOON_MS)) }
+            moonDrop.animateTo(0f, spring(dampingRatio = 0.7f, stiffness = 220f))
+        } else {
+            launch { moonAlpha.animateTo(0f, tween(MOON_MS)) }
+            moonDrop.animateTo(1f, tween(MOON_MS))
+            moonDrop.snapTo(0f)
+            moonAlpha.animateTo(1f, tween(MOON_BACK_MS))
+        }
+    }
     Box {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            PaneButton(icon = R.drawable.ic_dark_mode, label = "Sleep Timer", active = sleep != null) { open = true }
+            PaneButton(
+                icon = R.drawable.ic_dark_mode,
+                label = "Sleep Timer",
+                active = running,
+                iconModifier = Modifier.graphicsLayer {
+                    translationY = moonDrop.value * MoonSink.toPx()
+                    alpha = moonAlpha.value
+                },
+            ) { open = true }
             if (sleep != null) {
                 // The minutes left, kept current.
                 var now by remember { mutableLongStateOf(SystemClock.elapsedRealtime()) }
@@ -1250,12 +1330,13 @@ private fun SleepButton(sleep: SleepTimer?, actions: AudioActions) {
                         delay(SLEEP_TICK_MS)
                     }
                 }
-                Text(
+                // The minutes roll down as they pass.
+                RollingText(
                     when (sleep) {
                         is SleepTimer.At -> "${((sleep.endsAt - now).coerceAtLeast(0L) + 59_999L) / 60_000L} min"
                         SleepTimer.EndOfSong -> "End of song"
                     },
-                    fontSize = 11.sp,
+                    style = LocalTextStyle.current.copy(fontSize = 11.sp),
                     color = Color.White.copy(alpha = 0.7f),
                     modifier = Modifier.padding(top = 2.dp),
                 )
@@ -1292,11 +1373,25 @@ private val SLEEP_CHOICES = listOf(
 )
 private const val SLEEP_TICK_MS = 15_000L
 
+/** The moon's rise and set, and its fade back in once set. */
+private const val MOON_MS = 420
+private const val MOON_BACK_MS = 260
+
+/** How far the moon sinks to set: past the edge of its 44dp circle. */
+private val MoonSink = 26.dp
+
 /** The docked mini player's progress line. */
 private val MiniProgressHeight = 1.5.dp
 
 @Composable
-private fun PaneButton(@DrawableRes icon: Int, label: String, active: Boolean, enabled: Boolean = true, onClick: () -> Unit) {
+private fun PaneButton(
+    @DrawableRes icon: Int,
+    label: String,
+    active: Boolean,
+    enabled: Boolean = true,
+    iconModifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
     IosIconButton(
         onClick = onClick,
         enabled = enabled,
@@ -1313,7 +1408,7 @@ private fun PaneButton(@DrawableRes icon: Int, label: String, active: Boolean, e
                 enabled -> Color.White.copy(alpha = 0.8f)
                 else -> Color.White.copy(alpha = 0.3f)
             },
-            modifier = Modifier.size(24.dp),
+            modifier = iconModifier.size(24.dp),
         )
     }
 }

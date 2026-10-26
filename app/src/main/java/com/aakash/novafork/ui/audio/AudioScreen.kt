@@ -140,7 +140,7 @@ import com.aakash.novafork.ui.theme.NovaColors
 /**
  * The Audio tab, after Apple Music's Library (dark): a big "Library" title, Playlists / Artists /
  * Albums / Songs / Genres, then a Recently Added grid of covers; each opens its own page (album,
- * artist, genre, playlist pages with red Play and Shuffle). The mini player and Now Playing live
+ * artist, genre, playlist pages with blue Play and Shuffle). The mini player and Now Playing live
  * in the app shell (see [MiniPlayerBar], [NowPlayingScreen]).
  */
 @Composable
@@ -468,7 +468,7 @@ private fun LibraryHome(
 private fun PlaylistsPage(playlists: List<MusicPlaylistRow>, ctx: PageContext) {
     AudioPage("Playlists") {
         header("Playlists", ctx)
-        // Apple Music's first row: a red "+" tile and New Playlist….
+        // Apple Music's first row: a blue "+" tile and New Playlist….
         row("new") {
             var naming by rememberSaveable { mutableStateOf(false) }
             ListRow(
@@ -558,7 +558,7 @@ private fun GenresPage(ctx: PageContext) {
     }
 }
 
-/** Starred songs, most recently starred first; the red star takes one out. */
+/** Starred songs, most recently starred first; the star in Now Playing takes one out. */
 @Composable
 private fun FavoritesPage(songs: List<SongEntity>, ctx: PageContext) {
     AudioPage("Favorites") {
@@ -583,7 +583,7 @@ private fun SongsPage(title: String, songs: List<SongEntity>, ctx: PageContext) 
     }
 }
 
-/** Apple Music's album page: big cover, title, red artist, details, Play/Shuffle and the tracks. */
+/** Apple Music's album page: big cover, title, blue artist, details, Play/Shuffle and the tracks. */
 @Composable
 private fun AlbumPage(album: Album, ctx: PageContext) {
     AudioPage(album.title) {
@@ -691,7 +691,7 @@ private fun AlbumPage(album: Album, ctx: PageContext) {
 
 /**
  * Apple Music's artist header: a big picture (their newest cover, as there are no artist photos)
- * fading into black, the name over it, and the round red Play button. As the page scrolls the
+ * fading into black, the name over it, and the round blue Play button. As the page scrolls the
  * picture drifts at half speed inside its frame, and pulling the page down past its top makes the
  * whole header grow into the gap.
  */
@@ -873,7 +873,7 @@ private fun Missing(ctx: PageContext) {
 // Pieces
 // ---------------------------------------------------------------------------------------------
 
-/** A page's back link ("‹ Library", in red) and its big title. */
+/** A page's back link ("‹ Library", in blue) and its big title. */
 private fun LazyGridScope.header(title: String, ctx: PageContext) {
     row("back") { BackRow(ctx) }
     row("title") {
@@ -917,7 +917,7 @@ private fun BackRow(ctx: PageContext, menu: (@Composable ColumnScope.(close: () 
     }
 }
 
-/** Apple Music's "…": a red ellipsis on a grey circle that opens a menu. */
+/** Apple Music's "…": a blue ellipsis on a grey circle that opens a menu. */
 @Composable
 private fun MoreButton(label: String, content: @Composable ColumnScope.(close: () -> Unit) -> Unit) {
     var open by remember { mutableStateOf(false) }
@@ -961,11 +961,15 @@ private fun QueueItems(songs: List<SongEntity>, ctx: PageContext, close: () -> U
     )
 }
 
+/**
+ * A Library link (Playlists, Favorites): its glyph in plain white, as iOS 27.2's Music draws them
+ * (monochrome, no accent colour), the name, and a chevron.
+ */
 @Composable
 private fun CategoryRow(@DrawableRes icon: Int, label: String, divider: Boolean = true, onClick: () -> Unit) {
     Column(Modifier.clickable(onClick = onClick)) {
         Row(Modifier.padding(vertical = 13.dp), verticalAlignment = Alignment.CenterVertically) {
-            NovaIcon(icon, contentDescription = null, tint = NovaColors.IosBlue, modifier = Modifier.size(26.dp))
+            NovaIcon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(26.dp))
             Text(label, fontSize = 21.sp, modifier = Modifier.padding(start = 16.dp).weight(1f))
             NovaIcon(R.drawable.ic_chevron_right, contentDescription = null, tint = Color.White.copy(alpha = 0.3f))
         }
@@ -1046,7 +1050,7 @@ private fun AlbumTileContent(album: Album, onClick: () -> Unit, onLongClick: () 
     }
 }
 
-/** Apple Music's Play and Shuffle: two grey pills with red icon and label, side by side. */
+/** Apple Music's Play and Shuffle: two grey pills with blue icon and label, side by side. */
 @Composable
 private fun PlayShuffle(songs: List<SongEntity>, actions: AudioActions) {
     Row(Modifier.padding(vertical = 14.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -1078,8 +1082,8 @@ private fun LazyGridScope.songRows(songs: List<SongEntity>, ctx: PageContext) {
 }
 
 /**
- * A song with its cover, as in Apple Music's lists: the playing one in red with moving bars over
- * its cover, a small star when it is a favorite, and "…" (or a long press) for its menu.
+ * A song with its cover, as in Apple Music's lists: the playing one's title in blue, a small star
+ * when it is a favorite, and "…" (or a long press) for its menu.
  * [onRemove] adds Remove from Playlist to the menu.
  */
 @OptIn(ExperimentalFoundationApi::class)
@@ -1153,7 +1157,7 @@ private fun SongRow(song: SongEntity, ctx: PageContext, onClick: () -> Unit, onR
     }
 }
 
-/** An album's track: its number (moving bars while playing), title, star, "…". */
+/** An album's track: its number (blue while playing, with the title), title, star, "…". */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun TrackRow(song: SongEntity, ctx: PageContext, onClick: () -> Unit) {
@@ -1183,7 +1187,7 @@ private fun TrackRow(song: SongEntity, ctx: PageContext, onClick: () -> Unit) {
                 ) {
                     Row(Modifier.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                         Box(Modifier.width(32.dp)) {
-                            // The playing song's number turns red with its title (owner: no bars here).
+                            // The playing song's number turns blue with its title (owner: no bars here).
                             Text(
                                 song.trackNumber?.toString() ?: "",
                                 fontSize = 16.sp,

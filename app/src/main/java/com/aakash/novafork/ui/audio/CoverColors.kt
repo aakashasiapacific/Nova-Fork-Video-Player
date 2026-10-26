@@ -8,15 +8,27 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import coil.imageLoader
 import coil.request.ImageRequest
+import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.sin
+import kotlinx.coroutines.delay
 
 /** The three colours of Now Playing's background, top to bottom, taken from the cover. */
 internal data class CoverColors(val top: Color, val middle: Color, val bottom: Color) {
@@ -68,12 +80,15 @@ private fun tune(color: Color, darker: Boolean = false): Color {
 }
 
 /**
- * Apple Music's Now Playing background: a smooth gradient in the cover's colours, crossfading
- * to the next song's. It stays still (owner: no turning); a soft dark fade at the bottom keeps
- * the controls readable.
+ * Apple Music's Now Playing background on iOS 26/27: soft glows in the cover's colours (top,
+ * middle and bottom thirds) over AMOLED black, crossfading to the next song's. While [drifting]
+ * (the song plays) the glows wander very slowly about their places; they never turn (owner).
+ * To spare the battery they move in small steps a few times a second, only redraw (nothing is
+ * recomposed or decoded), and stay still when paused or when the phone's animations are off. A
+ * soft dark fade at the bottom keeps the controls readable.
  */
 @Composable
-internal fun CoverGradient(artUri: String?, modifier: Modifier = Modifier) {
+internal fun CoverGradient(artUri: String?, modifier: Modifier = Modifier, drifting: Boolean = false) {
     val context = LocalContext.current
     val colors by produceState(CoverColors.Fallback, artUri) {
         value = artUri?.let { uri ->
@@ -87,7 +102,32 @@ internal fun CoverGradient(artUri: String?, modifier: Modifier = Modifier) {
     val top by animateColorAsState(colors.top, fade, label = "gradientTop")
     val middle by animateColorAsState(colors.middle, fade, label = "gradientMiddle")
     val bottom by animateColorAsState(colors.bottom, fade, label = "gradientBottom")
-    Box(modifier.fillMaxSize().background(Brush.verticalGradient(listOf(top, middle, bottom))))
+    // Where the glows are on their slow round, 0 to 1; read only while drawing.
+    var phase by remember { mutableFloatStateOf(0f) }
+    val stillMotion = remember(context) {
+        android.provider.Settings.Global.getFloat(context.contentResolver, android.provider.Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f
+    }
+    LaunchedEffect(drifting, stillMotion) {
+        if (!drifting || stillMotion) return@LaunchedEffect
+        while (true) {
+            delay(GLOW_STEP_MS)
+            phase = (phase + GLOW_STEP_MS.toFloat() / GLOW_ROUND_MS) % 1f
+        }
+    }
+    Box(
+        modifier
+            .fillMaxSize()
+            // Its own layer, so a step redraws the glows alone.
+            .graphicsLayer()
+            .drawBehind {
+                drawRect(Color.Black)
+                val turn = phase * 2f * PI.toFloat()
+                val reach = size.maxDimension * 0.75f
+                glow(top, 0.22f + 0.08f * cos(turn), 0.16f + 0.05f * sin(turn), reach)
+                glow(middle, 0.82f + 0.07f * sin(turn + 2.1f), 0.48f + 0.06f * cos(turn + 2.1f), reach * 0.9f)
+                glow(bottom, 0.28f + 0.08f * cos(turn + 4.2f), 0.84f + 0.05f * sin(turn + 4.2f), reach * 0.85f)
+            },
+    )
     Box(
         modifier
             .fillMaxSize()
@@ -95,8 +135,25 @@ internal fun CoverGradient(artUri: String?, modifier: Modifier = Modifier) {
     )
 }
 
+/** One soft glow of [color], centred at ([x], [y]) parts of the size across and down. */
+private fun DrawScope.glow(color: Color, x: Float, y: Float, radius: Float) {
+    val center = Offset(size.width * x, size.height * y)
+    drawCircle(
+        brush = Brush.radialGradient(listOf(color.copy(alpha = GLOW_ALPHA), color.copy(alpha = 0f)), center = center, radius = radius),
+        radius = radius,
+        center = center,
+    )
+}
+
 /** The size the cover is read at: plenty for three averages. */
 private const val GRADIENT_PX = 24
+
+/** The glows' slow round, and how often they take a step along it. */
+private const val GLOW_ROUND_MS = 30_000L
+private const val GLOW_STEP_MS = 80L
+
+/** How strong a glow is at its heart. */
+private const val GLOW_ALPHA = 0.9f
 
 /** [artUri]'s middle colour (see [coverColors]), crossfading as it changes; clear until known. */
 @Composable
