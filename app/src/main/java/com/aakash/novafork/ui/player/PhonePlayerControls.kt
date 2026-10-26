@@ -199,6 +199,7 @@ private fun PhoneTransportRow(state: PlayerUiState, actions: PlayerActions, modi
         PlayPauseButton(
             isPlaying = state.isPlaying,
             buffering = state.isBuffering,
+            finished = state.finished,
             // A light tick with each play and pause.
             onClick = {
                 haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)

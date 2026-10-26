@@ -4,6 +4,7 @@ import android.content.Context
 import android.media.AudioAttributes
 import android.net.Uri
 import android.os.ParcelFileDescriptor
+import android.os.SystemClock
 import android.util.Log
 import com.aakash.novafork.core.audio.Lyrics
 import com.aakash.novafork.core.audio.MusicKeys
@@ -16,6 +17,8 @@ import com.aakash.novafork.player.PlaybackAudio
 import com.aakash.novafork.player.VlcEngine
 import com.aakash.novafork.player.closeQuietly
 import com.aakash.novafork.ui.model.RepeatMode
+import java.io.FileNotFoundException
+import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -29,8 +32,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.videolan.libvlc.Media
 import org.videolan.libvlc.MediaPlayer
-import java.io.FileNotFoundException
-import java.util.concurrent.atomic.AtomicReference
 
 /** The song playing (or paused), as the Audio tab and the notification show it. */
 data class NowPlaying(
@@ -42,11 +43,21 @@ data class NowPlaying(
     val artUri: String,
 )
 
+/** When the sleep timer stops the music (owner): at a time, or when the playing song ends. */
+sealed interface SleepTimer {
+    /** [endsAt] on the elapsed-realtime clock; [minutes] as it was set. */
+    data class At(val endsAt: Long, val minutes: Int) : SleepTimer
+
+    data object EndOfSong : SleepTimer
+}
+
 data class MusicPlayerState(
     /** A queue is open (its first song may still be loading); false once closed. */
     val active: Boolean = false,
     /** Null while nothing is queued, and while the first song loads. */
     val nowPlaying: NowPlaying? = null,
+    /** Set while the sleep timer runs. */
+    val sleep: SleepTimer? = null,
     val isPlaying: Boolean = false,
     /**
      * The user wants sound: set by play, cleared only by pause, close, a permanent loss of audio
@@ -234,6 +245,46 @@ class MusicPlayer(
         if (_state.value.isPlaying) pause() else play()
     }
 
+    private var sleepJob: Job? = null
+
+    /** The next song to load waits, paused, instead of playing (the sleep timer ran out with a song). */
+    private var holdNextStart = false
+
+    /**
+     * The sleep timer: the music fades out and pauses [minutes] from now, or at the end of the
+     * playing song when [minutes] is negative; 0 turns it off.
+     */
+    fun setSleepTimer(minutes: Int) {
+        sleepJob?.cancel()
+        mediaPlayer?.volume = FULL_VOLUME
+        when {
+            minutes == 0 -> _state.update { it.copy(sleep = null) }
+            minutes < 0 -> _state.update { it.copy(sleep = SleepTimer.EndOfSong) }
+            else -> {
+                val length = minutes * 60_000L
+                _state.update { it.copy(sleep = SleepTimer.At(SystemClock.elapsedRealtime() + length, minutes)) }
+                sleepJob = scope.launch {
+                    delay((length - SLEEP_FADE_MS).coerceAtLeast(0L))
+                    fallAsleep()
+                }
+            }
+        }
+    }
+
+    /** The timer is up: the music fades out over a few seconds, then pauses. */
+    private suspend fun fallAsleep() {
+        val player = mediaPlayer
+        if (player != null && _state.value.isPlaying) {
+            for (step in SLEEP_FADE_STEPS downTo 0) {
+                player.volume = FULL_VOLUME * step / SLEEP_FADE_STEPS
+                delay(SLEEP_FADE_MS / SLEEP_FADE_STEPS)
+            }
+        }
+        pause()
+        mediaPlayer?.volume = FULL_VOLUME
+        _state.update { it.copy(sleep = null) }
+    }
+
     /** The next song; at the end of the queue only with repeat on. */
     fun next() {
         val position = queue.nextPosition(wrap = _state.value.repeat != RepeatMode.OFF) ?: return
@@ -307,6 +358,8 @@ class MusicPlayer(
      */
     fun close(forget: Boolean = true) {
         if (forget) resumePrefs.edit().clear().apply() else saveResume()
+        sleepJob?.cancel()
+        holdNextStart = false
         loadJob?.cancel()
         lyricsJob?.cancel()
         skipJob?.cancel()
@@ -392,9 +445,14 @@ class MusicPlayer(
             descriptor.closeQuietly()
             descriptor = opened.descriptor
             pausedByFocusLoss = false
-            audio.requestFocus()
-            audio.registerNoisyReceiver()
-            player.play()
+            if (holdNextStart) {
+                holdNextStart = false
+                _state.update { it.copy(playRequested = false) }
+            } else {
+                audio.requestFocus()
+                audio.registerNoisyReceiver()
+                player.play()
+            }
             saveResume()
         }
     }
@@ -477,6 +535,16 @@ class MusicPlayer(
     private fun onEnded() {
         val songId = _state.value.nowPlaying?.songId
         if (songId != null) scope.launch { runCatchingLogged { music.markPlayed(songId) } }
+        // Asleep at the end of this song: the next one loads but waits, paused.
+        if (_state.value.sleep == SleepTimer.EndOfSong) {
+            _state.update { it.copy(sleep = null) }
+            val next = queue.nextPosition(wrap = _state.value.repeat == RepeatMode.ALL)
+            if (next != null) {
+                holdNextStart = true
+                moveTo(next)
+                return
+            }
+        }
         val repeat = _state.value.repeat
         if (repeat == RepeatMode.ONE) {
             startCurrent()
@@ -551,6 +619,10 @@ class MusicPlayer(
         const val TAG = "MusicPlayer"
         const val FULL_VOLUME = 100
         const val DUCKED_VOLUME = 30
+
+        /** The sleep timer's fade: how long, and in how many steps. */
+        const val SLEEP_FADE_MS = 6_000L
+        const val SLEEP_FADE_STEPS = 30
 
         /** "Previous" restarts the song after this much of it played. */
         const val RESTART_AFTER_MS = 3_000L

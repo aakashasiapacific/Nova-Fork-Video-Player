@@ -699,7 +699,14 @@ class PlayerController(
         }
         val current = NowPlaying(uri, kind, fileName, entry)
         nowPlaying = current
-        _state.update { it.copy(title = titles.title, subtitle = titles.subtitle) }
+        _state.update {
+            it.copy(
+                title = titles.title,
+                subtitle = titles.subtitle,
+                overview = entry?.meta?.overview?.takeIf { text -> text.isNotBlank() },
+                finished = false,
+            )
+        }
         if (entry != null) {
             val videoId = entry.video.id
             // A link that turned out to be a library video becomes a queue of one.
@@ -1750,7 +1757,7 @@ class PlayerController(
     /**
      * What follows an ended video: itself again (repeat), the next queue item, or the next
      * episode; offered on the up-next card, started at once in the background when it would
-     * start by itself. With nothing to follow the player closes.
+     * start by itself. With nothing to follow it stays on the last frame ([endHere]).
      */
     private fun continueAfterEnd() {
         val videoId = nowPlaying?.videoId
@@ -1769,7 +1776,7 @@ class PlayerController(
             if (usesQueue) {
                 val position = queue.nextPosition(wrap = repeat == RepeatMode.ALL)
                 if (position == null) {
-                    finishPlayback()
+                    endHere()
                     return@launch
                 }
                 if (inBackground) {
@@ -1785,7 +1792,7 @@ class PlayerController(
             } else {
                 next = if (videoId != null) nextEntry ?: fetchNextEpisode(videoId) else null
                 if (next == null) {
-                    finishPlayback()
+                    endHere()
                     return@launch
                 }
                 automatic = graph.settings.settings.value.autoPlayNext
@@ -1807,6 +1814,14 @@ class PlayerController(
     private fun finishPlayback() {
         PlayerDiagnostics.record("nothing left to play")
         onFinished()
+    }
+
+    /**
+     * Nothing follows the ended video: as Samsung's player does, it stays on its last frame with
+     * the controls up and Replay in the middle. Playing in the background, it closes instead.
+     */
+    private fun endHere() {
+        if (inBackground) finishPlayback() else _state.update { it.copy(finished = true) }
     }
 
     private suspend fun lookUp(videoId: Long): VideoWithMeta? =

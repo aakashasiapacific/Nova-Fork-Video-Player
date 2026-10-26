@@ -619,3 +619,13 @@ The owner asked for Apple Music to be copied more precisely, with less clutter. 
   - The "now playing" bars move with the song itself: each follows one band of its sound (bass, low and high mids, treble), read once from the file in the background (no microphone access needed), and kept in time with where the song is.
   - The mini player shows on the Audio tab only; on the other tabs the Audio tab's icon turns into those bars while a song plays.
 - **Build 127 (owner: too many bars moving):** the "now playing" bars show only as the Audio tab's icon while a song plays, always in Apple Music's red; they are gone from album covers, song covers, the album's track numbers (the playing one's number turns red with its title) and the mini player's cover.
+- **Build 128 (owner, all in one go):**
+  - Holding the Audio tab opens Now Playing from any tab (the mini player only shows on Audio).
+  - The docked mini player has a fine red line along its top that fills as the song plays.
+  - Now Playing has a sleep timer (a moon): 15, 30 or 45 minutes, an hour, or the end of the song; the minutes left show under it, and the music fades out over a few seconds before it pauses. At the end of the song, the next one waits, paused.
+  - Home's hero grows when the page is pulled down (iOS's stretchy header): its picture gets taller into the pull instead of a black gap opening above it.
+  - Movie and show pages list "Starring" and "Director" (or "Created by") under the synopsis, from TMDB's credits.
+  - Left paused for five seconds, the video drains from colour to black and white and dims, Netflix's way, with "You're watching", the title, what it is and its synopsis over it; any touch brings the controls back.
+  - A video played to the end with nothing after it stays on its last frame with the controls up and Replay in the middle, as Samsung's player does, instead of closing.
+  - Holding a title's poster, or an album's cover on its page, shows it large over the blurred page; a tap puts it back.
+  - The pinned month heading (Search, Recently Added) has a hairline under it.

@@ -97,6 +97,10 @@ data class PlayerUiState(
     val title: String = "",
     /** "S1 · E3 · Pilot", "1080p · nas.local" … */
     val subtitle: String? = null,
+    /** The title's synopsis (TMDB), shown over the picture after a while paused. */
+    val overview: String? = null,
+    /** Played to the end with nothing to follow: it stays on the last frame with Replay (Samsung). */
+    val finished: Boolean = false,
     val isPlaying: Boolean = false,
     val isBuffering: Boolean = false,
     val positionMs: Long = 0,

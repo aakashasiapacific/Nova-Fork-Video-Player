@@ -28,6 +28,7 @@ import androidx.compose.foundation.LocalOverscrollConfiguration
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -108,6 +109,8 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -386,6 +389,8 @@ fun PhoneApp(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
                                                 pullState = pull,
                                                 // Anywhere else, pulling down past the top looks for new videos, silently.
                                                 onPullRefresh = if (route.isTitlePage()) null else currentActions::refreshQuietly,
+                                                // Home's hero picture grows into the pull instead (iOS's stretchy header).
+                                                moveOnPullDown = route != Route.Home,
                                             )
                                             // Inside the bounce, so it still sees the push past the end.
                                             .nestedScroll(pageEnd),
@@ -454,6 +459,7 @@ fun PhoneApp(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
                 clear = { barClear },
                 selected = top,
                 musicPlaying = player?.isPlaying == true,
+                onHoldAudio = if (player != null && player.active) ({ nowPlayingOpen = true }) else null,
                 // The selected tab tapped again (iOS): from a page opened on it, back to its first
                 // page; on its first page, up to the top.
                 onSelect = { tab ->
@@ -573,6 +579,8 @@ private fun PhoneNavigationBar(
     clear: () -> Float = { 0f },
     /** A song plays: the Audio tab's icon becomes the "now playing" bars, moving with it. */
     musicPlaying: Boolean = false,
+    /** Holding the Audio tab opens Now Playing from any tab (null: nothing is queued). */
+    onHoldAudio: (() -> Unit)? = null,
 ) {
     val haptics = LocalHapticFeedback.current
     val scope = rememberCoroutineScope()
@@ -592,8 +600,13 @@ private fun PhoneNavigationBar(
                     Modifier
                         .weight(1f)
                         .fillMaxHeight()
-                        .selectable(
-                            selected = active,
+                        .semantics {
+                            selected = active
+                            role = Role.Tab
+                        }
+                        .combinedClickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
                             onClick = {
                                 if (!active) haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                 scope.launch {
@@ -602,9 +615,15 @@ private fun PhoneNavigationBar(
                                 }
                                 onSelect(tab)
                             },
-                            role = Role.Tab,
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null,
+                            onLongClickLabel = if (tab == TopDestination.AUDIO && onHoldAudio != null) "Open Now Playing" else null,
+                            onLongClick = if (tab == TopDestination.AUDIO && onHoldAudio != null) {
+                                {
+                                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    onHoldAudio()
+                                }
+                            } else {
+                                null
+                            },
                         ),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center,

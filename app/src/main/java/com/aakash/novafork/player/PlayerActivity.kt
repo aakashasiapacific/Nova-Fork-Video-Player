@@ -130,6 +130,10 @@ class PlayerActivity : ComponentActivity(), PlayerController.Host {
                         state = state,
                         actions = current,
                         layout = rememberDeviceLayout(settings.layoutMode),
+                        copyFrame = { onCopied ->
+                            val layout = videoLayout
+                            if (layout == null) onCopied(null) else FrameCapture.copy(layout, onCopied)
+                        },
                     ) {
                         AndroidView(
                             factory = { context -> VLCVideoLayout(context).also { onVideoLayoutCreated(it) } },

@@ -141,11 +141,13 @@ fun PhoneShowDetailsScreen(
                 }
             }
             item(key = "overview") {
-                OverviewBlock(
-                    tagline = details.tagline,
-                    overview = details.overview,
-                    modifier = Modifier.tintBand(tint, from = 0.55f, to = 0f).padding(start = dims.gutter, end = dims.gutter, top = 16.dp),
-                )
+                Column(Modifier.tintBand(tint, from = 0.55f, to = 0f).padding(start = dims.gutter, end = dims.gutter, top = 16.dp)) {
+                    OverviewBlock(tagline = details.tagline, overview = details.overview)
+                    Credits(
+                        lines = listOf("Starring" to details.starring, "Created by" to details.createdBy),
+                        modifier = Modifier.padding(top = 12.dp),
+                    )
+                }
             }
             item(key = "seasons") {
                 Column(Modifier.padding(top = dims.sectionSpacing)) {

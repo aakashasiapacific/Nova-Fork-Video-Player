@@ -14,6 +14,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -60,10 +61,15 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.coerceAtMost
 import androidx.compose.ui.unit.dp
@@ -72,6 +78,7 @@ import com.aakash.novafork.R
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
 import com.aakash.novafork.ui.common.ArtImage
 import com.aakash.novafork.ui.common.ArtPlaceholder
+import com.aakash.novafork.ui.common.ArtViewer
 import com.aakash.novafork.ui.common.BackdropArt
 import com.aakash.novafork.ui.common.Hairline
 import com.aakash.novafork.ui.common.HeroTitle
@@ -83,6 +90,7 @@ import com.aakash.novafork.ui.common.PosterArt
 import com.aakash.novafork.ui.common.RatingPill
 import com.aakash.novafork.ui.common.bottomScrim
 import com.aakash.novafork.ui.model.Artwork
+import kotlin.math.roundToInt
 
 /**
  * How far the poster reaches up into the backdrop's faded lower edge, on the Home hero and the
@@ -111,6 +119,10 @@ internal fun BackdropPosterHeader(
     fadeTo: Color? = null,
     /** How far the page has scrolled past its top, in px: the backdrop moves at half that (parallax). */
     scrolled: () -> Float = { 0f },
+    /** How far the page is pulled down past its top, in px: the backdrop grows taller by that (Home). */
+    stretch: () -> Float = { 0f },
+    /** A title's page: holding the poster shows it large ([ArtViewer]). */
+    enlargePoster: Boolean = false,
     info: @Composable ColumnScope.() -> Unit,
 ) {
     val dims = LocalNovaDimens.current
@@ -135,7 +147,11 @@ internal fun BackdropPosterHeader(
         Box(
             Modifier
                 .fillMaxWidth()
-                .height(backdropHeight)
+                .layout { measurable, constraints ->
+                    val tall = backdropHeight.roundToPx() + stretch().coerceAtLeast(0f).roundToInt()
+                    val placeable = measurable.measure(Constraints.fixed(constraints.maxWidth, tall))
+                    layout(placeable.width, placeable.height) { placeable.place(0, 0) }
+                }
                 // iOS parallax: as the page scrolls up, the backdrop follows at half the speed.
                 .graphicsLayer {
                     translationY = scrolled() * 0.5f
@@ -176,6 +192,7 @@ internal fun BackdropPosterHeader(
                 .fillMaxWidth()
                 .padding(start = dims.gutter, end = dims.gutter, top = backdropHeight - PosterOverlap),
         ) {
+            var enlarged by remember { mutableStateOf(false) }
             Box(
                 Modifier
                     .width(dims.detailPosterWidth)
@@ -183,9 +200,29 @@ internal fun BackdropPosterHeader(
                     .shadow(12.dp, posterShape)
                     .clip(posterShape)
                     .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                    .border(1.dp, Color.White.copy(alpha = 0.12f), posterShape),
+                    .border(1.dp, Color.White.copy(alpha = 0.12f), posterShape)
+                    .then(
+                        if (enlargePoster) {
+                            Modifier.combinedClickable(onClick = {}, onLongClickLabel = "Show the poster large", onLongClick = { enlarged = true })
+                        } else {
+                            Modifier
+                        },
+                    ),
             ) {
                 PosterArt(artwork = artwork, title = title, modifier = Modifier.fillMaxSize())
+            }
+            if (enlarged) {
+                ArtViewer(onDismiss = { enlarged = false }) { art ->
+                    Box(
+                        art
+                            .fillMaxWidth(0.82f)
+                            .aspectRatio(2f / 3f)
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                    ) {
+                        PosterArt(artwork = artwork, title = title, modifier = Modifier.fillMaxSize())
+                    }
+                }
             }
             Spacer(Modifier.width(16.dp))
             Column(
@@ -311,6 +348,7 @@ internal fun PhoneDetailsHeader(
         maxBackdropHeight = maxBackdropHeight,
         fadeTo = Color.Transparent,
         scrolled = scrolled,
+        enlargePoster = true,
     ) {
         // The title's TMDB logo, as on Home's hero (owner): the same artwork on both pages.
         HeroTitle(
@@ -504,6 +542,31 @@ internal fun PhoneDetailsLoading(onBack: () -> Unit, modifier: Modifier = Modifi
     Box(modifier.fillMaxSize()) {
         LoadingBox()
         PhoneDetailsTopBar(onBack = onBack, modifier = Modifier.align(Alignment.TopStart))
+    }
+}
+
+/**
+ * Who made a title, under its synopsis as Apple TV's iPhone pages list it: each role ("Starring",
+ * "Director") in white, the names after it in grey; roles without names are left out.
+ */
+@Composable
+internal fun Credits(lines: List<Pair<String, String?>>, modifier: Modifier = Modifier) {
+    val shown = lines.mapNotNull { (label, names) -> names?.let { label to it } }
+    if (shown.isEmpty()) return
+    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        shown.forEach { (label, names) ->
+            Text(
+                buildAnnotatedString {
+                    withStyle(SpanStyle(color = Color.White, fontWeight = FontWeight.SemiBold)) { append(label) }
+                    append("  ")
+                    append(names)
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
     }
 }
 

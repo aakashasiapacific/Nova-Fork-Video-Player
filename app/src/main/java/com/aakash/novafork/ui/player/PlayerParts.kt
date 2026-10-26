@@ -241,7 +241,10 @@ internal fun PlayerToggleButton(
     }
 }
 
-/** Big round play/pause; a spinner rings it while buffering so the centre never shows two things. */
+/**
+ * Big round play/pause; a spinner rings it while buffering so the centre never shows two things.
+ * [finished] (played to the end, nothing after it): Replay, as Samsung's player shows it.
+ */
 @Composable
 internal fun PlayPauseButton(
     isPlaying: Boolean,
@@ -249,6 +252,7 @@ internal fun PlayPauseButton(
     onClick: () -> Unit,
     size: Dp,
     modifier: Modifier = Modifier,
+    finished: Boolean = false,
 ) {
     Box(modifier.size(size + 12.dp), contentAlignment = Alignment.Center) {
         Box(
@@ -261,9 +265,19 @@ internal fun PlayPauseButton(
             contentAlignment = Alignment.Center,
         ) {
             Icon(
-                painter = painterResource(if (isPlaying) R.drawable.ic_pause else R.drawable.ic_play_arrow),
-                contentDescription = if (isPlaying) "Pause" else "Play",
-                modifier = Modifier.size(size * 0.5f),
+                painter = painterResource(
+                    when {
+                        finished -> R.drawable.ic_replay
+                        isPlaying -> R.drawable.ic_pause
+                        else -> R.drawable.ic_play_arrow
+                    },
+                ),
+                contentDescription = when {
+                    finished -> "Replay"
+                    isPlaying -> "Pause"
+                    else -> "Play"
+                },
+                modifier = Modifier.size(size * if (finished) 0.46f else 0.5f),
                 tint = Color.White,
             )
         }

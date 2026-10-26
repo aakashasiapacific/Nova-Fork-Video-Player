@@ -1,5 +1,6 @@
 package com.aakash.novafork.ui.audio
 
+import android.os.SystemClock
 import androidx.activity.compose.BackHandler
 import androidx.annotation.DrawableRes
 import androidx.compose.animation.AnimatedContent
@@ -62,6 +63,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -72,8 +74,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
@@ -102,6 +106,7 @@ import com.aakash.novafork.R
 import com.aakash.novafork.data.db.SongEntity
 import com.aakash.novafork.data.music.MusicLibrary
 import com.aakash.novafork.music.MusicPlayerState
+import com.aakash.novafork.music.SleepTimer
 import com.aakash.novafork.ui.common.IosIconButton
 import com.aakash.novafork.ui.common.NovaDropdownMenu
 import com.aakash.novafork.ui.common.NovaIcon
@@ -417,6 +422,21 @@ fun MiniPlayerBar(
             .fillMaxWidth()
             .height(if (docked) MiniPlayerDockedHeight else MiniPlayerHeight)
             .then(if (docked) Modifier else Modifier.frostedGlass(RoundedCornerShape(percent = 50)))
+            // Docked, a hairline along its top edge fills as the song plays (older Apple Music).
+            .then(
+                if (docked) {
+                    Modifier.drawWithContent {
+                        drawContent()
+                        val duration = player.durationMs
+                        if (duration > 0L) {
+                            val done = (player.positionMs.toFloat() / duration).coerceIn(0f, 1f)
+                            drawRect(NovaColors.AppleMusicRed, size = Size(size.width * done, MiniProgressHeight.toPx()))
+                        }
+                    }
+                } else {
+                    Modifier
+                },
+            )
             .clickable(onClickLabel = "Open Now Playing", onClick = onOpen)
             .draggable(
                 state = swipeState,
@@ -642,6 +662,7 @@ fun NowPlayingScreen(
                     active = pane == NowPlayingPane.LYRICS,
                     enabled = player.lyrics != null,
                 ) { pane = if (pane == NowPlayingPane.LYRICS) NowPlayingPane.ART else NowPlayingPane.LYRICS }
+                SleepButton(player.sleep, actions)
                 PaneButton(
                     icon = R.drawable.ic_view_list,
                     label = "Queue",
@@ -1208,6 +1229,70 @@ private fun BigControl(@DrawableRes icon: Int, description: String, size: Int, e
         )
     }
 }
+
+/**
+ * The sleep timer (owner): a moon that opens a menu of when to stop (15 to 60 minutes, or the end
+ * of the song); filled in while one runs, the minutes left under it.
+ */
+@Composable
+private fun SleepButton(sleep: SleepTimer?, actions: AudioActions) {
+    var open by remember { mutableStateOf(false) }
+    Box {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            PaneButton(icon = R.drawable.ic_dark_mode, label = "Sleep Timer", active = sleep != null) { open = true }
+            if (sleep != null) {
+                // The minutes left, kept current.
+                var now by remember { mutableLongStateOf(SystemClock.elapsedRealtime()) }
+                LaunchedEffect(sleep) {
+                    while (true) {
+                        now = SystemClock.elapsedRealtime()
+                        delay(SLEEP_TICK_MS)
+                    }
+                }
+                Text(
+                    when (sleep) {
+                        is SleepTimer.At -> "${((sleep.endsAt - now).coerceAtLeast(0L) + 59_999L) / 60_000L} min"
+                        SleepTimer.EndOfSong -> "End of song"
+                    },
+                    fontSize = 11.sp,
+                    color = Color.White.copy(alpha = 0.7f),
+                    modifier = Modifier.padding(top = 2.dp),
+                )
+            }
+        }
+        NovaDropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            SLEEP_CHOICES.forEach { (minutes, label) ->
+                val chosen = when (sleep) {
+                    null -> minutes == 0
+                    is SleepTimer.At -> sleep.minutes == minutes
+                    SleepTimer.EndOfSong -> minutes < 0
+                }
+                NovaMenuItem(
+                    text = { Text(label) },
+                    trailingIcon = if (chosen) ({ NovaIcon(R.drawable.ic_check, contentDescription = null) }) else null,
+                    onClick = {
+                        open = false
+                        actions.setSleepTimer(minutes)
+                    },
+                )
+            }
+        }
+    }
+}
+
+/** The sleep timer's choices: minutes (-1 the end of the song, 0 off) and how the menu names them. */
+private val SLEEP_CHOICES = listOf(
+    0 to "Off",
+    15 to "15 Minutes",
+    30 to "30 Minutes",
+    45 to "45 Minutes",
+    60 to "1 Hour",
+    -1 to "End of Song",
+)
+private const val SLEEP_TICK_MS = 15_000L
+
+/** The docked mini player's progress line. */
+private val MiniProgressHeight = 1.5.dp
 
 @Composable
 private fun PaneButton(@DrawableRes icon: Int, label: String, active: Boolean, enabled: Boolean = true, onClick: () -> Unit) {

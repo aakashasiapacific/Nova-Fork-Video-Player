@@ -372,6 +372,8 @@ object UiMappers {
             resolutionLabel = resolutionLabel(video.width, video.height),
             sourceLabel = item.source?.let(::sourceLabel).orEmpty(),
             isMatched = meta != null,
+            starring = meta?.castNames.nonBlank(),
+            directedBy = meta?.directors.nonBlank(),
         )
     }
 
@@ -425,6 +427,8 @@ object UiMappers {
             key = show.key,
             title = show.title,
             overview = show.meta?.overview.nonBlank(),
+            starring = show.meta?.castNames.nonBlank(),
+            createdBy = show.meta?.directors.nonBlank(),
             tagline = show.meta?.tagline.nonBlank(),
             year = show.card.year,
             rating = show.card.rating,

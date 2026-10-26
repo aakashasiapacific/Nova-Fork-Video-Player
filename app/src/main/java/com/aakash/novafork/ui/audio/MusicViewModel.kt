@@ -95,6 +95,8 @@ class MusicViewModel(app: Application) : AndroidViewModel(app), AudioActions {
 
     override fun cycleRepeat() = player.cycleRepeat()
 
+    override fun setSleepTimer(minutes: Int) = player.setSleepTimer(minutes)
+
     override fun closePlayer() = player.close()
 
     override fun showPlaylist(row: MusicPlaylistRow) = launchSafely {

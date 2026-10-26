@@ -177,6 +177,7 @@ private fun TabletTransportRow(state: PlayerUiState, actions: PlayerActions, mod
         PlayPauseButton(
             isPlaying = state.isPlaying,
             buffering = state.isBuffering,
+            finished = state.finished,
             onClick = actions::togglePlay,
             size = 72.dp,
         )

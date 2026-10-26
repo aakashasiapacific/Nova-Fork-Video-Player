@@ -38,4 +38,7 @@ interface AudioActions {
 
     /** Playlists' "New Playlist…": an empty playlist named [name]. */
     fun createPlaylist(name: String) = Unit
+
+    /** Now Playing's sleep timer: minutes from now, -1 for the end of the song, 0 off. */
+    fun setSleepTimer(minutes: Int) = Unit
 }

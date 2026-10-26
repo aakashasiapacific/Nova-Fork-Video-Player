@@ -1,11 +1,13 @@
 package com.aakash.novafork.ui.player
 
+import android.graphics.Bitmap
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.EnterExitState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationVector1D
+import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
@@ -13,12 +15,17 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -32,15 +39,25 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.BiasAlignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.ColorMatrix
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.aakash.novafork.ui.adaptive.DeviceLayout
 import com.aakash.novafork.ui.model.PlayerActions
 import com.aakash.novafork.ui.model.PlayerUiState
+import kotlin.coroutines.resume
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
 
 private const val AUTO_HIDE_MS = 3_500L
 private const val UNLOCK_HINT_MS = 2_000L
@@ -59,6 +76,8 @@ fun PlayerScreen(
     actions: PlayerActions,
     layout: DeviceLayout,
     modifier: Modifier = Modifier,
+    /** Copies the frame on screen (the video draws where Compose can't read it); null where it can't. */
+    copyFrame: ((onCopied: (Bitmap?) -> Unit) -> Unit)? = null,
     surface: @Composable () -> Unit,
 ) {
     // How far the video has been pulled down to close the player (iOS), px.
@@ -89,13 +108,19 @@ fun PlayerScreen(
         if (state.inPictureInPicture) {
             if (state.isBuffering) BufferingIndicator(Modifier.align(Alignment.Center))
         } else {
-            PlayerChrome(state = state, actions = actions, layout = layout, dismiss = dismiss)
+            PlayerChrome(state = state, actions = actions, layout = layout, dismiss = dismiss, copyFrame = copyFrame)
         }
     }
 }
 
 @Composable
-private fun PlayerChrome(state: PlayerUiState, actions: PlayerActions, layout: DeviceLayout, dismiss: Animatable<Float, AnimationVector1D>) {
+private fun PlayerChrome(
+    state: PlayerUiState,
+    actions: PlayerActions,
+    layout: DeviceLayout,
+    dismiss: Animatable<Float, AnimationVector1D>,
+    copyFrame: ((onCopied: (Bitmap?) -> Unit) -> Unit)?,
+) {
     val scope = rememberCoroutineScope()
     val backDispatcher = LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
     // The finger's pull, added up here: several moves can arrive before one is drawn.
@@ -114,7 +139,22 @@ private fun PlayerChrome(state: PlayerUiState, actions: PlayerActions, layout: D
     // Paused, failed or with options open, the controls stay up whatever was tapped.
     val searchOpen = state.subtitleSearch != null
     val forcedVisible = !state.isPlaying || state.error != null || panel != null || sheet != null || searchOpen
-    val controlsVisible = !state.locked && (controlsRequested || forcedVisible)
+
+    // Left paused a while, Netflix's way (owner): the picture drains to black and white and dims,
+    // the controls go, and what is playing shows over it; any touch brings the controls back.
+    var pausedInfo by remember { mutableStateOf(false) }
+    var pausedFrame by remember { mutableStateOf<ImageBitmap?>(null) }
+    val canShowInfo = !state.isPlaying && !state.isBuffering && !state.finished && state.error == null &&
+        !state.locked && panel == null && sheet == null && !searchOpen && state.castingTo == null && state.durationMs > 0
+    LaunchedEffect(canShowInfo, touching) {
+        pausedInfo = false
+        if (!canShowInfo || touching) return@LaunchedEffect
+        delay(PAUSED_INFO_DELAY_MS)
+        val bitmap = copyFrame?.let { copy -> suspendCancellableCoroutine<Bitmap?> { done -> copy { done.resume(it) } } }
+        pausedFrame = bitmap?.asImageBitmap()
+        pausedInfo = true
+    }
+    val controlsVisible = !state.locked && !pausedInfo && (controlsRequested || forcedVisible)
 
     // Keep them requested across a pause so resuming doesn't make them vanish under the finger.
     LaunchedEffect(state.isPlaying) {
@@ -288,6 +328,14 @@ private fun PlayerChrome(state: PlayerUiState, actions: PlayerActions, layout: D
                     )
                 }
             }
+            AnimatedVisibility(
+                visible = pausedInfo,
+                modifier = Modifier.fillMaxSize(),
+                enter = fadeIn(tween(PAUSED_INFO_FADE_IN_MS)),
+                exit = fadeOut(tween(200)),
+            ) {
+                PausedInfo(state = state, frame = pausedFrame)
+            }
             if (!state.locked) {
                 Box(
                     Modifier
@@ -379,3 +427,75 @@ private fun PlayerChrome(state: PlayerUiState, actions: PlayerActions, layout: D
 /** Pulled down past this share of the height (or flicked), the player closes. */
 private const val DISMISS_FRACTION = 0.22f
 private const val DISMISS_VELOCITY = 1_500f
+
+/**
+ * What shows over a picture left paused (Netflix): the frame drains from colour to black and white
+ * and dims, and the title, what it is and its synopsis rise in at the left.
+ */
+@Composable
+private fun PausedInfo(state: PlayerUiState, frame: ImageBitmap?) {
+    val drain = remember { Animatable(0f) }
+    LaunchedEffect(Unit) { drain.animateTo(1f, tween(PAUSED_DRAIN_MS, easing = LinearOutSlowInEasing)) }
+    Box(Modifier.fillMaxSize()) {
+        if (frame != null) {
+            Image(
+                bitmap = frame,
+                contentDescription = null,
+                contentScale = ContentScale.Fit,
+                colorFilter = ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(1f - drain.value) }),
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.horizontalGradient(
+                        0f to Color.Black.copy(alpha = 0.75f * drain.value),
+                        0.6f to Color.Black.copy(alpha = 0.45f * drain.value),
+                        1f to Color.Black.copy(alpha = 0.3f * drain.value),
+                    ),
+                ),
+        )
+        Column(
+            Modifier
+                .align(Alignment.CenterStart)
+                .safeDrawingPadding()
+                .padding(start = 40.dp, end = 40.dp)
+                .widthIn(max = 520.dp)
+                .graphicsLayer {
+                    alpha = drain.value
+                    translationY = (1f - drain.value) * 16.dp.toPx()
+                },
+        ) {
+            Text("You're watching", style = MaterialTheme.typography.labelLarge, color = Color.White.copy(alpha = 0.65f))
+            Text(
+                state.title,
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold,
+                color = Color.White,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+            state.subtitle?.let {
+                Text(it, style = MaterialTheme.typography.titleSmall, color = Color.White.copy(alpha = 0.75f), maxLines = 1, modifier = Modifier.padding(top = 4.dp))
+            }
+            state.overview?.let {
+                Text(
+                    it,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color.White.copy(alpha = 0.85f),
+                    maxLines = 4,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = 12.dp),
+                )
+            }
+        }
+    }
+}
+
+/** How long the picture stays paused before the info shows, and how it comes in. */
+private const val PAUSED_INFO_DELAY_MS = 5_000L
+private const val PAUSED_INFO_FADE_IN_MS = 500
+private const val PAUSED_DRAIN_MS = 1_600

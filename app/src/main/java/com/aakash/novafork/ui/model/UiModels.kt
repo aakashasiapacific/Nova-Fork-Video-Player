@@ -206,6 +206,9 @@ data class VideoDetailsUi(
     val originalTitle: String? = null,
     val tagline: String? = null,
     val overview: String? = null,
+    /** TMDB's top-billed cast and directors, "A, B, C"; null when unknown. */
+    val starring: String? = null,
+    val directedBy: String? = null,
     val year: Int? = null,
     val runtimeLabel: String? = null,
     val rating: Float? = null,
@@ -268,6 +271,9 @@ data class ShowDetailsUi(
     val key: String,
     val title: String,
     val overview: String? = null,
+    /** TMDB's top-billed cast and creators, "A, B, C"; null when unknown. */
+    val starring: String? = null,
+    val createdBy: String? = null,
     val tagline: String? = null,
     val year: Int? = null,
     val rating: Float? = null,

@@ -94,11 +94,13 @@ fun PhoneVideoDetailsScreen(
                 )
             }
             item(key = "overview") {
-                OverviewBlock(
-                    tagline = details.tagline,
-                    overview = details.overview,
-                    modifier = Modifier.tintBand(tint, from = 0.55f, to = 0f).padding(start = dims.gutter, end = dims.gutter, top = 16.dp),
-                )
+                Column(Modifier.tintBand(tint, from = 0.55f, to = 0f).padding(start = dims.gutter, end = dims.gutter, top = 16.dp)) {
+                    OverviewBlock(tagline = details.tagline, overview = details.overview)
+                    Credits(
+                        lines = listOf("Starring" to details.starring, "Director" to details.directedBy),
+                        modifier = Modifier.padding(top = 12.dp),
+                    )
+                }
             }
             val showKey = details.showKey
             val showTitle = details.showTitle

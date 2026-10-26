@@ -51,6 +51,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -74,6 +77,8 @@ import com.aakash.novafork.data.db.SourceType
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
 import com.aakash.novafork.ui.common.EndOfListGap
 import com.aakash.novafork.ui.common.GlassCircle
+import com.aakash.novafork.ui.common.Hairline
+import com.aakash.novafork.ui.common.IosColors
 import com.aakash.novafork.ui.common.IosSpinner
 import com.aakash.novafork.ui.common.LandscapeArt
 import com.aakash.novafork.ui.common.LocalBottomBarSpace
@@ -661,6 +666,11 @@ private fun PinnedMonth(months: List<TimelineMonth>, headings: List<Int>, state:
                 translationY = arriving?.let { (it.offset.y - height).coerceAtMost(0).toFloat() } ?: 0f
             }
             .background(MaterialTheme.colorScheme.background)
+            // A hairline under it, so it reads as a header with the posters passing beneath.
+            .drawBehind {
+                val line = Hairline.toPx()
+                drawRect(IosColors.Separator, topLeft = Offset(0f, size.height - line), size = Size(size.width, line))
+            }
             .padding(horizontal = dims.gutter)
             .padding(top = 12.dp, bottom = 6.dp),
     )

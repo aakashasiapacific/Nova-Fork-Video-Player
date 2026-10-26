@@ -111,6 +111,7 @@ import com.aakash.novafork.data.music.MusicScanState
 import com.aakash.novafork.music.MusicPlayerState
 import com.aakash.novafork.music.SongPulse
 import com.aakash.novafork.music.SongPulses
+import com.aakash.novafork.ui.common.ArtViewer
 import com.aakash.novafork.ui.common.CollapsedTitleBar
 import com.aakash.novafork.ui.common.ContextMenuLift
 import com.aakash.novafork.ui.common.EndOfListGap
@@ -592,6 +593,7 @@ private fun AlbumPage(album: Album, ctx: PageContext) {
             val glow = rememberCoverTint(album.artUri)
             val grid = LocalPageGrid.current
             val pull = LocalPagePull.current
+            var coverLarge by remember { mutableStateOf(false) }
             Column(
                 Modifier
                     .fillMaxWidth()
@@ -624,9 +626,16 @@ private fun AlbumPage(album: Album, ctx: PageContext) {
                             transformOrigin = TransformOrigin(0.5f, 1f)
                         }
                         .shadow(18.dp, RoundedCornerShape(10.dp))
-                        .clip(RoundedCornerShape(10.dp)),
+                        .clip(RoundedCornerShape(10.dp))
+                        // Held, the cover shows large over the blurred page.
+                        .combinedClickable(onClick = {}, onLongClickLabel = "Show the cover large", onLongClick = { coverLarge = true }),
                 ) {
                     Cover(album.artUri, size = 0, corner = 10, modifier = Modifier.fillMaxSize())
+                }
+                if (coverLarge) {
+                    ArtViewer(onDismiss = { coverLarge = false }) { art ->
+                        Cover(album.artUri, size = 0, corner = 14, modifier = art.fillMaxWidth().aspectRatio(1f))
+                    }
                 }
                 Text(
                     album.title,
