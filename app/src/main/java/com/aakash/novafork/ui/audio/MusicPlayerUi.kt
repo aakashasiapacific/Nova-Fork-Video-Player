@@ -110,6 +110,7 @@ import com.aakash.novafork.music.SleepTimer
 import com.aakash.novafork.ui.common.IosColors
 import com.aakash.novafork.ui.common.IosIconButton
 import com.aakash.novafork.ui.common.NovaDropdownMenu
+import com.aakash.novafork.ui.common.NovaMenuDivider
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.NovaMenuItem
 import com.aakash.novafork.ui.common.frostedGlass
@@ -1261,16 +1262,18 @@ private fun SleepButton(sleep: SleepTimer?, actions: AudioActions) {
                 )
             }
         }
-        NovaDropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+        NovaDropdownMenu(expanded = open, onDismissRequest = { open = false }, title = "Sleep Timer") {
             SLEEP_CHOICES.forEach { (minutes, label) ->
                 val chosen = when (sleep) {
                     null -> minutes == 0
                     is SleepTimer.At -> sleep.minutes == minutes
                     SleepTimer.EndOfSong -> minutes < 0
                 }
+                // The end of the song stands apart from the times, as iOS 27 sections a menu.
+                if (minutes < 0) NovaMenuDivider()
                 NovaMenuItem(
                     text = { Text(label) },
-                    trailingIcon = if (chosen) ({ NovaIcon(R.drawable.ic_check, contentDescription = null) }) else null,
+                    checked = chosen,
                     onClick = {
                         open = false
                         actions.setSleepTimer(minutes)

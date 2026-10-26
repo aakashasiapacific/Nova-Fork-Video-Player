@@ -26,7 +26,10 @@ import com.aakash.novafork.ui.common.IosHudHost
 import com.aakash.novafork.ui.common.IosTextButton
 import com.aakash.novafork.ui.common.IosToastHost
 import com.aakash.novafork.ui.common.LocalHud
+import com.aakash.novafork.ui.common.LocalSheetDepth
 import com.aakash.novafork.ui.common.NovaAlertDialog
+import com.aakash.novafork.ui.common.SheetDepth
+import com.aakash.novafork.ui.common.sinkBehindSheets
 import com.aakash.novafork.ui.dialogs.NovaDialogs
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.AppUiState
@@ -48,9 +51,10 @@ fun NovaRoot(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
             LocalDeviceLayout provides layout,
             LocalNovaDimens provides dimensFor(layout),
             LocalHud provides hud,
+            LocalSheetDepth provides remember { SheetDepth() },
         ) {
             Surface(modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-                Box(Modifier.fillMaxSize()) {
+                Box(Modifier.fillMaxSize().sinkBehindSheets()) {
                     if (layout.isTablet) {
                         TabletApp(state = state, actions = actions, layout = layout)
                     } else {

@@ -282,15 +282,11 @@ private fun SeasonSelector(
                 modifier = Modifier.padding(start = 6.dp).size(20.dp),
             )
         }
-        NovaDropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+        NovaDropdownMenu(expanded = open, onDismissRequest = { open = false }, title = "Seasons") {
             seasons.forEach { season ->
                 NovaMenuItem(
                     text = { Text("${season.title} · ${season.episodes.size}") },
-                    leadingIcon = {
-                        Box(Modifier.size(18.dp), contentAlignment = Alignment.Center) {
-                            if (season.number == selected) NovaIcon(R.drawable.ic_check, contentDescription = "Selected", modifier = Modifier.size(16.dp))
-                        }
-                    },
+                    checked = season.number == selected,
                     onClick = {
                         open = false
                         onSelect(season.number)

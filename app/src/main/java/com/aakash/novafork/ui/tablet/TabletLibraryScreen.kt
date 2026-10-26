@@ -206,7 +206,7 @@ private fun SortMenu(sort: LibrarySort, onSort: (LibrarySort) -> Unit) {
             Spacer(Modifier.width(4.dp))
             NovaIcon(R.drawable.ic_expand_more, contentDescription = null, modifier = Modifier.size(18.dp))
         }
-        NovaDropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+        NovaDropdownMenu(expanded = open, onDismissRequest = { open = false }, title = "Sort by") {
             LibrarySort.entries.forEach { option ->
                 NovaMenuItem(
                     text = { Text(option.label) },
@@ -214,11 +214,7 @@ private fun SortMenu(sort: LibrarySort, onSort: (LibrarySort) -> Unit) {
                         open = false
                         onSort(option)
                     },
-                    trailingIcon = if (option == sort) {
-                        { NovaIcon(R.drawable.ic_check, contentDescription = "Selected") }
-                    } else {
-                        null
-                    },
+                    checked = option == sort,
                 )
             }
         }

@@ -177,17 +177,11 @@ fun PhoneShowDetailsScreen(
                                         .graphicsLayer { rotationZ = turn },
                                 )
                             }
-                            NovaDropdownMenu(expanded = seasonMenu, onDismissRequest = { seasonMenu = false }) {
+                            NovaDropdownMenu(expanded = seasonMenu, onDismissRequest = { seasonMenu = false }, title = "Seasons") {
                                 seasons.forEach { s ->
                                     NovaMenuItem(
                                         text = { Text(s.title) },
-                                        leadingIcon = {
-                                            Box(Modifier.size(18.dp), contentAlignment = Alignment.Center) {
-                                                if (s.number == season?.number) {
-                                                    NovaIcon(R.drawable.ic_check, contentDescription = "Selected", modifier = Modifier.size(16.dp))
-                                                }
-                                            }
-                                        },
+                                        checked = s.number == season?.number,
                                         onClick = {
                                             seasonMenu = false
                                             selectedSeason = s.number

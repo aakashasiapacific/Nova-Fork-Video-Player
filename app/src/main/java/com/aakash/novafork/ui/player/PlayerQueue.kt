@@ -24,9 +24,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.BiasAlignment
@@ -39,9 +37,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
-import com.aakash.novafork.ui.common.IosColors
-import com.aakash.novafork.ui.common.IosGrabber
-import com.aakash.novafork.ui.common.IosSheetShape
+import com.aakash.novafork.ui.common.IosSheet
 import com.aakash.novafork.ui.common.LandscapeArt
 import com.aakash.novafork.ui.common.NovaChip
 import com.aakash.novafork.ui.model.CastDeviceUi
@@ -50,7 +46,7 @@ import com.aakash.novafork.ui.model.PlayerUiState
 import com.aakash.novafork.ui.model.QueueItemUi
 import com.aakash.novafork.ui.model.RepeatMode
 
-/** Phone: the queue or the cast devices in a modal bottom sheet. */
+/** Phone: the queue or the cast devices in a floating sheet, its title over them. */
 @Composable
 internal fun PlayerListSheet(
     sheet: PlayerSheet,
@@ -58,19 +54,7 @@ internal fun PlayerListSheet(
     actions: PlayerActions,
     onDismiss: () -> Unit,
 ) {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        containerColor = IosColors.GroupedCard,
-        shape = IosSheetShape,
-        dragHandle = { IosGrabber() },
-    ) {
-        Text(
-            text = sheet.title,
-            style = MaterialTheme.typography.titleLarge,
-            modifier = Modifier.padding(start = 24.dp, end = 24.dp, bottom = 4.dp),
-        )
+    IosSheet(onDismissRequest = onDismiss, title = sheet.title) {
         PlayerSheetContent(sheet = sheet, state = state, actions = actions, onDismiss = onDismiss)
     }
 }

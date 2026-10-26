@@ -1,26 +1,25 @@
 package com.aakash.novafork.ui.player
 
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import com.aakash.novafork.ui.common.IosColors
-import com.aakash.novafork.ui.common.IosGrabber
 import com.aakash.novafork.ui.common.IosSegmentedControl
-import com.aakash.novafork.ui.common.IosSheetShape
+import com.aakash.novafork.ui.common.IosSheet
+import com.aakash.novafork.ui.common.SheetDoneButton
 import com.aakash.novafork.ui.model.PlayerActions
 import com.aakash.novafork.ui.model.PlayerUiState
 
@@ -35,7 +34,7 @@ private fun PlayerPanel.sheetTab(): Int = when (this) {
     PlayerPanel.SPEED, PlayerPanel.ASPECT -> TAB_SPEED
 }
 
-/** Phone track picker: Audio | Subtitles | Speed (with aspect ratio and subtitle delay) in a modal bottom sheet. */
+/** Phone track picker: Audio | Subtitles | Speed (with aspect ratio and subtitle delay) in a floating sheet. */
 @Composable
 internal fun TrackSheet(
     initial: PlayerPanel,
@@ -43,24 +42,24 @@ internal fun TrackSheet(
     actions: PlayerActions,
     onDismiss: () -> Unit,
 ) {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var tab by rememberSaveable(initial) { mutableIntStateOf(initial.sheetTab()) }
 
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        containerColor = IosColors.GroupedCard,
-        shape = IosSheetShape,
-        dragHandle = { IosGrabber() },
-    ) {
-        IosSegmentedControl(
-            options = SheetTabs,
-            selectedIndex = tab,
-            onSelect = { tab = it },
-            modifier = Modifier
+    IosSheet(onDismissRequest = onDismiss) { close ->
+        // The tabs, with the sheet's tick beside them in place of a "Done" label (iOS 27).
+        Row(
+            Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 4.dp),
-        )
+                .padding(start = 16.dp, end = 14.dp, top = 4.dp, bottom = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            IosSegmentedControl(
+                options = SheetTabs,
+                selectedIndex = tab,
+                onSelect = { tab = it },
+                modifier = Modifier.weight(1f),
+            )
+            SheetDoneButton(onClick = close, modifier = Modifier.padding(start = 12.dp))
+        }
         Column(
             Modifier
                 .fillMaxWidth()
