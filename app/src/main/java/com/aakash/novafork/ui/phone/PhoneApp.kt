@@ -617,7 +617,8 @@ private fun PhoneNavigationBar(
                         }
                     if (tab == TopDestination.AUDIO && musicPlaying) {
                         Box(iconModifier, contentAlignment = Alignment.Center) {
-                            PlayingBars(playing = true, color = tint, modifier = Modifier.height(20.dp), barWidth = 3.5.dp)
+                            // Apple Music's red, on any tab (owner).
+                            PlayingBars(playing = true, color = NovaColors.AppleMusicRed, modifier = Modifier.height(20.dp), barWidth = 3.5.dp)
                         }
                     } else {
                         NovaIcon(tab.tabIconRes(), contentDescription = null, tint = tint, modifier = iconModifier)

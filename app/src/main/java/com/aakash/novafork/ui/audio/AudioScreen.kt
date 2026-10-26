@@ -977,13 +977,7 @@ private fun AlbumTile(album: Album, ctx: PageContext, modifier: Modifier = Modif
     var menuOpen by remember { mutableStateOf(false) }
     Box(modifier) {
         ContextMenuLift(open = menuOpen) { _ ->
-            val playing = ctx.nowPlayingId != null && album.songs.any { it.id == ctx.nowPlayingId }
-            AlbumTileContent(
-                album,
-                onClick = onClick,
-                onLongClick = { menuOpen = true },
-                playing = if (playing) ctx.isPlaying else null,
-            )
+            AlbumTileContent(album, onClick = onClick, onLongClick = { menuOpen = true })
         }
         NovaDropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
             val close = { menuOpen = false }
@@ -1018,7 +1012,7 @@ private fun AlbumTile(album: Album, ctx: PageContext, modifier: Modifier = Modif
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun AlbumTileContent(album: Album, onClick: () -> Unit, onLongClick: () -> Unit, playing: Boolean? = null) {
+private fun AlbumTileContent(album: Album, onClick: () -> Unit, onLongClick: () -> Unit) {
     Column(
         Modifier
             .padding(bottom = 18.dp)
@@ -1031,21 +1025,6 @@ private fun AlbumTileContent(album: Album, onClick: () -> Unit, onLongClick: () 
                 .clip(RoundedCornerShape(8.dp)),
         ) {
             Cover(album.artUri, size = 0, modifier = Modifier.fillMaxSize())
-            // The album that is playing ([playing] non-null) carries the mini player's bars in
-            // its corner, dancing while it plays.
-            if (playing != null) {
-                Box(
-                    Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(8.dp)
-                        .size(28.dp)
-                        .clip(RoundedCornerShape(7.dp))
-                        .background(Color.Black.copy(alpha = 0.55f)),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    PlayingBars(playing = playing, color = Color.White)
-                }
-            }
         }
         Text(
             album.title,
@@ -1123,18 +1102,7 @@ private fun SongRow(song: SongEntity, ctx: PageContext, onClick: () -> Unit, onR
                     ),
                 ) {
                     Row(Modifier.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Cover(MusicLibrary.artUri(song), size = 48, corner = 6)
-                            if (playing) {
-                                Box(
-                                    Modifier
-                                        .size(48.dp)
-                                        .clip(RoundedCornerShape(6.dp))
-                                        .background(Color.Black.copy(alpha = 0.45f)),
-                                )
-                                PlayingBars(ctx.isPlaying, color = Color.White)
-                            }
-                        }
+                        Cover(MusicLibrary.artUri(song), size = 48, corner = 6)
                         Column(
                             Modifier
                                 .weight(1f)
@@ -1206,11 +1174,12 @@ private fun TrackRow(song: SongEntity, ctx: PageContext, onClick: () -> Unit) {
                 ) {
                     Row(Modifier.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                         Box(Modifier.width(32.dp)) {
-                            if (playing) {
-                                PlayingBars(ctx.isPlaying, color = NovaColors.AppleMusicRed)
-                            } else {
-                                Text(song.trackNumber?.toString() ?: "", fontSize = 16.sp, color = Color.White.copy(alpha = 0.55f))
-                            }
+                            // The playing song's number turns red with its title (owner: no bars here).
+                            Text(
+                                song.trackNumber?.toString() ?: "",
+                                fontSize = 16.sp,
+                                color = if (playing) NovaColors.AppleMusicRed else Color.White.copy(alpha = 0.55f),
+                            )
                         }
                         Text(
                             song.title,
@@ -1325,10 +1294,10 @@ private fun SongMenu(
 }
 
 /**
- * Apple Music's "now playing" bars: four thin bars that move with the song while it plays (owner:
- * in time with it), each following one band of its sound, bass to treble, as read from the file
- * ([SongPulses]); until that is read, or when it can't be, they bounce on their own. They rest
- * low while it is paused.
+ * Apple Music's "now playing" bars, shown only as the Audio tab's icon while a song plays (owner):
+ * four thin bars that move with the song (in time with it), each following one band of its
+ * sound, bass to treble, as read from the file ([SongPulses]); until that is read, or when it
+ * can't be, they bounce on their own. They rest low while it is paused.
  */
 @Composable
 internal fun PlayingBars(playing: Boolean, color: Color, modifier: Modifier = Modifier, barWidth: Dp = 3.dp) {

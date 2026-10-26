@@ -454,18 +454,6 @@ fun MiniPlayerBar(
             Crossfade(targetState = now?.artUri, animationSpec = tween(MINI_FADE_MS), label = "miniCover") { art ->
                 Cover(art, size = coverSize, corner = coverCorner)
             }
-            // Little bars over the cover: dancing while it plays, still when paused.
-            if (now != null) {
-                Box(
-                    Modifier
-                        .size(coverSize.dp)
-                        .clip(RoundedCornerShape(coverCorner.dp))
-                        .background(Color.Black.copy(alpha = 0.35f)),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    PlayingBars(playing = player.isPlaying, color = Color.White)
-                }
-            }
         }
         Column(
             Modifier

@@ -618,3 +618,4 @@ The owner asked for Apple Music to be copied more precisely, with less clutter. 
   - Home's Library no longer lists the Watchlist (it has its own row above; it showed twice).
   - The "now playing" bars move with the song itself: each follows one band of its sound (bass, low and high mids, treble), read once from the file in the background (no microphone access needed), and kept in time with where the song is.
   - The mini player shows on the Audio tab only; on the other tabs the Audio tab's icon turns into those bars while a song plays.
+- **Build 127 (owner: too many bars moving):** the "now playing" bars show only as the Audio tab's icon while a song plays, always in Apple Music's red; they are gone from album covers, song covers, the album's track numbers (the playing one's number turns red with its title) and the mini player's cover.
