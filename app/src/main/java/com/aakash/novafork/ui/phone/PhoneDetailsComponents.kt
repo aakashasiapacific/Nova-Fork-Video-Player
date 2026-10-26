@@ -126,7 +126,8 @@ internal fun BackdropPosterHeader(
     info: @Composable ColumnScope.() -> Unit,
 ) {
     val dims = LocalNovaDimens.current
-    val posterShape = RoundedCornerShape(10.dp)
+    // The same corner as every poster card (iOS 27: one family of corners).
+    val posterShape = RoundedCornerShape(dims.cardRadius)
     val statusBar = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val background = MaterialTheme.colorScheme.background
     BoxWithConstraints(modifier.fillMaxWidth()) {

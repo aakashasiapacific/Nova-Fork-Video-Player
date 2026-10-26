@@ -53,6 +53,7 @@ import com.aakash.novafork.core.format.Formats
 import com.aakash.novafork.ui.common.IosIconButton
 import com.aakash.novafork.ui.common.NovaDropdownMenu
 import com.aakash.novafork.ui.common.NovaMenuItem
+import com.aakash.novafork.ui.common.SymbolSwap
 import com.aakash.novafork.ui.model.PlayerUiState
 import com.aakash.novafork.ui.model.RepeatMode
 import com.aakash.novafork.ui.model.TrackUi
@@ -264,14 +265,13 @@ internal fun PlayPauseButton(
                 .clickable(role = Role.Button, onClick = onClick),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(
-                painter = painterResource(
-                    when {
-                        finished -> R.drawable.ic_replay
-                        isPlaying -> R.drawable.ic_pause
-                        else -> R.drawable.ic_play_arrow
-                    },
-                ),
+            // SF Symbols' replace: play, pause and replay shrink into one another rather than cut.
+            SymbolSwap(
+                icon = when {
+                    finished -> R.drawable.ic_replay
+                    isPlaying -> R.drawable.ic_pause
+                    else -> R.drawable.ic_play_arrow
+                },
                 contentDescription = when {
                     finished -> "Replay"
                     isPlaying -> "Pause"

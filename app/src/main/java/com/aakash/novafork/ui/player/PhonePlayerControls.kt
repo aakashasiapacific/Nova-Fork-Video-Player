@@ -35,6 +35,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aakash.novafork.R
+import com.aakash.novafork.ui.common.RollingText
 import com.aakash.novafork.ui.common.rememberEndsAt
 import com.aakash.novafork.ui.model.PlayerActions
 import com.aakash.novafork.ui.model.PlayerUiState
@@ -145,7 +146,8 @@ private fun PhoneTopBar(
             // Apple TV's "Ends at 10:42 PM", at the speed it is playing.
             val left = if (state.durationMs > 0L) ((state.durationMs - state.positionMs) / state.rate.coerceAtLeast(0.1f)).toLong() else null
             rememberEndsAt(left)?.let { endsAt ->
-                Text(endsAt, style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.7f), maxLines = 1)
+                // Its digits roll when the time moves (a seek, another speed).
+                RollingText(endsAt, style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.7f))
             }
         }
         // Cast shows here only while casting, so where the picture went is never hidden.

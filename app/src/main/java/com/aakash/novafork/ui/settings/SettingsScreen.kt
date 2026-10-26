@@ -50,6 +50,8 @@ import com.aakash.novafork.ui.common.Hairline
 import com.aakash.novafork.ui.common.IosColors
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.OnTabReselect
+import com.aakash.novafork.ui.common.largeTitle
+import com.aakash.novafork.ui.common.rememberLargeTitleState
 import com.aakash.novafork.ui.common.stretchWithPull
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.Route
@@ -89,7 +91,7 @@ private fun PhoneSettings(actions: AppActions, modifier: Modifier, contentPaddin
     // iOS's large title: "Preferences" scrolls away and comes back small in a bar at the top.
     val listState = rememberLazyListState()
     OnTabReselect { listState.animateScrollToItem(0) }
-    val collapsed by remember { derivedStateOf { listState.firstVisibleItemIndex > 0 } }
+    val titleState = rememberLargeTitleState(listState)
     Box(modifier.fillMaxSize()) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
@@ -100,7 +102,7 @@ private fun PhoneSettings(actions: AppActions, modifier: Modifier, contentPaddin
                 Text(
                     text = "Preferences",
                     style = MaterialTheme.typography.headlineLarge,
-                    modifier = Modifier.padding(start = 4.dp, top = 16.dp, bottom = 4.dp).stretchWithPull(),
+                    modifier = Modifier.padding(start = 4.dp, top = 16.dp, bottom = 4.dp).stretchWithPull().largeTitle(titleState),
                 )
             }
             PhoneSectionCards.forEachIndexed { index, sections ->
@@ -113,7 +115,7 @@ private fun PhoneSettings(actions: AppActions, modifier: Modifier, contentPaddin
                 }
             }
         }
-        CollapsedTitleBar(visible = collapsed, title = "Preferences")
+        CollapsedTitleBar(state = titleState, title = "Preferences")
     }
 }
 

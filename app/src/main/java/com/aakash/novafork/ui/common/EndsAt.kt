@@ -27,7 +27,11 @@ fun rememberEndsAt(remainingMs: Long?): String? {
         }
     }
     if (remainingMs == null || remainingMs <= 0L) return null
-    return "Ends at " + format.format(Date(now + remainingMs))
+    // The tick makes this run again as the clock moves; the time itself is taken now, so a
+    // remaining time that shrinks as it plays does not drift the minute back and forth (its
+    // digits roll when it changes).
+    val clock = maxOf(now, System.currentTimeMillis())
+    return "Ends at " + format.format(Date(clock + remainingMs))
 }
 
 private const val ENDS_AT_TICK_MS = 20_000L

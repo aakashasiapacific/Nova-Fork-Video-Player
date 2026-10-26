@@ -67,6 +67,7 @@ import com.aakash.novafork.ui.common.SectionHeader
 import com.aakash.novafork.ui.common.VideoMenuBox
 import com.aakash.novafork.ui.common.bottomScrim
 import com.aakash.novafork.ui.common.deviceAccessNotice
+import com.aakash.novafork.ui.common.fadeEndEdge
 import com.aakash.novafork.ui.common.startScrim
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.DialogUi
@@ -212,7 +213,11 @@ private fun HomeSection(title: String, onSeeAll: (() -> Unit)? = null, content: 
 @Composable
 private fun WatchlistRow(items: List<LibraryItemUi>, actions: AppActions) {
     val dims = LocalNovaDimens.current
+    val rowState = rememberLazyListState()
     LazyRow(
+        state = rowState,
+        // The card peeking in at the end fades into the page (iOS 27).
+        modifier = Modifier.fadeEndEdge(rowState),
         contentPadding = PaddingValues(horizontal = dims.gutter, vertical = 6.dp),
         horizontalArrangement = Arrangement.spacedBy(dims.rowSpacing),
     ) {
@@ -241,7 +246,11 @@ private fun WatchlistRow(items: List<LibraryItemUi>, actions: AppActions) {
 @Composable
 private fun ContinueWatchingRow(cards: List<VideoCardUi>, actions: AppActions) {
     val dims = LocalNovaDimens.current
+    val rowState = rememberLazyListState()
     LazyRow(
+        state = rowState,
+        // The card peeking in at the end fades into the page (iOS 27).
+        modifier = Modifier.fadeEndEdge(rowState),
         contentPadding = PaddingValues(horizontal = dims.gutter, vertical = 6.dp),
         horizontalArrangement = Arrangement.spacedBy(dims.rowSpacing),
     ) {

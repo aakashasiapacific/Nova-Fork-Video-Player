@@ -102,6 +102,7 @@ import com.aakash.novafork.ui.common.LocalPagePull
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.PosterArt
 import com.aakash.novafork.ui.common.RatingPill
+import com.aakash.novafork.ui.common.popOnChange
 import com.aakash.novafork.ui.common.pressScale
 import com.aakash.novafork.ui.common.resumeFill
 import com.aakash.novafork.ui.model.AppActions
@@ -620,6 +621,8 @@ private fun RoundHeroButton(
         interactionSource = press,
         modifier = Modifier
             .size(50.dp)
+            // SF Symbols' bounce: turned on or off, the whole button pops and springs back.
+            .popOnChange(fill != null)
             .pressScale(press, pressed = 0.9f)
             .border(Hairline * 2, rim, CircleShape)
             .semantics { contentDescription = description },
