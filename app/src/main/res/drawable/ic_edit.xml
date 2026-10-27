@@ -1,11 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Material Icons (Round), Apache License 2.0, https://github.com/google/material-design-icons -->
+<!-- Framework7 Icons (pencil), MIT License, Copyright (c) 2016 Vladimir Kharlampidi, https://github.com/framework7io/framework7-icons -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"
     android:height="24dp"
-    android:viewportWidth="24"
-    android:viewportHeight="24">
-    <path
-        android:fillColor="#FFFFFFFF"
-        android:pathData="M3 17.46v3.04c0 .28.22.5.5.5h3.04c.13 0 .26-.05.35-.15L17.81 9.94l-3.75-3.75L3.15 17.1c-.1.1-.15.22-.15.36zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" />
+    android:viewportWidth="60"
+    android:viewportHeight="60">
+    <group
+        android:translateX="2"
+        android:translateY="2">
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="M 43.2930 16.9258 L 45.6601 14.6055 C 46.8555 13.4101 46.9023 12.1211 45.8477 11.0430 L 45.0508 10.2461 C 43.9961 9.1914 42.7070 9.3086 41.5117 10.4570 L 39.1445 12.8008 Z M 15.6601 44.4883 L 41.2305 18.9414 L 37.1289 14.8164 L 11.5352 40.3867 L 9.3086 45.5898 C 9.0977 46.1523 9.6836 46.8086 10.2461 46.5742 Z" />
+    </group>
 </vector>

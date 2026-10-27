@@ -7,10 +7,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -24,7 +21,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import com.aakash.novafork.R
 import com.aakash.novafork.ui.InputRules
+import com.aakash.novafork.ui.common.IosTextButton
+import com.aakash.novafork.ui.common.NovaAlertDialog
 import com.aakash.novafork.ui.common.NovaIcon
+import com.aakash.novafork.ui.common.NovaTextField
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.DialogUi
 import com.aakash.novafork.ui.model.PlaylistUi
@@ -32,21 +32,21 @@ import com.aakash.novafork.ui.model.SourceUi
 
 /**
  * Shows [dialog] (nothing for null). Shared by the phone and tablet UIs; each dialog is modal.
- * [playlists] fill the "Add to playlist" sheet.
+ * [playlists] fill the "Add to Playlist" sheet.
  */
 @Composable
 fun NovaDialogs(dialog: DialogUi?, actions: AppActions, playlists: List<PlaylistUi> = emptyList()) {
     when (dialog) {
         null -> Unit
         DialogUi.AddStream -> StreamUrlDialog(
-            title = "Add stream",
+            title = "Add Stream",
             confirmLabel = "Save",
             askForName = true,
             onConfirm = { name, url -> actions.addStream(name, url) },
             onDismiss = actions::dismissDialog,
         )
         DialogUi.OpenUrl -> StreamUrlDialog(
-            title = "Open network stream",
+            title = "Open Network Stream",
             confirmLabel = "Play",
             askForName = false,
             onConfirm = { _, url -> actions.playUrl(url) },
@@ -57,6 +57,7 @@ fun NovaDialogs(dialog: DialogUi?, actions: AppActions, playlists: List<Playlist
         is DialogUi.NetworkServer -> NetworkServerDialog(dialog = dialog, actions = actions)
         is DialogUi.UpnpServers -> UpnpServersDialog(dialog = dialog, actions = actions)
         is DialogUi.Identify -> IdentifyDialog(dialog = dialog, actions = actions)
+        is DialogUi.ChangeArtwork -> ChangeArtworkDialog(dialog = dialog, actions = actions)
         is DialogUi.ConfirmRemoveSource -> ConfirmRemoveSourceDialog(
             source = dialog.source,
             onConfirm = { actions.removeSource(dialog.source.id) },
@@ -64,7 +65,7 @@ fun NovaDialogs(dialog: DialogUi?, actions: AppActions, playlists: List<Playlist
         )
         is DialogUi.AddToPlaylist -> AddToPlaylistSheet(dialog = dialog, playlists = playlists, actions = actions)
         is DialogUi.NewPlaylist -> PlaylistNameDialog(
-            title = "New playlist",
+            title = "New Playlist",
             confirmLabel = "Create",
             initialName = "",
             onConfirm = { name -> actions.createPlaylist(name, dialog.videoIds) },
@@ -107,7 +108,8 @@ private fun StreamUrlDialog(
         }
     }
 
-    AlertDialog(
+    NovaAlertDialog(
+        form = true,
         onDismissRequest = onDismiss,
         // A stray tap outside should not throw away a pasted URL.
         properties = DialogProperties(dismissOnClickOutside = false),
@@ -118,7 +120,7 @@ private fun StreamUrlDialog(
                 Modifier.verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                OutlinedTextField(
+                NovaTextField(
                     value = url,
                     onValueChange = {
                         url = it
@@ -141,7 +143,7 @@ private fun StreamUrlDialog(
                     keyboardActions = KeyboardActions(onGo = { submit() }),
                 )
                 if (askForName) {
-                    OutlinedTextField(
+                    NovaTextField(
                         value = name,
                         onValueChange = { name = it },
                         modifier = Modifier.fillMaxWidth(),
@@ -157,26 +159,26 @@ private fun StreamUrlDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = { submit() }, enabled = url.isNotBlank()) { Text(confirmLabel) }
+            IosTextButton(onClick = { submit() }, enabled = url.isNotBlank()) { Text(confirmLabel) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            IosTextButton(onClick = onDismiss) { Text("Cancel") }
         },
     )
 }
 
 @Composable
 private fun ConfirmRemoveSourceDialog(source: SourceUi, onConfirm: () -> Unit, onDismiss: () -> Unit) {
-    AlertDialog(
+    NovaAlertDialog(
         onDismissRequest = onDismiss,
         icon = { NovaIcon(R.drawable.ic_delete, contentDescription = null) },
         title = { Text("Remove ${source.name}?") },
         text = { Text("Videos from this source leave your library. Files are not deleted.") },
         confirmButton = {
-            TextButton(onClick = onConfirm) { Text("Remove") }
+            IosTextButton(onClick = onConfirm) { Text("Remove") }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            IosTextButton(onClick = onDismiss) { Text("Cancel") }
         },
     )
 }

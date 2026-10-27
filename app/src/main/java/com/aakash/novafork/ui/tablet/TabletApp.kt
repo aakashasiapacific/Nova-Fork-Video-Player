@@ -10,35 +10,53 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.aakash.novafork.ui.adaptive.DeviceLayout
 import com.aakash.novafork.ui.adaptive.LocalDeviceLayout
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
 import com.aakash.novafork.ui.adaptive.dimensFor
+import com.aakash.novafork.ui.audio.AudioScreen
+import com.aakash.novafork.ui.audio.MiniPlayerBar
+import com.aakash.novafork.ui.audio.MiniPlayerHeight
+import com.aakash.novafork.ui.audio.ShellNowPlaying
+import com.aakash.novafork.ui.audio.rememberMusicShell
+import com.aakash.novafork.ui.common.LocalBottomBarSpace
+import com.aakash.novafork.ui.common.swipeBetweenTabs
+import com.aakash.novafork.ui.common.tabSlide
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.AppUiState
 import com.aakash.novafork.ui.model.Route
+import com.aakash.novafork.ui.model.TopDestination
 import com.aakash.novafork.ui.model.top
+import com.aakash.novafork.ui.phone.PhoneContinueWatchingScreen
 import com.aakash.novafork.ui.settings.SettingsScreen
 
 /**
- * Tablet UI: navigation rail plus one page per route. Pages with artwork draw behind the status
+ * Tablet UI: a floating tab bar at the top centre over one page per route. Pages with artwork draw behind the status
  * bar; the others pad themselves. Dialogs, snackbars and system back belong to the app shell.
  */
 @Composable
@@ -50,34 +68,75 @@ fun TabletApp(state: AppUiState, actions: AppActions, layout: DeviceLayout, modi
         // Pages leave the composition when navigated away from; this keeps their scroll positions
         // for when the user comes back.
         val pageStates = rememberSaveableStateHolder()
+        // Music (the real app only): a floating mini player at the bottom, Now Playing over all.
+        val music = rememberMusicShell()
+        // A queue brought back after the app was closed shows only on the Audio tab.
+        val miniPlayerShown = music?.second?.let { it.active && (!it.restored || state.route.top == TopDestination.AUDIO) } == true
+        var nowPlayingOpen by rememberSaveable { mutableStateOf(false) }
+        val navBar = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
         // A Surface (not just a background) so text and icons get onBackground by default.
         Surface(modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-            Row(Modifier.fillMaxSize()) {
-                TabletNavRail(
-                    selected = state.route.top,
-                    searchSelected = state.route == Route.Search,
-                    onSelect = actions::selectTab,
-                    onSearch = { if (state.route != Route.Search) actions.navigate(Route.Search) },
-                    modifier = Modifier.fillMaxHeight(),
-                )
-                // Keyed by page, so updates within a page recompose it in place while a page change
-                // crossfades and the outgoing page keeps the state it was built with.
-                AnimatedContent(
-                    targetState = state,
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
-                        .windowInsetsPadding(
-                            WindowInsets.systemBars.union(WindowInsets.displayCutout).only(WindowInsetsSides.End),
-                        ),
-                    transitionSpec = { fadeIn(tween(durationMillis = 240, delayMillis = 40)) togetherWith fadeOut(tween(durationMillis = 160)) },
-                    contentAlignment = Alignment.TopStart,
-                    contentKey = { it.route.pageKey() },
-                    label = "tabletPage",
-                ) { pageState ->
-                    pageStates.SaveableStateProvider(pageState.route.pageKey().toString()) {
-                        TabletPage(state = pageState, actions = actions, layout = layout)
+            Box(Modifier.fillMaxSize()) {
+                CompositionLocalProvider(
+                    LocalBottomBarSpace provides if (miniPlayerShown) MiniPlayerHeight + 24.dp + navBar else 0.dp,
+                ) {
+                    // Keyed by page, so updates within a page recompose it in place while a page change
+                    // crossfades and the outgoing page keeps the state it was built with.
+                    AnimatedContent(
+                        targetState = state,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .swipeBetweenTabs(state.route.top, enabled = !state.canGoBack, onSelect = actions::selectTab, onBack = actions::back)
+                            .windowInsetsPadding(
+                                WindowInsets.systemBars.union(WindowInsets.displayCutout).only(WindowInsetsSides.Horizontal),
+                            ),
+                        transitionSpec = {
+                            tabSlide(
+                                from = initialState.route.top,
+                                to = targetState.route.top,
+                                fade = fadeIn(tween(durationMillis = 240, delayMillis = 40)) togetherWith fadeOut(tween(durationMillis = 160)),
+                            )
+                        },
+                        contentAlignment = Alignment.TopStart,
+                        contentKey = { it.route.pageKey() },
+                        label = "tabletPage",
+                    ) { pageState ->
+                        pageStates.SaveableStateProvider(pageState.route.pageKey().toString()) {
+                            // Pages with art at the top (Home's hero, details) run under the floating
+                            // bar; the others start below it.
+                            val underBar = pageState.route is Route.VideoDetails || pageState.route is Route.ShowDetails ||
+                                (pageState.route == Route.Home && pageState.home.hero.isNotEmpty())
+                            Box(if (underBar) Modifier.fillMaxSize() else Modifier.fillMaxSize().padding(top = TabletTopBarSpace)) {
+                                TabletPage(state = pageState, actions = actions, layout = layout)
+                            }
+                        }
                     }
+                }
+                TabletTopBar(
+                    selected = state.route.top,
+                    onSelect = actions::selectTab,
+                    modifier = Modifier.align(Alignment.TopCenter),
+                )
+                if (music != null) {
+                    val (viewModel, player) = music
+                    if (miniPlayerShown) {
+                        MiniPlayerBar(
+                            player = player,
+                            actions = viewModel,
+                            onOpen = { nowPlayingOpen = true },
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .padding(bottom = navBar + 16.dp)
+                                .widthIn(max = 520.dp),
+                        )
+                    }
+                    ShellNowPlaying(
+                        viewModel = viewModel,
+                        player = player,
+                        open = nowPlayingOpen,
+                        onDismiss = { nowPlayingOpen = false },
+                        onShowAudio = { actions.selectTab(TopDestination.AUDIO) },
+                    )
                 }
             }
         }
@@ -105,6 +164,11 @@ private fun TabletPage(state: AppUiState, actions: AppActions, layout: DeviceLay
         Route.Library -> TabletLibraryScreen(
             state = state,
             layout = layout,
+            actions = actions,
+            modifier = pageModifier,
+        )
+        Route.ContinueWatching -> PhoneContinueWatchingScreen(
+            cards = state.home.continueWatching,
             actions = actions,
             modifier = pageModifier,
         )
@@ -137,7 +201,9 @@ private fun TabletPage(state: AppUiState, actions: AppActions, layout: DeviceLay
             actions = actions,
             modifier = pageModifier,
         )
-        Route.Settings -> SettingsScreen(
+        Route.Audio -> AudioScreen(modifier = pageModifier)
+        // A tablet shows every section beside the list on the one page.
+        Route.Settings, is Route.SettingsPage -> SettingsScreen(
             state = state.settings,
             actions = actions,
             layout = layout,

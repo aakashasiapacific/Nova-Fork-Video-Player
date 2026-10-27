@@ -66,7 +66,7 @@ val PhoneDimens = NovaDimens(
     cardRadius = 12.dp,
     rowSpacing = 10.dp,
     sectionSpacing = 24.dp,
-    detailPosterWidth = 112.dp,
+    detailPosterWidth = 150.dp,
 )
 
 val TabletDimens = NovaDimens(

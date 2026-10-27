@@ -51,10 +51,11 @@ data class Settings(
     /** Play the next episode automatically when one ends. */
     val autoPlayNext: Boolean = true,
     /**
-     * Leaving the player while a video plays (Home, screen off, another app) keeps its sound
-     * playing, with controls in a notification. Off: it pauses, or goes picture-in-picture.
+     * Background play for videos: leaving the player while a video plays (Home, screen off,
+     * another app) keeps its sound playing, with controls in a notification. Off (the default,
+     * owner's choice): leaving the player pauses the video. Music always plays in the background.
      */
-    val backgroundAudio: Boolean = true,
+    val backgroundAudio: Boolean = false,
     /** OpenSubtitles.com API key pasted by the user. Empty = the built-in BuildConfig.OPENSUBTITLES_API_KEY, if any. */
     val opensubtitlesApiKey: String = "",
     /** Optional OpenSubtitles.com account; logged in, the daily download quota is bigger. */
@@ -67,6 +68,11 @@ data class Settings(
     val subtitleLanguages: String = "",
     /** Download the best subtitle (once per video) when a video has none in the first of those languages. */
     val autoDownloadSubtitles: Boolean = false,
+    /**
+     * How tinted the app's glass buttons and bars are, 0 (clear) to 1 (tinted), as iOS 27's
+     * Liquid Glass slider sets it. The default is iOS 27's (ui.common.DEFAULT_GLASS_TINT).
+     */
+    val glassTint: Float = 1f,
 )
 
 interface SettingsStore {

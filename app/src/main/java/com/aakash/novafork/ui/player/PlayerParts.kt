@@ -1,35 +1,41 @@
 package com.aakash.novafork.ui.player
 
 import androidx.annotation.DrawableRes
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
@@ -37,10 +43,14 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
 import com.aakash.novafork.core.format.Formats
+import com.aakash.novafork.ui.common.IosIconButton
+import com.aakash.novafork.ui.common.playerGlass
+import com.aakash.novafork.ui.common.SymbolSwap
 import com.aakash.novafork.ui.model.PlayerUiState
 import com.aakash.novafork.ui.model.RepeatMode
 import com.aakash.novafork.ui.model.TrackUi
@@ -89,10 +99,6 @@ internal fun formatSignedClock(deltaMs: Long): String =
 internal fun formatRemaining(positionMs: Long, durationMs: Long): String =
     MINUS + Formats.clock((durationMs - positionMs).coerceAtLeast(0))
 
-/** "+20s" / "−10s" in the double-tap bubble. */
-internal fun formatSeekSeconds(forward: Boolean, totalMs: Long): String =
-    (if (forward) "+" else MINUS) + "${totalMs / 1000}s"
-
 /** "0 ms", "+300 ms", "−1200 ms". */
 internal fun formatDelay(delayMs: Long): String = when {
     delayMs > 0 -> "+$delayMs ms"
@@ -105,7 +111,12 @@ internal fun trackLabel(track: TrackUi): String = if (track.id == DISABLED_TRACK
 internal fun subtitlesOn(tracks: List<TrackUi>): Boolean = tracks.any { it.selected && it.id != DISABLED_TRACK_ID }
 
 @DrawableRes
-internal fun RepeatMode.iconRes(): Int = if (this == RepeatMode.ONE) R.drawable.ic_repeat_one else R.drawable.ic_repeat
+internal fun RepeatMode.iconRes(): Int = when (this) {
+    // One UI's play mode button: what happens when this video ends.
+    RepeatMode.OFF -> R.drawable.ic_player_mode_off
+    RepeatMode.ALL -> R.drawable.ic_player_mode_all
+    RepeatMode.ONE -> R.drawable.ic_player_mode_one
+}
 
 internal val RepeatMode.label: String
     get() = when (this) {
@@ -127,44 +138,10 @@ internal fun PlayerIconButton(
     buttonSize: Dp = 48.dp,
     iconSize: Dp = 24.dp,
     enabled: Boolean = true,
+    tint: Color = LocalContentColor.current,
 ) {
-    IconButton(onClick = onClick, modifier = modifier.size(buttonSize), enabled = enabled) {
-        Icon(painterResource(icon), contentDescription = contentDescription, modifier = Modifier.size(iconSize))
-    }
-}
-
-/** One entry of the player's overflow menu. */
-internal class PlayerMenuItem(@DrawableRes val icon: Int, val label: String, val onClick: () -> Unit)
-
-/** The ⋮ button and its menu of [items]. */
-@Composable
-internal fun PlayerMoreMenu(
-    items: List<PlayerMenuItem>,
-    modifier: Modifier = Modifier,
-    buttonSize: Dp = 48.dp,
-    iconSize: Dp = 24.dp,
-) {
-    var open by remember { mutableStateOf(false) }
-    Box(modifier) {
-        PlayerIconButton(
-            icon = R.drawable.ic_more_vert,
-            contentDescription = "More options",
-            onClick = { open = true },
-            buttonSize = buttonSize,
-            iconSize = iconSize,
-        )
-        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-            items.forEach { item ->
-                DropdownMenuItem(
-                    text = { Text(item.label) },
-                    leadingIcon = { Icon(painterResource(item.icon), contentDescription = null) },
-                    onClick = {
-                        open = false
-                        item.onClick()
-                    },
-                )
-            }
-        }
+    IosIconButton(onClick = onClick, modifier = modifier.size(buttonSize), enabled = enabled) {
+        Icon(painterResource(icon), contentDescription = contentDescription, modifier = Modifier.size(iconSize), tint = tint)
     }
 }
 
@@ -178,9 +155,9 @@ internal fun CastButton(
     iconSize: Dp = 24.dp,
 ) {
     val casting = castingTo != null
-    IconButton(onClick = onClick, modifier = modifier.size(buttonSize)) {
+    IosIconButton(onClick = onClick, modifier = modifier.size(buttonSize)) {
         Icon(
-            painter = painterResource(if (casting) R.drawable.ic_cast_connected else R.drawable.ic_cast),
+            painter = painterResource(if (casting) R.drawable.ic_player_cast_connected else R.drawable.ic_player_cast),
             contentDescription = if (casting) "Casting to $castingTo" else "Cast",
             modifier = Modifier.size(iconSize),
             tint = if (casting) MaterialTheme.colorScheme.primary else LocalContentColor.current,
@@ -200,7 +177,7 @@ internal fun PlayerToggleButton(
     iconSize: Dp = 24.dp,
 ) {
     val accent = MaterialTheme.colorScheme.primary
-    IconButton(
+    IosIconButton(
         onClick = onClick,
         modifier = modifier
             .size(buttonSize)
@@ -227,7 +204,11 @@ internal fun PlayerToggleButton(
     }
 }
 
-/** Big round play/pause; a spinner rings it while buffering so the centre never shows two things. */
+/**
+ * Big round play/pause in One UI's glyphs (a triangle with small rounded corners, two straight
+ * bars); a spinner rings it while buffering so the centre never shows two things. [finished]
+ * (played to the end, nothing after it): Replay, as Samsung's player shows it.
+ */
 @Composable
 internal fun PlayPauseButton(
     isPlaying: Boolean,
@@ -235,25 +216,38 @@ internal fun PlayPauseButton(
     onClick: () -> Unit,
     size: Dp,
     modifier: Modifier = Modifier,
+    finished: Boolean = false,
 ) {
     Box(modifier.size(size + 12.dp), contentAlignment = Alignment.Center) {
         Box(
             Modifier
                 .size(size)
-                .clip(CircleShape)
-                .background(Color.White.copy(alpha = 0.16f))
+                // A dark see-through disc behind the glyph, as Samsung's player draws it, in iOS
+                // 27's tinted glass so it holds up over bright scenes.
+                .playerGlass(CircleShape)
                 .clickable(role = Role.Button, onClick = onClick),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(
-                painter = painterResource(if (isPlaying) R.drawable.ic_pause else R.drawable.ic_play_arrow),
-                contentDescription = if (isPlaying) "Pause" else "Play",
-                modifier = Modifier.size(size * 0.6f),
+            // SF Symbols' replace: play, pause and replay shrink into one another rather than cut.
+            SymbolSwap(
+                icon = when {
+                    finished -> R.drawable.ic_replay
+                    isPlaying -> R.drawable.ic_player_pause
+                    else -> R.drawable.ic_player_play
+                },
+                contentDescription = when {
+                    finished -> "Replay"
+                    isPlaying -> "Pause"
+                    else -> "Play"
+                },
+                // One UI's glyphs sit in a 24dp box with room round them: the box is ~three
+                // quarters of the disc so the glyph itself fills a little under half of it.
+                modifier = Modifier.size(size * if (finished) 0.46f else 0.76f),
                 tint = Color.White,
             )
         }
         if (buffering) {
-            CircularProgressIndicator(modifier = Modifier.fillMaxSize(), color = Color.White, strokeWidth = 3.dp)
+            PlayerSpinner(modifier = Modifier.fillMaxSize())
         }
     }
 }
@@ -269,7 +263,7 @@ internal fun SeekStepButton(
     modifier: Modifier = Modifier,
 ) {
     val seconds = stepMs / 1000
-    IconButton(onClick = onClick, modifier = modifier.size(buttonSize), enabled = enabled) {
+    IosIconButton(onClick = onClick, modifier = modifier.size(buttonSize), enabled = enabled) {
         SeekStepIcon(
             forward = forward,
             seconds = seconds,
@@ -345,3 +339,60 @@ internal fun <T : Any> rememberLatestNonNull(value: T?): T? {
 private class LatestHolder<T : Any> {
     var value: T? = null
 }
+
+/**
+ * The title beside the back arrow, as Samsung's player shows it, with its details small and grey
+ * beneath.
+ */
+@Composable
+internal fun PlayerTitle(state: PlayerUiState, modifier: Modifier = Modifier, large: Boolean = false) {
+    Column(modifier) {
+        Text(
+            text = state.title,
+            style = if (large) MaterialTheme.typography.titleLarge else MaterialTheme.typography.titleMedium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        val subtitle = state.subtitle
+        if (!subtitle.isNullOrBlank()) {
+            Text(
+                text = subtitle,
+                style = if (large) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.bodySmall,
+                color = Color.White.copy(alpha = 0.72f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+/**
+ * Samsung's loading ring (owner: not iOS's spokes): a thin white arc turning round a faint ring,
+ * growing and shrinking as it goes, as One UI's progress circle does.
+ */
+@Composable
+internal fun PlayerSpinner(modifier: Modifier = Modifier, strokeWidth: Dp = 3.dp, color: Color = Color.White) {
+    val turning = rememberInfiniteTransition(label = "playerSpinner")
+    val turn by turning.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(tween(SPIN_MS, easing = LinearEasing)),
+        label = "spinnerTurn",
+    )
+    val sweep by turning.animateFloat(
+        initialValue = 30f,
+        targetValue = 270f,
+        animationSpec = infiniteRepeatable(tween(SWEEP_MS, easing = FastOutSlowInEasing), androidx.compose.animation.core.RepeatMode.Reverse),
+        label = "spinnerSweep",
+    )
+    Canvas(modifier) {
+        val stroke = strokeWidth.toPx()
+        val arcSize = Size(size.minDimension - stroke, size.minDimension - stroke)
+        val topLeft = Offset((size.width - arcSize.width) / 2f, (size.height - arcSize.height) / 2f)
+        drawArc(color.copy(alpha = 0.2f), 0f, 360f, useCenter = false, topLeft = topLeft, size = arcSize, style = Stroke(stroke))
+        drawArc(color, turn - 90f, sweep, useCenter = false, topLeft = topLeft, size = arcSize, style = Stroke(stroke, cap = StrokeCap.Round))
+    }
+}
+
+private const val SPIN_MS = 1_100
+private const val SWEEP_MS = 900

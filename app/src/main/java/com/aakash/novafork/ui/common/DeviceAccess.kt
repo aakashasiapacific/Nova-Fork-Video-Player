@@ -10,11 +10,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.Alignment
@@ -37,13 +35,13 @@ fun deviceAccessNotice(permission: PermissionUi): DeviceAccessNotice? = when {
         title = "Nova can't see the videos on this device",
         body = "Camera videos, downloads, screen recordings and messaging-app videos stay hidden until " +
             "you allow access to photos and videos.",
-        allowLabel = "Allow access",
+        allowLabel = "Allow Access",
     )
     permission.partial -> DeviceAccessNotice(
         title = "Nova sees only the videos you picked",
         body = "Other camera videos, downloads and screen recordings stay hidden. Allow access to all " +
             "photos and videos to see them.",
-        allowLabel = "Allow all",
+        allowLabel = "Allow All",
     )
     else -> null
 }
@@ -88,8 +86,8 @@ fun DeviceAccessCard(
                 horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                TextButton(onClick = onOpenSettings) { Text("App settings") }
-                Button(onClick = onAllow) { Text(notice.allowLabel) }
+                IosTextButton(onClick = onOpenSettings) { Text("App Settings") }
+                IosButton(onClick = onAllow) { Text(notice.allowLabel) }
             }
         }
     }
@@ -118,7 +116,7 @@ fun DeviceStorageEmptyState(
             modifier = modifier,
             actionLabel = notice.allowLabel,
             onAction = onAllow,
-            secondaryLabel = "App settings",
+            secondaryLabel = "App Settings",
             onSecondary = onOpenSettings,
         )
         !error.isNullOrBlank() -> EmptyState(

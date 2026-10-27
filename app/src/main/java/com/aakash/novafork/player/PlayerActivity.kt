@@ -13,6 +13,7 @@ import android.os.Bundle
 import android.os.IBinder
 import android.os.PowerManager
 import android.util.Log
+import android.view.KeyEvent
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
@@ -20,8 +21,12 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.toAndroidRect
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -31,13 +36,16 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import com.aakash.novafork.NovaApp
 import com.aakash.novafork.ui.adaptive.rememberDeviceLayout
+import com.aakash.novafork.ui.common.LocalGlassTint
 import com.aakash.novafork.ui.player.PlayerScreen
 import com.aakash.novafork.ui.theme.NovaPlayerTheme
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.videolan.libvlc.util.VLCVideoLayout
 
 /**
@@ -49,6 +57,9 @@ import org.videolan.libvlc.util.VLCVideoLayout
 class PlayerActivity : ComponentActivity(), PlayerController.Host {
 
     private var service: PlaybackService? = null
+
+    /** The last volume key down went to the player's indicator; its key up is swallowed too. */
+    private var volumeKeyHandled = false
     private val connected = MutableStateFlow<PlayerController?>(null)
     private val controller: PlayerController? get() = connected.value
     private var bound = false
@@ -89,6 +100,10 @@ class PlayerActivity : ComponentActivity(), PlayerController.Host {
         volumeControlStream = AudioManager.STREAM_MUSIC
         requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
 
+        // The player fades away as it closes (it is pulled down, or back), instead of sliding.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            overrideActivityTransition(OVERRIDE_TRANSITION_CLOSE, 0, android.R.anim.fade_out)
+        }
         pip = PipController(this) { controller?.togglePlay() }
         pip.register()
         subtitlePicker = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -108,21 +123,31 @@ class PlayerActivity : ComponentActivity(), PlayerController.Host {
         setContent {
             val controller by connected.collectAsStateWithLifecycle()
             val settings by graph.settings.settings.collectAsStateWithLifecycle()
+            // The player's glass is as tinted as Preferences › Appearance › Glass sets the app's.
             NovaPlayerTheme {
-                // Until the service is bound (a moment) the window's black background shows.
-                val current = controller
-                if (current != null) {
-                    val state by current.state.collectAsStateWithLifecycle()
-                    PlayerScreen(
-                        state = state,
-                        actions = current,
-                        layout = rememberDeviceLayout(settings.layoutMode),
-                    ) {
-                        AndroidView(
-                            factory = { context -> VLCVideoLayout(context).also { onVideoLayoutCreated(it) } },
-                            modifier = Modifier.fillMaxSize(),
-                            onRelease = { layout -> onVideoLayoutReleased(layout) },
-                        )
+                CompositionLocalProvider(LocalGlassTint provides settings.glassTint) {
+                    // Until the service is bound (a moment) the window's black background shows.
+                    val current = controller
+                    if (current != null) {
+                        val state by current.state.collectAsStateWithLifecycle()
+                        PlayerScreen(
+                            state = state,
+                            actions = current,
+                            layout = rememberDeviceLayout(settings.layoutMode),
+                            copyFrame = { onCopied ->
+                                val layout = videoLayout
+                                if (layout == null) onCopied(null) else FrameCapture.copy(layout, onCopied)
+                            },
+                        ) {
+                            AndroidView(
+                                factory = { context -> VLCVideoLayout(context).also { onVideoLayoutCreated(it) } },
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    // For a smooth shrink into the pop-up window (PipController).
+                                    .onGloballyPositioned { pip.videoBounds = it.boundsInWindow().toAndroidRect() },
+                                onRelease = { layout -> onVideoLayoutReleased(layout) },
+                            )
+                        }
                     }
                 }
             }
@@ -305,17 +330,31 @@ class PlayerActivity : ComponentActivity(), PlayerController.Host {
         if (hasFocus) hideSystemBars()
     }
 
-    override fun onUserLeaveHint() {
-        super.onUserLeaveHint()
-        val current = controller ?: return
-        // Android 12+ enters PiP by itself (auto-enter is on while playing without background audio).
-        if (
-            Build.VERSION.SDK_INT < Build.VERSION_CODES.S && !pickingSubtitle &&
-            current.state.value.isPlaying && !current.continuesInBackground && !current.isCasting
-        ) {
-            pip.enter()
+    /**
+     * The volume keys change the media volume with the player's own iOS-style indicator instead
+     * of the system's panel; in picture-in-picture (or before the player is connected) the
+     * system handles them as usual.
+     */
+    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
+        if (isVolumeKey(keyCode) && !isInPictureInPictureMode && controller?.onVolumeKey(keyCode) == true) {
+            volumeKeyHandled = true
+            return true
         }
+        return super.onKeyDown(keyCode, event)
     }
+
+    override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {
+        // The release of a key the player took, so the system doesn't act on it (a click sound, its panel).
+        if (isVolumeKey(keyCode) && volumeKeyHandled) {
+            volumeKeyHandled = false
+            return true
+        }
+        return super.onKeyUp(keyCode, event)
+    }
+
+    private fun isVolumeKey(keyCode: Int): Boolean =
+        keyCode == KeyEvent.KEYCODE_VOLUME_UP || keyCode == KeyEvent.KEYCODE_VOLUME_DOWN ||
+            keyCode == KeyEvent.KEYCODE_VOLUME_MUTE
 
     override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: Configuration) {
         super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
@@ -332,6 +371,20 @@ class PlayerActivity : ComponentActivity(), PlayerController.Host {
 
     override fun enterPictureInPicture() {
         pip.enter()
+    }
+
+    override fun captureFrame(onDone: (Boolean) -> Unit) {
+        val layout = videoLayout ?: return onDone(false)
+        FrameCapture.copy(layout) { bitmap ->
+            if (bitmap == null) {
+                onDone(false)
+            } else {
+                lifecycleScope.launch {
+                    val saved = withContext(Dispatchers.IO) { FrameCapture.save(applicationContext, bitmap, controller?.state?.value?.title) }
+                    onDone(saved)
+                }
+            }
+        }
     }
 
     override fun launchSubtitlePicker(): Boolean {
@@ -397,7 +450,9 @@ class PlayerActivity : ComponentActivity(), PlayerController.Host {
         pip.update(
             playing = playing,
             videoSize = current.videoSize.value,
-            autoEnter = playing && !current.continuesInBackground && !current.isCasting,
+            // Leaving the player pauses (or plays on in the background when that is wanted); it
+            // never turns into a picture-in-picture window by itself: the PiP button does that.
+            autoEnter = false,
         )
     }
 

@@ -1,0 +1,172 @@
+package com.aakash.novafork.ui.audio
+
+import android.graphics.Bitmap
+import android.graphics.drawable.BitmapDrawable
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalContext
+import coil.imageLoader
+import coil.request.ImageRequest
+import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.sin
+import kotlinx.coroutines.delay
+
+/** The three colours of Now Playing's background, top to bottom, taken from the cover. */
+internal data class CoverColors(val top: Color, val middle: Color, val bottom: Color) {
+    companion object {
+        /** No cover, or it has not loaded: Apple Music's dark grey. */
+        val Fallback = CoverColors(Color(0xFF3A3A3C), Color(0xFF2C2C2E), Color(0xFF1C1C1E))
+    }
+}
+
+/**
+ * The cover's colours as Apple Music paints its Now Playing background: the average of the top,
+ * middle and bottom thirds of the picture, made a little richer and kept dark enough for white
+ * text on top.
+ */
+internal fun coverColors(bitmap: Bitmap): CoverColors {
+    val width = bitmap.width
+    val height = bitmap.height
+    fun band(from: Int, to: Int): Color {
+        var r = 0L
+        var g = 0L
+        var b = 0L
+        var n = 0
+        for (y in from until to.coerceAtMost(height)) {
+            for (x in 0 until width) {
+                val p = bitmap.getPixel(x, y)
+                r += (p shr 16) and 0xFF
+                g += (p shr 8) and 0xFF
+                b += p and 0xFF
+                n++
+            }
+        }
+        if (n == 0) return Color.DarkGray
+        return Color((r / n).toInt(), (g / n).toInt(), (b / n).toInt())
+    }
+    val third = (height / 3).coerceAtLeast(1)
+    return CoverColors(
+        top = tune(band(0, third)),
+        middle = tune(band(third, third * 2)),
+        bottom = tune(band(third * 2, height), darker = true),
+    )
+}
+
+private fun tune(color: Color, darker: Boolean = false): Color {
+    val hsv = FloatArray(3)
+    android.graphics.Color.colorToHSV(color.toArgb(), hsv)
+    hsv[1] = (hsv[1] * 1.25f).coerceAtMost(1f)
+    hsv[2] = hsv[2].coerceIn(0.16f, if (darker) 0.42f else 0.58f)
+    return Color(android.graphics.Color.HSVToColor(hsv))
+}
+
+/**
+ * Apple Music's Now Playing background on iOS 26/27: soft glows in the cover's colours (top,
+ * middle and bottom thirds) over AMOLED black, crossfading to the next song's. While [drifting]
+ * (the song plays) the glows wander very slowly about their places; they never turn (owner).
+ * To spare the battery they move in small steps a few times a second, only redraw (nothing is
+ * recomposed or decoded), and stay still when paused or when the phone's animations are off. A
+ * soft dark fade at the bottom keeps the controls readable.
+ */
+@Composable
+internal fun CoverGradient(artUri: String?, modifier: Modifier = Modifier, drifting: Boolean = false) {
+    val context = LocalContext.current
+    val colors by produceState(CoverColors.Fallback, artUri) {
+        value = artUri?.let { uri ->
+            runCatching {
+                val request = ImageRequest.Builder(context).data(uri).size(GRADIENT_PX).allowHardware(false).build()
+                (context.imageLoader.execute(request).drawable as? BitmapDrawable)?.bitmap?.let(::coverColors)
+            }.getOrNull()
+        } ?: CoverColors.Fallback
+    }
+    val fade = tween<Color>(durationMillis = 700)
+    val top by animateColorAsState(colors.top, fade, label = "gradientTop")
+    val middle by animateColorAsState(colors.middle, fade, label = "gradientMiddle")
+    val bottom by animateColorAsState(colors.bottom, fade, label = "gradientBottom")
+    // Where the glows are on their slow round, 0 to 1; read only while drawing.
+    var phase by remember { mutableFloatStateOf(0f) }
+    val stillMotion = remember(context) {
+        android.provider.Settings.Global.getFloat(context.contentResolver, android.provider.Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f
+    }
+    LaunchedEffect(drifting, stillMotion) {
+        if (!drifting || stillMotion) return@LaunchedEffect
+        while (true) {
+            delay(GLOW_STEP_MS)
+            phase = (phase + GLOW_STEP_MS.toFloat() / GLOW_ROUND_MS) % 1f
+        }
+    }
+    Box(
+        modifier
+            .fillMaxSize()
+            // Its own layer, so a step redraws the glows alone.
+            .graphicsLayer()
+            .drawBehind {
+                drawRect(Color.Black)
+                val turn = phase * 2f * PI.toFloat()
+                val reach = size.maxDimension * 0.75f
+                glow(top, 0.22f + 0.08f * cos(turn), 0.16f + 0.05f * sin(turn), reach)
+                glow(middle, 0.82f + 0.07f * sin(turn + 2.1f), 0.48f + 0.06f * cos(turn + 2.1f), reach * 0.9f)
+                glow(bottom, 0.28f + 0.08f * cos(turn + 4.2f), 0.84f + 0.05f * sin(turn + 4.2f), reach * 0.85f)
+            },
+    )
+    Box(
+        modifier
+            .fillMaxSize()
+            .background(Brush.verticalGradient(0.55f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.35f))),
+    )
+}
+
+/** One soft glow of [color], centred at ([x], [y]) parts of the size across and down. */
+private fun DrawScope.glow(color: Color, x: Float, y: Float, radius: Float) {
+    val center = Offset(size.width * x, size.height * y)
+    drawCircle(
+        brush = Brush.radialGradient(listOf(color.copy(alpha = GLOW_ALPHA), color.copy(alpha = 0f)), center = center, radius = radius),
+        radius = radius,
+        center = center,
+    )
+}
+
+/** The size the cover is read at: plenty for three averages. */
+private const val GRADIENT_PX = 24
+
+/** The glows' slow round, and how often they take a step along it. */
+private const val GLOW_ROUND_MS = 30_000L
+private const val GLOW_STEP_MS = 80L
+
+/** How strong a glow is at its heart. */
+private const val GLOW_ALPHA = 0.9f
+
+/** [artUri]'s middle colour (see [coverColors]), crossfading as it changes; clear until known. */
+@Composable
+internal fun rememberCoverTint(artUri: String?): Color {
+    val context = LocalContext.current
+    val tint by produceState(Color.Transparent, artUri) {
+        value = artUri?.let { uri ->
+            runCatching {
+                val request = ImageRequest.Builder(context).data(uri).size(GRADIENT_PX).allowHardware(false).build()
+                (context.imageLoader.execute(request).drawable as? BitmapDrawable)?.bitmap?.let { coverColors(it).middle }
+            }.getOrNull()
+        } ?: Color.Transparent
+    }
+    val shown by animateColorAsState(tint, tween(600), label = "coverTint")
+    return shown
+}

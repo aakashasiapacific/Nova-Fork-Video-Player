@@ -1,6 +1,5 @@
 package com.aakash.novafork.ui.tablet
 
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,15 +17,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
-import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -40,7 +32,11 @@ import com.aakash.novafork.R
 import com.aakash.novafork.ui.adaptive.DeviceLayout
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
 import com.aakash.novafork.ui.common.EmptyState
+import com.aakash.novafork.ui.common.IosSegmentedControl
+import com.aakash.novafork.ui.common.IosTextButton
+import com.aakash.novafork.ui.common.NovaDropdownMenu
 import com.aakash.novafork.ui.common.NovaIcon
+import com.aakash.novafork.ui.common.NovaMenuItem
 import com.aakash.novafork.ui.common.ScanBanner
 import com.aakash.novafork.ui.common.VideoMenuBox
 import com.aakash.novafork.ui.model.AppActions
@@ -49,7 +45,7 @@ import com.aakash.novafork.ui.model.LibraryFilter
 import com.aakash.novafork.ui.model.LibraryItemUi
 import com.aakash.novafork.ui.model.LibrarySort
 import com.aakash.novafork.ui.model.LibraryUi
-import com.aakash.novafork.ui.model.TopDestination
+import com.aakash.novafork.ui.model.Route
 
 /**
  * Library. Landscape: list-detail (poster grid + preview pane driven by [AppActions.preview]).
@@ -64,7 +60,8 @@ internal fun TabletLibraryScreen(
 ) {
     val dims = LocalNovaDimens.current
     val library = state.library
-    val items = library.items
+    // All videos sorted by Recently added: every video newest first, one gapless grid.
+    val items = if (library.timeline.isNotEmpty()) library.timeline.map { LibraryItemUi.Video(it) } else library.items
     val previewKey = state.previewKey
     val listDetail = layout.isExpanded
 
@@ -86,7 +83,6 @@ internal fun TabletLibraryScreen(
                 .statusBarsPadding()
                 .padding(start = dims.gutter, end = dims.gutter - 8.dp, top = 20.dp, bottom = 12.dp),
         )
-        ScanBanner(state.scan, Modifier.padding(horizontal = dims.gutter - 16.dp))
         when {
             items.isEmpty() -> LibraryEmpty(
                 filter = library.filter,
@@ -186,33 +182,16 @@ private fun LibraryHeader(library: LibraryUi, actions: AppActions, stacked: Bool
 
 @Composable
 private fun FilterChipRow(library: LibraryUi, onFilter: (LibraryFilter) -> Unit, modifier: Modifier = Modifier) {
-    Row(
-        modifier.horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        LibraryFilter.entries.forEach { filter ->
-            val selected = filter == library.filter
-            val count = library.counts[filter]
-            FilterChip(
-                selected = selected,
-                onClick = { onFilter(filter) },
-                label = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(filter.label)
-                        if (count != null) {
-                            Spacer(Modifier.width(6.dp))
-                            Text(count.toString(), color = LocalContentColor.current.copy(alpha = 0.65f))
-                        }
-                    }
-                },
-                leadingIcon = if (selected) {
-                    { NovaIcon(R.drawable.ic_check, contentDescription = null, modifier = Modifier.size(FilterChipDefaults.IconSize)) }
-                } else {
-                    null
-                },
-            )
-        }
+    // iOS's segmented control; "Videos" left the library (owner): unidentified files are in All
+    // videos' timeline.
+    val filters = LibraryFilter.entries.filter { it.isChip }
+    Box(modifier) {
+        IosSegmentedControl(
+            options = filters.map { it.label },
+            selectedIndex = filters.indexOf(library.filter),
+            onSelect = { onFilter(filters[it]) },
+            modifier = Modifier.width(420.dp),
+        )
     }
 }
 
@@ -220,26 +199,22 @@ private fun FilterChipRow(library: LibraryUi, onFilter: (LibraryFilter) -> Unit,
 private fun SortMenu(sort: LibrarySort, onSort: (LibrarySort) -> Unit) {
     var open by remember { mutableStateOf(false) }
     Box {
-        TextButton(onClick = { open = true }) {
+        IosTextButton(onClick = { open = true }) {
             NovaIcon(R.drawable.ic_sort, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))
             Text(sort.label)
             Spacer(Modifier.width(4.dp))
             NovaIcon(R.drawable.ic_expand_more, contentDescription = null, modifier = Modifier.size(18.dp))
         }
-        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+        NovaDropdownMenu(expanded = open, onDismissRequest = { open = false }, title = "Sort by") {
             LibrarySort.entries.forEach { option ->
-                DropdownMenuItem(
+                NovaMenuItem(
                     text = { Text(option.label) },
                     onClick = {
                         open = false
                         onSort(option)
                     },
-                    trailingIcon = if (option == sort) {
-                        { NovaIcon(R.drawable.ic_check, contentDescription = "Selected") }
-                    } else {
-                        null
-                    },
+                    checked = option == sort,
                 )
             }
         }
@@ -266,40 +241,52 @@ private fun LibraryGrid(
         verticalArrangement = Arrangement.spacedBy(24.dp),
     ) {
         items(items, key = { it.key }, contentType = { "poster" }) { item ->
-            when (item) {
-                // Videos get a menu (Play, Details, Add to playlist) instead of one long-press action.
-                is LibraryItemUi.Video -> VideoMenuBox(
-                    videoId = item.card.id,
-                    title = item.card.primaryLine(),
-                    actions = actions,
-                    extraItems = { close ->
-                        DropdownMenuItem(
-                            text = { Text("Play") },
-                            leadingIcon = { NovaIcon(R.drawable.ic_play_arrow, contentDescription = null) },
-                            onClick = {
-                                close()
-                                actions.play(item.card.id)
-                            },
-                        )
-                    },
-                ) { openMenu ->
-                    TabletLibraryItemCard(
-                        item = item,
-                        onClick = { onClick(item) },
-                        onLongClick = openMenu,
-                        onLongClickLabel = "More options",
-                        selected = item.key == selectedKey,
-                    )
-                }
-                is LibraryItemUi.Show -> TabletLibraryItemCard(
-                    item = item,
-                    onClick = { onClick(item) },
-                    onLongClick = { onLongClick(item) },
-                    onLongClickLabel = longClickLabel(item),
-                    selected = item.key == selectedKey,
-                )
-            }
+            LibraryGridCard(item, selectedKey, onClick, onLongClick, longClickLabel, actions)
         }
+    }
+}
+
+@Composable
+private fun LibraryGridCard(
+    item: LibraryItemUi,
+    selectedKey: String?,
+    onClick: (LibraryItemUi) -> Unit,
+    onLongClick: (LibraryItemUi) -> Unit,
+    longClickLabel: (LibraryItemUi) -> String,
+    actions: AppActions,
+) {
+    when (item) {
+        // Videos get a menu (Play, Details, Add to playlist) instead of one long-press action.
+        is LibraryItemUi.Video -> VideoMenuBox(
+            videoId = item.card.id,
+            title = item.card.primaryLine(),
+            actions = actions,
+            extraItems = { close ->
+                NovaMenuItem(
+                    text = { Text("Play") },
+                    leadingIcon = { NovaIcon(R.drawable.ic_play_arrow, contentDescription = null) },
+                    onClick = {
+                        close()
+                        actions.play(item.card.id)
+                    },
+                )
+            },
+        ) { openMenu ->
+            TabletLibraryItemCard(
+                item = item,
+                onClick = { onClick(item) },
+                onLongClick = openMenu,
+                onLongClickLabel = "More options",
+                selected = item.key == selectedKey,
+            )
+        }
+        is LibraryItemUi.Show -> TabletLibraryItemCard(
+            item = item,
+            onClick = { onClick(item) },
+            onLongClick = { onLongClick(item) },
+            onLongClickLabel = longClickLabel(item),
+            selected = item.key == selectedKey,
+        )
     }
 }
 
@@ -311,16 +298,18 @@ private fun LibraryEmpty(filter: LibraryFilter, actions: AppActions, modifier: M
                 icon = R.drawable.ic_video_library,
                 title = "Your library is empty",
                 body = "Add a folder or a network share, or allow access to the videos on this tablet.",
-                actionLabel = "Add a folder",
+                actionLabel = "Add a Folder",
                 onAction = actions::addFolder,
                 secondaryLabel = "Browse sources",
-                onSecondary = { actions.selectTab(TopDestination.BROWSE) },
+                onSecondary = { actions.navigate(Route.Browse) },
             )
         } else {
             val title = when (filter) {
                 LibraryFilter.MOVIES -> "No movies yet"
                 LibraryFilter.SHOWS -> "No TV shows yet"
                 LibraryFilter.VIDEOS, LibraryFilter.ALL -> "No videos yet"
+                LibraryFilter.WATCHLIST -> "Your Watchlist is empty"
+                LibraryFilter.FAVORITES -> "No favorites yet"
             }
             EmptyState(
                 icon = R.drawable.ic_filter_list,

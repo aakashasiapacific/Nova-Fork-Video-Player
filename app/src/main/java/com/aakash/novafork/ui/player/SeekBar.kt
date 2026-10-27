@@ -1,6 +1,9 @@
 package com.aakash.novafork.ui.player
 
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -9,7 +12,10 @@ import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -33,16 +39,19 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.aakash.novafork.core.format.Formats
+import com.aakash.novafork.ui.common.RollingText
 import com.aakash.novafork.ui.model.GestureFeedback
 import com.aakash.novafork.ui.model.PlayerActions
 import com.aakash.novafork.ui.model.PlayerUiState
-import kotlinx.coroutines.delay
 import kotlin.math.abs
+import kotlinx.coroutines.delay
 
 /** How long a committed seek may keep the thumb at its target while the player catches up. */
 private const val PENDING_SEEK_MS = 2_000L
@@ -59,6 +68,8 @@ internal fun PlayerSeekBar(
     onToggleRemaining: () -> Unit,
     modifier: Modifier = Modifier,
     large: Boolean = false,
+    /** Portrait (Samsung): both times on a line above the bar, at its two ends. */
+    stacked: Boolean = false,
 ) {
     val duration = state.durationMs
     val live = duration <= 0L
@@ -89,18 +100,36 @@ internal fun PlayerSeekBar(
         .merge(TextStyle(fontFeatureSettings = "tnum"))
     val labelWidth = if (large) 64.dp else 52.dp
 
-    Row(
-        modifier = modifier,
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(if (large) 12.dp else 8.dp),
-    ) {
-        Text(
+    // The times' digits roll as they change (iOS), except while the bar is dragged, when they
+    // follow the finger.
+    val rolling = dragging == null
+    val elapsed: @Composable () -> Unit = {
+        TimeLabel(
             text = Formats.clock(shownMs),
             style = labelStyle,
-            color = Color.White,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.widthIn(min = labelWidth),
+            rolling = rolling,
+            alignment = if (stacked) Alignment.CenterStart else Alignment.Center,
+            modifier = if (stacked) Modifier else Modifier.widthIn(min = labelWidth),
         )
+    }
+    val end: @Composable () -> Unit = {
+        if (live) {
+            LiveBadge(large = large, modifier = Modifier.widthIn(min = labelWidth))
+        } else {
+            TimeLabel(
+                text = if (showRemaining) formatRemaining(shownMs, duration) else Formats.clock(duration),
+                style = labelStyle,
+                rolling = rolling,
+                alignment = Alignment.Center,
+                modifier = Modifier
+                    .then(if (stacked) Modifier else Modifier.widthIn(min = labelWidth))
+                    .clip(RoundedCornerShape(6.dp))
+                    .clickable(onClickLabel = "Switch between duration and time left", onClick = onToggleRemaining)
+                    .padding(horizontal = 4.dp, vertical = 6.dp),
+            )
+        }
+    }
+    val slider: @Composable (Modifier) -> Unit = { sliderModifier ->
         SeekSlider(
             fraction = fraction,
             enabled = enabled,
@@ -118,25 +147,70 @@ internal fun PlayerSeekBar(
                 }
                 dragFraction = null
             },
-            modifier = Modifier.weight(1f),
+            modifier = sliderModifier,
         )
-        if (live) {
-            LiveBadge(large = large, modifier = Modifier.widthIn(min = labelWidth))
-        } else {
+    }
+
+    // Samsung: while the bar is dragged, the time it points at shows large above it.
+    val bigTime = remember { Animatable(0f) }
+    LaunchedEffect(dragging != null) { bigTime.animateTo(if (dragging != null) 1f else 0f, tween(BIG_TIME_FADE_MS)) }
+    val bigTimeLabel: @Composable BoxScope.() -> Unit = {
+        if (bigTime.value > 0f) {
             Text(
-                text = if (showRemaining) formatRemaining(shownMs, duration) else Formats.clock(duration),
-                style = labelStyle,
+                text = Formats.clock(shownMs),
+                style = MaterialTheme.typography.headlineSmall.merge(TextStyle(fontFeatureSettings = "tnum")),
+                fontWeight = FontWeight.SemiBold,
                 color = Color.White,
-                textAlign = TextAlign.Center,
                 modifier = Modifier
-                    .widthIn(min = labelWidth)
-                    .clip(RoundedCornerShape(6.dp))
-                    .clickable(onClickLabel = "Switch between duration and time left", onClick = onToggleRemaining)
-                    .padding(horizontal = 4.dp, vertical = 6.dp),
+                    .align(Alignment.TopCenter)
+                    .graphicsLayer {
+                        alpha = bigTime.value
+                        translationY = -BigTimeRise.toPx() - (1f - bigTime.value) * 6.dp.toPx()
+                    },
             )
         }
     }
+
+    Box(modifier) {
+        if (stacked) {
+            Column(Modifier.fillMaxWidth()) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    elapsed()
+                    Spacer(Modifier.weight(1f))
+                    end()
+                }
+                slider(Modifier.fillMaxWidth())
+            }
+        } else {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(if (large) 12.dp else 8.dp),
+            ) {
+                elapsed()
+                slider(Modifier.weight(1f))
+                end()
+            }
+        }
+        bigTimeLabel()
+    }
 }
+
+/** A time beside the seek bar, white; with [rolling] its digits roll as they change. */
+@Composable
+private fun TimeLabel(text: String, style: TextStyle, rolling: Boolean, alignment: Alignment, modifier: Modifier = Modifier) {
+    Box(modifier, contentAlignment = alignment) {
+        if (rolling) {
+            RollingText(text, style = style, color = Color.White)
+        } else {
+            Text(text, style = style, color = Color.White, maxLines = 1)
+        }
+    }
+}
+
+/** How far above the seek bar's top the large scrubbing time sits. */
+private val BigTimeRise = 40.dp
+private const val BIG_TIME_FADE_MS = 150
 
 @Composable
 private fun SeekSlider(
@@ -151,9 +225,20 @@ private fun SeekSlider(
     val dragged by interactionSource.collectIsDraggedAsState()
     val pressed by interactionSource.collectIsPressedAsState()
     val active = dragged || pressed
-    val thumbSize by animateDpAsState(if (active) 20.dp else 14.dp, label = "seekThumb")
-    val trackHeight = if (large) 6.dp else 4.dp
-    val activeColor = MaterialTheme.colorScheme.primary
+    // Samsung's seek bar (owner): a thin white line on a grey track with a round white knob;
+    // while dragged the knob goes and the bar swells into a thick rounded bar, filled white.
+    val trackHeight by animateDpAsState(
+        targetValue = if (active) ActiveTrack else if (large) 4.dp else 3.dp,
+        animationSpec = spring(dampingRatio = 0.8f, stiffness = 600f),
+        label = "seekTrack",
+    )
+    val knob by animateDpAsState(
+        targetValue = when {
+            active -> 0.dp
+            else -> if (large) 22.dp else 20.dp
+        },
+        label = "seekKnob",
+    )
 
     Slider(
         value = fraction,
@@ -162,24 +247,17 @@ private fun SeekSlider(
         enabled = enabled,
         onValueChangeFinished = onValueChangeFinished,
         interactionSource = interactionSource,
-        // Fixed-size slot: the thumb grows inside it so the track never changes length mid-drag.
         thumb = {
-            Box(Modifier.size(20.dp), contentAlignment = Alignment.Center) {
-                if (enabled) {
-                    Box(
-                        Modifier
-                            .size(thumbSize)
-                            .background(Color.White, CircleShape),
-                    )
-                }
+            Box(Modifier.size(28.dp), contentAlignment = Alignment.Center) {
+                if (enabled && knob > 0.dp) Box(Modifier.size(knob).clip(CircleShape).background(Color.White))
             }
         },
         track = { sliderState ->
             val range = sliderState.valueRange
             val span = range.endInclusive - range.start
             val progress = if (span > 0f) ((sliderState.value - range.start) / span).coerceIn(0f, 1f) else 0f
-            val filled = if (enabled) activeColor else Color.White.copy(alpha = 0.38f)
-            val rest = Color.White.copy(alpha = if (enabled) 0.3f else 0.15f)
+            val filled = Color.White.copy(alpha = if (!enabled) 0.38f else if (active) 1f else 0.85f)
+            val rest = Color.White.copy(alpha = if (!enabled) 0.15f else if (active) 0.45f else 0.35f)
             Canvas(
                 Modifier
                     .fillMaxWidth()
@@ -201,6 +279,9 @@ private fun SeekSlider(
         },
     )
 }
+
+/** The seek bar's thickness while it is dragged (Samsung). */
+private val ActiveTrack = 16.dp
 
 @Composable
 private fun LiveBadge(large: Boolean, modifier: Modifier = Modifier) {

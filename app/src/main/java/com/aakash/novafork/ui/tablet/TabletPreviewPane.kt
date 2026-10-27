@@ -27,20 +27,19 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.coerceAtLeast
 import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
 import com.aakash.novafork.ui.common.BackdropArt
+import com.aakash.novafork.ui.common.IosTextButton
 import com.aakash.novafork.ui.common.LandscapeArt
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.ProgressStrip
@@ -111,12 +110,12 @@ private fun VideoPreview(details: VideoDetailsUi, paneColor: Color, actions: App
         Row(verticalAlignment = Alignment.CenterVertically) {
             TabletPlayButton(label = details.playLabel, onClick = { actions.play(details.id) })
             Spacer(Modifier.width(8.dp))
-            TextButton(onClick = { actions.openVideo(details.id) }) { Text("Open details") }
+            IosTextButton(onClick = { actions.openVideo(details.id) }) { Text("Open Details") }
         }
         WatchProgress(progress = details.progress, positionMs = details.positionMs, durationMs = details.durationMs)
         if (details.kind == MediaKind.EPISODE && !details.showTitle.isNullOrBlank()) {
             val showKey = details.showKey
-            TextButton(
+            IosTextButton(
                 onClick = { if (showKey != null) actions.openShow(showKey) },
                 enabled = showKey != null,
             ) {
@@ -148,7 +147,7 @@ private fun ShowPreview(details: ShowDetailsUi, paneColor: Color, actions: AppAc
                 TabletPlayButton(label = details.playLabel, onClick = { actions.play(playId) })
                 Spacer(Modifier.width(8.dp))
             }
-            TextButton(onClick = { actions.openShow(details.key) }) { Text("Open details") }
+            IosTextButton(onClick = { actions.openShow(details.key) }) { Text("Open Details") }
         }
         val nextUp = details.nextUp
         if (nextUp != null) NextUpRow(nextUp, onClick = { actions.play(nextUp.videoId) })
@@ -267,7 +266,6 @@ private fun PreviewText(tagline: String?, overview: String?) {
         Text(
             text = tagline,
             style = MaterialTheme.typography.titleMedium,
-            fontStyle = FontStyle.Italic,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }

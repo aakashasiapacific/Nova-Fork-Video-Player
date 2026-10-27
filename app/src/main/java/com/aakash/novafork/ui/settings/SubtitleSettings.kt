@@ -1,19 +1,16 @@
 package com.aakash.novafork.ui.settings
 
 import android.os.LocaleList
+import androidx.annotation.DrawableRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -37,40 +34,85 @@ import com.aakash.novafork.BuildConfig
 import com.aakash.novafork.R
 import com.aakash.novafork.data.Settings
 import com.aakash.novafork.player.SubtitleDownloadRules
+import com.aakash.novafork.ui.common.IosIconButton
 import com.aakash.novafork.ui.common.NovaIcon
+import com.aakash.novafork.ui.common.NovaTextField
 import com.aakash.novafork.ui.model.AppActions
+import com.aakash.novafork.ui.theme.IosPalette
 import com.aakash.novafork.ui.theme.NovaColors
+import java.util.Locale
 
 /**
  * Settings › Player › Subtitle downloads: the OpenSubtitles.com API key (the built-in one when
- * empty), an optional account for a bigger daily quota, the languages and automatic downloads.
+ * empty) and an optional account for a bigger daily quota, then the languages and automatic
+ * downloads. What each needs explaining is in the groups' footers.
  */
-internal fun subtitleDownloadGroup(settings: Settings, actions: AppActions): SettingsGroup = SettingsGroup(
-    key = "subtitle-downloads",
-    title = "Subtitle downloads",
-    rows = listOf(
-        SettingsRow("opensubtitles-key") { shape ->
-            OpenSubtitlesKeyRow(shape, saved = settings.opensubtitlesApiKey, actions = actions)
-        },
-        SettingsRow("opensubtitles-account") { shape -> OpenSubtitlesAccountRow(shape, settings, actions) },
-        SettingsRow("subtitle-languages") { shape -> SubtitleLanguagesRow(shape, settings, actions) },
-        SettingsRow("auto-download-subtitles") { shape ->
-            SwitchRow(
-                shape = shape,
-                icon = R.drawable.ic_cloud,
-                title = "Download subtitles automatically",
-                summary = "When a video has none in your first language, fetch one sure to fit: " +
-                    "the best match for a video matched with TMDB, else one timed for the file",
-                checked = settings.autoDownloadSubtitles,
-                onCheckedChange = { on -> actions.updateSettings { it.copy(autoDownloadSubtitles = on) } },
-            )
-        },
+internal fun subtitleDownloadGroups(settings: Settings, actions: AppActions): List<SettingsGroup> = listOf(
+    SettingsGroup(
+        key = "subtitle-downloads",
+        title = "Subtitle downloads",
+        rows = listOf(
+            SettingsRow("opensubtitles-key", "OpenSubtitles API key", R.drawable.ic_key) { shape ->
+                OpenSubtitlesKeyRow(shape, saved = settings.opensubtitlesApiKey, actions = actions)
+            },
+            SettingsRow("opensubtitles-account", "OpenSubtitles account", R.drawable.ic_lock, IosPalette.Gray) { shape ->
+                OpenSubtitlesAccountRow(shape, settings, actions)
+            },
+        ),
+        footer = "$keyNote Signed in to an account, you can download more subtitles a day.",
     ),
-    footer = "Subtitles come from OpenSubtitles.com. In the player: Subtitles → Download subtitles. " +
-        "Downloads are kept with the video for next time.",
+    SettingsGroup(
+        key = "subtitle-download-languages",
+        title = null,
+        rows = listOf(
+            SettingsRow("subtitle-languages", "Download languages", R.drawable.ic_language) { shape ->
+                SubtitleLanguagesRow(shape, settings, actions)
+            },
+            switchRow(
+                "auto-download-subtitles",
+                R.drawable.ic_cloud,
+                "Download automatically",
+                settings.autoDownloadSubtitles,
+                tile = IosPalette.Blue,
+            ) { on -> actions.updateSettings { it.copy(autoDownloadSubtitles = on) } },
+        ),
+        // Exactly what the player will use: text that names no language falls back to the automatic ones.
+        footer = "Codes or names, most wanted first, e.g. \"en, fr\" or \"Hindi, English\". Searching in " +
+            "${languagesLabel(settings.subtitleLanguages, settings)}. Automatic downloads fetch one subtitle " +
+            "sure to fit when a video has none in your first language. In the player: Subtitles → Download subtitles.",
+    ),
 )
 
 private val hasBuiltInKey: Boolean get() = BuildConfig.OPENSUBTITLES_API_KEY.isNotBlank()
+
+/** Where a key comes from, and whether one is needed at all. */
+private val keyNote: String
+    get() = if (hasBuiltInKey) {
+        "Optional: a key of your own (opensubtitles.com → API consumers) replaces the built-in one."
+    } else {
+        "Free key: opensubtitles.com → your profile → API consumers. Needed to download subtitles."
+    }
+
+private fun deviceLocales(): List<Locale> {
+    val locales = LocaleList.getDefault()
+    return (0 until locales.size()).mapNotNull { locales.get(it) }
+}
+
+/** The languages [text] asks for, as names ("English, French"); the automatic ones when it names none. */
+private fun languagesLabel(text: String, settings: Settings): String =
+    SubtitleDownloadRules.languagesLabel(
+        SubtitleDownloadRules.languages(text, settings.preferredSubtitleLanguage, deviceLocales()),
+    )
+
+/** A row's icon and title on one line, over what the row holds (a text field). */
+@Composable
+private fun FormRowTitle(@DrawableRes icon: Int,title: String, tile: Color = tileColor(icon), trailing: @Composable () -> Unit = {}) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(IconTextGap)) {
+        RowIcon(icon, tile)
+        RowTitle(title, Modifier.weight(1f))
+        trailing()
+    }
+}
 
 @Composable
 private fun OpenSubtitlesKeyRow(shape: Shape, saved: String, actions: AppActions) {
@@ -81,18 +123,20 @@ private fun OpenSubtitlesKeyRow(shape: Shape, saved: String, actions: AppActions
     val focusManager = LocalFocusManager.current
     val text = edited ?: saved
     RowSurface(shape = shape) {
-        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                RowIcon(R.drawable.ic_key)
-                Spacer(Modifier.width(16.dp))
-                Text("OpenSubtitles API key", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .padding(vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            FormRowTitle(R.drawable.ic_key, "OpenSubtitles API key") {
                 when {
                     text.isNotBlank() -> StatusPill("Your key", NovaColors.Mint)
                     hasBuiltInKey -> StatusPill("Built in", NovaColors.Mint)
                     else -> StatusPill("No key", MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
-            OutlinedTextField(
+            NovaTextField(
                 value = text,
                 onValueChange = { value ->
                     edited = value
@@ -106,15 +150,6 @@ private fun OpenSubtitlesKeyRow(shape: Shape, saved: String, actions: AppActions
                 keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
                 trailingIcon = { VisibilityToggle(visible = visible, what = "key", onToggle = { visible = !visible }) },
             )
-            Text(
-                text = if (hasBuiltInKey) {
-                    "Optional: a key of your own (opensubtitles.com → API consumers) replaces the built-in one."
-                } else {
-                    "Free key: opensubtitles.com → your profile → API consumers. Needed to download subtitles."
-                },
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
         }
     }
 }
@@ -126,24 +161,21 @@ private fun OpenSubtitlesAccountRow(shape: Shape, settings: Settings, actions: A
     var visible by remember { mutableStateOf(false) }
     val focusManager = LocalFocusManager.current
     RowSurface(shape = shape) {
-        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                RowIcon(R.drawable.ic_lock)
-                Spacer(Modifier.width(16.dp))
-                RowTexts(
-                    title = "OpenSubtitles account",
-                    summary = "Optional. Signed in, you can download more subtitles a day.",
-                    modifier = Modifier.weight(1f),
-                )
-            }
-            OutlinedTextField(
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .padding(vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            FormRowTitle(R.drawable.ic_lock, "OpenSubtitles account", tile = IosPalette.Gray)
+            NovaTextField(
                 value = editedUser ?: settings.opensubtitlesUsername,
                 onValueChange = { value ->
                     editedUser = value
                     actions.updateSettings { it.copy(opensubtitlesUsername = value.trim()) }
                 },
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text("Username") },
+                placeholder = { Text("Username") },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(
                     capitalization = KeyboardCapitalization.None,
@@ -153,14 +185,14 @@ private fun OpenSubtitlesAccountRow(shape: Shape, settings: Settings, actions: A
                 ),
                 keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
             )
-            OutlinedTextField(
+            NovaTextField(
                 value = editedPassword ?: settings.opensubtitlesPassword,
                 onValueChange = { value ->
                     editedPassword = value
                     actions.updateSettings { it.copy(opensubtitlesPassword = value) }
                 },
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text("Password") },
+                placeholder = { Text("Password") },
                 singleLine = true,
                 visualTransformation = if (visible) VisualTransformation.None else PasswordVisualTransformation(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
@@ -176,29 +208,16 @@ private fun SubtitleLanguagesRow(shape: Shape, settings: Settings, actions: AppA
     var edited by remember { mutableStateOf<String?>(null) }
     val focusManager = LocalFocusManager.current
     val text = edited ?: settings.subtitleLanguages
-    val deviceLocales = remember {
-        val locales = LocaleList.getDefault()
-        (0 until locales.size()).mapNotNull { locales.get(it) }
-    }
-    val automatic = remember(settings.preferredSubtitleLanguage, deviceLocales) {
-        SubtitleDownloadRules.languagesLabel(
-            SubtitleDownloadRules.languages("", settings.preferredSubtitleLanguage, deviceLocales),
-        )
-    }
-    // Exactly what the player will use: text that names no language falls back to the automatic ones.
-    val effective = remember(text, settings.preferredSubtitleLanguage, deviceLocales) {
-        SubtitleDownloadRules.languagesLabel(
-            SubtitleDownloadRules.languages(text, settings.preferredSubtitleLanguage, deviceLocales),
-        )
-    }
+    val automatic = remember(settings.preferredSubtitleLanguage) { languagesLabel("", settings) }
     RowSurface(shape = shape) {
-        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                RowIcon(R.drawable.ic_language)
-                Spacer(Modifier.width(16.dp))
-                Text("Download languages", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
-            }
-            OutlinedTextField(
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .padding(vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            FormRowTitle(R.drawable.ic_language, "Download languages")
+            NovaTextField(
                 value = text,
                 onValueChange = { value ->
                     edited = value
@@ -215,18 +234,13 @@ private fun SubtitleLanguagesRow(shape: Shape, settings: Settings, actions: AppA
                 ),
                 keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
             )
-            Text(
-                text = "Codes or names, most wanted first, e.g. \"en, fr\" or \"Hindi, English\". Searching in $effective.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
         }
     }
 }
 
 @Composable
 private fun VisibilityToggle(visible: Boolean, what: String, onToggle: () -> Unit) {
-    IconButton(onClick = onToggle) {
+    IosIconButton(onClick = onToggle) {
         NovaIcon(
             if (visible) R.drawable.ic_visibility_off else R.drawable.ic_visibility,
             contentDescription = if (visible) "Hide $what" else "Show $what",

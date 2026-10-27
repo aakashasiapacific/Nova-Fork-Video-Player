@@ -14,15 +14,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -37,7 +30,12 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
+import com.aakash.novafork.ui.common.IosSegmentedControl
+import com.aakash.novafork.ui.common.IosSpinner
+import com.aakash.novafork.ui.common.IosTextButton
+import com.aakash.novafork.ui.common.NovaAlertDialog
 import com.aakash.novafork.ui.common.NovaIcon
+import com.aakash.novafork.ui.common.NovaTextField
 import com.aakash.novafork.ui.common.PosterArt
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.Artwork
@@ -58,12 +56,13 @@ internal fun IdentifyDialog(dialog: DialogUi.Identify, actions: AppActions) {
         actions.identifySearch(query, tv)
     }
 
-    AlertDialog(
+    NovaAlertDialog(
+        form = true,
         onDismissRequest = actions::dismissDialog,
         title = { Text("Identify") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(
+                NovaTextField(
                     value = query,
                     onValueChange = { query = it },
                     modifier = Modifier.fillMaxWidth(),
@@ -73,28 +72,24 @@ internal fun IdentifyDialog(dialog: DialogUi.Identify, actions: AppActions) {
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                     keyboardActions = KeyboardActions(onSearch = { search() }),
                 )
-                SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-                    val kinds = listOf(false to "Movie", true to "TV show")
-                    kinds.forEachIndexed { index, (isTv, label) ->
-                        SegmentedButton(
-                            selected = tv == isTv,
-                            onClick = {
-                                if (tv != isTv) {
-                                    tv = isTv
-                                    search()
-                                }
-                            },
-                            shape = SegmentedButtonDefaults.itemShape(index = index, count = kinds.size),
-                        ) {
-                            Text(label)
+                val kinds = listOf(false to "Movie", true to "TV show")
+                IosSegmentedControl(
+                    options = kinds.map { it.second },
+                    selectedIndex = kinds.indexOfFirst { it.first == tv },
+                    onSelect = { index ->
+                        val isTv = kinds[index].first
+                        if (tv != isTv) {
+                            tv = isTv
+                            search()
                         }
-                    }
-                }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                )
                 IdentifyResults(dialog = dialog, onPick = { actions.identifyPick(dialog.videoId, it) })
             }
         },
         confirmButton = {
-            TextButton(onClick = actions::dismissDialog) { Text("Cancel") }
+            IosTextButton(onClick = actions::dismissDialog) { Text("Cancel") }
         },
     )
 }
@@ -109,7 +104,7 @@ private fun IdentifyResults(dialog: DialogUi.Identify, onPick: (IdentifyResultUi
                 .padding(vertical = 32.dp),
             contentAlignment = Alignment.Center,
         ) {
-            CircularProgressIndicator()
+            IosSpinner()
         }
         error != null -> Text(
             text = error,

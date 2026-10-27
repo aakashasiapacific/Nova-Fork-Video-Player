@@ -18,7 +18,9 @@ import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
+import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.unit.dp
+import com.aakash.novafork.data.AspectMode
 import com.aakash.novafork.ui.model.PlayerActions
 import com.aakash.novafork.ui.model.PlayerUiState
 import kotlin.math.abs
@@ -34,7 +36,10 @@ private const val MAX_SCRUB_SPAN_MS = 600_000L
  * Full-screen touch layer under the controls.
  *
  * Unlocked: tap, double tap ([onDoubleTap] with the third of the screen it hit), horizontal drag
- * scrubs, vertical drag on the left half changes brightness and on the right half volume.
+ * scrubs. A drag down pulls the video down to close the player ([onPullDown] with each move,
+ * [onPullDownEnd] with the release speed and the height), as iOS's player closes; other vertical
+ * drags do nothing: brightness and volume are the phone's own (the volume keys show the player's
+ * indicator, see PlayerController.onVolumeKey).
  * Locked: only [onLockedTap].
  */
 @Composable
@@ -45,6 +50,8 @@ internal fun PlayerGestureLayer(
     onDoubleTap: (TapZone) -> Unit,
     onLockedTap: () -> Unit,
     modifier: Modifier = Modifier,
+    onPullDown: (dy: Float) -> Unit = {},
+    onPullDownEnd: (velocity: Float, height: Float) -> Unit = { _, _ -> },
 ) {
     // Gesture coroutines outlive recompositions (state changes every 250 ms); read the latest through these.
     val currentState by rememberUpdatedState(state)
@@ -52,6 +59,8 @@ internal fun PlayerGestureLayer(
     val currentOnTap by rememberUpdatedState(onTap)
     val currentOnDoubleTap by rememberUpdatedState(onDoubleTap)
     val currentOnLockedTap by rememberUpdatedState(onLockedTap)
+    val currentOnPullDown by rememberUpdatedState(onPullDown)
+    val currentOnPullDownEnd by rememberUpdatedState(onPullDownEnd)
     val locked = state.locked
 
     Box(
@@ -68,10 +77,58 @@ internal fun PlayerGestureLayer(
                 }
             }
             .pointerInput(locked) {
-                if (!locked) detectPlayerDrags(state = { currentState }, actions = { currentActions })
+                if (!locked) {
+                    detectPlayerDrags(
+                        state = { currentState },
+                        actions = { currentActions },
+                        onPullDown = { currentOnPullDown(it) },
+                        onPullDownEnd = { velocity, height -> currentOnPullDownEnd(velocity, height) },
+                    )
+                }
+            }
+            .pointerInput(locked) {
+                if (!locked) detectPinchZoom(actions = { currentActions })
             },
     )
 }
+
+/**
+ * Two fingers spread to fill the screen (cropping the edges) or pinch in to fit the whole picture,
+ * as Samsung's and Apple's players do; the player names the new fit.
+ */
+private suspend fun PointerInputScope.detectPinchZoom(actions: () -> PlayerActions) {
+    awaitEachGesture {
+        awaitFirstDown(requireUnconsumed = false)
+        var startSpan = 0f
+        var decided = false
+        do {
+            val event = awaitPointerEvent()
+            val pressed = event.changes.filter { it.pressed }
+            if (pressed.size >= 2) {
+                val span = (pressed[0].position - pressed[1].position).getDistance()
+                if (startSpan == 0f) {
+                    startSpan = span
+                } else if (!decided) {
+                    when {
+                        span / startSpan > PINCH_OUT -> {
+                            actions().setAspect(AspectMode.FIT_SCREEN)
+                            decided = true
+                        }
+                        span / startSpan < PINCH_IN -> {
+                            actions().setAspect(AspectMode.BEST_FIT)
+                            decided = true
+                        }
+                    }
+                }
+                // Two fingers are a pinch, never a scrub or a tap.
+                event.changes.forEach { it.consume() }
+            }
+        } while (event.changes.any { it.pressed })
+    }
+}
+
+private const val PINCH_OUT = 1.15f
+private const val PINCH_IN = 0.87f
 
 /** Reports whether any pointer is down anywhere below this node, without consuming anything. */
 internal fun Modifier.observeTouches(onTouchingChanged: (Boolean) -> Unit): Modifier = pointerInput(Unit) {
@@ -92,6 +149,8 @@ private fun tapZone(x: Float, width: Float): TapZone = when {
 private suspend fun PointerInputScope.detectPlayerDrags(
     state: () -> PlayerUiState,
     actions: () -> PlayerActions,
+    onPullDown: (Float) -> Unit,
+    onPullDownEnd: (velocity: Float, height: Float) -> Unit,
 ) {
     val edge = SystemGestureEdge.toPx()
     awaitEachGesture {
@@ -110,8 +169,20 @@ private suspend fun PointerInputScope.detectPlayerDrags(
         val moved = start.position - down.position
         if (abs(moved.x) > abs(moved.y)) {
             scrub(start, overSlop.x, state(), actions)
+        } else if (moved.y > 0f) {
+            // Down: the video follows the finger, to close the player.
+            val tracker = VelocityTracker()
+            tracker.addPosition(start.uptimeMillis, start.position)
+            onPullDown(overSlop.y)
+            drag(start.id) { change ->
+                tracker.addPosition(change.uptimeMillis, change.position)
+                onPullDown(change.positionChange().y)
+                change.consume()
+            }
+            onPullDownEnd(tracker.calculateVelocity().y, height)
         } else {
-            adjustLevel(start, brightness = down.position.x < size.width / 2f, initialDy = overSlop.y, actions = actions)
+            // Swallowed, so a vertical swipe is not read as a tap either.
+            drag(start.id) { it.consume() }
         }
     }
 }
@@ -145,30 +216,5 @@ private suspend fun AwaitPointerEventScope.scrub(
     } finally {
         // Cancelled mid-drag (lock, PiP, leaving the screen): drop the preview instead of seeking.
         if (!committed) actions().endGesture()
-    }
-}
-
-private suspend fun AwaitPointerEventScope.adjustLevel(
-    start: PointerInputChange,
-    brightness: Boolean,
-    initialDy: Float,
-    actions: () -> PlayerActions,
-) {
-    val height = size.height.toFloat().coerceAtLeast(1f)
-    fun adjust(dy: Float) {
-        if (dy == 0f) return
-        // Up is positive; a drag over the full height spans the whole range.
-        val delta = -dy / height
-        if (brightness) actions().adjustBrightness(delta) else actions().adjustVolume(delta)
-    }
-    try {
-        adjust(initialDy)
-        drag(start.id) { change ->
-            val dy = change.positionChange().y
-            change.consume()
-            adjust(dy)
-        }
-    } finally {
-        actions().endGesture()
     }
 }

@@ -98,6 +98,7 @@ interface LibraryRepository {
     val scanState: StateFlow<ScanState>
 
     suspend fun video(id: Long): VideoWithMeta?
+
     suspend fun source(id: Long): SourceEntity?
     suspend fun findByUri(uri: String): VideoWithMeta?
 

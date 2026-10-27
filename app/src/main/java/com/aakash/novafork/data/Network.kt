@@ -8,6 +8,7 @@ import coil.disk.DiskCache
 import coil.memory.MemoryCache
 import com.aakash.novafork.BuildConfig
 import com.aakash.novafork.sources.SmbFetcher
+import com.aakash.novafork.sources.music.SongArtFetcher
 import okhttp3.Cache
 import okhttp3.Dns
 import okhttp3.HttpUrl.Companion.toHttpUrl
@@ -22,6 +23,7 @@ import java.util.concurrent.TimeUnit
 object Network {
     private const val HTTP_CACHE_BYTES = 50L * 1024 * 1024
     private const val IMAGE_CACHE_BYTES = 250L * 1024 * 1024
+    private const val IMAGE_FADE_MS = 250
 
     /** Shared client for TMDB and artwork: 15 s timeouts, disk cache, app User-Agent, secure DNS. */
     fun createOkHttp(context: Context, settings: SettingsStore): OkHttpClient {
@@ -49,6 +51,7 @@ object Network {
             .components {
                 add(VideoFrameDecoder.Factory())
                 add(SmbFetcher.Factory(smb))
+                add(SongArtFetcher.Factory())
             }
             .memoryCache { MemoryCache.Builder(appContext).maxSizePercent(0.20).build() }
             .diskCache {
@@ -57,7 +60,8 @@ object Network {
                     .maxSizeBytes(IMAGE_CACHE_BYTES)
                     .build()
             }
-            .crossfade(true)
+            // Pictures fade in softly as they arrive (iOS), rather than popping in.
+            .crossfade(IMAGE_FADE_MS)
             // TMDB images never change for a path; keep them even when headers say otherwise.
             .respectCacheHeaders(false)
             .build()

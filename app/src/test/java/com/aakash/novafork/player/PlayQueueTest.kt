@@ -136,4 +136,55 @@ class PlayQueueTest {
         assertEquals(0, queue.position)
         assertNull(queue.currentId)
     }
+
+    @Test
+    fun `play next goes right after the playing item and play last at the end`() {
+        val queue = PlayQueue()
+        queue.set(ids, startIndex = 1, shuffle = false)
+
+        queue.insert(listOf(60L, 70L), next = true)
+        assertEquals(listOf(10L, 20L, 60L, 70L, 30L, 40L, 50L), queue.playOrder)
+        assertEquals(20L, queue.currentId)
+
+        queue.insert(listOf(80L), next = false)
+        assertEquals(80L, queue.playOrder.last())
+        assertEquals(listOf(60L, 70L, 30L), queue.upNext(limit = 3))
+        assertEquals(2, queue.nextPosition(wrap = false))
+    }
+
+    @Test
+    fun `inserting into an empty queue starts it`() {
+        val queue = PlayQueue()
+        queue.insert(listOf(5L, 6L), next = true)
+
+        assertEquals(5L, queue.currentId)
+        assertEquals(listOf(6L), queue.upNext(limit = 10))
+    }
+
+    @Test
+    fun `inserted items survive shuffle on and off`() {
+        val queue = PlayQueue(Random(5))
+        queue.set(ids, startIndex = 0, shuffle = true)
+        queue.insert(listOf(99L), next = true)
+        assertEquals(99L, queue.upNext(limit = 1).single())
+
+        queue.setShuffled(false)
+        assertEquals(ids + 99L, queue.playOrder)
+    }
+
+    @Test
+    fun `up next can be reordered but not the playing item or what came before`() {
+        val queue = PlayQueue()
+        queue.set(ids, startIndex = 1, shuffle = false)
+
+        queue.move(from = 4, to = 2)
+        assertEquals(listOf(10L, 20L, 50L, 30L, 40L), queue.playOrder)
+        assertEquals(20L, queue.currentId)
+
+        queue.move(from = 1, to = 3)
+        queue.move(from = 0, to = 2)
+        queue.move(from = 2, to = 9)
+        assertEquals(listOf(10L, 20L, 50L, 30L, 40L), queue.playOrder)
+        assertEquals(listOf(50L, 30L, 40L), queue.upNext(limit = 5))
+    }
 }

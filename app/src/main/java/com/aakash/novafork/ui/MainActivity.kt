@@ -1,34 +1,49 @@
 package com.aakash.novafork.ui
 
+import android.app.ActivityOptions
+import android.app.RecoverableSecurityException
 import android.content.ActivityNotFoundException
+import android.content.ContentResolver
+import android.content.ContentUris
 import android.content.Intent
+import android.content.IntentSender
 import android.graphics.Color
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.DocumentsContract
+import android.provider.MediaStore
 import android.provider.Settings as AndroidSettings
 import android.util.Log
+import android.view.MotionEvent
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
-import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.core.view.WindowCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import com.aakash.novafork.data.StoragePermissions
-import com.aakash.novafork.data.ThemeMode
 import com.aakash.novafork.data.backup.BackupManager
 import com.aakash.novafork.player.PlayerIntents
+import com.aakash.novafork.ui.audio.LocalMusicEnabled
+import com.aakash.novafork.ui.common.LocalHeroPreviewEnabled
+import com.aakash.novafork.ui.common.LocalStatusBarIcons
 import com.aakash.novafork.ui.model.AppActions
+import com.aakash.novafork.ui.model.DialogUi
+import com.aakash.novafork.ui.model.TopDestination
 import java.time.LocalDate
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.distinctUntilChangedBy
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -66,7 +81,7 @@ class MainActivity : ComponentActivity() {
     private val actions: AppActions by lazy {
         object : AppActions by viewModel {
             override fun play(videoId: Long, startOver: Boolean) {
-                startActivity(PlayerIntents.forVideo(this@MainActivity, videoId, startOver))
+                startActivity(PlayerIntents.forVideo(this@MainActivity, videoId, startOver), growFromTouch())
             }
 
             override fun playUrl(url: String) {
@@ -76,11 +91,11 @@ class MainActivity : ComponentActivity() {
                     return
                 }
                 viewModel.dismissDialog()
-                startActivity(PlayerIntents.forUri(this@MainActivity, link))
+                startActivity(PlayerIntents.forUri(this@MainActivity, link), growFromTouch())
             }
 
             override fun playRemote(uri: String, title: String) {
-                startActivity(PlayerIntents.forUri(this@MainActivity, uri, title.ifBlank { null }))
+                startActivity(PlayerIntents.forUri(this@MainActivity, uri, title.ifBlank { null }), growFromTouch())
             }
 
             override fun openWebPage(url: String) {
@@ -138,23 +153,42 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        // Android 12+: the black launch screen fades into Home instead of cutting (iOS).
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            splashScreen.setOnExitAnimationListener { view ->
+                view.animate().alpha(0f).setDuration(SPLASH_FADE_MS).withEndAction { view.remove() }.start()
+            }
+        }
         setContent {
             val state by viewModel.state.collectAsStateWithLifecycle()
-            val dark = when (state.settings.settings.themeMode) {
-                ThemeMode.DARK -> true
-                ThemeMode.LIGHT -> false
-                ThemeMode.SYSTEM -> isSystemInDarkTheme()
+            // One dark theme: light (white) system bar icons on clear bars, except where a page
+            // asks for dark ones over a bright picture (the Home hero, see LocalStatusBarIcons).
+            LaunchedEffect(Unit) { applySystemBarStyle(dark = true) }
+            CompositionLocalProvider(
+                LocalStatusBarIcons provides { darkIcons -> setDarkStatusBarIcons(darkIcons) },
+                LocalHeroPreviewEnabled provides true,
+                LocalMusicEnabled provides true,
+            ) {
+                NovaRoot(state = state, actions = actions)
             }
-            // System bar icons follow the app's theme, which need not match the system's.
-            LaunchedEffect(dark) { applySystemBarStyle(dark) }
-            NovaRoot(state = state, actions = actions)
         }
+        lifecycleScope.launch {
+            // The app icon's "Continue" shortcut follows the first Continue Watching video.
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.state
+                    .map { it.home.continueWatching.firstOrNull() }
+                    .distinctUntilChangedBy { card -> card?.let { it.id to it.title } }
+                    .collect { card -> withContext(Dispatchers.Default) { AppShortcuts.update(this@MainActivity, card) } }
+            }
+        }
+        if (savedInstanceState == null) openShortcut(intent)
         lifecycleScope.launch {
             // Queues resolve in the background (folder, season, playlist); play each one once.
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.queueRequests.collect { queue ->
                     startActivity(
                         PlayerIntents.forQueue(this@MainActivity, queue.videoIds.toLongArray(), queue.startIndex, queue.shuffle),
+                        growFromTouch(),
                     )
                 }
             }
@@ -165,10 +199,58 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        openShortcut(intent)
+    }
+
+    /** The app icon's Search shortcut opens the Search tab. */
+    private fun openShortcut(intent: Intent?) {
+        if (intent?.action == AppShortcuts.ACTION_SEARCH) actions.selectTab(TopDestination.SEARCH)
+    }
+
+    /** Where the last touch went down, for the player to grow out of. */
+    private var lastTouchX = 0f
+    private var lastTouchY = 0f
+
+    override fun dispatchTouchEvent(event: MotionEvent): Boolean {
+        if (event.actionMasked == MotionEvent.ACTION_DOWN) {
+            lastTouchX = event.rawX
+            lastTouchY = event.rawY
+        }
+        return super.dispatchTouchEvent(event)
+    }
+
+    /** The player grows out of the Play button that was tapped instead of sliding in (iOS). */
+    private fun growFromTouch(): Bundle {
+        val size = (120 * resources.displayMetrics.density).toInt()
+        return ActivityOptions.makeScaleUpAnimation(
+            window.decorView,
+            (lastTouchX - size / 2).toInt(),
+            (lastTouchY - size / 4).toInt(),
+            size,
+            size / 2,
+        ).toBundle()
+    }
+
+    /** The first start is the launch, which refreshes on its own (MainViewModel). */
+    private var started = false
+
+    override fun onStart() {
+        super.onStart()
+        // Every return to the app looks for new videos again, silently, as at launch.
+        if (started) viewModel.onAppReturned()
+        started = true
+    }
+
     override fun onResume() {
         super.onResume()
         // Access can change in system settings while the app is in the background.
         viewModel.onPermissionsChanged()
+    }
+
+    private fun setDarkStatusBarIcons(dark: Boolean) {
+        WindowCompat.getInsetsController(window, window.decorView).isAppearanceLightStatusBars = dark
     }
 
     private fun applySystemBarStyle(dark: Boolean) {
@@ -237,7 +319,14 @@ class MainActivity : ComponentActivity() {
         lifecycleScope.launch {
             val name = withContext(Dispatchers.IO) {
                 try {
-                    contentResolver.takePersistableUriPermission(treeUri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    try {
+                        contentResolver.takePersistableUriPermission(
+                            treeUri,
+                            Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+                        )
+                    } catch (e: SecurityException) {
+                        contentResolver.takePersistableUriPermission(treeUri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }
                 } catch (e: SecurityException) {
                     Log.w(TAG, "No persistable permission for $treeUri", e)
                     return@withContext null
@@ -274,6 +363,9 @@ class MainActivity : ComponentActivity() {
         const val TAG = "MainActivity"
         const val UI_PREFS = "ui"
         const val KEY_ASKED_STORAGE = "asked_storage_permission"
+
+        /** How long the launch screen takes to fade into Home. */
+        const val SPLASH_FADE_MS = 260L
 
         /** The navigation bar scrim enableEdgeToEdge uses on Android 8.0, which has no dark nav icons. */
         val DARK_SCRIM = Color.argb(0x80, 0x1b, 0x1b, 0x1b)

@@ -38,22 +38,19 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonDefaults
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
-import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
-import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -67,6 +64,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -75,13 +73,17 @@ import com.aakash.novafork.core.format.Formats
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
 import com.aakash.novafork.ui.common.ArtPlaceholder
 import com.aakash.novafork.ui.common.BackdropArt
+import com.aakash.novafork.ui.common.IosButton
+import com.aakash.novafork.ui.common.IosProgressBar
+import com.aakash.novafork.ui.common.IosSpinner
 import com.aakash.novafork.ui.common.LandscapeArt
+import com.aakash.novafork.ui.common.LocalPagePull
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.PosterArt
 import com.aakash.novafork.ui.common.ProgressStrip
-import com.aakash.novafork.ui.common.RatingPill
 import com.aakash.novafork.ui.common.WatchedBadge
 import com.aakash.novafork.ui.common.bottomScrim
+import com.aakash.novafork.ui.common.iosOverscroll
 import com.aakash.novafork.ui.common.metaLine
 import com.aakash.novafork.ui.common.startScrim
 import com.aakash.novafork.ui.model.Artwork
@@ -91,9 +93,9 @@ import com.aakash.novafork.ui.model.MediaKind
 import com.aakash.novafork.ui.model.ShowCardUi
 import com.aakash.novafork.ui.model.VideoCardUi
 import com.aakash.novafork.ui.theme.NovaColors
+import kotlin.math.roundToInt
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
-import kotlin.math.roundToInt
 
 // ---------------------------------------------------------------------------------------------
 // Insets and small helpers
@@ -152,49 +154,22 @@ internal fun ShowCardUi.subtitleLine(): String = metaLine(
 )
 
 /**
- * Pull-to-refresh whose spinner shows from the pull until the scan it started is over. Scans that
- * start on their own only show the scan banner, not this spinner.
+ * A tablet page that bounces past its ends as the phone's do; pulling it down past its top looks
+ * for new videos ([onRefresh]), silently, with a tick when letting go will.
  */
 @Composable
 internal fun TabletPullToRefresh(
-    scanning: Boolean,
     onRefresh: () -> Unit,
     modifier: Modifier = Modifier,
     content: @Composable BoxScope.() -> Unit,
 ) {
-    var pulled by remember { mutableStateOf(false) }
-    val currentScanning by rememberUpdatedState(scanning)
-    if (pulled) {
-        LaunchedEffect(Unit) {
-            // Give the scan a moment to start, then keep spinning until it is over.
-            withTimeoutOrNull(PULL_REFRESH_GRACE_MS) { snapshotFlow { currentScanning }.first { it } }
-            snapshotFlow { currentScanning }.first { !it }
-            pulled = false
-        }
+    val pull = remember { mutableFloatStateOf(0f) }
+    val readPull = remember { { pull.floatValue } }
+    CompositionLocalProvider(LocalPagePull provides readPull) {
+        Box(modifier.iosOverscroll(pullState = pull, onPullRefresh = onRefresh), content = content)
     }
-    val refreshState = rememberPullToRefreshState()
-    PullToRefreshBox(
-        isRefreshing = pulled,
-        onRefresh = {
-            pulled = true
-            onRefresh()
-        },
-        modifier = modifier,
-        state = refreshState,
-        indicator = {
-            PullToRefreshDefaults.Indicator(
-                state = refreshState,
-                isRefreshing = pulled,
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .statusBarsPadding(),
-            )
-        },
-        content = content,
-    )
 }
 
-private const val PULL_REFRESH_GRACE_MS = 900L
 
 // ---------------------------------------------------------------------------------------------
 // Buttons and labels
@@ -203,7 +178,7 @@ private const val PULL_REFRESH_GRACE_MS = 900L
 /** Primary "Play / Resume …" button, a little taller than the default for lean-back screens. */
 @Composable
 internal fun TabletPlayButton(label: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true) {
-    Button(
+    IosButton(
         onClick = onClick,
         enabled = enabled,
         modifier = modifier.height(48.dp),
@@ -211,7 +186,7 @@ internal fun TabletPlayButton(label: String, onClick: () -> Unit, modifier: Modi
     ) {
         NovaIcon(R.drawable.ic_play_arrow, contentDescription = null, modifier = Modifier.size(22.dp))
         Spacer(Modifier.width(ButtonDefaults.IconSpacing))
-        Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(label, maxLines = 2, overflow = TextOverflow.Ellipsis)
     }
 }
 
@@ -220,7 +195,7 @@ internal fun TabletPlayButton(label: String, onClick: () -> Unit, modifier: Modi
 internal fun ButtonLabel(@DrawableRes icon: Int, text: String) {
     NovaIcon(icon, contentDescription = null, modifier = Modifier.size(ButtonDefaults.IconSize))
     Spacer(Modifier.width(ButtonDefaults.IconSpacing))
-    Text(text, maxLines = 1)
+    Text(text, maxLines = 2)
 }
 
 /** Round back button that stays readable over artwork. */
@@ -251,7 +226,7 @@ internal fun TabletTag(text: String, modifier: Modifier = Modifier) {
             text = text,
             style = MaterialTheme.typography.labelLarge,
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-            maxLines = 1,
+            maxLines = 2,
         )
     }
 }
@@ -263,7 +238,7 @@ internal fun ImageLabel(text: String, modifier: Modifier = Modifier, emphasized:
         text = text,
         style = MaterialTheme.typography.labelMedium,
         color = if (emphasized) MaterialTheme.colorScheme.onPrimary else Color.White,
-        maxLines = 1,
+        maxLines = 2,
         modifier = modifier
             .clip(RoundedCornerShape(6.dp))
             .background(if (emphasized) MaterialTheme.colorScheme.primary else Color.Black.copy(alpha = 0.6f))
@@ -275,21 +250,26 @@ internal fun ImageLabel(text: String, modifier: Modifier = Modifier, emphasized:
 @Composable
 internal fun TabletLoading(modifier: Modifier = Modifier) {
     Box(modifier, contentAlignment = Alignment.Center) {
-        CircularProgressIndicator()
+        IosSpinner()
     }
 }
 
-/** The brand mark: amber → coral disc with a play glyph. */
+/** The brand mark: the launcher icon on its iOS-blue rounded square. */
 @Composable
 internal fun BrandMark(modifier: Modifier = Modifier, size: Dp = 40.dp) {
     Box(
         modifier
             .size(size)
-            .clip(CircleShape)
-            .background(Brush.linearGradient(listOf(NovaColors.Amber, NovaColors.Coral))),
+            .clip(RoundedCornerShape(size * 0.24f))
+            .background(NovaColors.IosBlue),
         contentAlignment = Alignment.Center,
     ) {
-        NovaIcon(R.drawable.ic_play_arrow, contentDescription = null, tint = Color.White, modifier = Modifier.size(size * 0.6f))
+        Icon(
+            painterResource(R.drawable.ic_launcher_foreground),
+            contentDescription = null,
+            tint = Color.Unspecified,
+            modifier = Modifier.size(size * 1.5f),
+        )
     }
 }
 
@@ -310,7 +290,6 @@ internal fun TabletPosterCard(
     modifier: Modifier = Modifier,
     onLongClick: (() -> Unit)? = null,
     onLongClickLabel: String? = null,
-    rating: Float? = null,
     progress: Float? = null,
     watched: Boolean = false,
     badge: String? = null,
@@ -343,7 +322,6 @@ internal fun TabletPosterCard(
                 .indication(interactionSource, LocalIndication.current),
         ) {
             PosterArt(artwork = artwork, title = title, modifier = Modifier.fillMaxSize())
-            RatingPill(rating, onImage = true, modifier = Modifier.align(Alignment.TopStart).padding(8.dp))
             when {
                 watched -> WatchedBadge(Modifier.align(Alignment.TopEnd).padding(8.dp))
                 badge != null -> ImageLabel(badge, Modifier.align(Alignment.TopEnd).padding(8.dp), emphasized = true)
@@ -354,7 +332,7 @@ internal fun TabletPosterCard(
         Text(
             text = title,
             style = MaterialTheme.typography.titleSmall,
-            maxLines = 1,
+            maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
         if (!subtitle.isNullOrBlank()) {
@@ -362,7 +340,7 @@ internal fun TabletPosterCard(
                 text = subtitle,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
         }
@@ -387,7 +365,6 @@ internal fun TabletVideoPosterCard(
         onLongClick = { if (stream) onOpen(card.id) else onPlay(card.id) },
         onLongClickLabel = if (stream) "Details" else "Play",
         modifier = modifier,
-        rating = card.rating,
         progress = card.progress,
         watched = card.watched,
         selected = selected,
@@ -410,7 +387,6 @@ internal fun TabletShowPosterCard(
         onLongClick = onLongClick,
         onLongClickLabel = if (onLongClick != null) "Details" else null,
         modifier = modifier,
-        rating = card.rating,
         watched = card.episodeCount > 0 && card.unwatchedCount == 0,
         badge = if (card.unwatchedCount > 0) "${card.unwatchedCount} new" else null,
         selected = selected,
@@ -436,7 +412,6 @@ internal fun TabletLibraryItemCard(
             onLongClick = onLongClick,
             onLongClickLabel = onLongClickLabel,
             modifier = modifier,
-            rating = item.card.rating,
             progress = item.card.progress,
             watched = item.card.watched,
             selected = selected,
@@ -449,7 +424,6 @@ internal fun TabletLibraryItemCard(
             onLongClick = onLongClick,
             onLongClickLabel = onLongClickLabel,
             modifier = modifier,
-            rating = item.card.rating,
             watched = item.card.episodeCount > 0 && item.card.unwatchedCount == 0,
             badge = if (item.card.unwatchedCount > 0) "${item.card.unwatchedCount} new" else null,
             selected = selected,
@@ -508,7 +482,7 @@ internal fun TabletLandscapeCard(
                     text = card.primaryLine(),
                     style = MaterialTheme.typography.titleMedium,
                     color = Color.White,
-                    maxLines = 1,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
                 val secondary = metaLine(card.secondaryLine(), card.remainingLabel())
@@ -517,20 +491,10 @@ internal fun TabletLandscapeCard(
                         text = secondary,
                         style = MaterialTheme.typography.bodySmall,
                         color = Color.White.copy(alpha = 0.78f),
-                        maxLines = 1,
+                        maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
-            }
-            Spacer(Modifier.width(12.dp))
-            Box(
-                Modifier
-                    .size(44.dp)
-                    .clip(CircleShape)
-                    .background(Color.White.copy(alpha = 0.22f)),
-                contentAlignment = Alignment.Center,
-            ) {
-                NovaIcon(R.drawable.ic_play_arrow, contentDescription = null, tint = Color.White, modifier = Modifier.size(28.dp))
             }
         }
         if (card.watched) WatchedBadge(Modifier.align(Alignment.TopEnd).padding(10.dp))
@@ -557,6 +521,7 @@ internal fun TabletStillCard(
     watched: Boolean = false,
     badge: String? = null,
     highlighted: Boolean = false,
+    onClickLabel: String = "Play",
 ) {
     val dims = LocalNovaDimens.current
     val shape = RoundedCornerShape(dims.cardRadius)
@@ -571,7 +536,7 @@ internal fun TabletStillCard(
             .combinedClickable(
                 interactionSource = interactionSource,
                 indication = null,
-                onClickLabel = "Play",
+                onClickLabel = onClickLabel,
                 onLongClickLabel = "Details",
                 onLongClick = onLongClick,
                 onClick = onClick,
@@ -597,7 +562,7 @@ internal fun TabletStillCard(
         Text(
             text = title,
             style = MaterialTheme.typography.titleSmall,
-            maxLines = 1,
+            maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
         if (!subtitle.isNullOrBlank()) {
@@ -605,7 +570,7 @@ internal fun TabletStillCard(
                 text = subtitle,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
         }
@@ -625,7 +590,7 @@ internal fun TabletStillCard(
                 text = footnote,
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
+                maxLines = 2,
             )
         }
     }
@@ -667,7 +632,7 @@ internal fun WatchProgress(progress: Float?, positionMs: Long, durationMs: Long?
         "${(fraction * 100).roundToInt()}% watched"
     }
     Row(modifier, verticalAlignment = Alignment.CenterVertically) {
-        LinearProgressIndicator(
+        IosProgressBar(
             progress = { fraction },
             modifier = Modifier
                 .width(240.dp)

@@ -20,7 +20,6 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -31,18 +30,18 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
 import com.aakash.novafork.ui.adaptive.DeviceLayout
+import com.aakash.novafork.ui.common.IosTextButton
 import com.aakash.novafork.ui.model.PlayerActions
 import com.aakash.novafork.ui.model.PlayerUiState
-import com.aakash.novafork.ui.model.RepeatMode
 
 private val TransportButtonSize = 64.dp
 private val TransportIconSize = 40.dp
-private val ToggleButtonSize = 56.dp
 
 /**
- * Tablet controls: larger targets, title top-left with cast, queue and more on the right,
- * transport in the centre, a full-width seek bar and one row of labelled buttons. Track options
- * open in the side [TrackPanel] via [onOpenPanel]; the queue and cast devices via [onOpenSheet].
+ * Tablet controls: larger targets, title top-left with cast and queue on the right, transport in
+ * the centre, a full-width seek bar and one row under it with every other action (nothing in a
+ * ⋮ menu, owner). Track options open in the side [TrackPanel] via [onOpenPanel]; the queue and
+ * cast devices via [onOpenSheet].
  */
 @Composable
 internal fun TabletPlayerControls(
@@ -109,24 +108,7 @@ private fun TabletTopBar(
             iconSize = 28.dp,
         )
         Spacer(Modifier.width(12.dp))
-        Column(Modifier.weight(1f)) {
-            Text(
-                text = state.title,
-                style = MaterialTheme.typography.titleLarge,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            val subtitle = state.subtitle
-            if (!subtitle.isNullOrBlank()) {
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Color.White.copy(alpha = 0.72f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-        }
+        PlayerTitle(state, Modifier.weight(1f), large = true)
         Spacer(Modifier.width(12.dp))
         CastButton(
             castingTo = state.castingTo,
@@ -136,47 +118,31 @@ private fun TabletTopBar(
         )
         if (state.queue.size > 1) {
             PlayerIconButton(
-                icon = R.drawable.ic_playlist_play,
+                icon = R.drawable.ic_player_queue,
                 contentDescription = "Queue",
                 onClick = { onOpenSheet(PlayerSheet.QUEUE) },
                 buttonSize = 56.dp,
                 iconSize = 26.dp,
             )
         }
-        PlayerMoreMenu(
-            items = listOf(PlayerMenuItem(R.drawable.ic_volume_up, "Play in background", actions::playInBackground)),
-            buttonSize = 56.dp,
-            iconSize = 26.dp,
-        )
+        // No ⋮ menu any more (owner): aspect, play mode, shuffle, rotate and play in background
+        // sit in the row under the seek bar with the rest.
     }
 }
 
 @Composable
 private fun TabletTransportRow(state: PlayerUiState, actions: PlayerActions, modifier: Modifier = Modifier) {
-    // Previous/next keep both slots when either exists so play/pause stays centred; shuffle and
-    // repeat flank the row the same way.
+    // Previous/next keep both slots when either exists so play/pause stays centred.
     val showSkips = state.hasPrevious || state.hasNext
     Row(
         modifier = modifier,
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(32.dp),
     ) {
-        if (state.canShuffle) {
-            PlayerToggleButton(
-                icon = R.drawable.ic_shuffle,
-                contentDescription = "Shuffle",
-                checked = state.shuffle,
-                onClick = actions::toggleShuffle,
-                buttonSize = ToggleButtonSize,
-                iconSize = 26.dp,
-            )
-        } else {
-            Spacer(Modifier.size(ToggleButtonSize))
-        }
         if (showSkips) {
             if (state.hasPrevious) {
                 PlayerIconButton(
-                    icon = R.drawable.ic_skip_previous,
+                    icon = R.drawable.ic_player_previous,
                     contentDescription = "Previous",
                     onClick = actions::playPrevious,
                     buttonSize = TransportButtonSize,
@@ -197,8 +163,9 @@ private fun TabletTransportRow(state: PlayerUiState, actions: PlayerActions, mod
         PlayPauseButton(
             isPlaying = state.isPlaying,
             buffering = state.isBuffering,
+            finished = state.finished,
             onClick = actions::togglePlay,
-            size = 80.dp,
+            size = 72.dp,
         )
         SeekStepButton(
             forward = true,
@@ -211,7 +178,7 @@ private fun TabletTransportRow(state: PlayerUiState, actions: PlayerActions, mod
         if (showSkips) {
             if (state.hasNext) {
                 PlayerIconButton(
-                    icon = R.drawable.ic_skip_next,
+                    icon = R.drawable.ic_player_next,
                     contentDescription = "Next",
                     onClick = actions::playNext,
                     buttonSize = TransportButtonSize,
@@ -221,14 +188,6 @@ private fun TabletTransportRow(state: PlayerUiState, actions: PlayerActions, mod
                 Spacer(Modifier.size(TransportButtonSize))
             }
         }
-        PlayerToggleButton(
-            icon = state.repeatMode.iconRes(),
-            contentDescription = state.repeatMode.label,
-            checked = state.repeatMode != RepeatMode.OFF,
-            onClick = actions::cycleRepeat,
-            buttonSize = ToggleButtonSize,
-            iconSize = 26.dp,
-        )
     }
 }
 
@@ -272,42 +231,73 @@ private fun TabletBottomBar(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 LabelledButton(
-                    icon = R.drawable.ic_audiotrack,
+                    icon = R.drawable.ic_player_audio,
                     label = "Audio",
                     onClick = { onOpenPanel(PlayerPanel.AUDIO) },
                 )
                 LabelledButton(
-                    icon = if (subtitlesOn(state.subtitleTracks)) R.drawable.ic_subtitles else R.drawable.ic_subtitles_off,
+                    icon = R.drawable.ic_player_subtitles,
                     label = "Subtitles",
                     onClick = { onOpenPanel(PlayerPanel.SUBTITLES) },
+                    dim = !subtitlesOn(state.subtitleTracks),
                 )
                 LabelledButton(
                     icon = R.drawable.ic_speed,
                     label = "Speed ${formatRate(state.rate)}",
                     onClick = { onOpenPanel(PlayerPanel.SPEED) },
                 )
-                LabelledButton(
-                    icon = R.drawable.ic_aspect_ratio,
-                    label = "Aspect: ${state.aspect.label}",
+                // What the ⋮ menu held, as icons beside them (owner: nothing hidden in a menu).
+                PlayerIconButton(
+                    icon = R.drawable.ic_player_fit,
+                    contentDescription = "Aspect ratio: ${state.aspect.label}",
                     onClick = { onOpenPanel(PlayerPanel.ASPECT) },
+                    buttonSize = 56.dp,
+                    iconSize = 26.dp,
+                )
+                PlayerIconButton(
+                    icon = state.repeatMode.iconRes(),
+                    contentDescription = state.repeatMode.label,
+                    onClick = actions::cycleRepeat,
+                    buttonSize = 56.dp,
+                    iconSize = 26.dp,
+                )
+                if (state.canShuffle) {
+                    PlayerToggleButton(
+                        icon = R.drawable.ic_player_shuffle,
+                        contentDescription = if (state.shuffle) "Shuffle On" else "Shuffle Off",
+                        checked = state.shuffle,
+                        onClick = actions::toggleShuffle,
+                        buttonSize = 56.dp,
+                        iconSize = 26.dp,
+                    )
+                }
+                if (state.canRotate) {
+                    PlayerIconButton(
+                        icon = R.drawable.ic_player_rotate,
+                        contentDescription = "Rotate",
+                        onClick = actions::rotate,
+                        buttonSize = 56.dp,
+                        iconSize = 26.dp,
+                    )
+                }
+                PlayerIconButton(
+                    icon = R.drawable.ic_player_headphones,
+                    contentDescription = "Play in background",
+                    onClick = actions::playInBackground,
+                    buttonSize = 56.dp,
+                    iconSize = 26.dp,
                 )
             }
             Spacer(Modifier.width(8.dp))
             LabelledButton(
-                icon = R.drawable.ic_lock,
+                icon = R.drawable.ic_player_lock,
                 label = "Lock",
                 onClick = actions::toggleLock,
                 showLabel = labelSecondary,
             )
-            LabelledButton(
-                icon = R.drawable.ic_screen_rotation,
-                label = "Rotate",
-                onClick = actions::rotate,
-                showLabel = labelSecondary,
-            )
             if (state.canEnterPictureInPicture) {
                 LabelledButton(
-                    icon = R.drawable.ic_picture_in_picture_alt,
+                    icon = R.drawable.ic_player_popup,
                     label = "Picture-in-picture",
                     onClick = actions::enterPictureInPicture,
                     showLabel = labelSecondary,
@@ -323,19 +313,22 @@ private fun LabelledButton(
     label: String,
     onClick: () -> Unit,
     showLabel: Boolean = true,
+    /** Something that is off (no subtitles on) shows dimmer. */
+    dim: Boolean = false,
 ) {
+    val glyph = Color.White.copy(alpha = if (dim) 0.6f else 1f)
     if (showLabel) {
-        TextButton(
+        IosTextButton(
             onClick = onClick,
             modifier = Modifier.heightIn(min = 52.dp),
             colors = ButtonDefaults.textButtonColors(contentColor = Color.White),
             contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
         ) {
-            Icon(painter = painterResource(icon), contentDescription = null, modifier = Modifier.size(24.dp))
+            Icon(painter = painterResource(icon), contentDescription = null, modifier = Modifier.size(24.dp), tint = glyph)
             Spacer(Modifier.width(8.dp))
             Text(text = label, style = MaterialTheme.typography.labelLarge, maxLines = 1)
         }
     } else {
-        PlayerIconButton(icon = icon, contentDescription = label, onClick = onClick, buttonSize = 56.dp, iconSize = 26.dp)
+        PlayerIconButton(icon = icon, contentDescription = label, onClick = onClick, buttonSize = 56.dp, iconSize = 26.dp, tint = glyph)
     }
 }

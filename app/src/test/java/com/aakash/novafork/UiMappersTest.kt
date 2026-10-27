@@ -39,6 +39,7 @@ import com.aakash.novafork.ui.RemoteListing
 import com.aakash.novafork.ui.UiMappers
 import com.aakash.novafork.ui.common.deviceAccessNotice
 import com.aakash.novafork.ui.frameSourceOf
+import com.aakash.novafork.ui.model.withRecentSearch
 import com.aakash.novafork.ui.model.Crumb
 import com.aakash.novafork.ui.model.FolderUi
 import com.aakash.novafork.ui.model.HeroTarget
@@ -149,6 +150,126 @@ class UiMappersTest {
         assertEquals(SEVERANCE_S2E3, severance.playVideoId)
         assertEquals("S2 · E3 · Who Is Alive?", severance.metaLine)
         assertEquals("Play S1 · E1", hero[4].playLabel)
+    }
+
+    @Test
+    fun searchFindsTitlesByCastAndDirector() {
+        val meta = MetadataEntity(
+            key = "movie:603",
+            tmdbId = 603,
+            type = "movie",
+            title = "The Matrix",
+            castNames = "Keanu Reeves, Carrie-Anne Moss",
+            directors = "Lana Wachowski, Lilly Wachowski",
+        )
+        val rows = listOf(
+            VideoWithMeta(video(id = 1, sourceId = DEVICE, uri = "content://media/external/video/media/1", kind = VideoKind.MOVIE, metadataKey = meta.key), meta),
+        )
+        val small = LibraryIndex.build(rows, listOf(device), preferLocalArtwork = false)
+        assertEquals(1, UiMappers.search(small, "keanu").results.size)
+        assertEquals(1, UiMappers.search(small, "wachowski").results.size)
+        // Two letters are too few to search names by.
+        assertTrue(UiMappers.search(small, "ke").results.isEmpty())
+    }
+
+    @Test
+    fun allVideosIsAGaplessTimelineNewestFirst() {
+        val utc = java.time.ZoneOffset.UTC
+        val library = UiMappers.library(index, LibraryFilter.ALL, LibrarySort.RECENT, now = FakeLibrary.NOW, zone = utc)
+        // Every video, episodes one by one, newest first.
+        assertEquals(index.videos.size, library.timeline.size)
+        val added = library.timeline.map { card -> index.videos.first { it.id == card.id }.video.dateAdded }
+        assertEquals(added.sortedDescending(), added)
+        // Each card says when it arrived: Dune came a day before "now".
+        val dune = requireNotNull(library.timeline.first { it.id == DUNE }.subtitle)
+        assertTrue(dune, dune.startsWith("Yesterday · 2h "))
+        // Other sorts and filters are the plain grid.
+        assertTrue(UiMappers.library(index, LibraryFilter.ALL, LibrarySort.TITLE).timeline.isEmpty())
+        assertTrue(UiMappers.library(index, LibraryFilter.MOVIES, LibrarySort.RECENT).timeline.isEmpty())
+        // The same cards under month headings, newest month first.
+        assertEquals(library.timeline, library.timelineMonths.flatMap { it.cards })
+        assertEquals(library.timelineMonths.map { it.title }.distinct(), library.timelineMonths.map { it.title })
+    }
+
+    @Test
+    fun monthHeadingsNameTheYearOnlyBeforeThisOne() {
+        val today = java.time.LocalDate.of(2025, 10, 20)
+        fun name(month: java.time.Month) = month.getDisplayName(java.time.format.TextStyle.FULL, java.util.Locale.getDefault())
+        assertEquals(name(java.time.Month.OCTOBER), UiMappers.monthTitle(java.time.YearMonth.of(2025, 10), today))
+        assertEquals("${name(java.time.Month.MARCH)} 2024", UiMappers.monthTitle(java.time.YearMonth.of(2024, 3), today))
+    }
+
+    @Test
+    fun arrivalLabelsGoFromTodayToDates() {
+        val today = java.time.LocalDate.of(2026, 10, 19)
+        assertEquals("Today", UiMappers.arrivedLabel(today, today))
+        assertEquals("Yesterday", UiMappers.arrivedLabel(today.minusDays(1), today))
+        val weekday = today.minusDays(5).dayOfWeek.getDisplayName(java.time.format.TextStyle.FULL, java.util.Locale.getDefault())
+        assertEquals(weekday, UiMappers.arrivedLabel(today.minusDays(5), today))
+        val march = java.time.Month.MARCH.getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.getDefault())
+        assertEquals("2 $march", UiMappers.arrivedLabel(java.time.LocalDate.of(2026, 3, 2), today))
+        assertEquals("2 $march 2024", UiMappers.arrivedLabel(java.time.LocalDate.of(2024, 3, 2), today))
+    }
+
+    @Test
+    fun meaninglessFileNamesGetReadableTitles() {
+        val utc = java.time.ZoneOffset.UTC
+        val day = java.time.format.DateTimeFormatter.ofPattern("d MMM yyyy", java.util.Locale.getDefault())
+        fun on(y: Int, m: Int, d: Int) = java.time.LocalDate.of(y, m, d).format(day)
+        assertEquals("Video · ${on(2024, 5, 12)}", com.aakash.novafork.ui.friendlyVideoTitle("VID_20240512_183012", 0L, utc))
+        assertEquals("Video · ${on(2024, 5, 12)}", com.aakash.novafork.ui.friendlyVideoTitle("VID-20240512-WA0003", 0L, utc))
+        assertEquals("Video · ${on(2024, 5, 12)}", com.aakash.novafork.ui.friendlyVideoTitle("PXL_20240512_101500123", 0L, utc))
+        assertEquals("Screen recording · ${on(2026, 10, 16)}", com.aakash.novafork.ui.friendlyVideoTitle("Screen_Recording_20261016_145003", 0L, utc))
+        // A number for a name: the day the file arrived.
+        val added = java.time.LocalDate.of(2026, 2, 25).atStartOfDay(utc).toInstant().toEpochMilli()
+        assertEquals("Video · ${on(2026, 2, 25)}", com.aakash.novafork.ui.friendlyVideoTitle("17936004744169077", added, utc))
+        // Real names stay.
+        assertEquals("Goa trip - Palolem sunset", com.aakash.novafork.ui.friendlyVideoTitle("Goa trip - Palolem sunset", added, utc))
+        assertEquals("Science Fiction and Identity", com.aakash.novafork.ui.friendlyVideoTitle("Science Fiction and Identity", added, utc))
+    }
+
+    @Test
+    fun cardsCarryTheTitleLogoForTheHero() {
+        val meta = MetadataEntity(key = "movie:603", tmdbId = 603, type = "movie", title = "The Matrix", logoPath = "/matrix-logo.png")
+        val rows = listOf(
+            VideoWithMeta(video(id = 1, sourceId = DEVICE, uri = "content://media/external/video/media/1", kind = VideoKind.MOVIE, metadataKey = meta.key), meta),
+        )
+        val small = LibraryIndex.build(rows, listOf(device), preferLocalArtwork = false)
+        assertEquals("https://image.tmdb.org/t/p/w500/matrix-logo.png", requireNotNull(small.videosById[1L]).card.artwork.logoUrl)
+        // Without a logo the title is drawn as text.
+        assertNull(card(DUNE).artwork.logoUrl)
+    }
+
+    @Test
+    fun personalVideosFillAHeroThatHasRoom() {
+        val rows = listOf(
+            row(video(id = 1, sourceId = DEVICE, uri = "content://media/external/video/media/1", fileName = "Birthday.mp4")),
+            row(video(id = 2, sourceId = DEVICE, uri = "content://media/external/video/media/2", fileName = "Trip.mp4")),
+            // A network file has no frame to show: it stays out.
+            row(video(id = 3, sourceId = NAS, uri = "smb://nas.local/Media/Clip.mkv")),
+        )
+        val small = LibraryIndex.build(rows, listOf(device, nas), preferLocalArtwork = false)
+        val hero = UiMappers.home(small).hero
+        assertEquals(setOf(HeroTarget.Video(1), HeroTarget.Video(2)), hero.map { it.target }.toSet())
+        assertTrue(hero.all { it.artwork.frameSource != null })
+        // Camera-roll style videos have only a frame: one picture, not a backdrop plus a poster.
+        assertTrue(hero.all { it.artwork.frameOnly })
+        // A matched movie has real artwork.
+        assertFalse(index.home.hero.first { it.target == HeroTarget.Video(DUNE) }.artwork.frameOnly)
+        // These run two minutes: longer than a hero clip, so they show a still frame and don't play.
+        assertTrue(hero.all { it.previewUri == null })
+    }
+
+    @Test
+    fun heroesNeverPlayClips() {
+        // The owner dropped playing short clips in the hero: even a 45-second clip shows still art.
+        val clipRows = FakeLibrary.rows.map { row ->
+            if (row.video.id == DUNE) row.copy(video = row.video.copy(durationMs = 45_000)) else row
+        }
+        val clipIndex = LibraryIndex.build(clipRows, FakeLibrary.sources, preferLocalArtwork = false)
+        assertTrue(UiMappers.home(clipIndex).hero.all { it.previewUri == null })
+        assertEquals("v:$DUNE", index.home.hero.first { it.target == HeroTarget.Video(DUNE) }.itemKey)
+        assertEquals("s:$SEVERANCE_KEY", index.home.hero.first { it.target == HeroTarget.Show(SEVERANCE_KEY) }.itemKey)
     }
 
     @Test
@@ -311,7 +432,7 @@ class UiMappersTest {
         assertEquals(listOf("Panchayat", "The Office", "Shōgun"), byRating.take(3))
         assertEquals(
             "unrated last",
-            listOf("Big Buck Bunny", "Goa trip - Palolem sunset", "Tears of Steel", "VID_20250914_183012"),
+            listOf("Big Buck Bunny", "Goa trip - Palolem sunset", "Tears of Steel", com.aakash.novafork.ui.friendlyVideoTitle("VID_20250914_183012", 0L)),
             byRating.takeLast(4),
         )
 
@@ -607,10 +728,10 @@ class UiMappersTest {
         assertNull(deviceAccessNotice(PermissionUi(granted = false, deviceScanning = false)))
         val none = requireNotNull(deviceAccessNotice(PermissionUi(granted = false)))
         assertEquals("Nova can't see the videos on this device", none.title)
-        assertEquals("Allow access", none.allowLabel)
+        assertEquals("Allow Access", none.allowLabel)
         val limited = requireNotNull(deviceAccessNotice(PermissionUi(granted = true, partial = true)))
         assertEquals("Nova sees only the videos you picked", limited.title)
-        assertEquals("Allow all", limited.allowLabel)
+        assertEquals("Allow All", limited.allowLabel)
         assertTrue(PermissionUi(granted = false).needsAttention)
         assertFalse(PermissionUi(granted = true).needsAttention)
     }
@@ -679,4 +800,12 @@ class UiMappersTest {
         positionMs = positionMs,
         lastPlayedAt = lastPlayedAt,
     )
+
+    @Test
+    fun recentSearchesPutTheNewestFirstWithoutRepeats() {
+        val recent = listOf("dune", "Queen", "beatles")
+        assertEquals(listOf("queen", "dune", "beatles"), withRecentSearch(recent, " queen "))
+        assertEquals(recent, withRecentSearch(recent, "   "))
+        assertEquals(listOf("new", "dune"), withRecentSearch(recent, "new", max = 2))
+    }
 }

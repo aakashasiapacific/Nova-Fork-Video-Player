@@ -1,5 +1,10 @@
 package com.aakash.novafork.ui.common
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -9,6 +14,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -25,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import coil.request.videoFrameMillis
 import coil.request.videoFramePercent
 import com.aakash.novafork.ui.model.Artwork
 import kotlin.math.abs
@@ -41,19 +48,29 @@ fun ArtImage(
     modifier: Modifier = Modifier,
     contentScale: ContentScale = ContentScale.Crop,
     frameSource: String? = null,
+    alignment: Alignment = Alignment.Center,
+    /** Grab [frameSource]'s frame at this time instead of 10% in. */
+    frameAtMs: Long? = null,
     placeholder: @Composable () -> Unit,
 ) {
     val context = LocalContext.current
     var index by remember(candidates) { mutableIntStateOf(0) }
+    val current = candidates.getOrNull(index)
+    // A soft sweep of light while the picture loads, instead of a flat grey box.
+    var loading by remember(current) { mutableStateOf(current != null) }
     Box(modifier) {
         placeholder()
-        val current = candidates.getOrNull(index)
+        if (loading) Box(Modifier.fillMaxSize().shimmer())
         if (current != null) {
             val model = remember(current) {
                 ImageRequest.Builder(context)
                     .data(current)
-                    .crossfade(true)
-                    .apply { if (current == frameSource) videoFramePercent(0.1) }
+                    .crossfade(ART_FADE_MS)
+                    .apply {
+                        if (current == frameSource) {
+                            if (frameAtMs != null) videoFrameMillis(frameAtMs) else videoFramePercent(0.1)
+                        }
+                    }
                     .build()
             }
             AsyncImage(
@@ -61,7 +78,12 @@ fun ArtImage(
                 contentDescription = contentDescription,
                 modifier = Modifier.fillMaxSize(),
                 contentScale = contentScale,
-                onError = { index += 1 },
+                alignment = alignment,
+                onSuccess = { loading = false },
+                onError = {
+                    loading = false
+                    index += 1
+                },
             )
         }
     }
@@ -94,12 +116,20 @@ fun LandscapeArt(
     modifier: Modifier = Modifier,
     showTitleOnPlaceholder: Boolean = false,
 ) {
-    val candidates = remember(artwork) { listOfNotNull(artwork.stillUrl, artwork.backdropUrl, artwork.frameSource) }
+    val candidates = remember(artwork) {
+        // Where it was left first, when that frame is asked for (Continue Watching).
+        if (artwork.frameAtMs != null) {
+            listOfNotNull(artwork.frameSource, artwork.stillUrl, artwork.backdropUrl)
+        } else {
+            listOfNotNull(artwork.stillUrl, artwork.backdropUrl, artwork.frameSource)
+        }
+    }
     ArtImage(
         candidates = candidates,
         contentDescription = title,
         modifier = modifier,
         frameSource = artwork.frameSource,
+        frameAtMs = artwork.frameAtMs,
     ) {
         ArtPlaceholder(seed = artwork.seed.ifEmpty { title }, title = if (showTitleOnPlaceholder) title else null)
     }
@@ -185,3 +215,29 @@ fun Modifier.startScrim(color: Color, endFraction: Float = 0.7f): Modifier = dra
         ),
     )
 }
+
+/** A light band sweeping across, iOS-style, over a picture that is still loading. */
+@Composable
+internal fun Modifier.shimmer(): Modifier {
+    val sweep by rememberInfiniteTransition(label = "shimmer").animateFloat(
+        initialValue = -1f,
+        targetValue = 2f,
+        animationSpec = infiniteRepeatable(tween(durationMillis = 1_300, easing = LinearEasing)),
+        label = "shimmerSweep",
+    )
+    return drawWithContent {
+        drawContent()
+        val band = size.width * 0.6f
+        val x = size.width * sweep
+        drawRect(
+            Brush.linearGradient(
+                colors = listOf(Color.Transparent, Color.White.copy(alpha = 0.08f), Color.Transparent),
+                start = androidx.compose.ui.geometry.Offset(x - band, 0f),
+                end = androidx.compose.ui.geometry.Offset(x, size.height),
+            ),
+        )
+    }
+}
+
+/** How long a poster or backdrop takes to fade in as it arrives. */
+private const val ART_FADE_MS = 250

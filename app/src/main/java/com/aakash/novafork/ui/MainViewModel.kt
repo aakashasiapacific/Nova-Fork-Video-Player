@@ -10,6 +10,7 @@ import com.aakash.novafork.BuildConfig
 import com.aakash.novafork.CrashReporter
 import com.aakash.novafork.NovaApp
 import com.aakash.novafork.core.jellyfin.ServerSecrets
+import com.aakash.novafork.core.library.LibraryKeys
 import com.aakash.novafork.core.plex.PlexResource
 import com.aakash.novafork.core.smb.SmbUris
 import com.aakash.novafork.core.tmdb.TmdbDisabledException
@@ -30,9 +31,12 @@ import com.aakash.novafork.data.backup.BackupManager
 import com.aakash.novafork.data.backup.BackupSummary
 import com.aakash.novafork.data.backup.NovaBackup
 import com.aakash.novafork.data.backup.RestoreReport
+import com.aakash.novafork.data.db.ArtworkChoiceEntity
 import com.aakash.novafork.data.db.SourceEntity
 import com.aakash.novafork.data.db.SourceType
 import com.aakash.novafork.data.db.VideoKind
+import com.aakash.novafork.data.db.VideoWithMeta
+import com.aakash.novafork.data.music.MusicLibraryData
 import com.aakash.novafork.sources.DeviceScanner
 import com.aakash.novafork.sources.media.MediaServerSources
 import com.aakash.novafork.sources.media.PlexSignIn
@@ -44,10 +48,12 @@ import com.aakash.novafork.ui.model.BrowseDirUi
 import com.aakash.novafork.ui.model.DialogUi
 import com.aakash.novafork.ui.model.IdentifyResultUi
 import com.aakash.novafork.ui.model.KeyStatus
+import com.aakash.novafork.ui.model.LibraryCounts
 import com.aakash.novafork.ui.model.LibraryFilter
 import com.aakash.novafork.ui.model.LibraryItemUi
 import com.aakash.novafork.ui.model.LibrarySort
 import com.aakash.novafork.ui.model.LibraryUi
+import com.aakash.novafork.ui.model.MediaKind
 import com.aakash.novafork.ui.model.NetworkSourceForm
 import com.aakash.novafork.ui.model.PermissionUi
 import com.aakash.novafork.ui.model.PlexServerUi
@@ -61,6 +67,7 @@ import com.aakash.novafork.ui.model.SmbForm
 import com.aakash.novafork.ui.model.SourceUi
 import com.aakash.novafork.ui.model.TopDestination
 import com.aakash.novafork.ui.model.UpnpServerUi
+import com.aakash.novafork.ui.model.withRecentSearch
 import java.io.FileNotFoundException
 import java.io.IOException
 import java.io.OutputStream
@@ -82,6 +89,7 @@ import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapLatest
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -118,13 +126,18 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
         val crashReport: String? = null,
         /** Folders of network sources (other than SMB) listed live, most recently updated last. */
         val listings: Map<ListingKey, RemoteListing> = emptyMap(),
+        val recentSearches: List<String> = emptyList(),
     )
+
+    /** Search's recent searches, kept across launches (they never leave the device). */
+    private val searchPrefs = app.getSharedPreferences("search_history", android.content.Context.MODE_PRIVATE)
 
     private val local = MutableStateFlow(
         LocalState(
             permission = currentPermission(),
             allFilesAccess = StoragePermissions.hasAllFilesAccess(app),
             crashReport = CrashReporter.pending(app),
+            recentSearches = searchPrefs.getString(KEY_RECENT_SEARCHES, null)?.split('\n')?.filter { it.isNotBlank() }.orEmpty(),
         ),
     )
 
@@ -132,15 +145,51 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
         library.observeVideos(),
         library.observeSources(),
         settingsStore.settings.map { it.preferLocalArtwork }.distinctUntilChanged(),
-    ) { videos, sources, preferLocal ->
-        LibraryIndex.build(videos, sources, preferLocal)
+        graph.database.metadataDao().observeArtworkChoices(),
+    ) { videos, sources, preferLocal, choices ->
+        LibraryIndex.build(withArtworkChoices(videos, choices), sources, preferLocal)
     }
 
     // Only touched from the state combine below, which never runs concurrently with itself.
     private val libraryMemo = Memo<Triple<LibraryIndex, LibraryFilter, LibrarySort>, LibraryUi> { (index, filter, sort) ->
         UiMappers.library(index, filter, sort)
     }
-    private val searchMemo = Memo<Pair<LibraryIndex, String>, SearchUi> { (index, query) -> UiMappers.search(index, query) }
+    private val searchMemo = Memo<Triple<LibraryIndex, String, MusicLibraryData>, SearchUi> { (index, query, music) ->
+        UiMappers.search(index, query, music)
+    }
+
+    /** The library as last shown, for what a long-press menu saves (an episode saves its show). */
+    @Volatile private var latestIndex: LibraryIndex? = null
+
+    /** Watchlist keys, most recently added first. */
+    private val watchlist: StateFlow<List<String>> =
+        graph.music.observeWatchlist().stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    /** Starred movies, shows and videos, most recently starred first. */
+    private val videoFavorites: StateFlow<List<String>> =
+        graph.music.observeVideoFavorites().stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    private val favoritesMemo = Memo<Pair<LibraryIndex, List<String>>, List<LibraryItemUi>> { (index, keys) ->
+        if (keys.isEmpty()) {
+            emptyList()
+        } else {
+            val byKey = UiMappers.library(index, LibraryFilter.ALL, LibrarySort.RECENT).items.associateBy { it.key }
+            keys.mapNotNull { byKey[it] }
+        }
+    }
+
+    /** The watchlist row's items, rebuilt when the library or the list changes. */
+    private val watchlistMemo = Memo<Pair<LibraryIndex, List<String>>, List<LibraryItemUi>> { (index, keys) ->
+        if (keys.isEmpty()) {
+            emptyList()
+        } else {
+            val byKey = UiMappers.library(index, LibraryFilter.ALL, LibrarySort.RECENT).items.associateBy { it.key }
+            keys.mapNotNull { byKey[it] }
+        }
+    }
+
+    /** The music library, for search (one search over videos and music). */
+    private val musicLibrary: Flow<MusicLibraryData> = graph.music.observeLibrary().onStart { emit(MusicLibraryData()) }
     private val remoteDirMemo = Memo<RemoteDirInput, BrowseDirUi> { (index, source, path, listings) ->
         UiMappers.remoteDir(index, source, path, listings)
     }
@@ -163,9 +212,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
         library.scanState,
         settingsStore.settings,
         local,
-        playlists,
-    ) { index, scan, settings, user, lists ->
-        assemble(index, scan, settings, user, lists)
+        combine(playlists, musicLibrary, watchlist, videoFavorites) { lists, music, saved, starred ->
+            Saved(lists, music, saved, starred)
+        },
+    ) { index, scan, settings, user, extra ->
+        assemble(index, scan, settings, user, extra.lists, extra.music, extra.watchlist, extra.favorites)
     }
         .flowOn(Dispatchers.Default)
         // Seeded with the real settings so the first frame already has the right theme and layout.
@@ -236,7 +287,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
         settings: Settings,
         user: LocalState,
         lists: PlaylistsState,
+        music: MusicLibraryData,
+        saved: List<String>,
+        starred: List<String>,
     ): AppUiState {
+        latestIndex = index
         val route = user.backStack.lastOrNull() ?: Route.Home
         val previewKey = user.previewKey
         // Details follow the route; on a tablet's library page they follow the preview pane.
@@ -246,18 +301,40 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
             ?: previewKey?.takeIf { it.startsWith("s:") }?.removePrefix("s:")
         val browse = UiMappers.browse(index, scan, lists.all)
         val openPlaylist = lists.open
+        val home = if (saved.isEmpty() && starred.isEmpty()) {
+            index.home
+        } else {
+            val keys = saved.toHashSet()
+            val stars = starred.toHashSet()
+            index.home.copy(
+                hero = index.home.hero.map { hero ->
+                    hero.copy(onWatchlist = hero.itemKey in keys, favorite = hero.itemKey in stars)
+                },
+                watchlist = watchlistMemo[index to saved],
+            )
+        }
         return AppUiState(
             route = route,
             canGoBack = user.backStack.size > 1,
-            home = index.home,
-            library = libraryMemo[Triple(index, user.filter, user.sort)],
+            previousRoute = user.backStack.getOrNull(user.backStack.size - 2),
+            home = home.copy(
+                libraryCounts = LibraryCounts(
+                    favorites = if (starred.isEmpty()) 0 else favoritesMemo[index to starred].size,
+                    all = index.movies.size + index.shows.size + index.otherVideos.size,
+                ),
+            ),
+            library = when (user.filter) {
+                LibraryFilter.WATCHLIST -> LibraryUi(filter = user.filter, sort = user.sort, items = watchlistMemo[index to saved])
+                LibraryFilter.FAVORITES -> LibraryUi(filter = user.filter, sort = user.sort, items = favoritesMemo[index to starred])
+                else -> libraryMemo[Triple(index, user.filter, user.sort)]
+            },
             browse = browse,
             browseDir = (route as? Route.BrowseDir)?.let { browseDirFor(index, it, user.listings, scan) },
             videoDetails = videoId?.let { UiMappers.videoDetails(index, it) },
             showDetails = showKey?.let { UiMappers.showDetails(index, it) },
             previewKey = previewKey,
             playlist = openPlaylist?.let { UiMappers.playlistDetails(index, it.id, it.name, lists.openVideoIds) },
-            search = searchMemo[index to user.query],
+            search = searchMemo[Triple(index, user.query, music)].copy(recent = user.recentSearches),
             settings = SettingsUi(
                 settings = settings,
                 hasBuiltInKey = settingsStore.hasBuiltInTmdbKey,
@@ -306,19 +383,14 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
 
     override fun selectTab(tab: TopDestination) {
         val root = when (tab) {
-            TopDestination.HOME -> Route.Home
-            TopDestination.LIBRARY -> Route.Library
-            TopDestination.BROWSE -> Route.Browse
+            TopDestination.VIDEO -> Route.Home
+            TopDestination.AUDIO -> Route.Audio
             TopDestination.SETTINGS -> Route.Settings
+            TopDestination.SEARCH -> Route.Search
         }
         // Other tabs sit on top of Home, so system back from a tab's root returns Home first.
         val stack = if (root == Route.Home) listOf(Route.Home) else listOf(Route.Home, root)
-        local.update {
-            // Coming to Library from another tab shows everything again: a "See all" from Home
-            // used to leave it stuck on Movies, which hid home videos. (See all sets its filter after this.)
-            val freshLibrary = root == Route.Library && it.backStack.lastOrNull() != Route.Library
-            it.copy(backStack = stack, filter = if (freshLibrary) LibraryFilter.ALL else it.filter)
-        }
+        local.update { it.copy(backStack = stack) }
     }
 
     override fun preview(item: LibraryItemUi) {
@@ -331,6 +403,27 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
         // The refresh still scans folders and shares; it just can't see device storage.
         deviceScanBlocked()?.let(::showMessage)
         launchSafely("Couldn't scan the library") { library.refreshAll() }
+    }
+
+    override fun refreshQuietly() {
+        viewModelScope.launch {
+            try {
+                library.refreshAll()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.w(TAG, "A background refresh failed", e)
+            }
+        }
+    }
+
+    /**
+     * Back in the app (owner: every opening rescans, silently): the launch's light refresh again,
+     * which skips folders and shares scanned in the last half hour.
+     */
+    fun onAppReturned() {
+        graph.onMainScreenCreated()
+        refreshQuietly()
     }
 
     override fun rescanSource(sourceId: Long) {
@@ -357,6 +450,125 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
 
     override fun search(query: String) {
         local.update { it.copy(query = query) }
+    }
+
+    override fun rememberSearch(query: String) {
+        val recent = withRecentSearch(local.value.recentSearches, query)
+        local.update { it.copy(recentSearches = recent) }
+        searchPrefs.edit().putString(KEY_RECENT_SEARCHES, recent.joinToString("\n")).apply()
+    }
+
+    override fun clearRecentSearches() {
+        local.update { it.copy(recentSearches = emptyList()) }
+        searchPrefs.edit().remove(KEY_RECENT_SEARCHES).apply()
+    }
+
+    override fun forgetSearch(query: String) {
+        val recent = local.value.recentSearches - query
+        local.update { it.copy(recentSearches = recent) }
+        if (recent.isEmpty()) {
+            searchPrefs.edit().remove(KEY_RECENT_SEARCHES).apply()
+        } else {
+            searchPrefs.edit().putString(KEY_RECENT_SEARCHES, recent.joinToString("\n")).apply()
+        }
+    }
+
+    override fun changeArtwork(videoId: Long) {
+        launchSafely("Couldn't load artwork") {
+            val row = library.video(videoId) ?: return@launchSafely
+            val meta = row.meta
+            val tmdbId = meta?.key?.takeUnless { it.startsWith("server:") }?.let { LibraryKeys.tmdbId(it) }
+            if (meta == null || tmdbId == null) {
+                showMessage("Artwork can only be changed for titles matched with TMDB")
+                return@launchSafely
+            }
+            val key = meta.key
+            val type = if (key.startsWith("tv:")) "tv" else "movie"
+            val choice = graph.database.metadataDao().artworkChoices().firstOrNull { it.metadataKey == key }
+            val opened = DialogUi.ChangeArtwork(
+                metadataKey = key,
+                title = meta.title,
+                poster = choice?.posterPath ?: meta.posterPath,
+                backdrop = choice?.backdropPath ?: meta.backdropPath,
+                customised = choice != null,
+            )
+            showDialog(opened)
+            val loaded = try {
+                val images = graph.tmdb.images(type, tmdbId)
+                opened.copy(
+                    loading = false,
+                    posters = images.posters.sortedByDescending { it.voteAverage }.map { it.filePath }.filter { it.isNotBlank() }.distinct().take(ARTWORK_LIMIT),
+                    backdrops = images.backdrops.sortedByDescending { it.voteAverage }.map { it.filePath }.filter { it.isNotBlank() }.distinct().take(ARTWORK_LIMIT),
+                )
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.w(TAG, "TMDB images failed", e)
+                opened.copy(loading = false, error = "Couldn't reach TMDB. Check the connection and try again.")
+            }
+            local.update { state ->
+                val shown = state.dialog as? DialogUi.ChangeArtwork
+                if (shown != null && shown.metadataKey == key) state.copy(dialog = loaded.copy(poster = shown.poster, backdrop = shown.backdrop, customised = shown.customised)) else state
+            }
+        }
+    }
+
+    override fun chooseArtwork(metadataKey: String, posterPath: String?, backdropPath: String?) {
+        launchSafely("Couldn't change the artwork") {
+            val dao = graph.database.metadataDao()
+            val old = dao.artworkChoices().firstOrNull { it.metadataKey == metadataKey }
+            dao.setArtworkChoice(
+                ArtworkChoiceEntity(
+                    metadataKey = metadataKey,
+                    posterPath = posterPath ?: old?.posterPath,
+                    backdropPath = backdropPath ?: old?.backdropPath,
+                ),
+            )
+            local.update { state ->
+                val shown = state.dialog as? DialogUi.ChangeArtwork ?: return@update state
+                if (shown.metadataKey != metadataKey) return@update state
+                state.copy(
+                    dialog = shown.copy(
+                        poster = posterPath ?: shown.poster,
+                        backdrop = backdropPath ?: shown.backdrop,
+                        customised = true,
+                    ),
+                )
+            }
+        }
+    }
+
+    override fun resetArtwork(metadataKey: String) {
+        launchSafely("Couldn't change the artwork") {
+            graph.database.metadataDao().clearArtworkChoice(metadataKey)
+            dismissDialog()
+            showMessage("Back to TMDB's artwork")
+        }
+    }
+
+    override fun toggleFavorite(itemKey: String) {
+        val on = itemKey in videoFavorites.value
+        launchSafely("Couldn't change your favorites") { graph.music.setVideoFavorite(itemKey, favorite = !on) }
+    }
+
+    override fun toggleWatchlist(itemKey: String) {
+        val on = itemKey in watchlist.value
+        launchSafely("Couldn't change the watchlist") {
+            if (on) graph.music.removeFromWatchlist(itemKey) else graph.music.addToWatchlist(itemKey)
+        }
+    }
+
+    override fun saveKeyFor(videoId: Long): String? {
+        val video = latestIndex?.videosById?.get(videoId) ?: return null
+        return if (video.kind == MediaKind.EPISODE) video.showKey?.let { "s:$it" } else "v:$videoId"
+    }
+
+    override fun isFavorite(itemKey: String): Boolean = itemKey in videoFavorites.value
+
+    override fun isOnWatchlist(itemKey: String): Boolean = itemKey in watchlist.value
+
+    override fun playMusic(songIds: List<Long>, startIndex: Int) {
+        if (songIds.isNotEmpty()) graph.musicPlayer.playSongs(songIds, startIndex)
     }
 
     override fun setWatched(videoId: Long, watched: Boolean) {
@@ -1048,6 +1260,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
                     settings = settingsStore.settings.value,
                     appVersion = BuildConfig.VERSION_NAME,
                     census = { DeviceScanner(app).census() },
+                    music = { graph.music.diagnostics() },
                 )
             } catch (e: CancellationException) {
                 throw e
@@ -1300,9 +1513,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
     }
 
     private fun backupMessage(summary: BackupSummary): String {
-        val what = listOf(
+        val what = listOfNotNull(
             plural(summary.sources, "source", "sources"),
             plural(summary.videos, "video with history", "videos with history"),
+            summary.songs.takeIf { it > 0 }?.let { plural(it, "song with plays", "songs with plays") },
+            summary.saved.takeIf { it > 0 }?.let { plural(it, "watchlist or favorites entry", "watchlist and favorites entries") },
             plural(summary.playlists, "playlist", "playlists"),
         ).joinToString(", ")
         return if (summary.includesSecrets) {
@@ -1318,13 +1533,15 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
             if (report.sourcesAdded > 0) add(plural(report.sourcesAdded, "source", "sources"))
             if (report.applied.videos > 0) add("history of ${plural(report.applied.videos, "video", "videos")}")
             if (report.applied.matches > 0) add(plural(report.applied.matches, "match", "matches"))
+            if (report.applied.songs > 0) add("plays of ${plural(report.applied.songs, "song", "songs")}")
+            if (report.applied.saved > 0) add("your watchlist and favorites")
             if (report.playlistsCreated > 0 || report.applied.playlistItems > 0) add("playlists")
         }
         val sentences = ArrayList<String>()
         sentences += if (restored.isEmpty()) "Nothing new to restore" else "Restored ${restored.joinToString(", ")}"
         val waiting = report.waiting.total
-        if (waiting == 1) sentences += "1 item waits for its video to be scanned"
-        if (waiting > 1) sentences += "$waiting items wait for their videos to be scanned"
+        if (waiting == 1) sentences += "1 item waits for its video or song to be scanned"
+        if (waiting > 1) sentences += "$waiting items wait for their videos and songs to be scanned"
         if (report.foldersToPick.isNotEmpty()) {
             sentences += "Add ${report.foldersToPick.joinToString(", ")} again under Folders"
         }
@@ -1345,6 +1562,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
         videos = videos,
         matches = matches,
         playlists = playlists,
+        songs = songs,
+        saved = saved,
     )
 
     /** "wt" truncates what a provider hands back; not every provider knows it, "w" is the fallback. */
@@ -1383,12 +1602,16 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
     }
 
     private companion object {
+        const val KEY_RECENT_SEARCHES = "recent"
         val TRAILING_YEAR = Regex("""\s*\(?(19|20)\d{2}\)?$""")
 
         /** Live folder listings kept for going back without listing again. */
         const val MAX_LISTINGS = 40
 
         const val BACKUP_BUSY = "Wait for the backup or restore that is running"
+
+        /** "Change artwork" shows TMDB's best-voted images, up to this many of each. */
+        const val ARTWORK_LIMIT = 30
     }
 }
 
@@ -1418,5 +1641,31 @@ private class Memo<K, V>(private val compute: (K) -> V) {
         val cached = last
         if (cached != null && cached.first == key) return cached.second
         return compute(key).also { last = key to it }
+    }
+}
+
+/** The posters and backdrops the user picked in "Change artwork", over TMDB's defaults. */
+/** The playlists, music library, watchlist and favorites, combined as one input of the UI state. */
+private class Saved(
+    val lists: PlaylistsState,
+    val music: MusicLibraryData,
+    val watchlist: List<String>,
+    val favorites: List<String>,
+)
+
+private fun withArtworkChoices(rows: List<VideoWithMeta>, choices: List<ArtworkChoiceEntity>): List<VideoWithMeta> {
+    if (choices.isEmpty()) return rows
+    val byKey = choices.associateBy { it.metadataKey }
+    return rows.map { row ->
+        val meta = row.meta ?: return@map row
+        val choice = byKey[meta.key] ?: return@map row
+        row.copy(
+            meta = meta.copy(
+                posterPath = choice.posterPath ?: meta.posterPath,
+                backdropPath = choice.backdropPath ?: meta.backdropPath,
+                // A picked poster replaces TMDB's textless one wherever that would show.
+                textlessPosterPath = choice.posterPath ?: meta.textlessPosterPath,
+            ),
+        )
     }
 }

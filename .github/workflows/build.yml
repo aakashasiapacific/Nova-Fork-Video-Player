@@ -8,6 +8,12 @@ on:
 permissions:
   contents: write
 
+# One run at a time, across branches: every run force-pushes the shared apk, screens and ci-logs
+# branches, and two runs finishing together had one of those pushes rejected (build 32).
+concurrency:
+  group: publish-branches
+  cancel-in-progress: false
+
 jobs:
   build:
     runs-on: ubuntu-latest

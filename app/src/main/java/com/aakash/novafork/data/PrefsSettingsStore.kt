@@ -73,6 +73,7 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
             putString(KEY_OPENSUBTITLES_PASSWORD, s.opensubtitlesPassword)
             putString(KEY_SUBTITLE_LANGUAGES, s.subtitleLanguages)
             putBoolean(KEY_AUTO_DOWNLOAD_SUBTITLES, s.autoDownloadSubtitles)
+            putFloat(KEY_GLASS_TINT, s.glassTint)
         }
     }
 
@@ -97,12 +98,18 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
         const val KEY_PREFERRED_SUBTITLE_LANGUAGE = "preferred_subtitle_language"
         const val KEY_SEEK_STEP_SECONDS = "seek_step_seconds"
         const val KEY_AUTO_PLAY_NEXT = "auto_play_next"
-        const val KEY_BACKGROUND_AUDIO = "background_audio"
+        /**
+         * "background_audio" until it became off by default: a new key, so the old stored "on"
+         * doesn't carry over and every install starts with it off.
+         */
+        const val KEY_BACKGROUND_AUDIO = "background_play_video"
         const val KEY_OPENSUBTITLES_API_KEY = "opensubtitles_api_key"
         const val KEY_OPENSUBTITLES_USERNAME = "opensubtitles_username"
         const val KEY_OPENSUBTITLES_PASSWORD = "opensubtitles_password"
         const val KEY_SUBTITLE_LANGUAGES = "subtitle_languages"
         const val KEY_AUTO_DOWNLOAD_SUBTITLES = "auto_download_subtitles"
+        /** "_v2": the default moved to Tinted (owner), so a value saved under the old default is dropped. */
+        const val KEY_GLASS_TINT = "glass_tint_v2"
 
         /**
          * The type [write] stores each key with. A restored backup's entry of another type is
@@ -133,6 +140,7 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
             KEY_OPENSUBTITLES_PASSWORD to SettingType.STRING,
             KEY_SUBTITLE_LANGUAGES to SettingType.STRING,
             KEY_AUTO_DOWNLOAD_SUBTITLES to SettingType.BOOLEAN,
+            KEY_GLASS_TINT to SettingType.FLOAT,
         )
 
         /**
@@ -181,6 +189,7 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
                 opensubtitlesPassword = prefs.string(KEY_OPENSUBTITLES_PASSWORD) ?: defaults.opensubtitlesPassword,
                 subtitleLanguages = prefs.string(KEY_SUBTITLE_LANGUAGES) ?: defaults.subtitleLanguages,
                 autoDownloadSubtitles = prefs.boolean(KEY_AUTO_DOWNLOAD_SUBTITLES, defaults.autoDownloadSubtitles),
+                glassTint = prefs.float(KEY_GLASS_TINT, defaults.glassTint).coerceIn(0f, 1f),
             )
         }
 
@@ -205,6 +214,13 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
         private fun SharedPreferences.int(key: String, default: Int): Int =
             try {
                 getInt(key, default)
+            } catch (e: ClassCastException) {
+                default
+            }
+
+        private fun SharedPreferences.float(key: String, default: Float): Float =
+            try {
+                getFloat(key, default)
             } catch (e: ClassCastException) {
                 default
             }

@@ -21,14 +21,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.BiasAlignment
@@ -41,14 +37,16 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
+import com.aakash.novafork.ui.common.IosSheet
 import com.aakash.novafork.ui.common.LandscapeArt
+import com.aakash.novafork.ui.common.NovaChip
 import com.aakash.novafork.ui.model.CastDeviceUi
 import com.aakash.novafork.ui.model.PlayerActions
 import com.aakash.novafork.ui.model.PlayerUiState
 import com.aakash.novafork.ui.model.QueueItemUi
 import com.aakash.novafork.ui.model.RepeatMode
 
-/** Phone: the queue or the cast devices in a modal bottom sheet. */
+/** Phone: the queue or the cast devices in a floating sheet, its title over them. */
 @Composable
 internal fun PlayerListSheet(
     sheet: PlayerSheet,
@@ -56,17 +54,7 @@ internal fun PlayerListSheet(
     actions: PlayerActions,
     onDismiss: () -> Unit,
 ) {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-    ) {
-        Text(
-            text = sheet.title,
-            style = MaterialTheme.typography.titleLarge,
-            modifier = Modifier.padding(start = 24.dp, end = 24.dp, bottom = 4.dp),
-        )
+    IosSheet(onDismissRequest = onDismiss, title = sheet.title) {
         PlayerSheetContent(sheet = sheet, state = state, actions = actions, onDismiss = onDismiss)
     }
 }
@@ -97,14 +85,14 @@ private fun QueueOptions(state: PlayerUiState, actions: PlayerActions, onDismiss
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             if (state.canShuffle) {
-                FilterChip(
+                NovaChip(
                     selected = state.shuffle,
                     onClick = actions::toggleShuffle,
                     label = { Text(if (state.shuffle) "Shuffle on" else "Shuffle off") },
                     leadingIcon = { ChipIcon(R.drawable.ic_shuffle) },
                 )
             }
-            FilterChip(
+            NovaChip(
                 selected = state.repeatMode != RepeatMode.OFF,
                 onClick = actions::cycleRepeat,
                 label = { Text(state.repeatMode.label) },
@@ -201,7 +189,7 @@ private fun QueueRow(position: Int, item: QueueItemUi, playing: Boolean, onClick
                     text = subtitle,
                     style = MaterialTheme.typography.bodySmall,
                     color = LocalContentColor.current.copy(alpha = 0.7f),
-                    maxLines = 1,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
@@ -241,7 +229,7 @@ private fun CastOptions(state: PlayerUiState, actions: PlayerActions, onDismiss:
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                PlayerSpinner(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
                 Spacer(Modifier.width(14.dp))
                 Text(
                     text = "Looking for Chromecasts and TVs on this Wi-Fi…",
@@ -263,7 +251,7 @@ private fun CastOptions(state: PlayerUiState, actions: PlayerActions, onDismiss:
         }
         CastRow(
             icon = R.drawable.ic_refresh,
-            label = "Search again",
+            label = "Search Again",
             detail = null,
             onClick = actions::scanForCastDevices,
         )
@@ -307,7 +295,7 @@ private fun CastRow(
                 text = label,
                 style = MaterialTheme.typography.bodyLarge,
                 color = tint,
-                maxLines = 1,
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
             if (detail != null) {
@@ -378,7 +366,7 @@ internal fun CastingPlaceholder(deviceName: String, title: String, compact: Bool
                             text = title,
                             style = MaterialTheme.typography.bodyMedium,
                             color = Color.White.copy(alpha = 0.7f),
-                            maxLines = 1,
+                            maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
                         )
                     }

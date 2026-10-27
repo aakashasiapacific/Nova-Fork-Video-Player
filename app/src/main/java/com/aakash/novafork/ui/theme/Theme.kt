@@ -1,11 +1,9 @@
 package com.aakash.novafork.ui.theme
 
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
@@ -21,7 +19,6 @@ val Inter = FontFamily(
     Font(R.font.inter_medium, FontWeight.Medium),
     Font(R.font.inter_semibold, FontWeight.SemiBold),
     Font(R.font.inter_bold, FontWeight.Bold),
-    Font(R.font.inter_extrabold, FontWeight.ExtraBold),
 )
 
 /** Colours that are the same in both themes. */
@@ -29,6 +26,10 @@ object NovaColors {
     /** Brand gradient (launcher icon): amber → coral pink. */
     val Amber = Color(0xFFFFB347)
     val Coral = Color(0xFFFF5E7E)
+    /** Apple Music's red: the Audio tab's accent (owner: Audio keeps its red; the rest is blue). */
+    val AppleMusicRed = Color(0xFFFA2D48)
+    /** iOS 26/27 systemBlue in dark mode: the accent of Video, Search and Preferences. */
+    val IosBlue = IosPalette.Blue
     /** Rating star. */
     val Gold = Color(0xFFFFC24B)
     /** Watched check / success. */
@@ -38,119 +39,132 @@ object NovaColors {
     val PlayerSurface = Color(0xE6111318)
 }
 
+/**
+ * iOS 26/27's dark-mode system colours (Apple brightened and shifted the palette in iOS 26; iOS 27
+ * keeps it): for accents, icon tiles and states.
+ */
+object IosPalette {
+    val Red = Color(0xFFFF4245)
+    val Orange = Color(0xFFFF9230)
+    val Yellow = Color(0xFFFFD600)
+    val Green = Color(0xFF30D158)
+    val Mint = Color(0xFF00DAC3)
+    val Teal = Color(0xFF00D2E0)
+    val Cyan = Color(0xFF3CD3FE)
+    val Blue = Color(0xFF0091FF)
+    val Indigo = Color(0xFF6D7CFF)
+    val Purple = Color(0xFFDB34F2)
+    val Pink = Color(0xFFFF375F)
+    val Brown = Color(0xFFB78A66)
+    val Gray = Color(0xFF8E8E93)
+}
+
+/**
+ * The one theme (decided by the owner): the Apple TV app's dark look on pure black, with iOS
+ * blue (iOS 26/27 dark-mode systemBlue, #0091FF) as the accent: links, switches, buttons, progress. The
+ * hero keeps Apple's white Play pill and white/grey dots, and the tab bar its white selected tab;
+ * greys are iOS's dark system greys.
+ */
 private val DarkScheme: ColorScheme = darkColorScheme(
-    primary = Color(0xFFFF8A5B),
-    onPrimary = Color(0xFF2E1000),
-    primaryContainer = Color(0xFF5C2611),
-    onPrimaryContainer = Color(0xFFFFDBCC),
-    secondary = Color(0xFFB9C3FF),
-    onSecondary = Color(0xFF1C2559),
-    secondaryContainer = Color(0xFF2A3263),
-    onSecondaryContainer = Color(0xFFDDE1FF),
+    primary = NovaColors.IosBlue,
+    onPrimary = Color(0xFFFFFFFF),
+    primaryContainer = Color(0xFF003A6B),
+    onPrimaryContainer = Color(0xFFD6E8FF),
+    secondary = Color(0xFFAEAEB2),
+    onSecondary = Color(0xFF000000),
+    secondaryContainer = Color(0xFF2C2C2E),
+    onSecondaryContainer = Color(0xFFFFFFFF),
     tertiary = Color(0xFFFFC24B),
     onTertiary = Color(0xFF3F2E00),
     tertiaryContainer = Color(0xFF5B4300),
     onTertiaryContainer = Color(0xFFFFDF9E),
-    background = Color(0xFF0B0D12),
-    onBackground = Color(0xFFE8EAF0),
-    surface = Color(0xFF0B0D12),
-    onSurface = Color(0xFFE8EAF0),
-    surfaceVariant = Color(0xFF1E222C),
-    onSurfaceVariant = Color(0xFFB4B9C6),
-    surfaceTint = Color(0xFFFF8A5B),
-    inverseSurface = Color(0xFFE8EAF0),
-    inverseOnSurface = Color(0xFF1A1D24),
-    error = Color(0xFFFFB4AB),
-    onError = Color(0xFF690005),
-    errorContainer = Color(0xFF93000A),
+    background = Color(0xFF000000),
+    onBackground = Color(0xFFFFFFFF),
+    surface = Color(0xFF000000),
+    onSurface = Color(0xFFFFFFFF),
+    surfaceVariant = Color(0xFF1C1C1E),
+    onSurfaceVariant = Color(0xFF98989F),
+    surfaceTint = Color(0xFF000000),
+    inverseSurface = Color(0xFFFFFFFF),
+    inverseOnSurface = Color(0xFF000000),
+    inversePrimary = Color(0xFF0088FF),
+    error = IosPalette.Red,
+    onError = Color(0xFF000000),
+    errorContainer = Color(0xFF5C1A16),
     onErrorContainer = Color(0xFFFFDAD6),
-    outline = Color(0xFF3B414E),
-    outlineVariant = Color(0xFF2A2F3A),
+    outline = Color(0xFF48484A),
+    outlineVariant = Color(0xFF2C2C2E),
     scrim = Color(0xFF000000),
-    surfaceBright = Color(0xFF2A2F3A),
-    surfaceDim = Color(0xFF0B0D12),
-    surfaceContainerLowest = Color(0xFF07080C),
-    surfaceContainerLow = Color(0xFF111419),
-    surfaceContainer = Color(0xFF161A21),
-    surfaceContainerHigh = Color(0xFF1C2029),
-    surfaceContainerHighest = Color(0xFF242934),
+    surfaceBright = Color(0xFF2C2C2E),
+    surfaceDim = Color(0xFF000000),
+    surfaceContainerLowest = Color(0xFF000000),
+    surfaceContainerLow = Color(0xFF0E0E10),
+    surfaceContainer = Color(0xFF1C1C1E),
+    surfaceContainerHigh = Color(0xFF2C2C2E),
+    surfaceContainerHighest = Color(0xFF3A3A3C),
 )
 
-private val LightScheme: ColorScheme = lightColorScheme(
-    primary = Color(0xFFB4441A),
-    onPrimary = Color(0xFFFFFFFF),
-    primaryContainer = Color(0xFFFFDBCC),
-    onPrimaryContainer = Color(0xFF3A0B00),
-    secondary = Color(0xFF4A55A0),
-    onSecondary = Color(0xFFFFFFFF),
-    secondaryContainer = Color(0xFFDDE1FF),
-    onSecondaryContainer = Color(0xFF041463),
-    tertiary = Color(0xFF7A5900),
-    onTertiary = Color(0xFFFFFFFF),
-    tertiaryContainer = Color(0xFFFFDF9E),
-    onTertiaryContainer = Color(0xFF261A00),
-    background = Color(0xFFF8F8FB),
-    onBackground = Color(0xFF15181E),
-    surface = Color(0xFFF8F8FB),
-    onSurface = Color(0xFF15181E),
-    surfaceVariant = Color(0xFFE3E5EC),
-    onSurfaceVariant = Color(0xFF454A55),
-    surfaceTint = Color(0xFFB4441A),
-    error = Color(0xFFBA1A1A),
-    onError = Color(0xFFFFFFFF),
-    outline = Color(0xFF757B87),
-    outlineVariant = Color(0xFFC5C8D1),
-    surfaceBright = Color(0xFFF8F8FB),
-    surfaceDim = Color(0xFFD9DAE0),
-    surfaceContainerLowest = Color(0xFFFFFFFF),
-    surfaceContainerLow = Color(0xFFF2F2F6),
-    surfaceContainer = Color(0xFFECEDF2),
-    surfaceContainerHigh = Color(0xFFE6E7EC),
-    surfaceContainerHighest = Color(0xFFE0E1E7),
-)
-
-private fun TextStyle.inter(weight: FontWeight? = null, tracking: Float? = null): TextStyle = copy(
+private fun ios(size: Float, line: Float, weight: FontWeight, tracking: Float): TextStyle = Base.bodyLarge.copy(
     fontFamily = Inter,
-    fontWeight = weight ?: fontWeight,
-    letterSpacing = tracking?.sp ?: letterSpacing,
+    fontWeight = weight,
+    fontSize = size.sp,
+    lineHeight = line.sp,
+    letterSpacing = tracking.sp,
 )
 
 private val Base = Typography()
 
+/**
+ * iOS's text styles (dark Settings / Apple TV / Apple Music) set in Inter: Large Title 34 bold,
+ * Title 1 28, Title 2 22, Title 3 20, Headline 17 semibold, Body 17, Subheadline 15, Footnote 13,
+ * Caption 12 and 11. Nothing is heavier than bold. Inter runs wider than SF Pro, so every size
+ * is tracked a little tighter than Apple's table to keep the same line lengths.
+ */
 val NovaTypography = Typography(
-    displayLarge = Base.displayLarge.inter(FontWeight.ExtraBold, -1f),
-    displayMedium = Base.displayMedium.inter(FontWeight.ExtraBold, -0.8f),
-    displaySmall = Base.displaySmall.inter(FontWeight.Bold, -0.5f),
-    headlineLarge = Base.headlineLarge.inter(FontWeight.Bold, -0.4f),
-    headlineMedium = Base.headlineMedium.inter(FontWeight.Bold, -0.3f),
-    headlineSmall = Base.headlineSmall.inter(FontWeight.SemiBold, -0.2f),
-    titleLarge = Base.titleLarge.inter(FontWeight.SemiBold, -0.1f),
-    titleMedium = Base.titleMedium.inter(FontWeight.SemiBold),
-    titleSmall = Base.titleSmall.inter(FontWeight.SemiBold),
-    bodyLarge = Base.bodyLarge.inter(),
-    bodyMedium = Base.bodyMedium.inter(),
-    bodySmall = Base.bodySmall.inter(),
-    labelLarge = Base.labelLarge.inter(FontWeight.SemiBold),
-    labelMedium = Base.labelMedium.inter(FontWeight.Medium),
-    labelSmall = Base.labelSmall.inter(FontWeight.Medium),
+    displayLarge = ios(40f, 46f, FontWeight.Bold, -0.8f),
+    displayMedium = ios(36f, 42f, FontWeight.Bold, -0.7f),
+    displaySmall = ios(34f, 41f, FontWeight.Bold, -0.6f),
+    headlineLarge = ios(34f, 41f, FontWeight.Bold, -0.6f),
+    headlineMedium = ios(28f, 34f, FontWeight.Bold, -0.5f),
+    headlineSmall = ios(22f, 28f, FontWeight.Bold, -0.35f),
+    titleLarge = ios(20f, 25f, FontWeight.SemiBold, -0.3f),
+    titleMedium = ios(17f, 22f, FontWeight.SemiBold, -0.3f),
+    titleSmall = ios(15f, 20f, FontWeight.SemiBold, -0.2f),
+    bodyLarge = ios(17f, 22f, FontWeight.Normal, -0.3f),
+    bodyMedium = ios(15f, 20f, FontWeight.Normal, -0.2f),
+    bodySmall = ios(13f, 18f, FontWeight.Normal, -0.1f),
+    labelLarge = ios(15f, 20f, FontWeight.SemiBold, -0.2f),
+    labelMedium = ios(12f, 16f, FontWeight.Medium, 0f),
+    labelSmall = ios(11f, 13f, FontWeight.Medium, 0.05f),
 )
 
+/**
+ * Dark only, whatever [themeMode] says: the owner chose one AMOLED-black theme. The parameter
+ * stays so older callers and saved settings keep working.
+ */
 @Composable
+@Suppress("UNUSED_PARAMETER")
 fun NovaTheme(themeMode: ThemeMode = ThemeMode.DARK, content: @Composable () -> Unit) {
-    val dark = when (themeMode) {
-        ThemeMode.DARK -> true
-        ThemeMode.LIGHT -> false
-        ThemeMode.SYSTEM -> isSystemInDarkTheme()
-    }
-    MaterialTheme(
-        colorScheme = if (dark) DarkScheme else LightScheme,
-        typography = NovaTypography,
-        content = content,
-    )
+    MaterialTheme(colorScheme = DarkScheme, typography = NovaTypography) { IosTouch(content) }
 }
 
 /** The player always uses the dark scheme. */
 @Composable
 fun NovaPlayerTheme(content: @Composable () -> Unit) {
-    MaterialTheme(colorScheme = DarkScheme, typography = NovaTypography, content = content)
+    MaterialTheme(colorScheme = DarkScheme, typography = NovaTypography) { IosTouch(content) }
+}
+
+/** The Audio tab's look: the app's theme with Apple Music red as its accent. */
+@Composable
+fun AudioTheme(content: @Composable () -> Unit) {
+    val base = MaterialTheme.colorScheme
+    MaterialTheme(
+        colorScheme = base.copy(
+            primary = NovaColors.AppleMusicRed,
+            onPrimary = Color.White,
+            primaryContainer = Color(0xFF5C1520),
+            onPrimaryContainer = Color(0xFFFFD9DE),
+        ),
+        typography = MaterialTheme.typography,
+    ) { IosTouch(content) }
 }

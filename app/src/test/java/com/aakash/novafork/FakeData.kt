@@ -726,6 +726,9 @@ object FakeScreens {
 
     fun settingsPage(): AppUiState = app(Route.Settings)
 
+    /** One section of Preferences on its own page (phone). */
+    fun settingsSection(section: String): AppUiState = app(Route.SettingsPage(section))
+
     /** Adding a share from Browse, details typed in. */
     fun smbDialog(): AppUiState = browse().copy(
         dialog = DialogUi.SmbServer(
@@ -805,7 +808,7 @@ object FakeScreens {
     private fun videoDetailsUi(videoId: Long): VideoDetailsUi =
         requireNotNull(UiMappers.videoDetails(index, videoId)) { "No video $videoId in the fake library" }
 
-    private val TOP_LEVEL = setOf(Route.Home, Route.Library, Route.Browse, Route.Settings)
+    private val TOP_LEVEL = setOf(Route.Home, Route.Audio, Route.Settings, Route.Search)
 }
 
 /** Player states as PlayerController publishes them. */
