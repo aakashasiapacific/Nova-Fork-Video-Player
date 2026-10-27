@@ -235,11 +235,11 @@ private const val PlayerMinTint = 0.8f
 private val SelectedPillColor = Color(0xFF3A3A3C)
 
 /**
- * The selected tab's colour: iOS blue for every tab (owner: Audio dropped Apple Music's red when
- * Music itself went blue in iOS 27.2).
+ * The selected tab's colour, as the owner chose: Video, Search and Preferences iOS blue, Audio
+ * Apple Music red.
  */
-@Suppress("UnusedReceiverParameter")
-internal fun TopDestination.activeColor(): Color = NovaColors.IosBlue
+internal fun TopDestination.activeColor(): Color =
+    if (this == TopDestination.AUDIO) NovaColors.AppleMusicRed else NovaColors.IosBlue
 
 /** A tab's icon; the selected one pops in with a short spring. */
 @Composable

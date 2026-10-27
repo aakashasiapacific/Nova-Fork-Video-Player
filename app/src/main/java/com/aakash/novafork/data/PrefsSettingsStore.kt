@@ -108,7 +108,8 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
         const val KEY_OPENSUBTITLES_PASSWORD = "opensubtitles_password"
         const val KEY_SUBTITLE_LANGUAGES = "subtitle_languages"
         const val KEY_AUTO_DOWNLOAD_SUBTITLES = "auto_download_subtitles"
-        const val KEY_GLASS_TINT = "glass_tint"
+        /** "_v2": the default moved to Tinted (owner), so a value saved under the old default is dropped. */
+        const val KEY_GLASS_TINT = "glass_tint_v2"
 
         /**
          * The type [write] stores each key with. A restored backup's entry of another type is

@@ -9,5 +9,5 @@ import androidx.compose.runtime.compositionLocalOf
  */
 val LocalGlassTint = compositionLocalOf { DEFAULT_GLASS_TINT }
 
-/** iOS 27's default: less see-through than iOS 26's, for contrast. */
-const val DEFAULT_GLASS_TINT = 0.6f
+/** Tinted, the right end of the slider (owner): the most readable glass. */
+const val DEFAULT_GLASS_TINT = 1f

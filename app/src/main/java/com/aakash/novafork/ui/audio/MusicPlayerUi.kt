@@ -440,7 +440,7 @@ fun MiniPlayerBar(
                         val duration = player.durationMs
                         if (duration > 0L) {
                             val done = (player.positionMs.toFloat() / duration).coerceIn(0f, 1f)
-                            drawRect(NovaColors.IosBlue, size = Size(size.width * done, MiniProgressHeight.toPx()))
+                            drawRect(NovaColors.AppleMusicRed, size = Size(size.width * done, MiniProgressHeight.toPx()))
                         }
                     }
                 } else {
@@ -1084,7 +1084,7 @@ private fun QueuePane(player: MusicPlayerState, actions: AudioActions, upNext: L
         item(key = "stop") {
             Text(
                 "Stop Playing",
-                color = NovaColors.IosBlue,
+                color = NovaColors.AppleMusicRed,
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier
                     .padding(top = 16.dp)

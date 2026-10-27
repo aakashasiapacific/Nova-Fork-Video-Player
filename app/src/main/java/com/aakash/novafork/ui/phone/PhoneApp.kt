@@ -595,7 +595,7 @@ private fun PhonePage(state: AppUiState, actions: AppActions) {
 /**
  * The classic iOS tab bar (owner: the floating capsule was not appealing): docked full width along
  * the bottom edge over the page's foot, dark and see-through with a hairline on top, each tab an
- * icon over its name, the selected one in the accent blue on a soft glass pill (iOS 26/27) that
+ * icon over its name, the selected one in its colour (Audio red, the rest blue) on a soft glass pill (iOS 26/27) that
  * slides to the next selected tab, stretching on the way.
  */
 @Composable
@@ -704,8 +704,8 @@ private fun PhoneNavigationBar(
                         }
                     if (tab == TopDestination.AUDIO && musicPlaying) {
                         Box(iconModifier, contentAlignment = Alignment.Center) {
-                            // The accent blue, on any tab (owner; Apple Music went blue in iOS 27.2).
-                            PlayingBars(playing = true, color = NovaColors.IosBlue, modifier = Modifier.height(20.dp), barWidth = 3.5.dp)
+                            // Apple Music's red, on any tab (owner).
+                            PlayingBars(playing = true, color = NovaColors.AppleMusicRed, modifier = Modifier.height(20.dp), barWidth = 3.5.dp)
                         }
                     } else {
                         NovaIcon(tab.tabIconRes(), contentDescription = null, tint = tint, modifier = iconModifier)

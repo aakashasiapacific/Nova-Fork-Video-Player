@@ -474,7 +474,7 @@ private fun PlaylistsPage(playlists: List<MusicPlaylistRow>, ctx: PageContext) {
             var naming by rememberSaveable { mutableStateOf(false) }
             ListRow(
                 title = "New Playlist…",
-                titleColor = NovaColors.IosBlue,
+                titleColor = NovaColors.AppleMusicRed,
                 art = {
                     Box(
                         Modifier
@@ -483,7 +483,7 @@ private fun PlaylistsPage(playlists: List<MusicPlaylistRow>, ctx: PageContext) {
                             .background(Color(0xFF1C1C1E)),
                         contentAlignment = Alignment.Center,
                     ) {
-                        NovaIcon(R.drawable.ic_add, contentDescription = null, tint = NovaColors.IosBlue, modifier = Modifier.size(24.dp))
+                        NovaIcon(R.drawable.ic_add, contentDescription = null, tint = NovaColors.AppleMusicRed, modifier = Modifier.size(24.dp))
                     }
                 },
                 chevron = false,
@@ -648,7 +648,7 @@ private fun AlbumPage(album: Album, ctx: PageContext) {
                 Text(
                     album.artist,
                     fontSize = 20.sp,
-                    color = NovaColors.IosBlue,
+                    color = NovaColors.AppleMusicRed,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.clickable { ctx.onOpen(ARTIST + album.artistKey) },
                 )
@@ -692,7 +692,7 @@ private fun AlbumPage(album: Album, ctx: PageContext) {
 
 /**
  * Apple Music's artist header: a big picture (their newest cover, as there are no artist photos)
- * fading into black, the name over it, and the round blue Play button. As the page scrolls the
+ * fading into black, the name over it, and the round red Play button. As the page scrolls the
  * picture drifts at half speed inside its frame, and pulling the page down past its top makes the
  * whole header grow into the gap.
  */
@@ -755,7 +755,7 @@ private fun ArtistHero(artist: Artist, ctx: PageContext) {
                 Modifier
                     .size(48.dp)
                     .clip(CircleShape)
-                    .background(NovaColors.IosBlue)
+                    .background(NovaColors.AppleMusicRed)
                     .clickable(onClickLabel = "Play ${artist.name}", role = Role.Button) { ctx.actions.play(artist.songs, 0, false) },
                 contentAlignment = Alignment.Center,
             ) {
@@ -874,7 +874,7 @@ private fun Missing(ctx: PageContext) {
 // Pieces
 // ---------------------------------------------------------------------------------------------
 
-/** A page's back link ("‹ Library", in blue) and its big title. */
+/** A page's back link ("‹ Library", in red) and its big title. */
 private fun LazyGridScope.header(title: String, ctx: PageContext) {
     row("back") { BackRow(ctx) }
     row("title") {
@@ -901,10 +901,10 @@ private fun BackRow(ctx: PageContext, menu: (@Composable ColumnScope.(close: () 
                 .padding(vertical = 8.dp, horizontal = 2.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            NovaIcon(R.drawable.ic_arrow_back, contentDescription = null, tint = NovaColors.IosBlue, modifier = Modifier.size(20.dp))
+            NovaIcon(R.drawable.ic_arrow_back, contentDescription = null, tint = NovaColors.AppleMusicRed, modifier = Modifier.size(20.dp))
             Text(
                 ctx.backLabel,
-                color = NovaColors.IosBlue,
+                color = NovaColors.AppleMusicRed,
                 fontSize = 17.sp,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
@@ -918,7 +918,7 @@ private fun BackRow(ctx: PageContext, menu: (@Composable ColumnScope.(close: () 
     }
 }
 
-/** Apple Music's "…": a blue ellipsis on a grey circle that opens a menu. */
+/** Apple Music's "…": a red ellipsis on a grey circle that opens a menu. */
 @Composable
 private fun MoreButton(label: String, content: @Composable ColumnScope.(close: () -> Unit) -> Unit) {
     var open by remember { mutableStateOf(false) }
@@ -931,7 +931,7 @@ private fun MoreButton(label: String, content: @Composable ColumnScope.(close: (
                 .clickable(onClickLabel = label, role = Role.Button) { open = true },
             contentAlignment = Alignment.Center,
         ) {
-            NovaIcon(R.drawable.ic_more_vert, contentDescription = label, tint = NovaColors.IosBlue, modifier = Modifier.size(18.dp))
+            NovaIcon(R.drawable.ic_more_vert, contentDescription = label, tint = NovaColors.AppleMusicRed, modifier = Modifier.size(18.dp))
         }
         NovaDropdownMenu(expanded = open, onDismissRequest = { open = false }) {
             content { open = false }
@@ -962,15 +962,12 @@ private fun QueueItems(songs: List<SongEntity>, ctx: PageContext, close: () -> U
     )
 }
 
-/**
- * A Library link (Playlists, Favorites): its glyph in plain white, as iOS 27.2's Music draws them
- * (monochrome, no accent colour), the name, and a chevron.
- */
+/** A Library link (Playlists, Favorites): its glyph in Apple Music's red, the name, and a chevron. */
 @Composable
 private fun CategoryRow(@DrawableRes icon: Int, label: String, divider: Boolean = true, onClick: () -> Unit) {
     Column(Modifier.clickable(onClick = onClick)) {
         Row(Modifier.padding(vertical = 13.dp), verticalAlignment = Alignment.CenterVertically) {
-            NovaIcon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(26.dp))
+            NovaIcon(icon, contentDescription = null, tint = NovaColors.AppleMusicRed, modifier = Modifier.size(26.dp))
             Text(label, fontSize = 21.sp, modifier = Modifier.padding(start = 16.dp).weight(1f))
             NovaIcon(R.drawable.ic_chevron_right, contentDescription = null, tint = Color.White.copy(alpha = 0.3f))
         }
@@ -1051,7 +1048,7 @@ private fun AlbumTileContent(album: Album, onClick: () -> Unit, onLongClick: () 
     }
 }
 
-/** Apple Music's Play and Shuffle: two grey pills with blue icon and label, side by side. */
+/** Apple Music's Play and Shuffle: two grey pills with red icon and label, side by side. */
 @Composable
 private fun PlayShuffle(songs: List<SongEntity>, actions: AudioActions) {
     Row(Modifier.padding(vertical = 14.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -1071,8 +1068,8 @@ private fun GreyPill(@DrawableRes icon: Int, label: String, modifier: Modifier, 
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        NovaIcon(icon, contentDescription = null, tint = NovaColors.IosBlue, modifier = Modifier.size(22.dp))
-        Text(label, color = NovaColors.IosBlue, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(start = 6.dp))
+        NovaIcon(icon, contentDescription = null, tint = NovaColors.AppleMusicRed, modifier = Modifier.size(22.dp))
+        Text(label, color = NovaColors.AppleMusicRed, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(start = 6.dp))
     }
 }
 
@@ -1083,7 +1080,7 @@ private fun LazyGridScope.songRows(songs: List<SongEntity>, ctx: PageContext) {
 }
 
 /**
- * A song with its cover, as in Apple Music's lists: the playing one's title in blue, a small star
+ * A song with its cover, as in Apple Music's lists: the playing one in red, a small star
  * when it is a favorite, and "…" (or a long press) for its menu.
  * [onRemove] adds Remove from Playlist to the menu.
  */
@@ -1125,7 +1122,7 @@ private fun SongRow(song: SongEntity, ctx: PageContext, onClick: () -> Unit, onR
                             Text(
                                 song.title,
                                 fontSize = 16.sp,
-                                color = if (playing) NovaColors.IosBlue else Color.White,
+                                color = if (playing) NovaColors.AppleMusicRed else Color.White,
                                 maxLines = 2,
                                 overflow = TextOverflow.Ellipsis,
                             )
@@ -1192,13 +1189,13 @@ private fun TrackRow(song: SongEntity, ctx: PageContext, onClick: () -> Unit) {
                             Text(
                                 song.trackNumber?.toString() ?: "",
                                 fontSize = 16.sp,
-                                color = if (playing) NovaColors.IosBlue else Color.White.copy(alpha = 0.55f),
+                                color = if (playing) NovaColors.AppleMusicRed else Color.White.copy(alpha = 0.55f),
                             )
                         }
                         Text(
                             song.title,
                             fontSize = 16.sp,
-                            color = if (playing) NovaColors.IosBlue else Color.White,
+                            color = if (playing) NovaColors.AppleMusicRed else Color.White,
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f),
@@ -1491,13 +1488,13 @@ internal fun AddToPlaylistDialog(
                         modifier = Modifier.weight(1f),
                     )
                     IosTextButton(onClick = { onPick(null, name.trim()) }, enabled = name.isNotBlank()) {
-                        Text("Create", color = if (name.isNotBlank()) NovaColors.IosBlue else Color.White.copy(alpha = 0.3f))
+                        Text("Create", color = if (name.isNotBlank()) NovaColors.AppleMusicRed else Color.White.copy(alpha = 0.3f))
                     }
                 }
             } else {
                 ListRow(
                     title = "New Playlist…",
-                    titleColor = NovaColors.IosBlue,
+                    titleColor = NovaColors.AppleMusicRed,
                     art = {
                         Box(
                             Modifier
@@ -1506,7 +1503,7 @@ internal fun AddToPlaylistDialog(
                                 .background(Color(0xFF2C2C2E)),
                             contentAlignment = Alignment.Center,
                         ) {
-                            NovaIcon(R.drawable.ic_add, contentDescription = null, tint = NovaColors.IosBlue, modifier = Modifier.size(22.dp))
+                            NovaIcon(R.drawable.ic_add, contentDescription = null, tint = NovaColors.AppleMusicRed, modifier = Modifier.size(22.dp))
                         }
                     },
                     chevron = false,

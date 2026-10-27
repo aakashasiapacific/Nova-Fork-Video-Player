@@ -72,7 +72,7 @@ data class Settings(
      * How tinted the app's glass buttons and bars are, 0 (clear) to 1 (tinted), as iOS 27's
      * Liquid Glass slider sets it. The default is iOS 27's (ui.common.DEFAULT_GLASS_TINT).
      */
-    val glassTint: Float = 0.6f,
+    val glassTint: Float = 1f,
 )
 
 interface SettingsStore {

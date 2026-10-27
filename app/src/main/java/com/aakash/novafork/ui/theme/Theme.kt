@@ -26,10 +26,9 @@ object NovaColors {
     /** Brand gradient (launcher icon): amber → coral pink. */
     val Amber = Color(0xFFFFB347)
     val Coral = Color(0xFFFF5E7E)
-    /**
-     * iOS 26/27 systemBlue in dark mode: the accent everywhere, Audio included, as Apple Music
-     * itself turned blue in iOS 27.2 (owner).
-     */
+    /** Apple Music's red: the Audio tab's accent (owner: Audio keeps its red; the rest is blue). */
+    val AppleMusicRed = Color(0xFFFA2D48)
+    /** iOS 26/27 systemBlue in dark mode: the accent of Video, Search and Preferences. */
     val IosBlue = IosPalette.Blue
     /** Rating star. */
     val Gold = Color(0xFFFFC24B)
@@ -155,11 +154,17 @@ fun NovaPlayerTheme(content: @Composable () -> Unit) {
     MaterialTheme(colorScheme = DarkScheme, typography = NovaTypography) { IosTouch(content) }
 }
 
-/**
- * The Audio tab's look. It had Apple Music's red; iOS 27.2's Music went blue, and so did ours
- * (owner), so it is now the app's own theme. Kept so the Audio screens keep one place to theme.
- */
+/** The Audio tab's look: the app's theme with Apple Music red as its accent. */
 @Composable
 fun AudioTheme(content: @Composable () -> Unit) {
-    content()
+    val base = MaterialTheme.colorScheme
+    MaterialTheme(
+        colorScheme = base.copy(
+            primary = NovaColors.AppleMusicRed,
+            onPrimary = Color.White,
+            primaryContainer = Color(0xFF5C1520),
+            onPrimaryContainer = Color(0xFFFFD9DE),
+        ),
+        typography = MaterialTheme.typography,
+    ) { IosTouch(content) }
 }
