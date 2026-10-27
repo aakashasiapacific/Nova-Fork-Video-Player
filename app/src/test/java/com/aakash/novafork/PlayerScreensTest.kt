@@ -99,6 +99,14 @@ class PlayerScreensTest {
     /** Playing on a Chromecast: a placeholder names the device where the video would be. */
     @Test fun phoneCasting() = capture("casting", FakePlayer.casting(), DeviceLayout.PHONE)
 
+    /**
+     * Portrait: the actions (queue and shuffle too, with a queue) take two rows under the seek
+     * bar, Capture sits under the title, and nothing is left in a ⋮ menu.
+     */
+    @Test
+    @Config(qualifiers = "w411dp-h891dp-port-420dpi")
+    fun phonePortraitQueue() = capture("portrait_queue", FakePlayer.queued(), DeviceLayout.PHONE, frame = episodeFrame)
+
     // Tablet, landscape
 
     @Test

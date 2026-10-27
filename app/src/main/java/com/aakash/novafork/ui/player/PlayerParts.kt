@@ -26,9 +26,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -51,8 +49,6 @@ import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
 import com.aakash.novafork.core.format.Formats
 import com.aakash.novafork.ui.common.IosIconButton
-import com.aakash.novafork.ui.common.NovaDropdownMenu
-import com.aakash.novafork.ui.common.NovaMenuItem
 import com.aakash.novafork.ui.common.playerGlass
 import com.aakash.novafork.ui.common.SymbolSwap
 import com.aakash.novafork.ui.model.PlayerUiState
@@ -142,45 +138,10 @@ internal fun PlayerIconButton(
     buttonSize: Dp = 48.dp,
     iconSize: Dp = 24.dp,
     enabled: Boolean = true,
+    tint: Color = LocalContentColor.current,
 ) {
     IosIconButton(onClick = onClick, modifier = modifier.size(buttonSize), enabled = enabled) {
-        Icon(painterResource(icon), contentDescription = contentDescription, modifier = Modifier.size(iconSize))
-    }
-}
-
-/** One entry of the player's overflow menu. */
-internal class PlayerMenuItem(@DrawableRes val icon: Int, val label: String, val onClick: () -> Unit)
-
-/** The ⋮ button and its menu of [items]. */
-@Composable
-internal fun PlayerMoreMenu(
-    items: List<PlayerMenuItem>,
-    modifier: Modifier = Modifier,
-    buttonSize: Dp = 48.dp,
-    iconSize: Dp = 24.dp,
-    @DrawableRes icon: Int = R.drawable.ic_more_vert,
-) {
-    var open by remember { mutableStateOf(false) }
-    Box(modifier) {
-        PlayerIconButton(
-            icon = icon,
-            contentDescription = "More options",
-            onClick = { open = true },
-            buttonSize = buttonSize,
-            iconSize = iconSize,
-        )
-        NovaDropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-            items.forEach { item ->
-                NovaMenuItem(
-                    text = { Text(item.label) },
-                    leadingIcon = { Icon(painterResource(item.icon), contentDescription = null) },
-                    onClick = {
-                        open = false
-                        item.onClick()
-                    },
-                )
-            }
-        }
+        Icon(painterResource(icon), contentDescription = contentDescription, modifier = Modifier.size(iconSize), tint = tint)
     }
 }
 
@@ -196,7 +157,7 @@ internal fun CastButton(
     val casting = castingTo != null
     IosIconButton(onClick = onClick, modifier = modifier.size(buttonSize)) {
         Icon(
-            painter = painterResource(if (casting) R.drawable.ic_cast_connected else R.drawable.ic_cast),
+            painter = painterResource(if (casting) R.drawable.ic_player_cast_connected else R.drawable.ic_player_cast),
             contentDescription = if (casting) "Casting to $castingTo" else "Cast",
             modifier = Modifier.size(iconSize),
             tint = if (casting) MaterialTheme.colorScheme.primary else LocalContentColor.current,
@@ -244,8 +205,9 @@ internal fun PlayerToggleButton(
 }
 
 /**
- * Big round play/pause; a spinner rings it while buffering so the centre never shows two things.
- * [finished] (played to the end, nothing after it): Replay, as Samsung's player shows it.
+ * Big round play/pause in One UI's glyphs (a triangle with small rounded corners, two straight
+ * bars); a spinner rings it while buffering so the centre never shows two things. [finished]
+ * (played to the end, nothing after it): Replay, as Samsung's player shows it.
  */
 @Composable
 internal fun PlayPauseButton(
@@ -270,15 +232,17 @@ internal fun PlayPauseButton(
             SymbolSwap(
                 icon = when {
                     finished -> R.drawable.ic_replay
-                    isPlaying -> R.drawable.ic_pause
-                    else -> R.drawable.ic_play_arrow
+                    isPlaying -> R.drawable.ic_player_pause
+                    else -> R.drawable.ic_player_play
                 },
                 contentDescription = when {
                     finished -> "Replay"
                     isPlaying -> "Pause"
                     else -> "Play"
                 },
-                modifier = Modifier.size(size * if (finished) 0.46f else 0.5f),
+                // One UI's glyphs sit in a 24dp box with room round them: the box is ~three
+                // quarters of the disc so the glyph itself fills a little under half of it.
+                modifier = Modifier.size(size * if (finished) 0.46f else 0.76f),
                 tint = Color.White,
             )
         }
