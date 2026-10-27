@@ -8,6 +8,7 @@ import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.SpringSpec
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -17,6 +18,7 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.basicMarquee
@@ -60,6 +62,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -91,6 +94,7 @@ import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -105,6 +109,9 @@ import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
+import coil.compose.AsyncImagePainter
+import coil.compose.rememberAsyncImagePainter
+import coil.imageLoader
 import coil.request.ImageRequest
 import com.aakash.novafork.R
 import com.aakash.novafork.data.db.SongEntity
@@ -126,6 +133,8 @@ import com.aakash.novafork.ui.model.RepeatMode
 import com.aakash.novafork.ui.theme.AudioTheme
 import com.aakash.novafork.ui.theme.NovaColors
 import kotlin.math.roundToInt
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -163,28 +172,43 @@ fun NowPlayingHost(
     sheet: NowPlayingSheet? = null,
 ) {
     LaunchedEffect(player.active) { if (!player.active && open) onDismiss() }
-    // One number, 0 closed to 1 open, moves everything: the sheet's place, the finger's drag on
-    // it, and (through [sheet]) the page behind being pushed back, as an iOS sheet does.
+    // One number, [NowPlayingSheet.openFraction], moves everything in the same frame: the sheet's
+    // place, the finger's drag on it, the page behind being pushed back (as an iOS sheet does),
+    // the mini player's contents and the cover flying between the two covers.
+    val state = sheet ?: remember { NowPlayingSheet() }
     val visible = open && player.active
-    val progress = remember { Animatable(0f) }
-    var drag by remember { mutableFloatStateOf(0f) }
     val scope = rememberCoroutineScope()
     LaunchedEffect(visible) {
-        // Opened by pulling the mini player up: it carries on from where the finger left it.
-        val pulled = sheet?.pull ?: 0f
+        // Opened by pulling the mini player up: it carries on from where the finger left it, at
+        // the speed it left at (a flick up is not met by a slow start).
+        val pulled = state.pull
         if (visible && pulled > 0f) {
-            progress.snapTo(pulled)
-            sheet?.pull = 0f
+            state.progress = pulled
+            state.pull = 0f
         }
-        progress.animateTo(
-            if (visible) 1f else 0f,
-            if (visible) spring(dampingRatio = 0.86f, stiffness = 300f) else spring(dampingRatio = 1f, stiffness = 380f),
-        )
+        val velocity = state.releaseVelocity
+        state.releaseVelocity = 0f
+        if (visible || state.progress > 0f) {
+            // One critically damped spring both ways: no overshoot to be clamped at the ends.
+            state.settle(
+                scope,
+                if (visible) 1f else 0f,
+                velocity,
+                if (visible) spring(dampingRatio = 1f, stiffness = 320f) else spring(dampingRatio = 1f, stiffness = 380f),
+            )
+        }
     }
-    val fraction = (progress.value - drag + (sheet?.pull ?: 0f)).coerceIn(0f, 1f)
-    SideEffect { sheet?.openFraction = fraction }
-    DisposableEffect(sheet) { onDispose { sheet?.openFraction = 0f } }
-    if (fraction > 0f || visible) {
+    DisposableEffect(state) {
+        onDispose {
+            state.stopSettling()
+            state.progress = 0f
+            state.drag = 0f
+        }
+    }
+    // Composed only while any of it shows; read through a derived state so it is the start and
+    // the end of the motion that recompose, not every frame in between.
+    val shown by remember(state) { derivedStateOf { state.openFraction > 0f } }
+    if (shown || visible) {
         NowPlayingScreen(
             player = player,
             actions = actions,
@@ -192,17 +216,21 @@ fun NowPlayingHost(
             favorite = favorite,
             upNext = upNext,
             menu = menu,
-            progress = fraction,
-            onDragBy = { delta -> drag = (drag + delta).coerceIn(0f, progress.value) },
+            progress = { state.openFraction },
+            onDragBy = { delta ->
+                state.stopSettling()
+                state.drag = (state.drag + delta).coerceIn(0f, state.progress)
+            },
             onRelease = { velocity, dismiss ->
-                scope.launch {
-                    progress.snapTo(fraction)
-                    drag = 0f
-                    if (dismiss) {
-                        onDismiss()
-                    } else {
-                        progress.animateTo(1f, spring(dampingRatio = 0.8f, stiffness = 500f), initialVelocity = -velocity)
-                    }
+                // The finger's drag is folded into the sheet's own place, in one step.
+                state.progress = state.openFraction
+                state.drag = 0f
+                if (dismiss) {
+                    // Closing carries on at the speed the finger flung it.
+                    state.releaseVelocity = -velocity
+                    onDismiss()
+                } else {
+                    state.settle(scope, 1f, -velocity, spring(dampingRatio = 1f, stiffness = 500f))
                 }
             },
         )
@@ -216,51 +244,100 @@ fun NowPlayingHost(
  */
 @Stable
 class NowPlayingSheet {
-    var openFraction by mutableFloatStateOf(0f)
+    /** Where the sheet is, 0 (closed) to 1 (open): [NowPlayingHost]'s animations move it. */
+    var progress by mutableFloatStateOf(0f)
+
+    /** How far the finger has pulled Now Playing down from where it is (0 to 1 of its height). */
+    var drag by mutableFloatStateOf(0f)
 
     /** How far the mini player is being pulled up toward Now Playing (0 to 1), by the finger. */
     var pull by mutableFloatStateOf(0f)
 
+    /**
+     * How far Now Playing is open, 0 (closed) to 1 (open), from the animation and the finger
+     * together. The sheet, the page behind, the mini player and the flying cover all draw from this
+     * one number, read while drawing, so none of them is ever a frame ahead of another.
+     */
+    val openFraction: Float get() = (progress - drag + pull).coerceIn(0f, 1f)
+
+    /** How fast the finger let go (sheet heights a second, positive up): the next animation starts at it. */
+    var releaseVelocity = 0f
+
+    private var settling: Job? = null
+
+    /** Moves [progress] to [target] with [spring], from [velocity]; the finger or a newer move replaces it. */
+    fun settle(scope: CoroutineScope, target: Float, velocity: Float, spring: SpringSpec<Float>) {
+        settling?.cancel()
+        settling = scope.launch {
+            animate(progress, target, velocity, spring) { value, _ -> progress = value }
+        }
+    }
+
+    fun stopSettling() {
+        settling?.cancel()
+        settling = null
+    }
+
     /** Now Playing's height, which its slide is measured in. */
     var heightPx by mutableFloatStateOf(0f)
 
-    /** The big cover where it sits when Now Playing is fully open; null when not shown. */
+    /**
+     * The big cover's own box where it sits within Now Playing (its slide and its play/pause
+     * scale left out); null when not shown.
+     */
     var bigCover by mutableStateOf<Rect?>(null)
 
-    /** The mini player's cover; null when there is no mini player. */
+    /** The big cover's scale (smaller while paused) and shadow as they are now, for the flight to start from and land on. */
+    var coverScale by mutableStateOf<State<Float>?>(null)
+    var coverShadow by mutableStateOf<State<Dp>?>(null)
+
+    /** The mini player's cover, and its corner in dp; null when there is no mini player. */
     var miniCover by mutableStateOf<Rect?>(null)
+    var miniCorner by mutableFloatStateOf(8f)
 
     /** Now Playing's own layout, which the big cover is measured within (its slide left out). */
     var sheetCoordinates: LayoutCoordinates? = null
 
-    /** Between open and closed, with both ends known: [CoverFlight] draws the cover. */
+    /** The flying cover's picture is loaded, so the real covers can give way to it without a blank. */
+    var flightReady by mutableStateOf(false)
+
+    /** Between open and closed, with both ends known and the picture ready: [CoverFlight] draws the cover. */
     val flying: Boolean
-        get() = openFraction > 0f && openFraction < 1f && bigCover != null && miniCover != null
+        get() = openFraction > 0f && openFraction < 1f && bigCover != null && miniCover != null && flightReady
+
+    /** The mini player's own cover gives way from the first pixel of motion, to the flying cover or the big one. */
+    val miniCoverHidden: Boolean
+        get() = openFraction > 0f && bigCover != null && flightReady
 }
 
 /** The shell's sheet, for the covers to report where they are; null outside the phone shell. */
 val LocalNowPlayingSheet = staticCompositionLocalOf<NowPlayingSheet?> { null }
 
 /**
- * The one cover in flight between Now Playing and the mini player: it travels in a straight
- * line between the two, shrinking as it goes, in step with the sheet from start to end. Opening
- * runs the same path backwards. Drawn by the shell over all.
+ * The one cover in flight between Now Playing and the mini player: its place, size, corners and
+ * shadow all move in step with the sheet ([NowPlayingSheet.openFraction]), from the big cover's
+ * to the mini player's and back, so a finger dragging Now Playing down shrinks it into the mini
+ * player in lock-step. Drawn by the shell over all.
  */
 @Composable
 fun CoverFlight(artUri: String?) {
     val sheet = LocalNowPlayingSheet.current ?: return
-    if (artUri == null) return
-    val big = sheet.bigCover ?: return
     val context = LocalContext.current
-    // Loaded ahead at one fixed size and laid out once at the big cover's size; the flight only
-    // moves and scales it in the draw phase, in the same frame the real covers hide (owner: no
-    // blank frame when the drag starts, no reload or dark box as it shrinks).
+    // Loaded ahead, whenever a song plays, at one fixed size and laid out once at the big cover's
+    // size; the flight only moves and scales it in the draw phase. The real covers give way to it
+    // only once it is ready (owner: no blank frame, no reload or dark box as it shrinks).
     val request = remember(artUri) {
         ImageRequest.Builder(context).data(artUri).size(FLIGHT_PX).crossfade(false).build()
     }
+    val painter = rememberAsyncImagePainter(model = request, imageLoader = context.imageLoader)
+    val ready = artUri != null && painter.state is AsyncImagePainter.State.Success
+    SideEffect { sheet.flightReady = ready }
+    DisposableEffect(sheet) { onDispose { sheet.flightReady = false } }
+    val big = sheet.bigCover
+    if (!ready || big == null) return
     val density = LocalDensity.current
-    AsyncImage(
-        model = request,
+    Image(
+        painter = painter,
         contentDescription = null,
         contentScale = ContentScale.Crop,
         modifier = Modifier
@@ -271,23 +348,41 @@ fun CoverFlight(artUri: String?) {
                     alpha = 0f
                     return@graphicsLayer
                 }
-                // Apple Music's flight: one straight diagonal from the big cover's place to the
-                // mini player's, place, size and corners all moving together with the sheet from
-                // the first pixel (owner: it used to ride down with the sheet, then swing across).
+                // Apple Music's flight: one straight line from the big cover's place to the mini
+                // player's, place, size, corners and shadow all moving together with the sheet from
+                // the first pixel. The big cover's end is where it is now (smaller while paused).
                 val t = (1f - sheet.openFraction).coerceIn(0f, 1f)
                 fun mix(a: Float, b: Float) = a + (b - a) * t
+                val bigScale = sheet.coverScale?.value ?: 1f
+                val width = mix(big.width * bigScale, mini.width)
+                val height = mix(big.height * bigScale, mini.height)
                 alpha = 1f
                 transformOrigin = TransformOrigin(0f, 0f)
-                translationX = mix(big.left, mini.left)
-                translationY = mix(big.top, mini.top)
-                scaleX = mix(1f, mini.width / big.width)
-                scaleY = mix(1f, mini.height / big.height)
-                // The corner as seen, 12dp to the mini player's 8dp, through the scale.
-                shape = RoundedCornerShape(mix(12f, 8f).dp.toPx() / scaleX.coerceAtLeast(0.01f))
+                scaleX = width / big.width
+                scaleY = height / big.height
+                translationX = mix(big.center.x, mini.center.x) - width / 2f
+                translationY = mix(big.center.y, mini.center.y) - height / 2f
+                // The corner and shadow as seen, through the scale: the big cover's, then the mini player's.
+                shape = RoundedCornerShape(mix(BIG_COVER_CORNER_DP * bigScale, sheet.miniCorner).dp.toPx() / scaleX.coerceAtLeast(0.01f))
+                shadowElevation = (sheet.coverShadow?.value ?: 0.dp).toPx() * (1f - t)
                 clip = true
             },
     )
 }
+
+/** The big cover's corner, in dp, before its play/pause scale. */
+private const val BIG_COVER_CORNER_DP = 12f
+
+/**
+ * How much of the mini player's own contents (title, buttons) show while Now Playing is [open]
+ * (0 to 1): none until it has come nearly all the way down, then they fade in as it lands.
+ */
+fun miniContentAlpha(open: Float): Float = ((MINI_FADE_IN_BELOW - open) / MINI_FADE_IN_BELOW).coerceIn(0f, 1f)
+
+private const val MINI_FADE_IN_BELOW = 0.25f
+
+/** How much of Now Playing's controls show at [open]: they fade out over the first part of closing. */
+private fun nowPlayingContentAlpha(open: Float): Float = ((open - 0.55f) / 0.45f).coerceIn(0f, 1f)
 
 /** How long the mini player takes to fade from one song to the next. */
 private const val MINI_FADE_MS = 280
@@ -305,9 +400,6 @@ private class SongChange {
 
 /** How long lyrics scrolled by hand stay lit and unfollowed after the finger lifts. */
 private const val LYRICS_BROWSE_MS = 3_000L
-
-/** How much larger the cover lands before it settles. */
-private const val SETTLE_FROM = 1.035f
 
 /** The size the flying cover is decoded at, sharp enough for the big cover. */
 private const val FLIGHT_PX = 720
@@ -472,12 +564,13 @@ fun MiniPlayerBar(
         val coverCorner = if (docked) 6 else 8
         val sheet = LocalNowPlayingSheet.current
         DisposableEffect(sheet) { onDispose { sheet?.miniCover = null } }
+        SideEffect { sheet?.miniCorner = coverCorner.toFloat() }
         Box(
             Modifier
                 .offset { IntOffset((swipe * 0.5f).roundToInt(), 0) }
                 .onGloballyPositioned { if (sheet != null) sheet.miniCover = it.boundsInRoot() }
                 // The flying cover lands here; this one shows once Now Playing is closed.
-                .graphicsLayer { alpha = if (sheet != null && sheet.openFraction > 0f && sheet.bigCover != null) 0f else 1f },
+                .graphicsLayer { alpha = if (sheet != null && sheet.miniCoverHidden) 0f else 1f },
             contentAlignment = Alignment.Center,
         ) {
             // A new song's cover and name fade in over the old ones rather than switching.
@@ -553,8 +646,8 @@ fun NowPlayingScreen(
     upNext: List<SongEntity> = emptyList(),
     /** Apple Music's "…" beside the star; null = none (previews). */
     menu: (@Composable ColumnScope.(close: () -> Unit) -> Unit)? = null,
-    /** How far it is open, 0 to 1 ([NowPlayingHost] moves it); 1 stands still. */
-    progress: Float = 1f,
+    /** How far it is open, 0 to 1 ([NowPlayingHost] moves it), read while drawing; 1 stands still. */
+    progress: () -> Float = { 1f },
     /** The finger pulled it down by this part of the screen's height. */
     onDragBy: (Float) -> Unit = {},
     /** The finger let go, moving down at this many screen heights a second; close it or not. */
@@ -569,9 +662,11 @@ fun NowPlayingScreen(
     val density = LocalDensity.current
     val dismissPx = with(density) { 140.dp.toPx() }
     val flingPx = with(density) { 900.dp.toPx() }
-    var heightPx by remember { mutableFloatStateOf(0f) }
+    // Starts at the screen's height, so its first frame is already below the screen rather than
+    // a ghost of it in place until it has been measured.
+    val screenPx = with(density) { LocalConfiguration.current.screenHeightDp.dp.toPx() }
+    var heightPx by remember { mutableFloatStateOf(screenPx) }
     val sheet = LocalNowPlayingSheet.current
-    val offsetPx = (1f - progress) * heightPx
     // Its top corners round into the screen's own as it leaves (iOS 27's concentric corners).
     val screenCorner = rememberScreenCornerRadius()
     val dragState = rememberDraggableState { delta -> if (heightPx > 0f) onDragBy(delta / heightPx) }
@@ -583,8 +678,10 @@ fun NowPlayingScreen(
                 sheet?.heightPx = heightPx
             }
             .graphicsLayer {
+                val open = progress()
+                val offsetPx = (1f - open) * heightPx
                 translationY = offsetPx
-                alpha = (progress / 0.3f).coerceIn(0f, 1f)
+                alpha = (open / 0.3f).coerceIn(0f, 1f)
                 val corner = (offsetPx / dismissPx).coerceIn(0f, 1f) * screenCorner.toPx()
                 shape = RoundedCornerShape(topStart = corner, topEnd = corner)
                 clip = offsetPx > 0f
@@ -596,7 +693,7 @@ fun NowPlayingScreen(
                 state = dragState,
                 orientation = Orientation.Vertical,
                 onDragStopped = { velocity ->
-                    val dismiss = offsetPx > dismissPx || velocity > flingPx
+                    val dismiss = (1f - progress()) * heightPx > dismissPx || velocity > flingPx
                     onRelease(if (heightPx > 0f) velocity / heightPx else 0f, dismiss)
                 },
             ),
@@ -605,6 +702,9 @@ fun NowPlayingScreen(
         Column(
             Modifier
                 .fillMaxSize()
+                // The controls fade out over the first part of closing and back in over the last
+                // part of opening, while the cover flies.
+                .graphicsLayer { alpha = nowPlayingContentAlpha(progress()) }
                 .statusBarsPadding()
                 .navigationBarsPadding()
                 .padding(horizontal = 28.dp),
@@ -770,22 +870,22 @@ private fun FavoriteButton(favorite: Boolean, onClick: () -> Unit) {
 private fun BigCover(player: MusicPlayerState) {
     // Apple Music: paused, the cover sinks back small with a light shadow; playing, it springs
     // forward with a deep one.
-    val scale by animateFloatAsState(
+    val scale = animateFloatAsState(
         if (player.isPlaying) 1f else 0.8f,
         spring(dampingRatio = 0.62f, stiffness = 300f),
         label = "coverScale",
     )
-    val shadow by animateDpAsState(if (player.isPlaying) 30.dp else 8.dp, spring(stiffness = 300f), label = "coverShadow")
+    val shadow = animateDpAsState(if (player.isPlaying) 30.dp else 8.dp, spring(stiffness = 300f), label = "coverShadow")
     val sheet = LocalNowPlayingSheet.current
-    DisposableEffect(sheet) { onDispose { sheet?.bigCover = null } }
-    // As Now Playing finishes opening, the cover that flew in settles with a small spring, as
-    // Apple Music's does.
-    val settle = remember { Animatable(1f) }
-    val landed by remember(sheet) { derivedStateOf { sheet == null || sheet.openFraction >= 1f } }
-    LaunchedEffect(landed) {
-        if (landed && sheet != null) {
-            settle.snapTo(SETTLE_FROM)
-            settle.animateTo(1f, spring(dampingRatio = 0.45f, stiffness = 380f))
+    // The flying cover starts from, and lands on, this one's size and shadow as they are at that
+    // moment, so nothing jumps as the hand-over happens.
+    DisposableEffect(sheet) {
+        sheet?.coverScale = scale
+        sheet?.coverShadow = shadow
+        onDispose {
+            sheet?.bigCover = null
+            sheet?.coverScale = null
+            sheet?.coverShadow = null
         }
     }
     BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -793,24 +893,25 @@ private fun BigCover(player: MusicPlayerState) {
         Box(
             Modifier
                 .size(side)
-                .graphicsLayer {
-                    scaleX = scale * settle.value
-                    scaleY = scale * settle.value
-                    // While the cover flies to or from the mini player, the flying one is shown,
-                    // shadow and all (a hidden cover's shadow was the dark box around it).
-                    val flying = sheet?.flying == true
-                    alpha = if (flying) 0f else 1f
-                    shadowElevation = if (flying) 0f else shadow.toPx()
-                    shape = RoundedCornerShape(12.dp)
-                }
                 .onGloballyPositioned { coordinates ->
-                    // Where it sits within Now Playing, so the sheet's own slide is left out.
+                    // Its own box within Now Playing, ahead of the scale below: the sheet's slide
+                    // and the play/pause scale are left out, and the flight adds the scale as it is.
                     val root = sheet?.sheetCoordinates
                     if (sheet != null && root != null && root.isAttached && coordinates.isAttached) {
                         sheet.bigCover = root.localBoundingBoxOf(coordinates, clipBounds = false)
                     }
                 }
-                .clip(RoundedCornerShape(12.dp))
+                .graphicsLayer {
+                    scaleX = scale.value
+                    scaleY = scale.value
+                    // While the cover flies to or from the mini player, the flying one is shown,
+                    // shadow and all (a hidden cover's shadow was the dark box around it).
+                    val flying = sheet?.flying == true
+                    alpha = if (flying) 0f else 1f
+                    shadowElevation = if (flying) 0f else shadow.value.toPx()
+                    shape = RoundedCornerShape(BIG_COVER_CORNER_DP.dp)
+                }
+                .clip(RoundedCornerShape(BIG_COVER_CORNER_DP.dp))
                 .background(Color(0xFF2C2C2E)),
             contentAlignment = Alignment.Center,
         ) {

@@ -128,6 +128,7 @@ import com.aakash.novafork.ui.audio.MiniPlayerDockedHeight
 import com.aakash.novafork.ui.audio.NowPlayingSheet
 import com.aakash.novafork.ui.audio.PlayingBars
 import com.aakash.novafork.ui.audio.ShellNowPlaying
+import com.aakash.novafork.ui.audio.miniContentAlpha
 import com.aakash.novafork.ui.audio.rememberMusicShell
 import com.aakash.novafork.ui.common.EndOfListGap
 import com.aakash.novafork.ui.common.Hairline
@@ -447,11 +448,15 @@ fun PhoneApp(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
                                 state = pullState,
                                 orientation = Orientation.Vertical,
                                 onDragStopped = { velocity ->
+                                    // The finger's speed, in sheet heights a second (up is positive), carries on into
+                                    // whichever way it settles.
+                                    val upward = -velocity / screenPx
                                     if (nowPlayingSheet.pull > MiniPullOpen || velocity < -MiniFlingVelocity) {
+                                        nowPlayingSheet.releaseVelocity = upward
                                         nowPlayingOpen = true
                                     } else {
                                         pullScope.launch {
-                                            animate(nowPlayingSheet.pull, 0f, animationSpec = spring(dampingRatio = 1f, stiffness = 500f)) { value, _ ->
+                                            animate(nowPlayingSheet.pull, 0f, upward, spring(dampingRatio = 1f, stiffness = 500f)) { value, _ ->
                                                 nowPlayingSheet.pull = value
                                             }
                                         }
@@ -466,8 +471,9 @@ fun PhoneApp(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
                             actions = viewModel,
                             onOpen = { nowPlayingOpen = true },
                             docked = true,
-                            // Its content fades back in as Now Playing comes down into it.
-                            modifier = Modifier.graphicsLayer { alpha = 1f - nowPlayingSheet.openFraction },
+                            // Its title and buttons fade in only over the last part of Now Playing coming
+                            // down into it (and out over the first part of its going up).
+                            modifier = Modifier.graphicsLayer { alpha = miniContentAlpha(nowPlayingSheet.openFraction) },
                         )
                     }
                 }
