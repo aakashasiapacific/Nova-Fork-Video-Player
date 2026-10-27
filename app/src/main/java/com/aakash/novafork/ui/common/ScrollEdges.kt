@@ -49,6 +49,23 @@ import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
 
 /**
+ * The soft top edge (owner: no dark band when a page scrolls): a black wash strongest under the
+ * clock that eases out smoothly over the height it is drawn in, with no solid part and no line, so
+ * the page seems to blur away under the status bar. [strength] (0 to 1) scales it.
+ */
+internal fun softTopEdge(strength: Float = 1f): Brush = Brush.verticalGradient(
+    0.00f to Color.Black.copy(alpha = 0.78f * strength),
+    0.30f to Color.Black.copy(alpha = 0.62f * strength),
+    0.50f to Color.Black.copy(alpha = 0.40f * strength),
+    0.70f to Color.Black.copy(alpha = 0.20f * strength),
+    0.88f to Color.Black.copy(alpha = 0.06f * strength),
+    1.00f to Color.Transparent,
+)
+
+/** How far below the status bar the soft top edge reaches. */
+internal val SoftEdgeDepth = 40.dp
+
+/**
  * iOS 26/27's scroll edge with a page's small title: no solid band and no hairline, the content
  * fading out softly under the clock and the title instead (black at the top, clear a little
  * below the title). [edge] (0 to 1) is how strong the fade is; [showTitle] whether the small
@@ -69,15 +86,7 @@ internal fun ScrollEdgeTitleBar(
             .drawBehind {
                 val strength = edge()
                 if (strength <= 0f) return@drawBehind
-                val solid = ((size.height - EdgeFadeDepth.toPx()) / size.height).coerceIn(0f, 1f)
-                drawRect(
-                    Brush.verticalGradient(
-                        0f to Color.Black.copy(alpha = 0.96f * strength),
-                        solid * 0.6f to Color.Black.copy(alpha = 0.9f * strength),
-                        solid to Color.Black.copy(alpha = 0.7f * strength),
-                        1f to Color.Transparent,
-                    ),
-                )
+                drawRect(softTopEdge(strength))
             },
     ) {
         // Always as tall as the bar, so the fade has its depth while the title is hidden.

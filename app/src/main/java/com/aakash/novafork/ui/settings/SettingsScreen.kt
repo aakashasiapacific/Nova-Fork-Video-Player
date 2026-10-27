@@ -1,7 +1,6 @@
 package com.aakash.novafork.ui.settings
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -59,9 +58,9 @@ import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
 import com.aakash.novafork.ui.adaptive.DeviceLayout
 import com.aakash.novafork.ui.common.CollapsedTitleBar
-import com.aakash.novafork.ui.common.Hairline
 import com.aakash.novafork.ui.common.IosColors
 import com.aakash.novafork.ui.common.NovaIcon
+import com.aakash.novafork.ui.common.glassRim
 import com.aakash.novafork.ui.common.OnTabReselect
 import com.aakash.novafork.ui.common.largeTitle
 import com.aakash.novafork.ui.common.rememberLargeTitleState
@@ -213,7 +212,7 @@ private fun AppCard(versionName: String, onClick: () -> Unit, modifier: Modifier
 
 private val AppIconSize = 58.dp
 
-/** The launcher icon as the home screen shows it: the white mark on its blue gradient square. */
+/** The launcher icon as the home screen shows it: the white mark on its blue gradient square, in glass. */
 @Composable
 internal fun AppIcon(size: Dp, modifier: Modifier = Modifier) {
     val shape = RoundedCornerShape(size * 0.225f)
@@ -222,7 +221,8 @@ internal fun AppIcon(size: Dp, modifier: Modifier = Modifier) {
             .size(size)
             .clip(shape)
             .background(Brush.verticalGradient(listOf(LauncherTop, LauncherBottom)))
-            .border(Hairline, Color.White.copy(alpha = 0.18f), shape),
+            .glassSheen()
+            .glassRim(shape, strength = 0.9f),
         contentAlignment = Alignment.Center,
     ) {
         // The foreground layer is drawn for a 108dp canvas with the mark in its middle 72dp.

@@ -50,8 +50,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
@@ -81,6 +79,8 @@ import com.aakash.novafork.ui.common.OnTabReselect
 import com.aakash.novafork.ui.common.RatingPill
 import com.aakash.novafork.ui.common.ScanBanner
 import com.aakash.novafork.ui.common.SectionHeader
+import com.aakash.novafork.ui.common.SoftEdgeDepth
+import com.aakash.novafork.ui.common.softTopEdge
 import com.aakash.novafork.ui.common.VideoMenuBox
 import com.aakash.novafork.ui.common.bottomScrim
 import com.aakash.novafork.ui.common.deviceAccessNotice
@@ -224,23 +224,16 @@ private fun HomeFeed(home: HomeUi, scan: ScanUi, permission: PermissionUi, actio
                 HomeLibraryLinks(actions, counts = home.libraryCounts)
             }
         }
-        // Once the page scrolls, the rows passing under the clock and icons disappear behind
-        // solid black there and fade out just below it (owner: headings ran into the clock).
+        // Once the page scrolls, the rows passing under the clock and icons melt away softly
+        // under it (owner: no dark band), the same soft edge as every other page.
         val shade by animateFloatAsState(if (scrolled) 1f else 0f, label = "statusShade")
-        val solid = statusBar / (statusBar + StatusFadeDepth)
         Box(
             Modifier
                 .align(Alignment.TopCenter)
                 .fillMaxWidth()
-                .height(statusBar + StatusFadeDepth)
+                .height(statusBar + SoftEdgeDepth)
                 .graphicsLayer { alpha = shade }
-                .background(
-                    Brush.verticalGradient(
-                        0f to Color.Black,
-                        solid to Color.Black,
-                        1f to Color.Transparent,
-                    ),
-                ),
+                .background(softTopEdge()),
         )
     }
 }
@@ -456,6 +449,3 @@ private fun HomeOnboarding(scan: ScanUi, permission: PermissionUi, actions: AppA
         )
     }
 }
-
-/** How far below the status bar Home's scrolled shade fades out. */
-private val StatusFadeDepth = 18.dp

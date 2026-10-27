@@ -61,7 +61,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -69,7 +68,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
-import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.coerceAtMost
 import androidx.compose.ui.unit.dp
@@ -90,7 +88,6 @@ import com.aakash.novafork.ui.common.PosterArt
 import com.aakash.novafork.ui.common.RatingPill
 import com.aakash.novafork.ui.common.bottomScrim
 import com.aakash.novafork.ui.model.Artwork
-import kotlin.math.roundToInt
 
 /**
  * How far the poster reaches up into the backdrop's faded lower edge, on the Home hero and the
@@ -119,8 +116,6 @@ internal fun BackdropPosterHeader(
     fadeTo: Color? = null,
     /** How far the page has scrolled past its top, in px: the backdrop moves at half that (parallax). */
     scrolled: () -> Float = { 0f },
-    /** How far the page is pulled down past its top, in px: the backdrop grows taller by that (Home). */
-    stretch: () -> Float = { 0f },
     /** A title's page: holding the poster shows it large ([ArtViewer]). */
     enlargePoster: Boolean = false,
     info: @Composable ColumnScope.() -> Unit,
@@ -148,11 +143,7 @@ internal fun BackdropPosterHeader(
         Box(
             Modifier
                 .fillMaxWidth()
-                .layout { measurable, constraints ->
-                    val tall = backdropHeight.roundToPx() + stretch().coerceAtLeast(0f).roundToInt()
-                    val placeable = measurable.measure(Constraints.fixed(constraints.maxWidth, tall))
-                    layout(placeable.width, placeable.height) { placeable.place(0, 0) }
-                }
+                .height(backdropHeight)
                 // iOS parallax: as the page scrolls up, the backdrop follows at half the speed.
                 .graphicsLayer {
                     translationY = scrolled() * 0.5f

@@ -178,6 +178,7 @@ fun AudioScreen(modifier: Modifier = Modifier, viewModel: MusicViewModel = viewM
 private const val HOME = "home"
 private const val PLAYLISTS = "playlists"
 private const val FAVORITES = "favorites"
+private const val RECENT = "recent"
 private const val ARTISTS = "artists"
 private const val ALBUMS = "albums"
 private const val SONGS = "songs"
@@ -187,8 +188,8 @@ private const val ARTIST = "artist:"
 private const val GENRE = "genre:"
 private const val STACK_SEPARATOR = "\u0001"
 
-/** How many albums Recently Played shows. */
-private const val RECENTLY_PLAYED = 10
+/** How many songs the Recently Played page lists. */
+private const val RECENTLY_PLAYED = 100
 
 /** The album page's cover row, which its shrinking as it scrolls away is measured by. */
 private const val ALBUM_COVER_KEY = "cover"
@@ -298,6 +299,7 @@ fun AudioContent(
                 val byId = library.songs.associateBy { it.id }
                 FavoritesPage(favorites.mapNotNull { byId[it] }, ctx)
             }
+            shown == RECENT -> RecentlyPlayedPage(recentSongs(library), ctx)
             shown == ARTISTS -> ArtistsPage(library.artists, ctx)
             shown == ALBUMS -> AlbumsPage("Albums", library.albums, ctx)
             shown == SONGS -> SongsPage("Songs", library.songs, ctx)
@@ -345,6 +347,7 @@ private fun pageTitle(page: String, library: MusicLibraryData): String = when {
     page == HOME -> "Library"
     page == PLAYLISTS -> "Playlists"
     page == FAVORITES -> "Favorites"
+    page == RECENT -> "Recently Played"
     page == ARTISTS -> "Artists"
     page == ALBUMS -> "Albums"
     page == SONGS -> "Songs"
@@ -403,14 +406,6 @@ private fun LibraryHome(
     onRequestAccess: () -> Unit,
     ctx: PageContext,
 ) {
-    // Apple Music's Recently Played: the albums last listened to, newest first.
-    val recentlyPlayed = remember(library) {
-        library.albums
-            .mapNotNull { album -> album.songs.mapNotNull { it.lastPlayedAt }.maxOrNull()?.let { album to it } }
-            .sortedByDescending { it.second }
-            .take(RECENTLY_PLAYED)
-            .map { it.first }
-    }
     AudioPage("Library") {
         row("title") {
             Row(Modifier.padding(top = 20.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -441,17 +436,10 @@ private fun LibraryHome(
         if (!hasAccess) row("access") { AccessCard(onRequestAccess) }
         // Apple Music's Library, cut down to what the owner uses: playlists, favorites, albums.
         row("playlists") { CategoryRow(R.drawable.ic_playlist_play, "Playlists") { ctx.onOpen(PLAYLISTS) } }
-        row("favorites") { CategoryRow(R.drawable.ic_star, "Favorites", divider = false) { ctx.onOpen(FAVORITES) } }
-        if (recentlyPlayed.isNotEmpty()) {
-            row("recentTitle") { SectionTitle("Recently Played") }
-            row("recent") {
-                val rowState = rememberLazyListState()
-                LazyRow(state = rowState, flingBehavior = rememberRowSnap(rowState), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                    items(recentlyPlayed, key = { it.key }) { album ->
-                        AlbumTile(album, ctx, Modifier.width(150.dp)) { ctx.onOpen(ALBUM + album.key) }
-                    }
-                }
-            }
+        row("favorites") { CategoryRow(R.drawable.ic_star, "Favorites") { ctx.onOpen(FAVORITES) } }
+        // Under Favorites, a library of its own (owner), when something has been played.
+        if (library.songs.any { it.lastPlayedAt != null }) {
+            row("recent") { CategoryRow(R.drawable.ic_history, "Recently Played", divider = false) { ctx.onOpen(RECENT) } }
         }
         if (library.recentlyAdded.isNotEmpty()) {
             row("albumsTitle") { SectionTitle("Albums") }
@@ -571,6 +559,24 @@ private fun FavoritesPage(songs: List<SongEntity>, ctx: PageContext) {
                 SongRow(song = song, ctx = ctx, onClick = { ctx.actions.play(songs, index, false) })
             }
         }
+    }
+}
+
+/** The songs last listened to, newest first. */
+private fun recentSongs(library: MusicLibraryData): List<SongEntity> =
+    library.songs
+        .filter { it.lastPlayedAt != null }
+        .sortedByDescending { it.lastPlayedAt }
+        .take(RECENTLY_PLAYED)
+
+/** Recently Played: big title, Play and Shuffle, then the songs, the latest first. */
+@Composable
+private fun RecentlyPlayedPage(songs: List<SongEntity>, ctx: PageContext) {
+    AudioPage("Recently Played") {
+        header("Recently Played", ctx)
+        if (songs.isEmpty()) row("empty") { Hint("Nothing played yet. Songs you listen to show up here.") }
+        if (songs.isNotEmpty()) row("play") { PlayShuffle(songs, ctx.actions) }
+        songRows(songs, ctx)
     }
 }
 

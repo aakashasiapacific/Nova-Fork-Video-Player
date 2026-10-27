@@ -73,7 +73,6 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.contentDescription
@@ -81,7 +80,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil.imageLoader
@@ -98,7 +96,6 @@ import com.aakash.novafork.ui.common.IosButton
 import com.aakash.novafork.ui.common.IosColors
 import com.aakash.novafork.ui.common.IosIconButton
 import com.aakash.novafork.ui.common.LocalGlassTint
-import com.aakash.novafork.ui.common.LocalPagePull
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.PosterArt
 import com.aakash.novafork.ui.common.RatingPill
@@ -112,7 +109,6 @@ import com.aakash.novafork.ui.model.HeroTarget
 import com.aakash.novafork.ui.model.HeroUi
 import com.aakash.novafork.ui.theme.IosPalette
 import com.aakash.novafork.ui.theme.NovaColors
-import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 
 /** A hero without a preview moves on after this long, like Apple TV's. */
@@ -184,17 +180,10 @@ internal fun PhoneHeroPager(
     }
     val targetHeight = pageHeight?.let { forPage -> heroes.getOrNull(pagerState.currentPage)?.let(forPage) } ?: height
     val shownHeight by animateDpAsState(targetHeight, tween(durationMillis = 320), label = "heroHeight")
-    // Pulled down past the top of Home, the hero grows by the pull (its picture stretching) instead
-    // of the page moving down from under the status bar.
-    val pull = LocalPagePull.current
     Box(
         Modifier
             .fillMaxWidth()
-            .layout { measurable, constraints ->
-                val tall = shownHeight.roundToPx() + pull().coerceAtLeast(0f).roundToInt()
-                val placeable = measurable.measure(Constraints.fixed(constraints.maxWidth, tall))
-                layout(placeable.width, placeable.height) { placeable.place(0, 0) }
-            }
+            .height(shownHeight)
             .pointerInput(Unit) {
                 awaitPointerEventScope {
                     while (true) {
@@ -412,7 +401,6 @@ private fun DetailsStyleHeroPage(
             title = hero.title,
             drift = true,
             fadeTo = Color.Transparent,
-            stretch = LocalPagePull.current,
         ) {
             HeroTitle(
                 title = hero.title,

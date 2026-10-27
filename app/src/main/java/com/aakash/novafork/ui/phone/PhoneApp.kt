@@ -137,7 +137,9 @@ import com.aakash.novafork.ui.common.LocalMenuFocus
 import com.aakash.novafork.ui.common.LocalPagePull
 import com.aakash.novafork.ui.common.LocalTabReselect
 import com.aakash.novafork.ui.common.NovaIcon
+import com.aakash.novafork.ui.common.SoftEdgeDepth
 import com.aakash.novafork.ui.common.TabReselect
+import com.aakash.novafork.ui.common.softTopEdge
 import com.aakash.novafork.ui.common.activeColor
 import com.aakash.novafork.ui.common.iosOverscroll
 import com.aakash.novafork.ui.common.rememberScreenCornerRadius
@@ -300,16 +302,8 @@ fun PhoneApp(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
                             // iOS 26's scroll edge: lists fade out under the clock and battery
                             // instead of running into them. Not over Home's hero, whose picture
                             // sets the status bar's own colours.
-                            val fadeEnd = statusBarTop + StatusFade.toPx()
-                            if (statusFade) drawRect(
-                                Brush.verticalGradient(
-                                    0f to Color.Black.copy(alpha = StatusFadeStrength),
-                                    statusBarTop / fadeEnd to Color.Black.copy(alpha = StatusFadeStrength * 0.8f),
-                                    1f to Color.Transparent,
-                                    endY = fadeEnd,
-                                ),
-                                size = size.copy(height = fadeEnd),
-                            )
+                            val fadeEnd = statusBarTop + SoftEdgeDepth.toPx()
+                            if (statusFade) drawRect(softTopEdge(), size = size.copy(height = fadeEnd))
                             val open = nowPlayingSheet.openFraction
                             if (open > 0f) drawRect(Color.Black.copy(alpha = 0.4f * open))
                         }
@@ -413,8 +407,6 @@ fun PhoneApp(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
                                                 pullState = pull,
                                                 // Anywhere else, pulling down past the top looks for new videos, silently.
                                                 onPullRefresh = if (route.isTitlePage()) null else currentActions::refreshQuietly,
-                                                // Home's hero picture grows into the pull instead (iOS's stretchy header).
-                                                moveOnPullDown = route != Route.Home,
                                             )
                                             // Inside the bounce, so it still sees the push past the end.
                                             .nestedScroll(pageEnd),
@@ -897,9 +889,6 @@ private const val SwipeFinishMs = 220
 /** Pages whose last state is kept for showing them again (going out, or under a swipe back). */
 private const val MaxPageStates = 12
 
-/** How far below the status bar the scroll-edge fade runs, and how dark it starts. */
-private val StatusFade = 14.dp
-private const val StatusFadeStrength = 0.6f
 
 private val TabBarHeight = 52.dp
 

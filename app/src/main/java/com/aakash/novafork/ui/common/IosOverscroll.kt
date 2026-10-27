@@ -48,11 +48,6 @@ internal fun Modifier.iosOverscroll(
     onPullClose: (() -> Unit)? = null,
     pullState: MutableFloatState? = null,
     onPullRefresh: (() -> Unit)? = null,
-    /**
-     * False where the page stretches its own header into a pull down past its top instead of
-     * moving (Home's hero); a push past the bottom still bounces.
-     */
-    moveOnPullDown: Boolean = true,
 ): Modifier {
     val scope = rememberCoroutineScope()
     val closePx = with(LocalDensity.current) { 120.dp.toPx() }
@@ -137,7 +132,7 @@ internal fun Modifier.iosOverscroll(
         .onSizeChanged { heightPx = it.height.toFloat().coerceAtLeast(1f) }
         .nestedScroll(connection)
         .graphicsLayer {
-            translationY = if (pull > 0f && !moveOnPullDown) 0f else pull
+            translationY = pull
             if (onPullClose != null && pull > 0f) {
                 val shrink = 1f - (pull / heightPx).coerceIn(0f, 1f) * 0.4f
                 scaleX = shrink
