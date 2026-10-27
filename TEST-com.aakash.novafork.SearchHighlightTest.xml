@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.aakash.novafork.SearchHighlightTest" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-10-27T14:28:46.889Z" hostname="runnervmtai0g" time="0.015">
+  <properties/>
+  <testcase name="every word typed is bold wherever it appears, whatever its case" classname="com.aakash.novafork.SearchHighlightTest" time="0.015"/>
+  <testcase name="nothing typed leaves the title plain" classname="com.aakash.novafork.SearchHighlightTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

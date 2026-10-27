@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.aakash.novafork.AudioScreensTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-10-27T14:28:21.702Z" hostname="runnervmtai0g" time="12.574">
+  <properties/>
+  <testcase name="miniPlayer" classname="com.aakash.novafork.AudioScreensTest" time="11.141"/>
+  <testcase name="nowPlaying" classname="com.aakash.novafork.AudioScreensTest" time="0.774"/>
+  <testcase name="noAccessYet" classname="com.aakash.novafork.AudioScreensTest" time="0.311"/>
+  <testcase name="songsWithThePlayer" classname="com.aakash.novafork.AudioScreensTest" time="0.348"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

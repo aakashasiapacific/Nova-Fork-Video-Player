@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.aakash.novafork.data.DeviceStorageWatchTest" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-10-27T14:28:55.717Z" hostname="runnervmtai0g" time="11.619">
+  <properties/>
+  <testcase name="changesRescanDeviceStorageOnceTheySettle" classname="com.aakash.novafork.data.DeviceStorageWatchTest" time="5.086"/>
+  <testcase name="noRescanWhileDeviceScanningIsOff" classname="com.aakash.novafork.data.DeviceStorageWatchTest" time="6.533"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

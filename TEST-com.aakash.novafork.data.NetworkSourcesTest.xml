@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.aakash.novafork.data.NetworkSourcesTest" tests="10" skipped="0" failures="0" errors="0" timestamp="2026-10-27T14:29:10.370Z" hostname="runnervmtai0g" time="0.003">
+  <properties/>
+  <testcase name="loginsThatWouldCrossTheInternetUnencryptedAreWarnedAbout" classname="com.aakash.novafork.data.NetworkSourcesTest" time="0.001"/>
+  <testcase name="everyNetworkTypeHasSchemes" classname="com.aakash.novafork.data.NetworkSourcesTest" time="0.0"/>
+  <testcase name="fileServerAddressesBecomeEncodedBaseUris" classname="com.aakash.novafork.data.NetworkSourcesTest" time="0.001"/>
+  <testcase name="aMediaServerOnTheInternetTypedBareIsAskedOverHttps" classname="com.aakash.novafork.data.NetworkSourcesTest" time="0.0"/>
+  <testcase name="upnpTakesADescriptionUrlOrAUdn" classname="com.aakash.novafork.data.NetworkSourcesTest" time="0.0"/>
+  <testcase name="credentialsLeaveTheAddressForTheirColumns" classname="com.aakash.novafork.data.NetworkSourcesTest" time="0.0"/>
+  <testcase name="locationsParseEncodeAndContainEachOther" classname="com.aakash.novafork.data.NetworkSourcesTest" time="0.001"/>
+  <testcase name="badInputIsRefusedWithAMessage" classname="com.aakash.novafork.data.NetworkSourcesTest" time="0.0"/>
+  <testcase name="webDavDefaultsToHttpsAndTakesDavSchemes" classname="com.aakash.novafork.data.NetworkSourcesTest" time="0.0"/>
+  <testcase name="mediaServersGetTheirUsualPortWhenTypedBare" classname="com.aakash.novafork.data.NetworkSourcesTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

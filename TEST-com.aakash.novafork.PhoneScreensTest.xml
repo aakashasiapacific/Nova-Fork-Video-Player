@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.aakash.novafork.PhoneScreensTest" tests="21" skipped="0" failures="0" errors="0" timestamp="2026-10-27T14:28:34.300Z" hostname="runnervmtai0g" time="8.244">
+  <properties/>
+  <testcase name="settingsPlayer" classname="com.aakash.novafork.PhoneScreensTest" time="0.485"/>
+  <testcase name="smbDialog" classname="com.aakash.novafork.PhoneScreensTest" time="0.614"/>
+  <testcase name="libraryShows" classname="com.aakash.novafork.PhoneScreensTest" time="0.328"/>
+  <testcase name="browse" classname="com.aakash.novafork.PhoneScreensTest" time="0.274"/>
+  <testcase name="addSourceDialog" classname="com.aakash.novafork.PhoneScreensTest" time="0.343"/>
+  <testcase name="browseDir" classname="com.aakash.novafork.PhoneScreensTest" time="0.259"/>
+  <testcase name="search" classname="com.aakash.novafork.PhoneScreensTest" time="0.329"/>
+  <testcase name="searchBrowse" classname="com.aakash.novafork.PhoneScreensTest" time="0.437"/>
+  <testcase name="movieDetails" classname="com.aakash.novafork.PhoneScreensTest" time="0.847"/>
+  <testcase name="home" classname="com.aakash.novafork.PhoneScreensTest" time="0.692"/>
+  <testcase name="jellyfinDialog" classname="com.aakash.novafork.PhoneScreensTest" time="0.316"/>
+  <testcase name="library" classname="com.aakash.novafork.PhoneScreensTest" time="0.323"/>
+  <testcase name="settingsAppearance" classname="com.aakash.novafork.PhoneScreensTest" time="0.217"/>
+  <testcase name="episodeDetails" classname="com.aakash.novafork.PhoneScreensTest" time="0.517"/>
+  <testcase name="browseRemote" classname="com.aakash.novafork.PhoneScreensTest" time="0.237"/>
+  <testcase name="identifyDialog" classname="com.aakash.novafork.PhoneScreensTest" time="0.591"/>
+  <testcase name="settingsSources" classname="com.aakash.novafork.PhoneScreensTest" time="0.209"/>
+  <testcase name="settings" classname="com.aakash.novafork.PhoneScreensTest" time="0.206"/>
+  <testcase name="playlist" classname="com.aakash.novafork.PhoneScreensTest" time="0.344"/>
+  <testcase name="showDetails" classname="com.aakash.novafork.PhoneScreensTest" time="0.512"/>
+  <testcase name="homeEmpty" classname="com.aakash.novafork.PhoneScreensTest" time="0.163"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

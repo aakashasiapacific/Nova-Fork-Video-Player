@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.aakash.novafork.data.DatabaseUpgradeTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-10-27T14:28:51.601Z" hostname="runnervmtai0g" time="2.372">
+  <properties/>
+  <testcase name="firstReleasesLibraryOpensWithEverythingKept" classname="com.aakash.novafork.data.DatabaseUpgradeTest" time="2.372"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
