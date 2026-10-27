@@ -645,3 +645,13 @@ The owner asked for Apple Music to be copied more precisely, with less clutter. 
   - Numbers roll when they change (player times, Ends at, Continue Watching's time left, Now Playing's times, the sleep timer); play and pause swap with a quick shrink-and-grow, the star and bookmark pop when set, and the sleep timer's moon rises and sets.
   - Now Playing: a slow, soft glow in the cover's colours over black (still when paused or with the phone's animations off); while the scrubber is held, its point turns into a glass pill under the finger.
   - Not done: the tilt-following glass shine (owner: battery), which iOS 27 itself dropped.
+- **Build 136 (owner, follow-ups to the iOS 27 build):**
+  - Audio has Apple Music's red back (owner: blue looked colourless): the Audio tab, its play buttons, links, Library icons and the mini player's line; Video, Search and Preferences stay iOS blue.
+  - Home's Library link is "Streams and playlists".
+  - Pulling a page down no longer stretches Home's hero or a title's backdrop (the page just bounces, and a title's page still closes); the dark band that came under the status bar when a page scrolled is a soft fade now, strongest under the clock and easing out smoothly with no solid part, on Home, other pages and under shrinking titles.
+  - The glass defaults to the Tinted end of its slider (a saved setting from before is reset once).
+  - Preferences' icons are iOS 27 layered glass: a tile shading from light to deep with a sheen over its top half, the glass rim and the white glyph on its own soft shadow (the Nova Fork card's icon too).
+  - Search: the field is under the large title, as Apple TV's, and with nothing typed the library is a bare three-column poster wall, newest first, without months, dates or captions.
+  - Audio's Library list: Playlists, Favorites, then Recently Played (the songs last played, newest first, with Play and Shuffle) in place of the shelf of albums.
+  - Now Playing and the mini player share one motion: a single cover flies between them with its position, size, corners and shadow following the sheet frame for frame (and the finger), settling without a bounce.
+  - Video player: no menu behind a "⋮"; Subtitles, Audio Track, Play on TV, Queue, Shuffle, Play in Background and Play mode sit in rows under the seek bar with Fit, Pop-up, Speed, Rotate and Lock (two rows in portrait, one in landscape; the top shows only the title and Ends at), in One UI line icons; play and pause have Samsung's glyphs (a rounded triangle, two straight bars). Built from memory of One UI, so it is not yet a screenshot-exact copy.
