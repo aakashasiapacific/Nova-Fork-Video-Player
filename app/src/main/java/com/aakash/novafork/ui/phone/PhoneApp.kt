@@ -138,7 +138,6 @@ import com.aakash.novafork.ui.common.LocalMenuFocus
 import com.aakash.novafork.ui.common.LocalPagePull
 import com.aakash.novafork.ui.common.LocalTabReselect
 import com.aakash.novafork.ui.common.NovaIcon
-import com.aakash.novafork.ui.common.SoftEdgeDepth
 import com.aakash.novafork.ui.common.TabReselect
 import com.aakash.novafork.ui.common.softTopEdge
 import com.aakash.novafork.ui.common.activeColor
@@ -303,7 +302,7 @@ fun PhoneApp(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
                             // iOS 26's scroll edge: lists fade out under the clock and battery
                             // instead of running into them. Not over Home's hero, whose picture
                             // sets the status bar's own colours.
-                            val fadeEnd = statusBarTop + SoftEdgeDepth.toPx()
+                            val fadeEnd = statusBarTop + StatusEdgeDepth.toPx()
                             if (statusFade) drawRect(softTopEdge(), size = size.copy(height = fadeEnd))
                             val open = nowPlayingSheet.openFraction
                             if (open > 0f) drawRect(Color.Black.copy(alpha = 0.4f * open))
@@ -935,3 +934,10 @@ private fun rootOf(tab: TopDestination): Route = when (tab) {
 
 /** A movie, episode or show page: the pages that zoom out of the poster that opened them. */
 private fun Route.isTitlePage(): Boolean = this is Route.VideoDetails || this is Route.ShowDetails
+
+/**
+ * How far below the status bar the page's always-on soft edge runs: shallow, so a large title at
+ * the top of a page is not dimmed by it (the deeper [com.aakash.novafork.ui.common.SoftEdgeDepth]
+ * only comes in as a page scrolls).
+ */
+private val StatusEdgeDepth = 20.dp
