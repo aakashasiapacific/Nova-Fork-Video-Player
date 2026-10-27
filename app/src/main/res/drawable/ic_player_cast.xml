@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Play on TV, after One UI's Smart View: a screen with waves coming in at its corner. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path android:strokeColor="#FFFFFFFF" android:strokeWidth="1.7" android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M3.5,9.2 V8.2 A3.2,3.2 0 0 1 6.7,5 H17.3 A3.2,3.2 0 0 1 20.5,8.2 V15.8 A3.2,3.2 0 0 1 17.3,19 H13.5" />
+    <path android:strokeColor="#FFFFFFFF" android:strokeWidth="1.7" android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M3.5,14.6 A4.4,4.4 0 0 1 7.9,19" />
+    <path android:strokeColor="#FFFFFFFF" android:strokeWidth="1.7" android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M3.5,10.8 A8.2,8.2 0 0 1 11.7,19" />
+    <path android:fillColor="#FFFFFFFF" android:pathData="M3.5,19 m-1.1,0 a1.1,1.1 0 1 0 2.2,0 a1.1,1.1 0 1 0 -2.2,0 Z" />
+</vector>

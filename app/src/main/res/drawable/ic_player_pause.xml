@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Pause, after One UI's video player: two straight bars, their ends only slightly rounded. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path android:fillColor="#FFFFFFFF" android:pathData="M7.5,5.5 H9.5 A1,1 0 0 1 10.5,6.5 V17.5 A1,1 0 0 1 9.5,18.5 H7.5 A1,1 0 0 1 6.5,17.5 V6.5 A1,1 0 0 1 7.5,5.5 Z M14.5,5.5 H16.5 A1,1 0 0 1 17.5,6.5 V17.5 A1,1 0 0 1 16.5,18.5 H14.5 A1,1 0 0 1 13.5,17.5 V6.5 A1,1 0 0 1 14.5,5.5 Z" />
+</vector>

@@ -14,6 +14,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
@@ -32,6 +34,8 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.coerceAtMost
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aakash.novafork.R
@@ -42,12 +46,14 @@ import com.aakash.novafork.ui.model.PlayerActions
 import com.aakash.novafork.ui.model.PlayerUiState
 
 /**
- * Phone controls drawn after Samsung's own video player (owner's screenshots): the whole picture
- * dimmed; a bold title with repeat, CC and a vertical "⋮" at the top; previous, play/pause and
- * next on dark see-through discs in the middle; the seek bar with a big white knob; and fit,
- * pop-up, a "1.0x" speed pill, rotate and lock along the bottom. In portrait the times sit above
- * the bar and the bottom icons spread across the width. Track pickers open via [onOpenPanel];
- * the queue and cast devices via [onOpenSheet].
+ * Phone controls drawn after Samsung's own video player: the whole picture dimmed; a bold title
+ * with "Ends at" under it at the top; previous, play/pause and next on dark see-through discs in
+ * the middle; the seek bar with a big white knob; and under it every action the player has, none
+ * of them hidden in a menu (owner): fit, pop-up, a "1.0x" speed pill, rotate, lock, play mode,
+ * subtitles, audio track, play on TV, the queue, shuffle and play in background. In portrait the
+ * times sit above the bar and the icons spread over two rows; in landscape they take one row with
+ * Capture at its left. Track pickers open via [onOpenPanel]; the queue and cast devices via
+ * [onOpenSheet].
  */
 @Composable
 internal fun PhonePlayerControls(
@@ -76,9 +82,6 @@ internal fun PhonePlayerControls(
         ) {
             PhoneTopBar(
                 state = state,
-                actions = actions,
-                onOpenPanel = onOpenPanel,
-                onOpenSheet = onOpenSheet,
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .graphicsLayer { translationY = -(1f - shown()) * ControlsSlide.toPx() },
@@ -105,6 +108,7 @@ internal fun PhonePlayerControls(
                 showRemaining = showRemaining,
                 onToggleRemaining = onToggleRemaining,
                 onOpenPanel = onOpenPanel,
+                onOpenSheet = onOpenSheet,
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .onSizeChanged { onBottomBarHeightChanged(it.height) }
@@ -121,66 +125,28 @@ private val ControlsSlide = 36.dp
 private val PortraitCaptureTop = 76.dp
 
 @Composable
-private fun PhoneTopBar(
-    state: PlayerUiState,
-    actions: PlayerActions,
-    onOpenPanel: (PlayerPanel) -> Unit,
-    onOpenSheet: (PlayerSheet) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Row(
+private fun PhoneTopBar(state: PlayerUiState, modifier: Modifier = Modifier) {
+    // No back arrow, as in Samsung's player: the system back gesture closes it. What used to sit
+    // beside the title (play mode, subtitles, cast) and in the ⋮ menu is under the seek bar now.
+    Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(start = 20.dp, end = 4.dp, top = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
+            .padding(start = 20.dp, end = 20.dp, top = 12.dp),
     ) {
-        // No back arrow, as in Samsung's player: the system back gesture closes it.
-        Column(Modifier.weight(1f)) {
-            Text(
-                text = state.title,
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-                color = Color.White,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            // Apple TV's "Ends at 10:42 PM", at the speed it is playing.
-            val left = if (state.durationMs > 0L) ((state.durationMs - state.positionMs) / state.rate.coerceAtLeast(0.1f)).toLong() else null
-            rememberEndsAt(left)?.let { endsAt ->
-                // Its digits roll when the time moves (a seek, another speed).
-                RollingText(endsAt, style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.7f))
-            }
-        }
-        // Cast shows here only while casting, so where the picture went is never hidden.
-        if (state.castingTo != null) CastButton(castingTo = state.castingTo, onClick = { onOpenSheet(PlayerSheet.CAST) })
-        PlayerIconButton(icon = state.repeatMode.iconRes(), contentDescription = state.repeatMode.label, onClick = actions::cycleRepeat)
-        Box(
-            Modifier
-                .size(48.dp)
-                .clip(CircleShape)
-                .clickable(onClickLabel = "Subtitles", role = Role.Button) { onOpenPanel(PlayerPanel.SUBTITLES) },
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                "CC",
-                style = MaterialTheme.typography.titleMedium,
-                color = Color.White.copy(alpha = if (subtitlesOn(state.subtitleTracks)) 1f else 0.6f),
-            )
-        }
-        PlayerMoreMenu(
-            icon = R.drawable.ic_player_more,
-            items = buildList {
-                add(PlayerMenuItem(R.drawable.ic_audiotrack, "Audio Track") { onOpenPanel(PlayerPanel.AUDIO) })
-                if (state.castingTo == null) add(PlayerMenuItem(R.drawable.ic_cast, "Play on TV") { onOpenSheet(PlayerSheet.CAST) })
-                if (state.queue.size > 1) {
-                    add(PlayerMenuItem(R.drawable.ic_playlist_play, "Queue") { onOpenSheet(PlayerSheet.QUEUE) })
-                }
-                if (state.canShuffle) {
-                    add(PlayerMenuItem(R.drawable.ic_shuffle, if (state.shuffle) "Shuffle On" else "Shuffle Off", actions::toggleShuffle))
-                }
-                add(PlayerMenuItem(R.drawable.ic_volume_up, "Play in Background", actions::playInBackground))
-            },
+        Text(
+            text = state.title,
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold,
+            color = Color.White,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
+        // Apple TV's "Ends at 10:42 PM", at the speed it is playing.
+        val left = if (state.durationMs > 0L) ((state.durationMs - state.positionMs) / state.rate.coerceAtLeast(0.1f)).toLong() else null
+        rememberEndsAt(left)?.let { endsAt ->
+            // Its digits roll when the time moves (a seek, another speed).
+            RollingText(endsAt, style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.7f))
+        }
     }
 }
 
@@ -249,6 +215,7 @@ private fun PhoneBottomBar(
     showRemaining: Boolean,
     onToggleRemaining: () -> Unit,
     onOpenPanel: (PlayerPanel) -> Unit,
+    onOpenSheet: (PlayerSheet) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -264,50 +231,140 @@ private fun PhoneBottomBar(
             stacked = portrait,
             modifier = Modifier.fillMaxWidth(),
         )
-        Spacer(Modifier.height(if (portrait) 16.dp else 8.dp))
-        Row(
-            Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            // Landscape keeps them to the right; portrait spreads them across, as Samsung does.
-            horizontalArrangement = if (portrait) Arrangement.SpaceEvenly else Arrangement.spacedBy(8.dp, Alignment.End),
-        ) {
-            // Landscape: Samsung's Capture at the far left of the row.
-            if (!portrait && state.castingTo == null) {
-                PlayerIconButton(icon = R.drawable.ic_player_capture, contentDescription = "Capture", onClick = actions::captureFrame)
-                Spacer(Modifier.weight(1f))
+        Spacer(Modifier.height(if (portrait) 8.dp else 4.dp))
+        PlayerOptionRows(
+            options = playerOptions(state, actions, onOpenPanel, onOpenSheet),
+            // Landscape: Samsung's Capture at the far left of the row (portrait puts it under the title).
+            onCapture = if (!portrait && state.castingTo == null) actions::captureFrame else null,
+        )
+    }
+}
+
+/** One control of the rows under the seek bar: whatever it draws goes in a cell of the row. */
+private class PlayerOption(val content: @Composable () -> Unit)
+
+/**
+ * Everything the player can do besides play, pause and skip, in the order they sit under the
+ * seek bar: how the picture is shown, then what is played and where. Nothing is left out of
+ * sight in a menu (owner); queue and shuffle only show when there is a queue.
+ */
+private fun playerOptions(
+    state: PlayerUiState,
+    actions: PlayerActions,
+    onOpenPanel: (PlayerPanel) -> Unit,
+    onOpenSheet: (PlayerSheet) -> Unit,
+): List<PlayerOption> = buildList {
+    add(PlayerOption { PlayerIconButton(R.drawable.ic_player_fit, "Fit or fill: ${state.aspect.label}", actions::cycleAspect) })
+    if (state.canEnterPictureInPicture) {
+        add(PlayerOption { PlayerIconButton(R.drawable.ic_player_popup, "Pop-up play", actions::enterPictureInPicture) })
+    }
+    add(PlayerOption { SpeedPill(rate = state.rate, onClick = { onOpenPanel(PlayerPanel.SPEED) }) })
+    if (state.canRotate) {
+        add(PlayerOption { PlayerIconButton(R.drawable.ic_player_rotate, "Rotate", actions::rotate) })
+    }
+    add(PlayerOption { PlayerIconButton(R.drawable.ic_player_lock, "Lock screen", actions::toggleLock) })
+    add(PlayerOption { PlayerIconButton(state.repeatMode.iconRes(), state.repeatMode.label, actions::cycleRepeat) })
+    add(
+        PlayerOption {
+            PlayerIconButton(
+                R.drawable.ic_player_subtitles,
+                "Subtitles",
+                { onOpenPanel(PlayerPanel.SUBTITLES) },
+                tint = Color.White.copy(alpha = if (subtitlesOn(state.subtitleTracks)) 1f else 0.6f),
+            )
+        },
+    )
+    add(PlayerOption { PlayerIconButton(R.drawable.ic_player_audio, "Audio track", { onOpenPanel(PlayerPanel.AUDIO) }) })
+    add(PlayerOption { CastButton(castingTo = state.castingTo, onClick = { onOpenSheet(PlayerSheet.CAST) }) })
+    if (state.queue.size > 1) {
+        add(PlayerOption { PlayerIconButton(R.drawable.ic_player_queue, "Queue", { onOpenSheet(PlayerSheet.QUEUE) }) })
+    }
+    if (state.canShuffle) {
+        add(
+            PlayerOption {
+                PlayerToggleButton(
+                    icon = R.drawable.ic_player_shuffle,
+                    contentDescription = if (state.shuffle) "Shuffle On" else "Shuffle Off",
+                    checked = state.shuffle,
+                    onClick = actions::toggleShuffle,
+                )
+            },
+        )
+    }
+    add(PlayerOption { PlayerIconButton(R.drawable.ic_player_headphones, "Play in background", actions::playInBackground) })
+}
+
+/**
+ * The [options] under the seek bar, each in an equal cell. One wide row when every cell can keep
+ * at least [OptionCellMin] (landscape), Capture ([onCapture]) at its left; otherwise two balanced
+ * rows, centred (portrait). A cell never grows past [OptionCellMax], so nothing clips or spreads
+ * thin, whatever number of options there are.
+ */
+@Composable
+private fun PlayerOptionRows(options: List<PlayerOption>, onCapture: (() -> Unit)?, modifier: Modifier = Modifier) {
+    val capture = onCapture?.let { onClick ->
+        PlayerOption { PlayerIconButton(R.drawable.ic_player_capture, "Capture", onClick) }
+    }
+    BoxWithConstraints(modifier.fillMaxWidth()) {
+        val total = options.size + if (capture != null) 1 else 0
+        if (maxWidth / total >= OptionCellMin) {
+            val cell = (maxWidth / total).coerceAtMost(OptionCellMax)
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                if (capture != null) {
+                    OptionCell(capture, cell)
+                    Spacer(Modifier.weight(1f))
+                }
+                options.forEach { OptionCell(it, cell) }
             }
-            PlayerIconButton(icon = R.drawable.ic_player_fit, contentDescription = "Fit or fill: ${state.aspect.label}", onClick = actions::cycleAspect)
-            if (state.canEnterPictureInPicture) {
-                PlayerIconButton(icon = R.drawable.ic_player_popup, contentDescription = "Pop-up play", onClick = actions::enterPictureInPicture)
+        } else {
+            val all = listOfNotNull(capture) + options
+            val perRow = (all.size + 1) / 2
+            val cell = (maxWidth / perRow).coerceAtMost(OptionCellMax)
+            Column(Modifier.fillMaxWidth()) {
+                all.chunked(perRow).forEach { rowOptions ->
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        rowOptions.forEach { OptionCell(it, cell) }
+                    }
+                }
             }
-            SpeedPill(rate = state.rate, onClick = { onOpenPanel(PlayerPanel.SPEED) })
-            if (state.canRotate) {
-                PlayerIconButton(icon = R.drawable.ic_player_rotate, contentDescription = "Rotate", onClick = actions::rotate)
-            }
-            PlayerIconButton(icon = R.drawable.ic_player_lock, contentDescription = "Lock screen", onClick = actions::toggleLock)
         }
     }
 }
+
+@Composable
+private fun OptionCell(option: PlayerOption, width: Dp) {
+    Box(Modifier.width(width).height(OptionHeight), contentAlignment = Alignment.Center) { option.content() }
+}
+
+private val OptionCellMin = 44.dp
+private val OptionCellMax = 56.dp
+private val OptionHeight = 48.dp
 
 /** Samsung's speed button: the rate, "1.0x", small in a low grey pill, in a full-size touch target. */
 @Composable
 private fun SpeedPill(rate: Float, onClick: () -> Unit) {
     Box(
         Modifier
+            // A narrow cell lets it spill over its sides rather than squeeze the label.
+            .wrapContentWidth(Alignment.CenterHorizontally, unbounded = true)
             .height(48.dp)
             .clip(RoundedCornerShape(percent = 50))
             .clickable(onClickLabel = "Playback speed", role = Role.Button, onClick = onClick)
-            .padding(horizontal = 4.dp),
+            .padding(horizontal = 2.dp),
         contentAlignment = Alignment.Center,
     ) {
         Box(
             Modifier
                 .height(28.dp)
                 .playerGlass(RoundedCornerShape(percent = 50))
-                .padding(horizontal = 9.dp),
+                .padding(horizontal = 8.dp),
             contentAlignment = Alignment.Center,
         ) {
-            Text("%.1fx".format(rate), fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
+            Text("%.1fx".format(rate), fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Color.White, maxLines = 1, softWrap = false)
         }
     }
 }
