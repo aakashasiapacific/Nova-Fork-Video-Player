@@ -75,7 +75,6 @@ import com.aakash.novafork.ui.common.OnTabReselect
 import com.aakash.novafork.ui.common.PosterArt
 import com.aakash.novafork.ui.common.SwipeToDelete
 import com.aakash.novafork.ui.common.collapsingHeader
-import com.aakash.novafork.ui.common.glass
 import com.aakash.novafork.ui.common.largeTitle
 import com.aakash.novafork.ui.common.musicSearchResults
 import com.aakash.novafork.ui.common.rememberCollapsingTitle
@@ -119,12 +118,11 @@ fun PhoneSearchScreen(
         if (field.text.isEmpty()) focusRequester.requestFocus()
     }
 
-    // iOS 26's search: a big title on top, the field at the bottom in thumb reach, riding just
-    // above the keyboard while typing and above the tab bar otherwise.
+    // Apple TV's search (owner): a big title with the field right under it, then the results.
+    // They end above the tab bar, or above the keyboard while typing.
     val barSpace = LocalBottomBarSpace.current
     val imeBottom = WindowInsets.ime.asPaddingValues().calculateBottomPadding()
-    val fieldBottom = maxOf(imeBottom, barSpace) + 8.dp
-    val listSpace = fieldBottom + SearchFieldHeight + 8.dp
+    val listSpace = maxOf(imeBottom, barSpace)
     // Scrolling the results puts the keyboard away, so more of them show (iOS).
     val currentKeyboard by rememberUpdatedState(keyboard)
     val hideOnScroll = remember {
@@ -151,8 +149,29 @@ fun PhoneSearchScreen(
                     .stretchWithPull()
                     .largeTitle(searchTitle.state),
             )
+            // Always full width (owner: no Cancel beside it); its ✕ clears what was typed. Once
+            // the title has shrunk into the bar the field stays pinned right under it.
+            SearchField(
+                value = field,
+                onValueChange = { value ->
+                    val changed = value.text != field.text
+                    field = value
+                    if (changed) actions.search(value.text)
+                },
+                onClear = {
+                    field = TextFieldValue("")
+                    actions.search("")
+                    focusRequester.requestFocus()
+                },
+                onSearch = {
+                    actions.rememberSearch(field.text)
+                    keyboard?.hide()
+                },
+                focusRequester = focusRequester,
+                modifier = Modifier.padding(start = dims.gutter, end = dims.gutter, top = 8.dp, bottom = 12.dp),
+            )
             val query = search.query.trim()
-            // Lists end above the field; results show what was typed in bold.
+            // Results show what was typed in bold.
             CompositionLocalProvider(LocalBottomBarSpace provides listSpace, LocalSearchQuery provides field.text) {
                 when {
                     field.text.isBlank() && (search.recent.isNotEmpty() || search.browse.isNotEmpty()) -> {
@@ -162,8 +181,8 @@ fun PhoneSearchScreen(
                             actions.rememberSearch(picked)
                             keyboard?.hide()
                         }
-                        // Nothing typed (owner): every video in one long scroll, newest first,
-                        // under the month it arrived; recent searches, if any, above it.
+                        // Nothing typed (owner): Apple TV's poster wall, every video as a bare
+                        // poster in three columns, newest first; recent searches, if any, above.
                         val recent: (@Composable () -> Unit)? = if (search.recent.isEmpty()) {
                             null
                         } else {
@@ -186,7 +205,8 @@ fun PhoneSearchScreen(
                                 onForget = actions::forgetSearch,
                             )
                         } else {
-                            PhoneTimelineGrid(months = search.browse, actions = actions, header = recent)
+                            val posters = remember(search.browse) { search.browse.flatMap { it.cards } }
+                            PhoneSearchPosterGrid(cards = posters, actions = actions, header = recent)
                         }
                     }
                     field.text.isBlank() -> CenteredScrollable(Modifier.padding(bottom = listSpace)) {
@@ -232,28 +252,6 @@ fun PhoneSearchScreen(
                 focusManager.clearFocus()
             }
         }
-        // Always full width (owner: no Cancel beside it); its ✕ clears what was typed.
-        SearchField(
-            value = field,
-            onValueChange = { value ->
-                val changed = value.text != field.text
-                field = value
-                if (changed) actions.search(value.text)
-            },
-            onClear = {
-                field = TextFieldValue("")
-                actions.search("")
-                focusRequester.requestFocus()
-            },
-            onSearch = {
-                actions.rememberSearch(field.text)
-                keyboard?.hide()
-            },
-            focusRequester = focusRequester,
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(start = 20.dp, end = 20.dp, bottom = fieldBottom),
-        )
     }
 }
 
@@ -312,7 +310,10 @@ private val TopHitPosterWidth = 84.dp
 private val TopHitPosterCorner = 8.dp
 private val TopHitPadding = 12.dp
 
-/** A slim glass capsule: magnifier, one line of text (or a short hint), clear. */
+/**
+ * Apple TV's search field: a slim grey capsule (the same as Preferences') with a magnifier, one
+ * line of text (or a short hint), and a clear button.
+ */
 @Composable
 private fun SearchField(
     value: TextFieldValue,
@@ -326,11 +327,11 @@ private fun SearchField(
         modifier
             .fillMaxWidth()
             .height(SearchFieldHeight)
-            .glass(RoundedCornerShape(percent = 50))
+            .background(IosColors.GroupedCard, RoundedCornerShape(percent = 50))
             .padding(start = 16.dp, end = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        NovaIcon(R.drawable.ic_search, contentDescription = null, tint = Color.White.copy(alpha = 0.6f), modifier = Modifier.size(22.dp))
+        NovaIcon(R.drawable.ic_search, contentDescription = null, tint = IosColors.SecondaryLabel, modifier = Modifier.size(22.dp))
         Box(
             Modifier
                 .weight(1f)
@@ -342,7 +343,7 @@ private fun SearchField(
                 Text(
                     "Movies, music and more",
                     style = MaterialTheme.typography.bodyLarge,
-                    color = Color.White.copy(alpha = 0.45f),
+                    color = IosColors.SecondaryLabel,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -368,7 +369,7 @@ private fun SearchField(
     }
 }
 
-private val SearchFieldHeight = 52.dp
+private val SearchFieldHeight = 48.dp
 
 /**
  * iOS's recent searches as a page of their own: a header with Clear, then each search, tap to run

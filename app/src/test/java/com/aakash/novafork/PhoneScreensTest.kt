@@ -79,6 +79,9 @@ class PhoneScreensTest {
 
     @Test fun search() = capture("search", FakeScreens.search("pa"))
 
+    /** Nothing typed: the field under the title, then Apple TV's wall of bare posters. */
+    @Test fun searchBrowse() = capture("search_browse", FakeScreens.search(""))
+
     @Test fun playlist() = capture("playlist", FakeScreens.playlist(SEVERANCE_REWATCH))
 
     @Test fun settings() = capture("settings", FakeScreens.settingsPage())

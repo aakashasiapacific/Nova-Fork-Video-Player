@@ -63,6 +63,8 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -160,7 +162,8 @@ internal fun SourceType.iconRes(): Int = when (this) {
 
 /**
  * 2:3 poster with the watched badge and progress on the art, then title and subtitle. No rating
- * on posters: Apple TV keeps it for the title's own page (owner).
+ * on posters: Apple TV keeps it for the title's own page (owner). With [bare] it is the poster
+ * alone, nothing written under it (Search's wall), and is read out by its title instead.
  */
 @Composable
 private fun PosterCardLayout(
@@ -172,6 +175,7 @@ private fun PosterCardLayout(
     progress: Float?,
     watched: Boolean,
     onLongClick: (() -> Unit)?,
+    bare: Boolean = false,
 ) {
     val dims = LocalNovaDimens.current
     val shape = RoundedCornerShape(dims.cardRadius)
@@ -181,7 +185,8 @@ private fun PosterCardLayout(
         modifier
             .pressScale(press, pressed = CardPressScale)
             .clip(shape)
-            .combinedClickable(interactionSource = press, indication = null, onClick = onClick, onLongClick = onLongClick),
+            .combinedClickable(interactionSource = press, indication = null, onClick = onClick, onLongClick = onLongClick)
+            .then(if (bare) Modifier.semantics(mergeDescendants = true) { contentDescription = title } else Modifier),
     ) {
         Box(
             Modifier
@@ -195,22 +200,24 @@ private fun PosterCardLayout(
             if (watched) WatchedBadge(Modifier.align(Alignment.TopEnd).padding(6.dp))
             ProgressStrip(progress, Modifier.align(Alignment.BottomStart))
         }
-        Spacer(Modifier.height(8.dp))
-        Text(
-            text = searchHighlighted(title),
-            style = MaterialTheme.typography.titleSmall,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-        )
-        // Always present so cards in a row or grid line up.
-        Text(
-            text = subtitle.orEmpty(),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-        )
-        Spacer(Modifier.height(4.dp))
+        if (!bare) {
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = searchHighlighted(title),
+                style = MaterialTheme.typography.titleSmall,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            // Always present so cards in a row or grid line up.
+            Text(
+                text = subtitle.orEmpty(),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Spacer(Modifier.height(4.dp))
+        }
     }
 }
 
@@ -221,6 +228,7 @@ internal fun PhonePosterCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     onLongClick: (() -> Unit)? = null,
+    bare: Boolean = false,
 ) {
     PosterCardLayout(
         title = card.displayTitle(),
@@ -231,6 +239,7 @@ internal fun PhonePosterCard(
         progress = card.progress,
         watched = card.watched,
         onLongClick = onLongClick,
+        bare = bare,
     )
 }
 
@@ -609,14 +618,12 @@ internal fun PhoneTimelineGrid(
     actions: AppActions,
     modifier: Modifier = Modifier,
     state: LazyGridState = rememberLazyGridState(),
-    /** Full-width content above the first month (Search's recent searches). */
-    header: (@Composable () -> Unit)? = null,
 ) {
     val dims = LocalNovaDimens.current
     val seen = remember { mutableSetOf<Any>() }
     // Where each month's heading sits in the grid, to know which month is under the top edge.
-    val headings = remember(months, header != null) {
-        var index = if (header != null) 1 else 0
+    val headings = remember(months) {
+        var index = 0
         months.map { month -> index.also { index += 1 + month.cards.size } }
     }
     Box(modifier.fillMaxSize()) {
@@ -628,7 +635,6 @@ internal fun PhoneTimelineGrid(
             horizontalArrangement = Arrangement.spacedBy(dims.rowSpacing),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            if (header != null) item(key = "header", span = { GridItemSpan(maxLineSpan) }) { header() }
             months.forEach { month ->
                 item(key = "month:" + month.title, span = { GridItemSpan(maxLineSpan) }) {
                     Text(
@@ -649,6 +655,43 @@ internal fun PhoneTimelineGrid(
         PinnedMonth(months, headings, state)
     }
 }
+
+/**
+ * Search's poster wall, as Apple TV's Search tab draws it (owner): the videos as three columns of
+ * bare posters in the order given (newest first), no headings and nothing written under them,
+ * each read out by its title. Tap opens the video, a long press its menu. [header] goes above the
+ * first row, full width (the recent searches).
+ */
+@Composable
+internal fun PhoneSearchPosterGrid(
+    cards: List<VideoCardUi>,
+    actions: AppActions,
+    modifier: Modifier = Modifier,
+    state: LazyGridState = rememberLazyGridState(),
+    header: (@Composable () -> Unit)? = null,
+) {
+    val dims = LocalNovaDimens.current
+    val seen = remember { mutableSetOf<Any>() }
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(SearchWallColumns),
+        modifier = modifier.fillMaxSize().iosScrollIndicator(state),
+        state = state,
+        contentPadding = PaddingValues(start = dims.gutter, end = dims.gutter, top = 0.dp, bottom = EndOfListGap + LocalBottomBarSpace.current),
+        horizontalArrangement = Arrangement.spacedBy(SearchWallGap),
+        verticalArrangement = Arrangement.spacedBy(SearchWallGap),
+    ) {
+        if (header != null) item(key = "header", span = { GridItemSpan(maxLineSpan) }) { header() }
+        itemsIndexed(cards, key = { _, card -> "v:" + card.id }) { index, card ->
+            val appear = Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null).staggeredAppear("v:" + card.id, index, seen)
+            VideoMenuBox(videoId = card.id, title = card.displayTitle(), actions = actions, showDetails = false, modifier = appear) { openMenu ->
+                PhonePosterCard(card, onClick = { actions.openVideo(card.id) }, onLongClick = openMenu, bare = true)
+            }
+        }
+    }
+}
+
+private const val SearchWallColumns = 3
+private val SearchWallGap = 10.dp
 
 /**
  * The month being scrolled through stays pinned at the top, as Photos does; the next month's
