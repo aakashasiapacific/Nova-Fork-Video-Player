@@ -845,15 +845,13 @@ fun CollapsedTitleBar(visible: Boolean, title: String, modifier: Modifier = Modi
     ScrollEdgeTitleBar(title = title, showTitle = visible, edge = { edge }, modifier = modifier)
 }
 
-/** iOS 26's press: the button shrinks a little while held and springs back on release. */
+/**
+ * The press (owner: snappy, like ChatGPT's app): nothing moves; the flat grey highlight of the
+ * row or button is the whole feedback. Kept so call sites stay as they are.
+ */
+@Suppress("UNUSED_PARAMETER")
 @Composable
-fun Modifier.pressScale(source: InteractionSource, pressed: Float = 0.94f): Modifier {
-    val down by source.collectIsPressedAsState()
-    val scale by animateFloatAsState(if (down) pressed else 1f, spring(dampingRatio = 0.6f, stiffness = 700f), label = "pressScale")
-    return graphicsLayer {
-        scaleX = scale
-        scaleY = scale
-    }
+fun Modifier.pressScale(source: InteractionSource, pressed: Float = 0.94f): Modifier = this
 }
 
 /**

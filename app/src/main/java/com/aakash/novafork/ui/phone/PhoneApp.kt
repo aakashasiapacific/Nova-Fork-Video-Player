@@ -5,6 +5,7 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.SeekableTransitionState
@@ -333,7 +334,7 @@ fun PhoneApp(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
                     routeTransition.AnimatedContent(
                         modifier = Modifier.fillMaxSize(),
                         transitionSpec = {
-                            val fade = fadeIn(tween(durationMillis = 220, delayMillis = 40)) togetherWith fadeOut(tween(durationMillis = 140))
+                            val fade = fadeIn(tween(durationMillis = 150)) togetherWith fadeOut(tween(durationMillis = 90))
                             val from = initialState
                             val to = targetState
                             when {
@@ -360,13 +361,13 @@ fun PhoneApp(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
                                 from.top != to.top -> tabSlide(from = from.top, to = to.top, fade = fade)
                                 to.isTitlePage() && to != from -> {
                                     val origin = tapOrigin.also { zoomOrigins[to] = it }
-                                    (scaleIn(spring(dampingRatio = 0.86f, stiffness = 380f), initialScale = 0.2f, transformOrigin = origin) + fadeIn(tween(160))) togetherWith
-                                        (fadeOut(tween(220)) + scaleOut(tween(300), targetScale = 0.94f))
+                                    (scaleIn(tween(200, easing = FastOutSlowInEasing), initialScale = 0.2f, transformOrigin = origin) + fadeIn(tween(120))) togetherWith
+                                        (fadeOut(tween(150)) + scaleOut(tween(200), targetScale = 0.94f))
                                 }
                                 from.isTitlePage() && !to.isTitlePage() -> {
                                     val origin = zoomOrigins[from] ?: TransformOrigin.Center
-                                    (fadeIn(tween(220)) + scaleIn(tween(300), initialScale = 0.94f)) togetherWith
-                                        (scaleOut(tween(260), targetScale = 0.2f, transformOrigin = origin) + fadeOut(tween(220, delayMillis = 60)))
+                                    (fadeIn(tween(150)) + scaleIn(tween(200), initialScale = 0.94f)) togetherWith
+                                        (scaleOut(tween(200), targetScale = 0.2f, transformOrigin = origin) + fadeOut(tween(160, delayMillis = 40)))
                                 }
                                 else -> fade
                             }
@@ -737,7 +738,7 @@ private fun PhoneNavigationBar(
                                 if (!active) haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                 scope.launch {
                                     bounce.snapTo(TabBounceFrom)
-                                    bounce.animateTo(1f, spring(dampingRatio = 0.4f, stiffness = 600f))
+                                    bounce.animateTo(1f, tween(140))
                                 }
                                 onSelect(tab)
                             },

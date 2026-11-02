@@ -286,8 +286,8 @@ fun AudioContent(
             .graphicsLayer { translationX = backSwipe * 0.6f },
         transitionSpec = {
             val forward = targetState != HOME && (initialState == HOME || targetState.length >= initialState.length)
-            (slideInHorizontally(tween(260)) { if (forward) it / 4 else -it / 4 } + fadeIn(tween(220))) togetherWith
-                (slideOutHorizontally(tween(260)) { if (forward) -it / 4 else it / 4 } + fadeOut(tween(160)))
+            (slideInHorizontally(tween(180)) { if (forward) it / 4 else -it / 4 } + fadeIn(tween(150))) togetherWith
+                (slideOutHorizontally(tween(180)) { if (forward) -it / 4 else it / 4 } + fadeOut(tween(100)))
         },
         label = "audioPage",
     ) { shown ->

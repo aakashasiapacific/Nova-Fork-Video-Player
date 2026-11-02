@@ -329,6 +329,6 @@ internal fun tabSlide(from: TopDestination, to: TopDestination, fade: ContentTra
     val tabs = TopDestination.entries
     if (from == to) return fade
     val direction = if (tabs.indexOf(to) > tabs.indexOf(from)) 1 else -1
-    return (slideInHorizontally(tween(280)) { it * direction / 4 } + fadeIn(tween(220))) togetherWith
-        (slideOutHorizontally(tween(280)) { -it * direction / 4 } + fadeOut(tween(160)))
+    return (slideInHorizontally(tween(180)) { it * direction / 4 } + fadeIn(tween(150))) togetherWith
+        (slideOutHorizontally(tween(180)) { -it * direction / 4 } + fadeOut(tween(100)))
 }
