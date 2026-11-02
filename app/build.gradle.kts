@@ -53,7 +53,9 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            // R8 (owner: snappier): Compose and the app are optimised; see proguard-rules.pro.
+            isMinifyEnabled = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             signingConfig = signingConfigs.getByName("release")
         }
         debug {
