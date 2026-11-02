@@ -242,6 +242,8 @@ data class VideoDetailsUi(
     val collectionName: String? = null,
     /** Those films, this one included, oldest first. */
     val collection: List<VideoCardUi> = emptyList(),
+    /** On a share or media server the app can copy it from into Movies/Nova Fork. */
+    val downloadable: Boolean = false,
 )
 
 @Immutable

@@ -11,6 +11,7 @@ import com.aakash.novafork.data.db.SourceType
 import com.aakash.novafork.data.music.MusicLibrary
 import com.aakash.novafork.data.music.MusicLibraryData
 import com.aakash.novafork.data.music.MusicSearch
+import com.aakash.novafork.download.VideoDownloads
 import com.aakash.novafork.ui.model.Artwork
 import com.aakash.novafork.ui.model.BrowseDirUi
 import com.aakash.novafork.ui.model.BrowseUi
@@ -374,6 +375,7 @@ object UiMappers {
             isMatched = meta != null,
             starring = meta?.castNames.nonBlank(),
             directedBy = meta?.directors.nonBlank(),
+            downloadable = item.kind != MediaKind.STREAM && VideoDownloads.canDownload(item.source?.type),
         ).let { details ->
             val collection = if (isMovie) collectionOf(index, meta) else emptyList()
             if (collection.size < 2) {
