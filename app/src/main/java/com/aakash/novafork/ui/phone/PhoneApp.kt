@@ -594,6 +594,11 @@ private fun PhonePage(state: AppUiState, actions: AppActions) {
             actions = actions,
             modifier = pageModifier,
         )
+        Route.History -> PhoneHistoryScreen(
+            entries = state.home.history,
+            actions = actions,
+            modifier = pageModifier,
+        )
         is Route.Playlist -> PhonePlaylistScreen(
             playlist = state.playlist?.takeIf { it.id == route.playlistId },
             actions = actions,

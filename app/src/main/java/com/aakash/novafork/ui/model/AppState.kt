@@ -37,6 +37,9 @@ sealed interface Route {
     /** Everything left partway, from Home's "Continue Watching ›". */
     data object ContinueWatching : Route
 
+    /** Every video played, newest first, from Home's Library list. */
+    data object History : Route
+
     /** One section of Preferences on its own page (phone), as iOS Settings opens its rows. */
     data class SettingsPage(val section: String) : Route
 }
@@ -44,7 +47,7 @@ sealed interface Route {
 /** The tab a route belongs to (for highlighting the nav bar / rail). */
 val Route.top: TopDestination
     get() = when (this) {
-        Route.Home, Route.Library, Route.ContinueWatching, is Route.VideoDetails, is Route.ShowDetails, is Route.Playlist ->
+        Route.Home, Route.Library, Route.ContinueWatching, Route.History, is Route.VideoDetails, is Route.ShowDetails, is Route.Playlist ->
             TopDestination.VIDEO
         // Sources are under Settings.
         Route.Browse, is Route.BrowseDir, Route.Settings, is Route.SettingsPage -> TopDestination.SETTINGS
@@ -270,6 +273,8 @@ data class AppUiState(
     val previewKey: String? = null,
     /** The playlist being shown (route Playlist); null while it loads or after it was deleted. */
     val playlist: PlaylistDetailsUi? = null,
+    /** The History page (route History): played videos by day, newest first. */
+    val history: List<HistoryDayUi> = emptyList(),
     val search: SearchUi = SearchUi(),
     val settings: SettingsUi = SettingsUi(),
     val scan: ScanUi = ScanUi(),
@@ -313,6 +318,9 @@ interface AppActions {
     fun rememberSearch(query: String) {}
 
     fun clearRecentSearches() {}
+
+    /** Takes a video off the History page only (files, resume and watched state stay); a later play brings it back. */
+    fun hideFromHistory(videoId: Long, playedAt: Long) {}
 
     /** Takes one search out of the recent searches (swiped away). */
     fun forgetSearch(query: String) {}

@@ -44,6 +44,7 @@ fun HomeLibraryLinks(actions: AppActions, modifier: Modifier = Modifier, counts:
             actions.openLibrary(LibraryFilter.ALL)
             actions.setLibrarySort(LibrarySort.TITLE)
         }
+        LibraryLink(R.drawable.ic_history, "History") { actions.navigate(Route.History) }
         LibraryLink(R.drawable.ic_language, "Streams and playlists", last = true) { actions.navigate(Route.Browse) }
     }
 }

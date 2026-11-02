@@ -1,4 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Nova Fork</string>
+    <string name="widget_continue_description">Pick up the video you left off, with how far you got.</string>
+    <string name="widget_continue_empty">Nothing to continue</string>
+    <string name="widget_now_playing_description">The song playing, with play, pause and next.</string>
+    <string name="widget_now_playing_idle">Not Playing</string>
+    <string name="widget_play">Play</string>
+    <string name="widget_next">Next</string>
 </resources>

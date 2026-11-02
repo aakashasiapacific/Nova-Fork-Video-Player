@@ -53,6 +53,7 @@ import com.aakash.novafork.ui.model.Route
 import com.aakash.novafork.ui.model.TopDestination
 import com.aakash.novafork.ui.model.top
 import com.aakash.novafork.ui.phone.PhoneContinueWatchingScreen
+import com.aakash.novafork.ui.phone.PhoneHistoryScreen
 import com.aakash.novafork.ui.settings.SettingsScreen
 
 /**
@@ -169,6 +170,11 @@ private fun TabletPage(state: AppUiState, actions: AppActions, layout: DeviceLay
         )
         Route.ContinueWatching -> PhoneContinueWatchingScreen(
             cards = state.home.continueWatching,
+            actions = actions,
+            modifier = pageModifier,
+        )
+        Route.History -> PhoneHistoryScreen(
+            entries = state.home.history,
             actions = actions,
             modifier = pageModifier,
         )

@@ -21,6 +21,7 @@ import com.aakash.novafork.player.PlaybackArtwork
 import com.aakash.novafork.player.PlaybackSession
 import com.aakash.novafork.ui.model.Artwork
 import com.aakash.novafork.ui.model.PlayerUiState
+import com.aakash.novafork.widget.NowPlayingWidget
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -96,6 +97,8 @@ class MusicService : Service() {
         artworkLoader = PlaybackArtwork(this, graph.imageLoader)
         createChannel()
         session = PlaybackSession(this, openAppIntent, controls, seekButtons = false)
+        // The home-screen Now Playing widget follows the player while the service runs.
+        NowPlayingWidget.follow(this, player.state, scope)
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -374,9 +377,9 @@ class MusicService : Service() {
         private const val REQUEST_OPEN = 1
         private const val REQUEST_ACTION = 2
 
-        private const val ACTION_PLAY = "com.aakash.novafork.music.PLAY"
-        private const val ACTION_PAUSE = "com.aakash.novafork.music.PAUSE"
-        private const val ACTION_NEXT = "com.aakash.novafork.music.NEXT"
+        internal const val ACTION_PLAY = "com.aakash.novafork.music.PLAY"
+        internal const val ACTION_PAUSE = "com.aakash.novafork.music.PAUSE"
+        internal const val ACTION_NEXT = "com.aakash.novafork.music.NEXT"
         private const val ACTION_PREVIOUS = "com.aakash.novafork.music.PREVIOUS"
         private const val ACTION_STOP = "com.aakash.novafork.music.STOP"
 

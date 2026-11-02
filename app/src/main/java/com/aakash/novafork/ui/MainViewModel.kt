@@ -127,10 +127,15 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
         /** Folders of network sources (other than SMB) listed live, most recently updated last. */
         val listings: Map<ListingKey, RemoteListing> = emptyMap(),
         val recentSearches: List<String> = emptyList(),
+        /** Videos taken off the History page, each with the lastPlayedAt it was hidden at. */
+        val historyHidden: Map<Long, Long> = emptyMap(),
     )
 
     /** Search's recent searches, kept across launches (they never leave the device). */
     private val searchPrefs = app.getSharedPreferences("search_history", android.content.Context.MODE_PRIVATE)
+
+    /** History's hidden videos (video id to when it had last been played); only the list is hidden, never a file. */
+    private val historyPrefs = app.getSharedPreferences("history_hidden", android.content.Context.MODE_PRIVATE)
 
     private val local = MutableStateFlow(
         LocalState(
@@ -138,6 +143,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
             allFilesAccess = StoragePermissions.hasAllFilesAccess(app),
             crashReport = CrashReporter.pending(app),
             recentSearches = searchPrefs.getString(KEY_RECENT_SEARCHES, null)?.split('\n')?.filter { it.isNotBlank() }.orEmpty(),
+            historyHidden = readHistoryHidden(),
         ),
     )
 
@@ -333,6 +339,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
             videoDetails = videoId?.let { UiMappers.videoDetails(index, it) },
             showDetails = showKey?.let { UiMappers.showDetails(index, it) },
             previewKey = previewKey,
+            history = if (route == Route.History) UiMappers.history(index, user.historyHidden) else emptyList(),
             playlist = openPlaylist?.let { UiMappers.playlistDetails(index, it.id, it.name, lists.openVideoIds) },
             search = searchMemo[Triple(index, user.query, music)].copy(recent = user.recentSearches),
             settings = SettingsUi(
@@ -450,6 +457,18 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
 
     override fun search(query: String) {
         local.update { it.copy(query = query) }
+    }
+
+    private fun readHistoryHidden(): Map<Long, Long> =
+        historyPrefs.all.mapNotNull { (key, value) ->
+            val id = key.toLongOrNull() ?: return@mapNotNull null
+            val at = value as? Long ?: return@mapNotNull null
+            id to at
+        }.toMap()
+
+    override fun hideFromHistory(videoId: Long, playedAt: Long) {
+        local.update { it.copy(historyHidden = it.historyHidden + (videoId to playedAt)) }
+        historyPrefs.edit().putLong(videoId.toString(), playedAt).apply()
     }
 
     override fun rememberSearch(query: String) {

@@ -40,6 +40,7 @@ import com.aakash.novafork.ui.common.LocalStatusBarIcons
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.DialogUi
 import com.aakash.novafork.ui.model.TopDestination
+import com.aakash.novafork.widget.ContinueWatchingWidget
 import java.time.LocalDate
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.distinctUntilChangedBy
@@ -173,12 +174,17 @@ class MainActivity : ComponentActivity() {
             }
         }
         lifecycleScope.launch {
-            // The app icon's "Continue" shortcut follows the first Continue Watching video.
+            // The app icon's "Continue" shortcut and the home-screen widget follow the first Continue Watching video.
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.state
                     .map { it.home.continueWatching.firstOrNull() }
-                    .distinctUntilChangedBy { card -> card?.let { it.id to it.title } }
-                    .collect { card -> withContext(Dispatchers.Default) { AppShortcuts.update(this@MainActivity, card) } }
+                    .distinctUntilChangedBy { card -> card?.let { Triple(it.id, it.title, it.progress) } }
+                    .collect { card ->
+                        withContext(Dispatchers.Default) {
+                            AppShortcuts.update(this@MainActivity, card)
+                            ContinueWatchingWidget.update(this@MainActivity, card)
+                        }
+                    }
             }
         }
         if (savedInstanceState == null) openShortcut(intent)

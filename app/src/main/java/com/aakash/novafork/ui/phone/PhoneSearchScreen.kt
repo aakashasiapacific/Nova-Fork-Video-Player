@@ -2,6 +2,7 @@ package com.aakash.novafork.ui.phone
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,6 +22,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -70,6 +72,7 @@ import com.aakash.novafork.ui.common.IosIconButton
 import com.aakash.novafork.ui.common.IosTextButton
 import com.aakash.novafork.ui.common.LocalBottomBarSpace
 import com.aakash.novafork.ui.common.LocalSearchQuery
+import com.aakash.novafork.ui.common.NovaChip
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.OnTabReselect
 import com.aakash.novafork.ui.common.PosterArt
@@ -83,6 +86,7 @@ import com.aakash.novafork.ui.common.stretchWithPull
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.Artwork
 import com.aakash.novafork.ui.model.LibraryItemUi
+import com.aakash.novafork.ui.model.MediaKind
 import com.aakash.novafork.ui.model.SearchUi
 import kotlin.math.abs
 
@@ -100,6 +104,10 @@ fun PhoneSearchScreen(
         mutableStateOf(TextFieldValue(search.query, TextRange(search.query.length)))
     }
     val focusRequester = remember { FocusRequester() }
+    // Which kind of result the chips under the field show; All again once the field is emptied.
+    var filter by remember { mutableStateOf(SearchFilter.ALL) }
+    val fieldBlank = field.text.isBlank()
+    LaunchedEffect(fieldBlank) { if (fieldBlank) filter = SearchFilter.ALL }
     // Leaving Search with results on screen keeps the query in the recent searches, as iOS does
     // once a search has been used.
     val latest by rememberUpdatedState(field.text to !search.isEmpty)
@@ -170,7 +178,27 @@ fun PhoneSearchScreen(
                 focusRequester = focusRequester,
                 modifier = Modifier.padding(start = dims.gutter, end = dims.gutter, top = 8.dp, bottom = 12.dp),
             )
+            if (!fieldBlank) {
+                // All, Movies, Shows and Songs, as in the TV and Music apps' search.
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState())
+                        .padding(start = dims.gutter, end = dims.gutter, bottom = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    SearchFilter.entries.forEach { option ->
+                        NovaChip(
+                            selected = filter == option,
+                            onClick = { filter = option },
+                            label = { Text(option.label) },
+                        )
+                    }
+                }
+            }
             val query = search.query.trim()
+            val shown = remember(search.results, filter) { search.results.filter(filter::accepts) }
+            val showMusic = filter == SearchFilter.ALL || filter == SearchFilter.SONGS
             // Results show what was typed in bold.
             CompositionLocalProvider(LocalBottomBarSpace provides listSpace, LocalSearchQuery provides field.text) {
                 when {
@@ -223,18 +251,27 @@ fun PhoneSearchScreen(
                             body = "Nothing in your library matches “$query”.",
                         )
                     }
+                    shown.isEmpty() && !(showMusic && search.hasMusic) -> CenteredScrollable(Modifier.padding(bottom = listSpace)) {
+                        EmptyState(
+                            icon = R.drawable.ic_search,
+                            title = "No Results",
+                            body = "No ${filter.label.lowercase()} match “$query”.",
+                        )
+                    }
                     else -> {
                         // Apple Music's Top Hit: the best match first, larger, then the rest.
-                        val topHit = search.results.firstOrNull()
+                        val topHit = shown.firstOrNull()
                         PhoneLibraryGrid(
-                            items = search.results.drop(1),
+                            items = shown.drop(1),
                             actions = actions,
                             header = {
                                 if (topHit != null) {
                                     item(key = "top:" + topHit.key, span = { GridItemSpan(maxLineSpan) }) { TopHit(topHit, actions) }
                                 }
                             },
-                            footer = { musicSearchResults(search) { actions.playMusic(it.songIds, it.startIndex) } },
+                            footer = {
+                                if (showMusic) musicSearchResults(search) { actions.playMusic(it.songIds, it.startIndex) }
+                            },
                         )
                     }
                 }
@@ -252,6 +289,23 @@ fun PhoneSearchScreen(
                 focusManager.clearFocus()
             }
         }
+    }
+}
+
+/** The chips under the search field: what kind of result is shown. */
+private enum class SearchFilter(val label: String) {
+    ALL("All"),
+    MOVIES("Movies"),
+    SHOWS("Shows"),
+    SONGS("Songs"),
+    ;
+
+    /** Whether a video or show result belongs to this filter (Songs are music, which is handled apart). */
+    fun accepts(item: LibraryItemUi): Boolean = when (this) {
+        ALL -> true
+        MOVIES -> item is LibraryItemUi.Video && item.card.kind != MediaKind.EPISODE
+        SHOWS -> item is LibraryItemUi.Show || (item is LibraryItemUi.Video && item.card.kind == MediaKind.EPISODE)
+        SONGS -> false
     }
 }
 
