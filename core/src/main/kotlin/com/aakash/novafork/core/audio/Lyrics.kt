@@ -1,7 +1,13 @@
 package com.aakash.novafork.core.audio
 
-/** One line of lyrics. [timeMs] is null for lyrics without timing (a plain text file or tag). */
-data class LyricLine(val timeMs: Long?, val text: String)
+/**
+ * One line of lyrics. [timeMs] is null for lyrics without timing (a plain text file or tag).
+ * [words]: when each word starts being sung, for enhanced LRC; empty otherwise.
+ */
+data class LyricLine(val timeMs: Long?, val text: String, val words: List<LyricWord> = emptyList())
+
+/** One sung word of an enhanced-LRC line: from [timeMs], the characters [start] until [end] of its text. */
+data class LyricWord(val timeMs: Long, val start: Int, val end: Int)
 
 /** A song's lyrics. [synced]: every line has a time, sorted, so the playing line can be followed. */
 data class Lyrics(val lines: List<LyricLine>, val synced: Boolean) {
@@ -33,7 +39,7 @@ data class Lyrics(val lines: List<LyricLine>, val synced: Boolean) {
  * Reads .lrc lyrics: "[mm:ss.xx]text" lines, with any number of time tags in front of one text
  * ("[00:12.00][01:30.00]chorus"), "[mm:ss]" and "[mm:ss:xx]" spellings, an "[offset:±ms]" tag
  * (positive = the lyrics come sooner) and enhanced-LRC word times ("<00:12.34>word"), which are
- * dropped. Other tags ([ar:], [ti:], [al:], [by:], [length:] …) are skipped. A file without any
+ * taken out of the text and kept as the line's [LyricLine.words]. Other tags ([ar:], [ti:], [al:], [by:], [length:] …) are skipped. A file without any
  * time tag is read as plain lyrics, one line per line. Parsed by hand rather than with regexes:
  * Android's regex engine rejects patterns the JVM accepts, and these brackets are everywhere.
  */
@@ -41,7 +47,7 @@ object LrcParser {
     fun parse(text: String): Lyrics {
         val rawLines = text.removePrefix("﻿").lines()
         var offsetMs = 0L
-        val timed = ArrayList<Pair<Long, String>>()
+        val timed = ArrayList<Triple<Long, String, List<LyricWord>>>()
         val plain = ArrayList<String>()
         for (raw in rawLines) {
             val line = raw.trim()
@@ -72,14 +78,25 @@ object LrcParser {
             }
             if (stamps.isNotEmpty()) {
                 val lyric = stripWordTimes(rest).trim()
-                for (stamp in stamps) timed += stamp to lyric
+                val words = wordTimes(rest, lyric)
+                // A line sung again later ([00:12][01:30]) keeps its words' timing from each start.
+                for (stamp in stamps) {
+                    val shift = stamp - stamps[0]
+                    timed += Triple(stamp, lyric, if (shift == 0L) words else words.map { it.copy(timeMs = it.timeMs + shift) })
+                }
             } else if (!isTagLine) {
                 plain += stripWordTimes(line).trim()
             }
         }
         if (timed.isNotEmpty()) {
             val lines = timed
-                .map { (time, lyric) -> LyricLine((time - offsetMs).coerceAtLeast(0L), lyric) }
+                .map { (time, lyric, words) ->
+                    LyricLine(
+                        (time - offsetMs).coerceAtLeast(0L),
+                        lyric,
+                        words.map { it.copy(timeMs = (it.timeMs - offsetMs).coerceAtLeast(0L)) },
+                    )
+                }
                 .sortedBy { it.timeMs }
             return Lyrics(lines, synced = true)
         }
@@ -115,6 +132,48 @@ object LrcParser {
         if (seconds >= 60 || (values.size == 3 && minutes >= 60)) return null
         val fractionMs = fraction?.let { (it + "00").take(3).toLong() } ?: 0L
         return ((hours * 60 + minutes) * 60 + seconds) * 1000 + fractionMs
+    }
+
+    /**
+     * The enhanced-LRC word times of [raw] (a line's text after its time tags), each placed on
+     * its word in [text] (the same line with the times taken out); empty for a line without them.
+     */
+    private fun wordTimes(raw: String, text: String): List<LyricWord> {
+        if ('<' !in raw) return emptyList()
+        val words = ArrayList<LyricWord>()
+        var cursor = 0
+        var time: Long? = null
+        val piece = StringBuilder()
+        fun flush() {
+            val start = time
+            val word = piece.toString().trim()
+            piece.setLength(0)
+            if (start == null || word.isEmpty()) return
+            val at = text.indexOf(word, cursor)
+            if (at < 0) return
+            words += LyricWord(start, at, at + word.length)
+            cursor = at + word.length
+        }
+        var i = 0
+        while (i < raw.length) {
+            val c = raw[i]
+            if (c == '<') {
+                val close = raw.indexOf('>', i + 1)
+                if (close > i) {
+                    val stamp = parseTime(raw.substring(i + 1, close))
+                    if (stamp != null) {
+                        flush()
+                        time = stamp
+                        i = close + 1
+                        continue
+                    }
+                }
+            }
+            piece.append(c)
+            i++
+        }
+        flush()
+        return words
     }
 
     /** Drops enhanced-LRC word times ("<00:12.34>"); other angle brackets stay. */

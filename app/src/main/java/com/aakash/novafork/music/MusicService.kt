@@ -12,7 +12,9 @@ import android.graphics.Bitmap
 import android.graphics.drawable.Icon
 import android.os.Build
 import android.os.IBinder
+import android.os.SystemClock
 import android.util.Log
+import androidx.annotation.RequiresApi
 import com.aakash.novafork.NovaApp
 import com.aakash.novafork.R
 import com.aakash.novafork.player.PlaybackArtwork
@@ -30,7 +32,9 @@ import kotlinx.coroutines.launch
  * Keeps music playing while the app is in the background: a foreground service with a
  * MediaStyle notification (previous, play/pause, next, close) and a media session for the lock
  * screen, headsets and cars. It follows [MusicPlayer]: in the foreground while a song plays, a
- * dismissible notification while paused, gone once the queue is closed.
+ * dismissible notification while paused, gone once the queue is closed. While a sleep timer runs,
+ * Android 16 and later also show it as a Live Update: a promoted notification counting down to
+ * when the music stops, with its progress, and the minutes left in the status bar's chip.
  */
 class MusicService : Service() {
 
@@ -59,6 +63,9 @@ class MusicService : Service() {
     private var artUri: String? = null
     private var artwork: Bitmap? = null
     private var artworkJob: Job? = null
+
+    /** The sleep timer's Live Update as posted: its end and the minutes it showed; null when none. */
+    private var sleepPosted: Pair<Long, Long>? = null
 
     private val openAppIntent: PendingIntent by lazy {
         val launch = packageManager.getLaunchIntentForPackage(packageName) ?: Intent()
@@ -124,6 +131,7 @@ class MusicService : Service() {
         foreground = false
         notificationManager.cancel(NOTIFICATION_ID)
         posted = null
+        cancelSleepUpdate()
         stopSelf()
     }
 
@@ -135,6 +143,7 @@ class MusicService : Service() {
         if (foreground) stopForeground(STOP_FOREGROUND_REMOVE)
         foreground = false
         notificationManager.cancel(NOTIFICATION_ID)
+        cancelSleepUpdate()
         super.onDestroy()
     }
 
@@ -152,6 +161,7 @@ class MusicService : Service() {
             active = state.active,
             artwork = artwork,
         )
+        syncSleepUpdate(state)
         when {
             !state.active -> {
                 if (foreground) stopForeground(STOP_FOREGROUND_REMOVE)
@@ -174,6 +184,60 @@ class MusicService : Service() {
                 post(content(ongoing = false))
             }
         }
+    }
+
+    /**
+     * The sleep timer's Live Update (Android 16+): posted while a timed sleep timer runs, again
+     * each minute so the status bar chip's minutes stay right, and gone when it ends.
+     */
+    private fun syncSleepUpdate(state: MusicPlayerState) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.BAKLAVA) return
+        val sleep = state.sleep as? SleepTimer.At
+        if (sleep == null || !state.active) {
+            cancelSleepUpdate()
+            return
+        }
+        val leftMs = (sleep.endsAt - SystemClock.elapsedRealtime()).coerceAtLeast(0L)
+        val minutesLeft = (leftMs + 59_999L) / 60_000L
+        val key = sleep.endsAt to minutesLeft
+        if (key == sleepPosted) return
+        sleepPosted = key
+        notificationManager.notify(SLEEP_NOTIFICATION_ID, buildSleepUpdate(sleep, leftMs, minutesLeft, state.nowPlaying?.title))
+    }
+
+    private fun cancelSleepUpdate() {
+        if (sleepPosted == null) return
+        sleepPosted = null
+        notificationManager.cancel(SLEEP_NOTIFICATION_ID)
+    }
+
+    @RequiresApi(Build.VERSION_CODES.BAKLAVA)
+    private fun buildSleepUpdate(sleep: SleepTimer.At, leftMs: Long, minutesLeft: Long, song: String?): Notification {
+        val totalMs = (sleep.minutes * 60_000L).coerceAtLeast(1L)
+        val done = (((totalMs - leftMs).coerceIn(0L, totalMs) * SLEEP_PROGRESS_STEPS) / totalMs).toInt()
+        val minutes = if (minutesLeft == 1L) "1 minute" else "$minutesLeft minutes"
+        return Notification.Builder(this, CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_dark_mode)
+            .setContentTitle("Music stops in $minutes")
+            .setContentText(song)
+            .setContentIntent(openAppIntent)
+            .setCategory(Notification.CATEGORY_PROGRESS)
+            .setVisibility(Notification.VISIBILITY_PUBLIC)
+            .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            // The time left counts down by itself between updates.
+            .setWhen(System.currentTimeMillis() + leftMs)
+            .setShowWhen(true)
+            .setUsesChronometer(true)
+            .setChronometerCountDown(true)
+            .setStyle(
+                Notification.ProgressStyle()
+                    .setProgressSegments(listOf(Notification.ProgressStyle.Segment(SLEEP_PROGRESS_STEPS)))
+                    .setProgress(done),
+            )
+            .setShortCriticalText("${minutesLeft}m")
+            .setRequestPromotedOngoing(true)
+            .build()
     }
 
     private fun sessionState(state: MusicPlayerState) = PlayerUiState(
@@ -301,6 +365,10 @@ class MusicService : Service() {
         private const val TAG = "MusicService"
         private const val CHANNEL_ID = "music"
         private const val NOTIFICATION_ID = 1002
+        private const val SLEEP_NOTIFICATION_ID = 1003
+
+        /** The sleep timer's progress bar's length, in steps. */
+        private const val SLEEP_PROGRESS_STEPS = 1_000
         private const val DEFAULT_TITLE = "Nova Fork"
         private const val REQUEST_OPEN = 1
         private const val REQUEST_ACTION = 2

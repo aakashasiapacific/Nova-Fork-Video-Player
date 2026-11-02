@@ -61,6 +61,13 @@ class LrcParserTest {
     }
 
     @Test
+    fun keepsWordTimesOfEnhancedLrcOnTheirWords() {
+        val line = LrcParser.parse("[offset:+100]\n[00:01.00]<00:01.00>Hello <00:01.50>world").lines.single()
+        assertEquals("Hello world", line.text)
+        assertEquals(listOf(LyricWord(900, 0, 5), LyricWord(1_400, 6, 11)), line.words)
+    }
+
+    @Test
     fun keepsEmptyTimedLinesAsBreaks() {
         val lyrics = LrcParser.parse("[00:01.00]Line\n[00:05.00]\n[00:09.00]Next")
         assertEquals(listOf("Line", "", "Next"), lyrics.lines.map { it.text })
