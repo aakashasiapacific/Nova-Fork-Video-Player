@@ -85,6 +85,7 @@ fun PhoneShowDetailsScreen(
         val backdropHeight = detailsBackdropHeight(maxHeight)
         val listState = rememberLazyListState()
         val titleCollapse = rememberTitleCollapse(listState, backdropHeight)
+        DetailsStatusBar(details.artwork, listState, backdropHeight)
         val tint = rememberDetailsTint(details.artwork)
         val hasOverview = !details.tagline.isNullOrBlank() || !details.overview.isNullOrBlank()
         LazyColumn(

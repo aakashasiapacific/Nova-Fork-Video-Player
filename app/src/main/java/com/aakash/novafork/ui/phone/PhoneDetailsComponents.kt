@@ -84,6 +84,7 @@ import com.aakash.novafork.ui.common.IosColors
 import com.aakash.novafork.ui.common.IosIconButton
 import com.aakash.novafork.ui.common.NovaDropdownMenu
 import com.aakash.novafork.ui.common.NovaIcon
+import com.aakash.novafork.ui.common.PictureStatusBar
 import com.aakash.novafork.ui.common.PosterArt
 import com.aakash.novafork.ui.common.RatingPill
 import com.aakash.novafork.ui.common.bottomScrim
@@ -100,8 +101,9 @@ internal fun detailsBackdropHeight(pageHeight: Dp): Dp = pageHeight * 0.5f
 
 /**
  * The phone's title header, shared by the Home hero and the details pages so both look the same:
- * the backdrop at 16:9 (at most [maxBackdropHeight]) below the status bar, with a darkened sliver
- * of it running under the bar, fading into the page; the poster reaching [PosterOverlap] up into
+ * the backdrop at 16:9 (at most [maxBackdropHeight]) below the status bar, with a sliver of it
+ * running under the bar (unshaded: the bar's icons follow the picture, [DetailsStatusBar]), fading
+ * into the page; the poster reaching [PosterOverlap] up into
  * the faded edge; [info] beside the poster, starting below the picture.
  */
 @Composable
@@ -166,7 +168,6 @@ internal fun BackdropPosterHeader(
                 ),
         ) {
             BackdropArt(artwork = artwork, modifier = Modifier.fillMaxSize().then(if (drift) Modifier.slowZoom() else Modifier))
-            StatusBarShade(statusBar)
             Box(
                 Modifier
                     .fillMaxSize()
@@ -287,7 +288,6 @@ internal fun FramePicture(artwork: Artwork, modifier: Modifier = Modifier) {
                 }
             }
         }
-        StatusBarShade(statusBar)
         Box(
             Modifier
                 .fillMaxSize()
@@ -302,20 +302,20 @@ internal fun FramePicture(artwork: Artwork, modifier: Modifier = Modifier) {
     }
 }
 
-/** Darkens the status bar strip of a picture that runs under it: soft, darker at the very top. */
+/**
+ * A title page's status bar (owner: no black shade under the clock): dark icons over a bright top
+ * of its backdrop while the backdrop is still under the status bar, light ones once it has
+ * scrolled away. A frame-only video's picture is blurred and dimmed, so its icons stay light.
+ */
 @Composable
-internal fun StatusBarShade(statusBar: Dp) {
-    Box(
-        Modifier
-            .fillMaxWidth()
-            .height(statusBar * 2)
-            .background(
-                Brush.verticalGradient(
-                    0f to Color.Black.copy(alpha = 0.85f),
-                    0.5f to Color.Black.copy(alpha = 0.55f),
-                    1f to Color.Transparent,
-                ),
-            ),
+internal fun DetailsStatusBar(artwork: Artwork, listState: LazyListState, backdropHeight: Dp) {
+    val halfPx = with(LocalDensity.current) { backdropHeight.toPx() / 2f }
+    val onTop by remember(listState, halfPx) {
+        derivedStateOf { listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset < halfPx }
+    }
+    PictureStatusBar(
+        model = artwork.backdropUrl ?: artwork.stillUrl ?: artwork.posterUrl,
+        active = onTop && !artwork.frameOnly,
     )
 }
 
