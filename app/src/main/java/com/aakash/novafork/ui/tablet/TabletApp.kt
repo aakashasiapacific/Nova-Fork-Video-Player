@@ -174,7 +174,7 @@ private fun TabletPage(state: AppUiState, actions: AppActions, layout: DeviceLay
             modifier = pageModifier,
         )
         Route.History -> PhoneHistoryScreen(
-            entries = state.home.history,
+            entries = state.history,
             actions = actions,
             modifier = pageModifier,
         )

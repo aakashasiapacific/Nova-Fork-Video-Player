@@ -595,7 +595,7 @@ private fun PhonePage(state: AppUiState, actions: AppActions) {
             modifier = pageModifier,
         )
         Route.History -> PhoneHistoryScreen(
-            entries = state.home.history,
+            entries = state.history,
             actions = actions,
             modifier = pageModifier,
         )
