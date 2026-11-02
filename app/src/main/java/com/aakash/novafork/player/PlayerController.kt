@@ -40,12 +40,15 @@ import com.aakash.novafork.ui.model.PlayerActions
 import com.aakash.novafork.ui.model.PlayerUiState
 import com.aakash.novafork.ui.model.QueueItemUi
 import com.aakash.novafork.ui.model.RepeatMode
+import com.aakash.novafork.ui.model.SLEEP_END_OF_VIDEO
+import com.aakash.novafork.ui.model.SleepTimerUi
 import com.aakash.novafork.ui.model.SubtitleSearchUi
 import com.aakash.novafork.ui.model.TrackUi
 import com.aakash.novafork.ui.model.UpNextUi
 import java.io.File
 import java.util.Locale
 import java.util.concurrent.atomic.AtomicReference
+import kotlin.math.ceil
 import kotlin.math.roundToInt
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -55,7 +58,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -313,6 +318,12 @@ class PlayerController(
     private var feedbackJob: Job? = null
     private var pictureWatchJob: Job? = null
 
+    /** The sleep timer counting down, then fading the video out; see [setSleepTimer]. */
+    private var sleepJob: Job? = null
+
+    /** The sleep timer waits for the end of the video playing ("End of Video"). */
+    private var sleepAtEnd = false
+
     private val eventListener = object : MediaPlayer.EventListener {
         override fun onEvent(event: MediaPlayer.Event) = onPlayerEvent(event)
     }
@@ -364,6 +375,18 @@ class PlayerController(
                 delay(SAVE_INTERVAL_MS)
                 if (_state.value.isPlaying) saveProgress()
             }
+        }
+        // The equaliser and night mode follow the settings as they change, also mid-video:
+        // libVLC keeps them on the player for every video it opens after.
+        scope.launch {
+            graph.settings.settings
+                .map { Triple(it.equalizerPreset, it.equalizerBands, it.nightMode) }
+                .distinctUntilChanged()
+                .collect { (preset, _, night) ->
+                    if (released) return@collect
+                    AudioEffects.applyEqualizer(mediaPlayer, graph.settings.settings.value, nightMode = night)
+                    _state.update { it.copy(nightMode = night, equalizerOn = preset.isNotBlank()) }
+                }
         }
     }
 
@@ -495,6 +518,7 @@ class PlayerController(
         feedbackJob?.cancel()
         pictureWatchJob?.cancel()
         queueJob?.cancel()
+        sleepJob?.cancel()
         if (mediaPlayer.hasMedia()) {
             mediaPlayer.stop()
             dropStaleEvents()
@@ -1115,6 +1139,8 @@ class PlayerController(
     override fun play() {
         if (released || !hasContent) return
         pausedByFocusLoss = false
+        // Played again after (or while) the sleep timer faded it out: the picture and sound come back.
+        if (_state.value.sleepDim > 0f) setSleepTimer(0)
         val request = lastRequest
         if (_state.value.error != null && request != null) {
             // Retry, continuing where it stopped when it had started.
@@ -1791,6 +1817,15 @@ class PlayerController(
      * start by itself. With nothing to follow it stays on the last frame ([endHere]).
      */
     private fun continueAfterEnd() {
+        if (sleepAtEnd) {
+            // The sleep timer said "End of Video": it stops here, whatever would follow.
+            sleepAtEnd = false
+            upNextJob?.cancel()
+            _playRequested.value = false
+            _state.update { it.copy(upNext = null, sleepTimer = null) }
+            endHere()
+            return
+        }
         val videoId = nowPlaying?.videoId
         val repeat = _state.value.repeatMode
         upNextJob?.cancel()
@@ -2482,6 +2517,68 @@ class PlayerController(
         }
     }
 
+    override fun toggleNightMode() {
+        if (released) return
+        val on = !graph.settings.settings.value.nightMode
+        graph.settings.update { it.copy(nightMode = on) }
+        showLabel(if (on) "Night mode on" else "Night mode off")
+    }
+
+    override fun updateSettings(transform: (Settings) -> Settings) {
+        if (!released) graph.settings.update(transform)
+    }
+
+    override fun setSleepTimer(minutes: Int) {
+        if (released) return
+        sleepJob?.cancel()
+        sleepJob = null
+        sleepAtEnd = minutes == SLEEP_END_OF_VIDEO
+        // Turned off or changed mid-fade: the sound and the picture come straight back.
+        if (_state.value.sleepDim > 0f) {
+            mediaPlayer.setVolume(FULL_VOLUME)
+            _state.update { it.copy(sleepDim = 0f) }
+        }
+        when {
+            minutes == 0 -> _state.update { it.copy(sleepTimer = null) }
+            sleepAtEnd -> _state.update { it.copy(sleepTimer = SleepTimerUi(choice = minutes, minutesLeft = null)) }
+            else -> {
+                val endsAt = SystemClock.elapsedRealtime() + minutes * 60_000L
+                sleepJob = scope.launch { runSleepTimer(minutes, endsAt) }
+            }
+        }
+    }
+
+    /** Counts down to [endsAt] (elapsed realtime), showing the minutes left, then [fallAsleep]. */
+    private suspend fun runSleepTimer(choice: Int, endsAt: Long) {
+        while (true) {
+            val left = endsAt - SystemClock.elapsedRealtime()
+            if (left <= 0L) break
+            val minutesLeft = ceil(left / 60_000.0).toInt()
+            _state.update { it.copy(sleepTimer = SleepTimerUi(choice, minutesLeft)) }
+            delay(left.coerceAtMost(SLEEP_TICK_MS))
+        }
+        fallAsleep()
+    }
+
+    /**
+     * The sleep timer ran out: the picture dims and the sound fades together over
+     * [SLEEP_FADE_MS], then the video pauses (and the screen may sleep). It stays dimmed until it
+     * is played again.
+     */
+    private suspend fun fallAsleep() {
+        for (step in 1..SLEEP_FADE_STEPS) {
+            val shown = 1f - step.toFloat() / SLEEP_FADE_STEPS
+            if (released) return
+            mediaPlayer.setVolume((FULL_VOLUME * shown).roundToInt())
+            _state.update { it.copy(sleepDim = 1f - shown) }
+            delay(SLEEP_FADE_MS / SLEEP_FADE_STEPS)
+        }
+        sleepJob = null
+        pause()
+        if (!released) mediaPlayer.setVolume(FULL_VOLUME)
+        _state.update { it.copy(sleepTimer = null) }
+    }
+
     private fun showLabel(text: String) = showFeedback(GestureFeedback.Label(text), LABEL_MS)
 
     private fun showFeedback(feedback: GestureFeedback, hideAfterMs: Long?) {
@@ -2541,6 +2638,11 @@ class PlayerController(
         const val DISABLED_TRACK = -1
         const val FULL_VOLUME = 100
         const val DUCKED_VOLUME = 30
+
+        /** The sleep timer's minutes left are refreshed this often; its fade lasts this long. */
+        const val SLEEP_TICK_MS = 15_000L
+        const val SLEEP_FADE_MS = 6_000L
+        const val SLEEP_FADE_STEPS = 30
 
         /** The volume indicator stays this long after the last volume key, like iOS's. */
         const val VOLUME_HUD_MS = 1_500L

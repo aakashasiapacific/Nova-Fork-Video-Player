@@ -11,6 +11,7 @@ import com.aakash.novafork.core.audio.MusicKeys
 import com.aakash.novafork.data.db.SongEntity
 import com.aakash.novafork.data.music.MusicLibrary
 import com.aakash.novafork.data.music.MusicRepository
+import com.aakash.novafork.player.AudioEffects
 import com.aakash.novafork.player.OpenedMedia
 import com.aakash.novafork.player.PlayQueue
 import com.aakash.novafork.player.PlaybackAudio
@@ -154,6 +155,8 @@ class MusicPlayer(
 
     init {
         scope.launch { restore() }
+        // The equaliser follows the setting as it changes, on whichever player is current.
+        AudioEffects.follow(appContext, scope) { mediaPlayer }
     }
 
     /** Brings back the queue saved when the app was last closed, paused (see [MusicPlayerState.restored]). */
@@ -433,6 +436,8 @@ class MusicPlayer(
                 (mediaPlayer ?: VlcEngine.newMediaPlayer(appContext).also {
                     it.setEventListener(eventListener)
                     mediaPlayer = it
+                    // The equaliser (Now Playing, the video player) on the new player.
+                    AudioEffects.applyCurrent(appContext, it)
                 }).also { it.setMedia(opened.media) }
             } catch (e: RuntimeException) {
                 Log.w(TAG, "libVLC refused a song", e)
