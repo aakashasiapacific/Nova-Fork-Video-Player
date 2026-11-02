@@ -1,5 +1,6 @@
 package com.aakash.novafork.ui.audio
 
+import android.content.res.Configuration
 import android.os.SystemClock
 import androidx.activity.compose.BackHandler
 import androidx.annotation.DrawableRes
@@ -79,6 +80,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Rect
@@ -86,6 +88,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
@@ -99,7 +102,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
@@ -114,10 +121,12 @@ import coil.compose.rememberAsyncImagePainter
 import coil.imageLoader
 import coil.request.ImageRequest
 import com.aakash.novafork.R
+import com.aakash.novafork.core.audio.LyricLine
 import com.aakash.novafork.data.db.SongEntity
 import com.aakash.novafork.data.music.MusicLibrary
 import com.aakash.novafork.music.MusicPlayerState
 import com.aakash.novafork.music.SleepTimer
+import com.aakash.novafork.ui.common.EqualizerSheet
 import com.aakash.novafork.ui.common.IosColors
 import com.aakash.novafork.ui.common.IosIconButton
 import com.aakash.novafork.ui.common.NovaDropdownMenu
@@ -407,7 +416,7 @@ private const val FLIGHT_PX = 720
 /**
  * Now Playing for the app shell: the star, the queue, and Apple Music's "…" with Add to a
  * Playlist…, Go to Album and Go to Artist (which close Now Playing and open the page in the Audio
- * tab, [onShowAudio] switching to it).
+ * tab, [onShowAudio] switching to it), and the Equaliser (shared with the video player).
  */
 @Composable
 fun ShellNowPlaying(
@@ -423,6 +432,7 @@ fun ShellNowPlaying(
     val playlists by viewModel.playlists.collectAsStateWithLifecycle()
     val song = remember(player.nowPlaying?.songId, library) { library.songs.firstOrNull { it.id == player.nowPlaying?.songId } }
     var adding by remember { mutableStateOf<SongEntity?>(null) }
+    var equalizing by remember { mutableStateOf(false) }
     NowPlayingHost(
         open = open,
         player = player,
@@ -461,9 +471,23 @@ fun ShellNowPlaying(
                         onDismiss()
                     },
                 )
+                NovaMenuItem(
+                    text = { Text("Equaliser") },
+                    leadingIcon = { NovaIcon(R.drawable.ic_tune, contentDescription = null) },
+                    onClick = {
+                        close()
+                        equalizing = true
+                    },
+                )
             }
         },
     )
+    if (equalizing) {
+        val settings by viewModel.settings.collectAsStateWithLifecycle()
+        AudioTheme {
+            EqualizerSheet(settings = settings, onUpdate = viewModel::updateSettings, onDismiss = { equalizing = false })
+        }
+    }
     adding?.let { picked ->
         AudioTheme {
             AddToPlaylistDialog(
@@ -493,6 +517,9 @@ fun rememberUpNext(viewModel: MusicViewModel, player: MusicPlayerState): List<So
 /** The floating mini player's height; the space pages leave for it comes from the shell. */
 val MiniPlayerHeight = 60.dp
 
+/** How strongly the mini player is tinted by its cover while playing. */
+private const val MiniTintAlpha = 0.3f
+
 /** The docked (old Apple Music) mini player's height on the phone. */
 val MiniPlayerDockedHeight = 64.dp
 
@@ -519,11 +546,15 @@ fun MiniPlayerBar(
     val skipPx = with(LocalDensity.current) { 64.dp.toPx() }
     val swipeState = rememberDraggableState { delta -> swipe = (swipe + delta).coerceIn(-skipPx * 1.6f, skipPx * 1.6f) }
     val haptics = LocalHapticFeedback.current
+    // While a song plays the mini player takes a soft tint of its cover (owner).
+    val coverTint = rememberCoverTint(now?.artUri)
+    val tintStrength by animateFloatAsState(if (player.isPlaying) MiniTintAlpha else MiniTintAlpha / 2f, tween(600), label = "miniTint")
     Row(
         modifier
             .fillMaxWidth()
             .height(if (docked) MiniPlayerDockedHeight else MiniPlayerHeight)
             .then(if (docked) Modifier else Modifier.frostedGlass(RoundedCornerShape(percent = 50)))
+            .drawBehind { drawRect(coverTint.copy(alpha = coverTint.alpha * tintStrength)) }
             // Docked, a hairline along its top edge fills as the song plays (older Apple Music).
             .then(
                 if (docked) {
@@ -699,90 +730,169 @@ fun NowPlayingScreen(
             ),
     ) {
         CoverGradient(now?.artUri, drifting = player.isPlaying)
-        Column(
-            Modifier
-                .fillMaxSize()
-                // The controls fade out over the first part of closing and back in over the last
-                // part of opening, while the cover flies.
-                .graphicsLayer { alpha = nowPlayingContentAlpha(progress()) }
-                .statusBarsPadding()
-                .navigationBarsPadding()
-                .padding(horizontal = 28.dp),
-        ) {
-            // No grabber line (owner): the whole screen still drags down to close.
-            Spacer(Modifier.height(16.dp))
-            if (pane != NowPlayingPane.ART) {
-                // Lyrics and the queue keep the song in a small header, as in Apple Music.
-                Row(Modifier.padding(top = 8.dp, bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Cover(now?.artUri, size = 64, corner = 8)
-                    SongTitles(player, Modifier.weight(1f).padding(start = 14.dp), small = true)
-                    if (now != null) FavoriteButton(favorite) { actions.toggleFavorite(now.songId) }
-                    if (menu != null) NowPlayingMore(menu)
-                }
-            }
-            Box(
-                Modifier
-                    .weight(1f)
-                    .fillMaxWidth(),
-                contentAlignment = Alignment.Center,
+        // The controls fade out over the first part of closing and back in over the last part of
+        // opening, while the cover flies.
+        val content = Modifier
+            .fillMaxSize()
+            .graphicsLayer { alpha = nowPlayingContentAlpha(progress()) }
+            .statusBarsPadding()
+            .navigationBarsPadding()
+        if (LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE) {
+            // Landscape (Apple Music on a wide screen): the cover with the controls under it on the
+            // left, the lyrics on the right, or Up Next for a song without lyrics.
+            val side = if (pane == NowPlayingPane.QUEUE || player.lyrics == null) NowPlayingPane.QUEUE else NowPlayingPane.LYRICS
+            Row(
+                content.padding(horizontal = 28.dp, vertical = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(32.dp),
             ) {
-                AnimatedContent(
-                    targetState = pane,
-                    transitionSpec = { fadeIn(tween(220)) togetherWith fadeOut(tween(160)) },
-                    label = "nowPlayingPane",
-                ) { shown ->
-                    when (shown) {
-                        NowPlayingPane.ART -> BigCover(player)
-                        NowPlayingPane.LYRICS -> LyricsPane(player, actions)
-                        NowPlayingPane.QUEUE -> QueuePane(player, actions, upNext)
+                Column(
+                    Modifier
+                        .weight(1f)
+                        .fillMaxHeight(),
+                ) {
+                    Box(
+                        Modifier
+                            .weight(1f)
+                            .fillMaxWidth(),
+                        contentAlignment = Alignment.Center,
+                    ) { BigCover(player) }
+                    Spacer(Modifier.height(12.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        SongTitles(player, Modifier.weight(1f), small = true)
+                        if (now != null) FavoriteButton(favorite) { actions.toggleFavorite(now.songId) }
+                        if (menu != null) NowPlayingMore(menu)
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Scrubber(player, actions)
+                    TransportRow(player, actions)
+                    NowPlayingButtons(
+                        player = player,
+                        actions = actions,
+                        lyricsActive = side == NowPlayingPane.LYRICS,
+                        queueActive = side == NowPlayingPane.QUEUE,
+                        onLyrics = { pane = NowPlayingPane.LYRICS },
+                        onQueue = { pane = if (side == NowPlayingPane.QUEUE) NowPlayingPane.LYRICS else NowPlayingPane.QUEUE },
+                    )
+                }
+                Box(
+                    Modifier
+                        .weight(1f)
+                        .fillMaxHeight(),
+                ) {
+                    AnimatedContent(
+                        targetState = side,
+                        transitionSpec = { fadeIn(tween(220)) togetherWith fadeOut(tween(160)) },
+                        label = "nowPlayingSide",
+                    ) { shown ->
+                        if (shown == NowPlayingPane.LYRICS) LyricsPane(player, actions) else QueuePane(player, actions, upNext)
                     }
                 }
             }
-            if (pane == NowPlayingPane.ART) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    SongTitles(player, Modifier.weight(1f))
-                    if (now != null) FavoriteButton(favorite) { actions.toggleFavorite(now.songId) }
-                    if (menu != null) NowPlayingMore(menu)
+        } else {
+            Column(content.padding(horizontal = 28.dp)) {
+                // No grabber line (owner): the whole screen still drags down to close.
+                Spacer(Modifier.height(16.dp))
+                if (pane != NowPlayingPane.ART) {
+                    // Lyrics and the queue keep the song in a small header, as in Apple Music.
+                    Row(Modifier.padding(top = 8.dp, bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Cover(now?.artUri, size = 64, corner = 8)
+                        SongTitles(player, Modifier.weight(1f).padding(start = 14.dp), small = true)
+                        if (now != null) FavoriteButton(favorite) { actions.toggleFavorite(now.songId) }
+                        if (menu != null) NowPlayingMore(menu)
+                    }
                 }
-            }
-            Spacer(Modifier.height(20.dp))
-            Scrubber(player, actions)
-            Spacer(Modifier.height(18.dp))
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                BigControl(R.drawable.ic_skip_previous, "Previous", size = 40, onClick = actions::previous)
-                BigControl(
-                    if (player.isPlaying) R.drawable.ic_pause else R.drawable.ic_play_arrow,
-                    if (player.isPlaying) "Pause" else "Play",
-                    size = 54,
-                    onClick = actions::togglePlay,
+                Box(
+                    Modifier
+                        .weight(1f)
+                        .fillMaxWidth(),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    AnimatedContent(
+                        targetState = pane,
+                        transitionSpec = { fadeIn(tween(220)) togetherWith fadeOut(tween(160)) },
+                        label = "nowPlayingPane",
+                    ) { shown ->
+                        when (shown) {
+                            NowPlayingPane.ART -> BigCover(player)
+                            NowPlayingPane.LYRICS -> LyricsPane(player, actions)
+                            NowPlayingPane.QUEUE -> QueuePane(player, actions, upNext)
+                        }
+                    }
+                }
+                if (pane == NowPlayingPane.ART) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        SongTitles(player, Modifier.weight(1f))
+                        if (now != null) FavoriteButton(favorite) { actions.toggleFavorite(now.songId) }
+                        if (menu != null) NowPlayingMore(menu)
+                    }
+                }
+                Spacer(Modifier.height(20.dp))
+                Scrubber(player, actions)
+                Spacer(Modifier.height(18.dp))
+                TransportRow(player, actions)
+                Spacer(Modifier.height(14.dp))
+                NowPlayingButtons(
+                    player = player,
+                    actions = actions,
+                    lyricsActive = pane == NowPlayingPane.LYRICS,
+                    queueActive = pane == NowPlayingPane.QUEUE,
+                    onLyrics = { pane = if (pane == NowPlayingPane.LYRICS) NowPlayingPane.ART else NowPlayingPane.LYRICS },
+                    onQueue = { pane = if (pane == NowPlayingPane.QUEUE) NowPlayingPane.ART else NowPlayingPane.QUEUE },
+                    modifier = Modifier.padding(bottom = 8.dp),
                 )
-                BigControl(R.drawable.ic_skip_next, "Next", size = 40, enabled = player.hasNext, onClick = actions::next)
-            }
-            Spacer(Modifier.height(14.dp))
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 8.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-            ) {
-                PaneButton(
-                    icon = if (pane == NowPlayingPane.LYRICS) R.drawable.ic_lyrics_on else R.drawable.ic_lyrics,
-                    label = "Lyrics",
-                    active = pane == NowPlayingPane.LYRICS,
-                    enabled = player.lyrics != null,
-                ) { pane = if (pane == NowPlayingPane.LYRICS) NowPlayingPane.ART else NowPlayingPane.LYRICS }
-                SleepButton(player.sleep, actions)
-                PaneButton(
-                    icon = R.drawable.ic_view_list,
-                    label = "Queue",
-                    active = pane == NowPlayingPane.QUEUE,
-                ) { pane = if (pane == NowPlayingPane.QUEUE) NowPlayingPane.ART else NowPlayingPane.QUEUE }
             }
         }
+    }
+}
+
+/** Previous, play/pause and next. */
+@Composable
+private fun TransportRow(player: MusicPlayerState, actions: AudioActions) {
+    Row(
+        Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceEvenly,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        BigControl(R.drawable.ic_skip_previous, "Previous", size = 40, onClick = actions::previous)
+        BigControl(
+            if (player.isPlaying) R.drawable.ic_pause else R.drawable.ic_play_arrow,
+            if (player.isPlaying) "Pause" else "Play",
+            size = 54,
+            onClick = actions::togglePlay,
+        )
+        BigControl(R.drawable.ic_skip_next, "Next", size = 40, enabled = player.hasNext, onClick = actions::next)
+    }
+}
+
+/** Lyrics, the sleep timer and the queue, under the controls. */
+@Composable
+private fun NowPlayingButtons(
+    player: MusicPlayerState,
+    actions: AudioActions,
+    lyricsActive: Boolean,
+    queueActive: Boolean,
+    onLyrics: () -> Unit,
+    onQueue: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceEvenly,
+    ) {
+        PaneButton(
+            icon = if (lyricsActive) R.drawable.ic_lyrics_on else R.drawable.ic_lyrics,
+            label = "Lyrics",
+            active = lyricsActive,
+            enabled = player.lyrics != null,
+            onClick = onLyrics,
+        )
+        SleepButton(player.sleep, actions)
+        PaneButton(
+            icon = R.drawable.ic_view_list,
+            label = "Queue",
+            active = queueActive,
+            onClick = onQueue,
+        )
     }
 }
 
@@ -959,8 +1069,9 @@ private const val ALBUM_FADE_MS = 600
 
 /**
  * Big, bold lyric lines; synced ones light up as the song plays and a tap jumps to them (with a
- * tick, playing again if paused). Scrolling them by hand lights every line up for reading and
- * stops the follow for a moment, as in Apple Music.
+ * tick, playing again if paused). The sung line fills from left to right in white as it is sung,
+ * word by word where the lyrics time their words, as in Apple Music. Scrolling them by hand
+ * lights every line up for reading and stops the follow for a moment.
  */
 @Composable
 private fun LyricsPane(player: MusicPlayerState, actions: AudioActions) {
@@ -1002,8 +1113,15 @@ private fun LyricsPane(player: MusicPlayerState, actions: AudioActions) {
             )
             val scale by animateFloatAsState(if (distance == 0) 1f else 0.94f, spring(dampingRatio = 0.8f, stiffness = 250f), label = "lyricScale")
             val blur by animateDpAsState((distance.coerceAtMost(3) * 1.4f).dp, tween(450), label = "lyricBlur")
+            val sung = lyrics.synced && !browsing && index == active && line.text.isNotEmpty()
+            val shown = if (sung) {
+                val next = lyrics.lines.getOrNull(index + 1)?.timeMs
+                sungLyric(line.text, sungChars(line, next, player.positionMs))
+            } else {
+                AnnotatedString(line.text.ifEmpty { "♪" })
+            }
             Text(
-                line.text.ifEmpty { "♪" },
+                shown,
                 fontSize = 28.sp,
                 lineHeight = 34.sp,
                 fontWeight = FontWeight.Bold,
@@ -1031,6 +1149,44 @@ private fun LyricsPane(player: MusicPlayerState, actions: AudioActions) {
         }
     }
 }
+
+/**
+ * How much of [line] has been sung at [positionMs], in characters of its text (with a fraction of
+ * the next one): by its words' times where it has them, else spread over the line at a singing
+ * pace, done by the time [nextTimeMs] (the next line) starts.
+ */
+private fun sungChars(line: LyricLine, nextTimeMs: Long?, positionMs: Long): Float {
+    val length = line.text.length
+    val words = line.words
+    if (words.isNotEmpty()) {
+        val index = words.indexOfLast { it.timeMs <= positionMs }
+        if (index < 0) return 0f
+        val word = words[index]
+        val until = words.getOrNull(index + 1)?.timeMs ?: nextTimeMs ?: (word.timeMs + LAST_WORD_MS)
+        val share = ((positionMs - word.timeMs).toFloat() / (until - word.timeMs).coerceAtLeast(1L)).coerceIn(0f, 1f)
+        return word.start + (word.end - word.start) * share
+    }
+    val start = line.timeMs ?: return length.toFloat()
+    val span = minOf((nextTimeMs ?: Long.MAX_VALUE) - start, length * SUNG_MS_PER_CHAR).coerceAtLeast(1L)
+    return length * ((positionMs - start).toFloat() / span).coerceIn(0f, 1f)
+}
+
+/** [text] lit white as far as [sung] characters, the letter at the edge part way, the rest grey. */
+private fun sungLyric(text: String, sung: Float): AnnotatedString = buildAnnotatedString {
+    val whole = sung.toInt().coerceIn(0, text.length)
+    withStyle(SpanStyle(color = Color.White)) { append(text, 0, whole) }
+    if (whole < text.length) {
+        withStyle(SpanStyle(color = lerp(UnsungLyric, Color.White, sung - whole))) { append(text[whole]) }
+        withStyle(SpanStyle(color = UnsungLyric)) { append(text, whole + 1, text.length) }
+    }
+}
+
+/** The sung line's part still to come. */
+private val UnsungLyric = Color.White.copy(alpha = 0.45f)
+
+/** A line without word times fills at about this pace; the last word of a line takes this long. */
+private const val SUNG_MS_PER_CHAR = 90L
+private const val LAST_WORD_MS = 600L
 
 /**
  * Apple Music's queue: "Playing Next" with square shuffle and repeat toggles beside it, then the

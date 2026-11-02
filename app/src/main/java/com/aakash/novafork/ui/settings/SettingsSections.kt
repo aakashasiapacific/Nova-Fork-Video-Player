@@ -513,7 +513,20 @@ private fun playerGroups(settings: Settings, actions: AppActions): List<Settings
         footer = "Auto-load picks up .srt and other subtitle files next to a video. Change the encoding if " +
             "subtitles show garbled letters. The languages are chosen first when a video has several tracks.",
     ),
+    SettingsGroup(
+        key = "music",
+        title = "Music",
+        rows = listOf(
+            choiceRow("crossfade", R.drawable.ic_music_notes, "Crossfade", CrossfadeChoices, settings.crossfadeSeconds) { seconds ->
+                actions.updateSettings { it.copy(crossfadeSeconds = seconds) }
+            },
+        ),
+        footer = "Each song fades into the next over this many seconds. Off: songs follow with no gap.",
+    ),
 ) + subtitleDownloadGroups(settings, actions)
+
+/** Off, then one to eight seconds. */
+private val CrossfadeChoices = listOf(Option(0, "Off")) + (1..8).map { Option(it, if (it == 1) "1 second" else "$it seconds") }
 
 // Appearance
 

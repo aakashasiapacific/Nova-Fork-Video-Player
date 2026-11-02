@@ -8,9 +8,11 @@ import android.os.SystemClock
 import android.util.Log
 import com.aakash.novafork.core.audio.Lyrics
 import com.aakash.novafork.core.audio.MusicKeys
+import com.aakash.novafork.data.Settings
 import com.aakash.novafork.data.db.SongEntity
 import com.aakash.novafork.data.music.MusicLibrary
 import com.aakash.novafork.data.music.MusicRepository
+import com.aakash.novafork.player.AudioEffects
 import com.aakash.novafork.player.OpenedMedia
 import com.aakash.novafork.player.PlayQueue
 import com.aakash.novafork.player.PlaybackAudio
@@ -19,6 +21,7 @@ import com.aakash.novafork.player.closeQuietly
 import com.aakash.novafork.ui.model.RepeatMode
 import java.io.FileNotFoundException
 import java.util.concurrent.atomic.AtomicReference
+import kotlin.math.roundToInt
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -92,12 +95,16 @@ data class MusicPlayerState(
  * Plays songs from the music library, one queue at a time, on its own libVLC player (the video
  * player has another). It lives as long as the process (see AppGraph); [MusicService] keeps the
  * process in the foreground with a notification while it plays. Video and music take audio focus
- * from each other, so starting one pauses the other. Main thread only.
+ * from each other, so starting one pauses the other. With a crossfade set, the next song starts
+ * on a second player before this one ends and the two fade into each other; without one, the
+ * next song is opened ahead so it follows with no gap. Main thread only.
  */
 class MusicPlayer(
     context: Context,
     private val music: MusicRepository,
     private val scope: CoroutineScope,
+    /** The settings as they are now: the crossfade's length and the equaliser. */
+    private val settings: () -> Settings = { Settings() },
 ) {
     private val appContext = context.applicationContext
     private val _state = MutableStateFlow(MusicPlayerState())
@@ -119,6 +126,18 @@ class MusicPlayer(
     private val resumePrefs = appContext.getSharedPreferences(RESUME_PREFS, Context.MODE_PRIVATE)
     private var pausedByFocusLoss = false
     private var durationSaved = false
+
+    /** The next song, opened ahead of its turn so it starts with no gap (no crossfade set). */
+    private var preloaded: Pair<Long, OpenedMedia>? = null
+    private var preloadJob: Job? = null
+
+    /** The song fading in over this one (a crossfade), on its own player until it takes over. */
+    private class Incoming(val position: Int, val song: SongEntity, val player: MediaPlayer, val descriptor: ParcelFileDescriptor?)
+
+    private var incoming: Incoming? = null
+
+    /** The crossfade into the next song; set from its start until the song changes, so it runs once. */
+    private var crossfadeJob: Job? = null
 
     private val eventListener = object : MediaPlayer.EventListener {
         override fun onEvent(event: MediaPlayer.Event) = this@MusicPlayer.onEvent(event)
@@ -236,6 +255,8 @@ class MusicPlayer(
 
     fun pause() {
         pausedByFocusLoss = false
+        // A crossfade under way is dropped: the song playing now plays on alone when resumed.
+        cancelCrossfade()
         _state.update { it.copy(playRequested = false) }
         mediaPlayer?.pause()
         saveResume()
@@ -256,6 +277,7 @@ class MusicPlayer(
      */
     fun setSleepTimer(minutes: Int) {
         sleepJob?.cancel()
+        cancelCrossfade()
         mediaPlayer?.volume = FULL_VOLUME
         when {
             minutes == 0 -> _state.update { it.copy(sleep = null) }
@@ -273,6 +295,7 @@ class MusicPlayer(
 
     /** The timer is up: the music fades out over a few seconds, then pauses. */
     private suspend fun fallAsleep() {
+        cancelCrossfade()
         val player = mediaPlayer
         if (player != null && _state.value.isPlaying) {
             for (step in SLEEP_FADE_STEPS downTo 0) {
@@ -312,6 +335,9 @@ class MusicPlayer(
             playSongs(songIds)
             return
         }
+        // What comes next may have changed: a crossfade or a song opened ahead starts again.
+        cancelCrossfade()
+        dropPreloaded()
         queue.insert(songIds, next)
         _state.update { it.withQueue() }
         saveResume()
@@ -319,6 +345,8 @@ class MusicPlayer(
 
     /** Up Next reordered: the song [from] places after this one goes to [to] places after it. */
     fun moveUpNext(from: Int, to: Int) {
+        cancelCrossfade()
+        dropPreloaded()
         queue.move(queue.position + from, queue.position + to)
         _state.update { it.withQueue() }
         saveResume()
@@ -332,12 +360,16 @@ class MusicPlayer(
     fun seekTo(positionMs: Long) {
         val player = mediaPlayer ?: return
         if (!player.isSeekable) return
+        // Back from the last seconds: the song coming in goes again; it starts over nearer the end.
+        cancelCrossfade()
         val target = positionMs.coerceIn(0L, _state.value.durationMs.takeIf { it > 0 } ?: Long.MAX_VALUE)
         player.setTime(target)
         _state.update { it.copy(positionMs = target) }
     }
 
     fun setShuffle(on: Boolean) {
+        cancelCrossfade()
+        dropPreloaded()
         queue.setShuffled(on)
         _state.update { it.copy(shuffle = on).withQueue() }
     }
@@ -360,6 +392,8 @@ class MusicPlayer(
         if (forget) resumePrefs.edit().clear().apply() else saveResume()
         sleepJob?.cancel()
         holdNextStart = false
+        cancelCrossfade()
+        dropPreloaded()
         loadJob?.cancel()
         lyricsJob?.cancel()
         skipJob?.cancel()
@@ -386,6 +420,10 @@ class MusicPlayer(
 
     private fun startCurrent() {
         val songId = queue.currentId ?: return close()
+        cancelCrossfade()
+        // Its open may be under way: a media it finishes is still taken below when it is this song.
+        preloadJob?.cancel()
+        preloadJob = null
         loadJob?.cancel()
         lyricsJob?.cancel()
         skipJob?.cancel()
@@ -424,7 +462,8 @@ class MusicPlayer(
                 val lyrics = music.lyrics(song)
                 if (_state.value.nowPlaying?.songId == song.id) _state.update { it.copy(lyrics = lyrics) }
             }
-            val opened = open(song.uri)
+            // Opened ahead while the song before played, when it was this one: no gap.
+            val opened = takePreloaded(song.id) ?: open(song.uri)
             if (opened == null) {
                 onFailed(song, "Can't open this song")
                 return@launch
@@ -433,7 +472,11 @@ class MusicPlayer(
                 (mediaPlayer ?: VlcEngine.newMediaPlayer(appContext).also {
                     it.setEventListener(eventListener)
                     mediaPlayer = it
-                }).also { it.setMedia(opened.media) }
+                }).also {
+                    it.setMedia(opened.media)
+                    it.volume = FULL_VOLUME
+                    AudioEffects.applyEqualizer(it, settings())
+                }
             } catch (e: RuntimeException) {
                 Log.w(TAG, "libVLC refused a song", e)
                 opened.discard()
@@ -506,8 +549,10 @@ class MusicPlayer(
                 if (buffering != _state.value.isBuffering) _state.update { it.copy(isBuffering = buffering) }
             }
             MediaPlayer.Event.TimeChanged -> {
-                _state.update { it.copy(positionMs = event.timeChanged.coerceAtLeast(0L)) }
+                val position = event.timeChanged.coerceAtLeast(0L)
+                _state.update { it.copy(positionMs = position) }
                 if (System.currentTimeMillis() - lastSavedAt > SAVE_EVERY_MS) saveResume()
+                nearingTheEnd(position)
             }
             MediaPlayer.Event.LengthChanged -> {
                 val length = event.lengthChanged
@@ -533,6 +578,12 @@ class MusicPlayer(
     }
 
     private fun onEnded() {
+        // Ended while the next song was still fading in: it takes over now, at the volume it has.
+        if (incoming != null) {
+            crossfadeJob?.cancel()
+            handOver()
+            return
+        }
         val songId = _state.value.nowPlaying?.songId
         if (songId != null) scope.launch { runCatchingLogged { music.markPlayed(songId) } }
         // Asleep at the end of this song: the next one loads but waits, paused.
@@ -586,6 +637,152 @@ class MusicPlayer(
         }
     }
 
+    /**
+     * The playing song is near its end: with a crossfade set, the next song starts fading in over
+     * it; without one, the next song is opened ahead so it follows with no gap.
+     */
+    private fun nearingTheEnd(positionMs: Long) {
+        val state = _state.value
+        val duration = state.durationMs
+        if (duration <= 0L || ended || !state.playRequested) return
+        val fadeMs = settings().crossfadeSeconds.coerceIn(0, MAX_CROSSFADE_SECONDS) * 1_000L
+        if (fadeMs > 0L) {
+            // Not into the same song again (repeat one), nor past a sleep timer set for the song's end.
+            if (crossfadeJob != null || !state.isPlaying || state.repeat == RepeatMode.ONE || state.sleep == SleepTimer.EndOfSong) return
+            if (duration < fadeMs * 3 || positionMs < duration - fadeMs) return
+            val next = queue.nextPosition(wrap = state.repeat == RepeatMode.ALL) ?: return
+            val nextId = queue.idAt(next) ?: return
+            if (nextId == queue.currentId) return
+            crossfadeJob = scope.launch { crossfadeInto(next, nextId, fadeMs) }
+            return
+        }
+        if (preloadJob != null || preloaded != null || duration - positionMs > PRELOAD_BEFORE_END_MS) return
+        val nextId = if (state.repeat == RepeatMode.ONE) {
+            queue.currentId
+        } else {
+            queue.nextPosition(wrap = state.repeat == RepeatMode.ALL)?.let { queue.idAt(it) }
+        } ?: return
+        preloadJob = scope.launch {
+            val song = findSong(nextId) ?: return@launch
+            val opened = open(song.uri) ?: return@launch
+            preloaded?.second?.discard()
+            preloaded = nextId to opened
+        }
+    }
+
+    /** The media opened ahead for [songId], if it was that song; any other is let go. */
+    private fun takePreloaded(songId: Long): OpenedMedia? {
+        val ahead = preloaded ?: return null
+        preloaded = null
+        if (ahead.first == songId) return ahead.second
+        ahead.second.discard()
+        return null
+    }
+
+    private fun dropPreloaded() {
+        preloadJob?.cancel()
+        preloadJob = null
+        preloaded?.second?.discard()
+        preloaded = null
+    }
+
+    /**
+     * Starts the song at [position] of the play order silently on a second player and fades it
+     * up over [fadeMs] while this one fades down, then hands over to it ([handOver]).
+     */
+    private suspend fun crossfadeInto(position: Int, songId: Long, fadeMs: Long) {
+        val song = findSong(songId) ?: return
+        val opened = open(song.uri) ?: return
+        val player = try {
+            VlcEngine.newMediaPlayer(appContext).also { it.setMedia(opened.media) }
+        } catch (e: RuntimeException) {
+            Log.w(TAG, "libVLC refused the song to fade into", e)
+            opened.discard()
+            return
+        }
+        // The player keeps its own reference.
+        opened.media.release()
+        AudioEffects.applyEqualizer(player, settings())
+        player.volume = 0
+        player.play()
+        incoming = Incoming(position, song, player, opened.descriptor)
+        val outgoing = mediaPlayer
+        val steps = (fadeMs / CROSSFADE_STEP_MS).toInt().coerceAtLeast(1)
+        for (step in 1..steps) {
+            delay(CROSSFADE_STEP_MS)
+            val share = step.toFloat() / steps
+            player.volume = (FULL_VOLUME * share).roundToInt()
+            outgoing?.volume = (FULL_VOLUME * (1f - share)).roundToInt()
+        }
+        handOver()
+    }
+
+    /** The song that faded in becomes the playing one; the one that faded out is let go. */
+    private fun handOver() {
+        val next = incoming ?: return
+        incoming = null
+        crossfadeJob = null
+        _state.value.nowPlaying?.songId?.let { endedId -> scope.launch { runCatchingLogged { music.markPlayed(endedId) } } }
+        mediaPlayer?.let { old ->
+            old.setEventListener(null)
+            old.stop()
+            old.release()
+        }
+        descriptor.closeQuietly()
+        mediaPlayer = next.player
+        descriptor = next.descriptor
+        next.player.volume = FULL_VOLUME
+        next.player.setEventListener(eventListener)
+        queue.moveTo(next.position)
+        lyricsJob?.cancel()
+        skipJob?.cancel()
+        ended = false
+        durationSaved = false
+        pendingSeekMs = 0L
+        val song = next.song
+        _state.update {
+            it.copy(
+                nowPlaying = nowPlaying(song),
+                isPlaying = next.player.isPlaying,
+                playRequested = true,
+                isBuffering = false,
+                restored = false,
+                positionMs = next.player.time.coerceAtLeast(0L),
+                durationMs = song.durationMs ?: next.player.length.coerceAtLeast(0L),
+                error = null,
+                lyrics = null,
+            ).withQueue()
+        }
+        SongPulses.prepare(appContext, scope, song.id, song.uri)
+        lyricsJob = scope.launch {
+            val lyrics = music.lyrics(song)
+            if (_state.value.nowPlaying?.songId == song.id) _state.update { it.copy(lyrics = lyrics) }
+        }
+        saveResume()
+    }
+
+    /** Stops a crossfade: the song coming in is let go and the playing one is back at full volume. */
+    private fun cancelCrossfade() {
+        crossfadeJob?.cancel()
+        crossfadeJob = null
+        incoming?.let { coming ->
+            coming.player.stop()
+            coming.player.release()
+            coming.descriptor.closeQuietly()
+        }
+        incoming = null
+        mediaPlayer?.volume = FULL_VOLUME
+    }
+
+    private suspend fun findSong(songId: Long): SongEntity? = try {
+        music.song(songId)
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        Log.w(TAG, "Library lookup failed", e)
+        null
+    }
+
     private fun MusicPlayerState.withQueue(): MusicPlayerState {
         val wrap = repeat == RepeatMode.ALL
         return copy(
@@ -626,6 +823,13 @@ class MusicPlayer(
 
         /** "Previous" restarts the song after this much of it played. */
         const val RESTART_AFTER_MS = 3_000L
+
+        /** The longest crossfade, and the steps its volumes move in. */
+        const val MAX_CROSSFADE_SECONDS = 8
+        const val CROSSFADE_STEP_MS = 50L
+
+        /** How long before a song ends the next one is opened, without a crossfade. */
+        const val PRELOAD_BEFORE_END_MS = 8_000L
         const val SKIP_AFTER_ERROR_MS = 1_500L
         const val SAVE_EVERY_MS = 5_000L
         const val UP_NEXT_LIMIT = 50

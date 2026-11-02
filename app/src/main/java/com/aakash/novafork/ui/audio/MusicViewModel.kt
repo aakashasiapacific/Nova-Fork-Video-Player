@@ -5,6 +5,7 @@ import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.aakash.novafork.NovaApp
+import com.aakash.novafork.data.Settings
 import com.aakash.novafork.data.StoragePermissions
 import com.aakash.novafork.data.db.MusicPlaylistRow
 import com.aakash.novafork.data.db.SongEntity
@@ -37,6 +38,11 @@ class MusicViewModel(app: Application) : AndroidViewModel(app), AudioActions {
     val playlists: StateFlow<List<MusicPlaylistRow>> =
         music.observePlaylists().stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
     val playerState: StateFlow<MusicPlayerState> = player.state
+
+    /** The app's settings: Now Playing's equaliser reads and changes them. */
+    val settings: StateFlow<Settings> = graph.settings.settings
+
+    fun updateSettings(transform: (Settings) -> Settings) = graph.settings.update(transform)
 
     /** Starred song ids, most recently starred first. */
     val favorites: StateFlow<List<Long>> =

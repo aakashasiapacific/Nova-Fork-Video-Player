@@ -142,7 +142,7 @@ class AppGraph(val app: Application) {
 
     /** The music player; main thread only, so first used from there (it creates libVLC's player lazily). */
     val musicPlayer: MusicPlayer by lazy {
-        MusicPlayer(app, music, CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate))
+        MusicPlayer(app, music, CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate), settings = { settings.settings.value })
     }
 
     val imageLoader: ImageLoader by lazy {

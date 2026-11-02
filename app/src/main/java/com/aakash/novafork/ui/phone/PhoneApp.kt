@@ -129,6 +129,7 @@ import com.aakash.novafork.ui.audio.NowPlayingSheet
 import com.aakash.novafork.ui.audio.PlayingBars
 import com.aakash.novafork.ui.audio.ShellNowPlaying
 import com.aakash.novafork.ui.audio.miniContentAlpha
+import com.aakash.novafork.ui.audio.rememberCoverAccent
 import com.aakash.novafork.ui.audio.rememberMusicShell
 import com.aakash.novafork.ui.common.EndOfListGap
 import com.aakash.novafork.ui.common.Hairline
@@ -434,19 +435,44 @@ fun PhoneApp(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
                     exit = slideOutVertically(tween(220)) { it } + fadeOut(tween(160)),
                 ) {
                     // Pulled up, it opens Now Playing with the finger (Apple Music); let go early
-                    // and it settles back.
+                    // and it settles back. Swiped down behind the tab bar, it stops the music
+                    // (owner), with a tick once letting go will; a short swipe springs back.
                     val screenPx = with(LocalDensity.current) { LocalConfiguration.current.screenHeightDp.dp.toPx() }
+                    val dismissPx = with(LocalDensity.current) { MiniDismissDrag.toPx() }
                     val pullScope = rememberCoroutineScope()
+                    val haptics = LocalHapticFeedback.current
+                    var dismissDrag by remember { mutableFloatStateOf(0f) }
+                    val dismissArmed = dismissDrag > dismissPx
+                    LaunchedEffect(dismissArmed) { if (dismissArmed) haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove) }
                     val pullState = rememberDraggableState { delta ->
-                        nowPlayingSheet.pull = (nowPlayingSheet.pull - delta / screenPx).coerceIn(0f, 1f)
+                        if (dismissDrag > 0f || (nowPlayingSheet.pull <= 0f && delta > 0f)) {
+                            dismissDrag = (dismissDrag + delta).coerceAtLeast(0f)
+                        } else {
+                            nowPlayingSheet.pull = (nowPlayingSheet.pull - delta / screenPx).coerceIn(0f, 1f)
+                        }
                     }
                     Column(
                         Modifier
                             .fillMaxWidth()
+                            .graphicsLayer { translationY = dismissDrag }
                             .draggable(
                                 state = pullState,
                                 orientation = Orientation.Vertical,
                                 onDragStopped = { velocity ->
+                                    if (dismissDrag > 0f) {
+                                        pullScope.launch {
+                                            if (dismissDrag > dismissPx || velocity > MiniFlingVelocity) {
+                                                // Away behind the bar, then the music stops and it goes.
+                                                animate(dismissDrag, dismissPx * 2.5f, velocity, tween(180)) { value, _ -> dismissDrag = value }
+                                                viewModel.closePlayer()
+                                            } else {
+                                                animate(dismissDrag, 0f, velocity, spring(dampingRatio = 1f, stiffness = 500f)) { value, _ ->
+                                                    dismissDrag = value
+                                                }
+                                            }
+                                        }
+                                        return@draggable
+                                    }
                                     // The finger's speed, in sheet heights a second (up is positive), carries on into
                                     // whichever way it settles.
                                     val upward = -velocity / screenPx
@@ -478,11 +504,14 @@ fun PhoneApp(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
                 }
             }
             // Over the mini player, so it slides up from behind the bar.
+            val coverAccent = rememberCoverAccent(player?.nowPlaying?.artUri)
             PhoneNavigationBar(
                 clear = { barClear },
                 shrink = { barShrink },
                 selected = top,
                 musicPlaying = player?.isPlaying == true,
+                // While a song plays the Audio tab takes its cover's colour (owner).
+                audioTint = if (player?.isPlaying == true) coverAccent else null,
                 onHoldAudio = if (player != null && player.active) ({ nowPlayingOpen = true }) else null,
                 // The selected tab tapped again (iOS): from a page opened on it, back to its first
                 // page; on its first page, up to the top.
@@ -606,6 +635,8 @@ private fun PhoneNavigationBar(
     shrink: () -> Float = { 0f },
     /** A song plays: the Audio tab's icon becomes the "now playing" bars, moving with it. */
     musicPlaying: Boolean = false,
+    /** The Audio tab's colour while a song plays (its cover's); null for Apple Music's red. */
+    audioTint: Color? = null,
     /** Holding the Audio tab opens Now Playing from any tab (null: nothing is queued). */
     onHoldAudio: (() -> Unit)? = null,
 ) {
@@ -656,7 +687,11 @@ private fun PhoneNavigationBar(
         ) {
             tabs.forEach { tab ->
                 val active = tab == selected
-                val tint = if (active) tab.activeColor() else IosColors.SecondaryLabel
+                val tint = when {
+                    !active -> IosColors.SecondaryLabel
+                    tab == TopDestination.AUDIO && audioTint != null -> audioTint
+                    else -> tab.activeColor()
+                }
                 // iOS 17's symbol bounce: the tapped tab's icon dips and springs back.
                 val bounce = remember { Animatable(1f) }
                 Column(
@@ -702,7 +737,7 @@ private fun PhoneNavigationBar(
                     if (tab == TopDestination.AUDIO && musicPlaying) {
                         Box(iconModifier, contentAlignment = Alignment.Center) {
                             // Apple Music's red, on any tab (owner).
-                            PlayingBars(playing = true, color = NovaColors.AppleMusicRed, modifier = Modifier.height(20.dp), barWidth = 3.5.dp)
+                            PlayingBars(playing = true, color = audioTint ?: NovaColors.AppleMusicRed, modifier = Modifier.height(20.dp), barWidth = 3.5.dp)
                         }
                     } else {
                         NovaIcon(tab.tabIconRes(), contentDescription = null, tint = tint, modifier = iconModifier)
@@ -917,6 +952,9 @@ private val TabPillColor = Color.White.copy(alpha = 0.1f)
 /** Pulled up past this share of the screen (or flicked), the mini player opens Now Playing. */
 private const val MiniPullOpen = 0.18f
 private const val MiniFlingVelocity = 900f
+
+/** How far the docked mini player is swiped down before letting go stops the music. */
+private val MiniDismissDrag = 44.dp
 
 /** How small a tapped tab's icon dips before it springs back. */
 private const val TabBounceFrom = 0.8f

@@ -25,6 +25,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import coil.imageLoader
 import coil.request.ImageRequest
+import com.aakash.novafork.ui.theme.NovaColors
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
@@ -170,3 +171,38 @@ internal fun rememberCoverTint(artUri: String?): Color {
     val shown by animateColorAsState(tint, tween(600), label = "coverTint")
     return shown
 }
+
+/**
+ * A bright accent from [artUri]'s cover, for the Audio tab while it plays (owner): the most
+ * colourful third of the picture, made vivid and light enough to read on black. Apple Music's red
+ * for no cover, until it has loaded, and for a cover with hardly any colour.
+ */
+@Composable
+internal fun rememberCoverAccent(artUri: String?): Color {
+    val context = LocalContext.current
+    val accent by produceState(NovaColors.AppleMusicRed, artUri) {
+        value = artUri?.let { uri ->
+            runCatching {
+                val request = ImageRequest.Builder(context).data(uri).size(GRADIENT_PX).allowHardware(false).build()
+                (context.imageLoader.execute(request).drawable as? BitmapDrawable)?.bitmap?.let { accentOf(coverColors(it)) }
+            }.getOrNull()
+        } ?: NovaColors.AppleMusicRed
+    }
+    val shown by animateColorAsState(accent, tween(600), label = "coverAccent")
+    return shown
+}
+
+private fun accentOf(colors: CoverColors): Color {
+    val hsv = FloatArray(3)
+    val best = listOf(colors.top, colors.middle, colors.bottom)
+        .map { color -> FloatArray(3).also { android.graphics.Color.colorToHSV(color.toArgb(), it) } }
+        .maxBy { it[1] }
+    if (best[1] < ACCENT_MIN_SATURATION) return NovaColors.AppleMusicRed
+    hsv[0] = best[0]
+    hsv[1] = best[1].coerceIn(0.55f, 0.9f)
+    hsv[2] = 0.95f
+    return Color(android.graphics.Color.HSVToColor(hsv))
+}
+
+/** Below this, a cover reads as grey and the Audio tab keeps its red. */
+private const val ACCENT_MIN_SATURATION = 0.18f
