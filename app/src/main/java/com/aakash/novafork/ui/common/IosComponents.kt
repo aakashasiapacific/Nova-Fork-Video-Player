@@ -852,7 +852,6 @@ fun CollapsedTitleBar(visible: Boolean, title: String, modifier: Modifier = Modi
 @Suppress("UNUSED_PARAMETER")
 @Composable
 fun Modifier.pressScale(source: InteractionSource, pressed: Float = 0.94f): Modifier = this
-}
 
 /**
  * Apple TV's poster press: while held the picture darkens a little (with [pressScale] shrinking
