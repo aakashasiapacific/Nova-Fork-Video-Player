@@ -20,6 +20,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
  * Version 6 adds metadata.logoPath.
  * Version 7 adds song_favorites (Apple Music's star).
  * Version 8 adds video_favorites (the hero's star).
+ * Version 9 adds metadata.collectionId and collectionName (a movie's TMDB collection).
  */
 @Database(
     entities = [
@@ -36,7 +37,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         FavoriteSongEntity::class,
         VideoFavoriteEntity::class,
     ],
-    version = 8,
+    version = 9,
     exportSchema = true,
 )
 abstract class NovaDatabase : RoomDatabase() {
@@ -177,11 +178,24 @@ abstract class NovaDatabase : RoomDatabase() {
         }
 
         /**
+         * Adds the movie's collection. Movie rows are marked as missing their details (castNames
+         * NULL), so the next metadata pass fetches each movie once more, collection included, as
+         * version 6 did for the logo; shows are left alone.
+         */
+        val MIGRATION_8_9: Migration = object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `metadata` ADD COLUMN `collectionId` INTEGER")
+                db.execSQL("ALTER TABLE `metadata` ADD COLUMN `collectionName` TEXT")
+                db.execSQL("UPDATE `metadata` SET `castNames` = NULL WHERE `key` LIKE 'movie:%'")
+            }
+        }
+
+        /**
          * Upgrades between schema versions, oldest first (`Migration(1, 2)`, `Migration(2, 3)`, …).
          * Watch history, resume points and manual matches only survive an app update through these:
          * with a version missing here Room refuses to open the database rather than wipe it.
          */
-        val MIGRATIONS: Array<Migration> = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
+        val MIGRATIONS: Array<Migration> = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)
 
         fun create(context: Context): NovaDatabase =
             Room.databaseBuilder(context.applicationContext, NovaDatabase::class.java, "nova.db")

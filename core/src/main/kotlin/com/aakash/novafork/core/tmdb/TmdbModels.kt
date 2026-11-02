@@ -65,9 +65,18 @@ data class TmdbMovieDetails(
     /** The title logo in the app's language ([TmdbImages.logo]), picked by [TmdbClient]. */
     @Transient val logoPath: String? = null,
     val credits: TmdbCredits = TmdbCredits(),
+    /** The series of films it belongs to ("Dune Collection"), if TMDB groups it in one. */
+    @SerialName("belongs_to_collection") val collection: TmdbCollectionRef? = null,
 ) {
     val year: Int? get() = releaseDate?.take(4)?.toIntOrNull()
 }
+
+/** A movie's collection as its details name it: the id and name are all the library needs. */
+@Serializable
+data class TmdbCollectionRef(
+    val id: Int,
+    val name: String = "",
+)
 
 @Serializable
 data class TmdbSeasonSummary(

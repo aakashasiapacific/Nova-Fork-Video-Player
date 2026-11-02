@@ -210,6 +210,12 @@ data class MetadataEntity(
      * in place of plain text. Null = none.
      */
     val logoPath: String? = null,
+    /**
+     * The TMDB collection a movie belongs to (version 9: "Dune Collection"), so its page can list
+     * the library's other films in it. Null = none (or not fetched yet).
+     */
+    val collectionId: Int? = null,
+    val collectionName: String? = null,
 )
 
 /**

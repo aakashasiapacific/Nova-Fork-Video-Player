@@ -242,6 +242,12 @@ data class VideoDetailsUi(
     val lastWatched: String? = null,
     /** More Like This: the library's titles closest to this one, best first. */
     val moreLikeThis: List<LibraryItemUi> = emptyList(),
+    /** A movie's TMDB collection ("Dune Collection") when the library has 2+ of its films. */
+    val collectionName: String? = null,
+    /** Those films, this one included, oldest first. */
+    val collection: List<VideoCardUi> = emptyList(),
+    /** On a share or media server the app can copy it from into Movies/Nova Fork. */
+    val downloadable: Boolean = false,
 )
 
 @Immutable

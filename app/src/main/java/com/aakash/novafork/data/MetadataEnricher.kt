@@ -426,6 +426,8 @@ internal fun TmdbMovieDetails.toMetadata(now: Long): MetadataEntity = MetadataEn
     logoPath = logoPath,
     castNames = credits.topCast().joinToString(", "),
     directors = credits.directors.joinToString(", "),
+    collectionId = collection?.id?.takeIf { it > 0 },
+    collectionName = collection?.name.nonBlank(),
 )
 
 internal fun TmdbTvDetails.toMetadata(now: Long): MetadataEntity {

@@ -96,6 +96,10 @@ fun PhoneVideoDetailsScreen(
                     modifier = Modifier.tintBand(tint, from = 0.8f, to = if (hasOverview) 0.55f else 0f).padding(start = dims.gutter, end = dims.gutter, top = 20.dp),
                 )
             }
+            // "Downloading 42%" while it copies to the phone (Download is in the ⋮ menu).
+            item(key = "download") {
+                DownloadStatus(details, Modifier.padding(start = dims.gutter, end = dims.gutter, top = 12.dp))
+            }
             item(key = "overview") {
                 Column(Modifier.tintBand(tint, from = 0.55f, to = 0f).padding(start = dims.gutter, end = dims.gutter, top = 16.dp)) {
                     OverviewBlock(tagline = details.tagline, overview = details.overview)
@@ -134,6 +138,9 @@ fun PhoneVideoDetailsScreen(
                         )
                     }
                 }
+            }
+            if (details.collection.isNotEmpty()) {
+                item(key = "collection") { CollectionRow(details, actions) }
             }
             // An unidentified video is usually not a movie or show at all: no nagging card;
             // Identify stays in the ⋮ menu.
@@ -187,6 +194,7 @@ fun PhoneVideoDetailsScreen(
                         actions.addToPlaylist(listOf(details.id), details.title)
                     },
                 )
+                DownloadMenuItem(details, close)
             },
         )
     }
