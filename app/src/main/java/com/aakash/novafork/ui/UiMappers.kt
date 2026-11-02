@@ -19,6 +19,8 @@ import com.aakash.novafork.ui.model.EpisodeUi
 import com.aakash.novafork.ui.model.FolderUi
 import com.aakash.novafork.ui.model.HeroTarget
 import com.aakash.novafork.ui.model.HeroUi
+import com.aakash.novafork.ui.model.HistoryDayUi
+import com.aakash.novafork.ui.model.HistoryEntryUi
 import com.aakash.novafork.ui.model.HomeUi
 import com.aakash.novafork.ui.model.LibraryFilter
 import com.aakash.novafork.ui.model.LibraryItemUi
@@ -42,6 +44,7 @@ import java.time.LocalDate
 import java.time.YearMonth
 import java.time.ZoneId
 import java.time.format.TextStyle
+import java.time.temporal.ChronoUnit
 import java.util.Locale
 
 /**
@@ -50,6 +53,10 @@ import java.util.Locale
  */
 object UiMappers {
     private const val CONTINUE_WATCHING_LIMIT = 60
+    private const val MORE_LIKE_THIS_LIMIT = 12
+    /** A shared genre counts for less than a shared actor in More Like This. */
+    private const val GENRE_WEIGHT = 2
+    private const val CAST_WEIGHT = 3
     private const val RECENTLY_ADDED_LIMIT = 30
     private const val HERO_LIMIT = 6
     /** Newest movies and shows considered for the hero before the backdrop preference is applied. */
@@ -374,6 +381,9 @@ object UiMappers {
             isMatched = meta != null,
             starring = meta?.castNames.nonBlank(),
             directedBy = meta?.directors.nonBlank(),
+            lastWatched = video.lastPlayedAt?.let { watchedLabel(it) },
+            // An episode's page leaves it to its show's page.
+            moreLikeThis = if (isMovie) moreLikeThis(index, meta, item.title) else emptyList(),
         )
     }
 
@@ -438,7 +448,73 @@ object UiMappers {
             nextUp = episodeUi(next),
             playLabel = showPlayLabel(next),
             isMatched = show.meta != null,
+            lastWatched = show.episodes.mapNotNull { it.video.lastPlayedAt }.maxOrNull()?.let { watchedLabel(it) },
+            moreLikeThis = moreLikeThis(index, show.meta, show.title),
         )
+    }
+
+    /**
+     * More Like This (Apple TV): the library's other movies and shows sharing the most genres and
+     * cast with [meta], best first (then the better rated), at most [MORE_LIKE_THIS_LIMIT]; none
+     * when [meta] has neither. Other copies of the same title ([title]) are left out.
+     */
+    private fun moreLikeThis(index: LibraryIndex, meta: MetadataEntity?, title: String): List<LibraryItemUi> {
+        val genres = genresOf(meta).mapTo(HashSet()) { it.lowercase(Locale.ROOT) }
+        val cast = namesOf(meta?.castNames)
+        if (genres.isEmpty() && cast.isEmpty()) return emptyList()
+        fun score(other: MetadataEntity?): Int =
+            genresOf(other).count { it.lowercase(Locale.ROOT) in genres } * GENRE_WEIGHT +
+                namesOf(other?.castNames).count { it in cast } * CAST_WEIGHT
+        val movies = index.movies.map { Triple<LibraryItemUi, String, Int>(LibraryItemUi.Video(it.card), it.title, score(it.meta)) to it.card.rating }
+        val shows = index.shows.map { Triple<LibraryItemUi, String, Int>(LibraryItemUi.Show(it.card), it.title, score(it.meta)) to it.card.rating }
+        return (movies + shows)
+            .filter { (entry, _) -> entry.third > 0 && !entry.second.equals(title, ignoreCase = true) }
+            .sortedWith(compareByDescending<Pair<Triple<LibraryItemUi, String, Int>, Float?>> { it.first.third }.thenByDescending { it.second ?: 0f })
+            .distinctBy { it.first.second.lowercase(Locale.ROOT) }
+            .take(MORE_LIKE_THIS_LIMIT)
+            .map { it.first.first }
+    }
+
+    private fun namesOf(list: String?): Set<String> =
+        list.orEmpty().split(',').mapNotNullTo(HashSet()) { it.trim().lowercase(Locale.ROOT).ifEmpty { null } }
+
+    /** "Watched today", "Watched yesterday", "Watched 3 days ago", then "Watched 12 Mar" (with the year before this one). */
+    internal fun watchedLabel(at: Long, now: Long = System.currentTimeMillis(), zone: ZoneId = ZoneId.systemDefault()): String {
+        val day = Instant.ofEpochMilli(at).atZone(zone).toLocalDate()
+        val today = Instant.ofEpochMilli(now).atZone(zone).toLocalDate()
+        val days = ChronoUnit.DAYS.between(day, today)
+        val month = day.month.getDisplayName(TextStyle.SHORT, Locale.getDefault())
+        return "Watched " + when {
+            days <= 0L -> "today"
+            days == 1L -> "yesterday"
+            days < 7L -> "$days days ago"
+            day.year == today.year -> "${day.dayOfMonth} $month"
+            else -> "${day.dayOfMonth} $month ${day.year}"
+        }
+    }
+
+    // Watch history
+
+    /**
+     * Everything played, newest first, under the day it was last played ("Today", "Yesterday", a
+     * weekday, then a date). [hidden] holds the videos taken off the history, each with when it
+     * had last been played then: played again since, it comes back.
+     */
+    fun history(
+        index: LibraryIndex,
+        hidden: Map<Long, Long>,
+        now: Long = System.currentTimeMillis(),
+        zone: ZoneId = ZoneId.systemDefault(),
+    ): List<HistoryDayUi> {
+        val today = Instant.ofEpochMilli(now).atZone(zone).toLocalDate()
+        return index.videos
+            .mapNotNull { video ->
+                val at = video.video.lastPlayedAt ?: return@mapNotNull null
+                if (hidden[video.id]?.let { at <= it } == true) null else HistoryEntryUi(video.card, at)
+            }
+            .sortedByDescending { it.playedAt }
+            .groupBy { Instant.ofEpochMilli(it.playedAt).atZone(zone).toLocalDate() }
+            .map { (day, entries) -> HistoryDayUi(arrivedLabel(day, today), entries) }
     }
 
     private fun episodeUi(item: IndexedVideo): EpisodeUi {
