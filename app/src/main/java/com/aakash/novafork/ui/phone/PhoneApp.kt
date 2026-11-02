@@ -359,16 +359,15 @@ fun PhoneApp(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
                                     sizeTransform = null,
                                 )
                                 from.top != to.top -> tabSlide(from = from.top, to = to.top, fade = fade)
-                                to.isTitlePage() && to != from -> {
-                                    val origin = tapOrigin.also { zoomOrigins[to] = it }
-                                    (scaleIn(tween(200, easing = FastOutSlowInEasing), initialScale = 0.2f, transformOrigin = origin) + fadeIn(tween(120))) togetherWith
-                                        (fadeOut(tween(150)) + scaleOut(tween(200), targetScale = 0.94f))
-                                }
-                                from.isTitlePage() && !to.isTitlePage() -> {
-                                    val origin = zoomOrigins[from] ?: TransformOrigin.Center
-                                    (fadeIn(tween(150)) + scaleIn(tween(200), initialScale = 0.94f)) togetherWith
-                                        (scaleOut(tween(200), targetScale = 0.2f, transformOrigin = origin) + fadeOut(tween(160, delayMillis = 40)))
-                                }
+                                // A title's page (owner: the zoom out of the tapped poster or hero was
+                                // erratic): a quick, plain push like ChatGPT's, the page gliding in a
+                                // little from the right as it fades in; back undoes it.
+                                to.isTitlePage() && to != from ->
+                                    (slideInHorizontally(tween(PushMs, easing = FastOutSlowInEasing)) { it / PushShare } + fadeIn(tween(PushMs))) togetherWith
+                                        fadeOut(tween(PushOutMs))
+                                from.isTitlePage() && !to.isTitlePage() ->
+                                    fadeIn(tween(PushMs)) togetherWith
+                                        (slideOutHorizontally(tween(PushMs, easing = FastOutSlowInEasing)) { it / PushShare } + fadeOut(tween(PushOutMs)))
                                 else -> fade
                             }
                         },
@@ -1008,3 +1007,8 @@ private fun Route.isTitlePage(): Boolean = this is Route.VideoDetails || this is
  * only comes in as a page scrolls).
  */
 private val StatusEdgeDepth = 20.dp
+
+/** A title page's push: how long, how long the page under it takes to fade, and 1/n of the width it glides. */
+private const val PushMs = 180
+private const val PushOutMs = 110
+private const val PushShare = 8
