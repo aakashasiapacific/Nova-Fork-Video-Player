@@ -287,6 +287,10 @@ private fun TabletBottomBar(
                     buttonSize = 56.dp,
                     iconSize = 26.dp,
                 )
+                // The sound: the equaliser, night mode and the sleep timer.
+                EqualizerButton(on = state.equalizerOn, buttonSize = 56.dp, iconSize = 26.dp)
+                NightModeButton(on = state.nightMode, onClick = actions::toggleNightMode, buttonSize = 56.dp, iconSize = 26.dp)
+                SleepTimerButton(sleep = state.sleepTimer, onSet = actions::setSleepTimer, buttonSize = 56.dp, iconSize = 26.dp)
             }
             Spacer(Modifier.width(8.dp))
             LabelledButton(

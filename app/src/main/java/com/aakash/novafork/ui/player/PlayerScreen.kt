@@ -51,7 +51,9 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.aakash.novafork.data.Settings
 import com.aakash.novafork.ui.adaptive.DeviceLayout
+import com.aakash.novafork.ui.common.EqualizerSheet
 import com.aakash.novafork.ui.model.PlayerActions
 import com.aakash.novafork.ui.model.PlayerUiState
 import kotlin.coroutines.resume
@@ -78,6 +80,8 @@ fun PlayerScreen(
     modifier: Modifier = Modifier,
     /** Copies the frame on screen (the video draws where Compose can't read it); null where it can't. */
     copyFrame: ((onCopied: (Bitmap?) -> Unit) -> Unit)? = null,
+    /** The app's settings, for the equaliser sheet. */
+    settings: Settings = Settings(),
     surface: @Composable () -> Unit,
 ) {
     // How far the video has been pulled down to close the player (iOS), px.
@@ -95,6 +99,14 @@ fun PlayerScreen(
             contentAlignment = Alignment.Center,
         ) {
             surface()
+            // The sleep timer running out: the picture dims as the sound fades.
+            if (state.sleepDim > 0f) {
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = SLEEP_DIM_MAX * state.sleepDim)),
+                )
+            }
         }
         val castingTo = state.castingTo
         if (castingTo != null) {
@@ -108,7 +120,7 @@ fun PlayerScreen(
         if (state.inPictureInPicture) {
             if (state.isBuffering) BufferingIndicator(Modifier.align(Alignment.Center))
         } else {
-            PlayerChrome(state = state, actions = actions, layout = layout, dismiss = dismiss, copyFrame = copyFrame)
+            PlayerChrome(state = state, actions = actions, layout = layout, dismiss = dismiss, copyFrame = copyFrame, settings = settings)
         }
     }
 }
@@ -120,6 +132,7 @@ private fun PlayerChrome(
     layout: DeviceLayout,
     dismiss: Animatable<Float, AnimationVector1D>,
     copyFrame: ((onCopied: (Bitmap?) -> Unit) -> Unit)?,
+    settings: Settings,
 ) {
     val scope = rememberCoroutineScope()
     val backDispatcher = LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
@@ -128,6 +141,8 @@ private fun PlayerChrome(
     var controlsRequested by rememberSaveable { mutableStateOf(true) }
     var panel by rememberSaveable { mutableStateOf<PlayerPanel?>(null) }
     var sheet by rememberSaveable { mutableStateOf<PlayerSheet?>(null) }
+    var equalizerOpen by rememberSaveable { mutableStateOf(false) }
+    val audioHost = remember { PlayerAudioHost(openEqualizer = { equalizerOpen = true }) }
     // The full length, as Samsung's player shows it; a tap on it switches to the time left.
     var showRemaining by rememberSaveable { mutableStateOf(false) }
     var touching by remember { mutableStateOf(false) }
@@ -138,7 +153,8 @@ private fun PlayerChrome(
 
     // Paused, failed or with options open, the controls stay up whatever was tapped.
     val searchOpen = state.subtitleSearch != null
-    val forcedVisible = !state.isPlaying || state.error != null || panel != null || sheet != null || searchOpen
+    val forcedVisible = !state.isPlaying || state.error != null || panel != null || sheet != null || searchOpen ||
+        equalizerOpen || audioHost.holds > 0
 
     // Left paused a while, Netflix's way (owner): the picture drains to black and white and dims,
     // the controls go, and what is playing shows over it; any touch brings the controls back.
@@ -164,6 +180,7 @@ private fun PlayerChrome(
         if (state.locked) {
             panel = null
             sheet = null
+            equalizerOpen = false
             if (state.subtitleSearch != null) actions.dismissSubtitleSearch()
             unlockHintRequests += 1
         } else {
@@ -237,7 +254,7 @@ private fun PlayerChrome(
     // With the controls up, feedback moves above the play button instead of covering it.
     val feedbackBias by animateFloatAsState(if (controlsVisible) -0.5f else 0f, label = "feedbackBias")
 
-    CompositionLocalProvider(LocalContentColor provides Color.White) {
+    CompositionLocalProvider(LocalContentColor provides Color.White, LocalPlayerAudioHost provides audioHost) {
         Box(
             Modifier
                 .fillMaxSize()
@@ -414,6 +431,9 @@ private fun PlayerChrome(
         if (!layout.isTablet && subtitleSearch != null) {
             SubtitleSearchSheet(search = subtitleSearch, actions = actions)
         }
+        if (equalizerOpen) {
+            EqualizerSheet(settings = settings, onUpdate = actions::updateSettings, onDismiss = { equalizerOpen = false })
+        }
     }
 
     // The phone sheets handle back themselves; this closes the tablet panels before back leaves the player.
@@ -423,6 +443,9 @@ private fun PlayerChrome(
         sheet = null
     }
 }
+
+/** How dark the picture gets as the sleep timer runs out. */
+private const val SLEEP_DIM_MAX = 0.85f
 
 /** Pulled down past this share of the height (or flicked), the player closes. */
 private const val DISMISS_FRACTION = 0.22f

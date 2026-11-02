@@ -3,6 +3,7 @@ package com.aakash.novafork.ui.model
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.graphics.ImageBitmap
 import com.aakash.novafork.data.AspectMode
+import com.aakash.novafork.data.Settings
 
 /** One audio or subtitle track as libVLC reports it. id -1 = "Disable". */
 @Immutable
@@ -38,6 +39,18 @@ enum class RepeatMode {
     /** Play the same item again. */
     ONE,
 }
+
+/** [PlayerActions.setSleepTimer]'s choice to stop at the end of the video playing. */
+const val SLEEP_END_OF_VIDEO = -1
+
+/** The video sleep timer while it runs (see [PlayerActions.setSleepTimer]). */
+@Immutable
+data class SleepTimerUi(
+    /** What was chosen: minutes, or [SLEEP_END_OF_VIDEO]. */
+    val choice: Int,
+    /** Whole minutes to go, rounded up; null when it waits for the end of the video. */
+    val minutesLeft: Int?,
+)
 
 /** One library video of the play queue, in play order (shuffled order while shuffle is on). */
 @Immutable
@@ -156,6 +169,14 @@ data class PlayerUiState(
     val castingTo: String? = null,
     /** The subtitle download list while it is open; null = closed. */
     val subtitleSearch: SubtitleSearchUi? = null,
+    /** Night mode (Settings.nightMode): voices lifted, booms softened. */
+    val nightMode: Boolean = false,
+    /** The equaliser is on (a preset or the person's own bands). */
+    val equalizerOn: Boolean = false,
+    /** The sleep timer while it runs; null = off. */
+    val sleepTimer: SleepTimerUi? = null,
+    /** 0 to 1: how far the picture has dimmed as the sleep timer ran out; back to 0 on play. */
+    val sleepDim: Float = 0f,
 )
 
 /**
@@ -238,6 +259,20 @@ interface PlayerActions {
 
     /** Closes the list; a download already running still finishes and turns its subtitle on. */
     fun dismissSubtitleSearch() {}
+
+    // Sound and sleep. Default bodies keep other implementations compiling.
+
+    /** Night mode on or off; it stays so for every video (Settings.nightMode). */
+    fun toggleNightMode() {}
+
+    /** Changes the app's settings from the player (the equaliser sheet). */
+    fun updateSettings(transform: (Settings) -> Settings) {}
+
+    /**
+     * The sleep timer: in [minutes] the picture dims and the sound fades, then the video pauses;
+     * [SLEEP_END_OF_VIDEO] pauses at the end of this video instead of going on; 0 turns it off.
+     */
+    fun setSleepTimer(minutes: Int) {}
 }
 
 open class NoOpPlayerActions : PlayerActions {

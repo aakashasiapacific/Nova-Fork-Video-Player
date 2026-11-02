@@ -275,6 +275,10 @@ private fun playerOptions(
         },
     )
     add(PlayerOption { PlayerIconButton(R.drawable.ic_player_audio, "Audio track", { onOpenPanel(PlayerPanel.AUDIO) }) })
+    // The sound: the equaliser, night mode and the sleep timer.
+    add(PlayerOption { EqualizerButton(on = state.equalizerOn) })
+    add(PlayerOption { NightModeButton(on = state.nightMode, onClick = actions::toggleNightMode) })
+    add(PlayerOption { SleepTimerButton(sleep = state.sleepTimer, onSet = actions::setSleepTimer) })
     add(PlayerOption { CastButton(castingTo = state.castingTo, onClick = { onOpenSheet(PlayerSheet.CAST) }) })
     if (state.queue.size > 1) {
         add(PlayerOption { PlayerIconButton(R.drawable.ic_player_queue, "Queue", { onOpenSheet(PlayerSheet.QUEUE) }) })
@@ -297,7 +301,7 @@ private fun playerOptions(
 /**
  * The [options] under the seek bar, each in an equal cell. One wide row when every cell can keep
  * at least [OptionCellMin] (landscape), Capture ([onCapture]) at its left; otherwise two balanced
- * rows, centred (portrait). A cell never grows past [OptionCellMax], so nothing clips or spreads
+ * rows, centred (portrait), or three when two would be too tight. A cell never grows past [OptionCellMax], so nothing clips or spreads
  * thin, whatever number of options there are.
  */
 @Composable
@@ -318,7 +322,10 @@ private fun PlayerOptionRows(options: List<PlayerOption>, onCapture: (() -> Unit
             }
         } else {
             val all = listOfNotNull(capture) + options
-            val perRow = (all.size + 1) / 2
+            // Two rows, or three when two would squeeze the cells under OptionCellMin.
+            val fit = (maxWidth / OptionCellMin).toInt().coerceAtLeast(1)
+            val rows = maxOf(2, (all.size + fit - 1) / fit)
+            val perRow = (all.size + rows - 1) / rows
             val cell = (maxWidth / perRow).coerceAtMost(OptionCellMax)
             Column(Modifier.fillMaxWidth()) {
                 all.chunked(perRow).forEach { rowOptions ->
