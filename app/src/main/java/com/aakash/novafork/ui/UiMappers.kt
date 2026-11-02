@@ -374,7 +374,27 @@ object UiMappers {
             isMatched = meta != null,
             starring = meta?.castNames.nonBlank(),
             directedBy = meta?.directors.nonBlank(),
-        )
+        ).let { details ->
+            val collection = if (isMovie) collectionOf(index, meta) else emptyList()
+            if (collection.size < 2) {
+                details
+            } else {
+                details.copy(collectionName = meta?.collectionName.nonBlank() ?: "Collection", collection = collection)
+            }
+        }
+    }
+
+    /**
+     * The library's films in [meta]'s TMDB collection, one card per title (its first copy),
+     * oldest first; empty when it is in none.
+     */
+    private fun collectionOf(index: LibraryIndex, meta: MetadataEntity?): List<VideoCardUi> {
+        val collectionId = meta?.collectionId ?: return emptyList()
+        return index.movies
+            .filter { it.meta?.collectionId == collectionId }
+            .distinctBy { it.meta?.key ?: it.id.toString() }
+            .sortedWith(compareBy<IndexedVideo, Int?>(nullsLast()) { it.meta?.year ?: it.card.year }.then(TITLE_ORDER))
+            .map { it.card }
     }
 
     /** The episode after [current] in watching order, skipping other copies of the same episode. */

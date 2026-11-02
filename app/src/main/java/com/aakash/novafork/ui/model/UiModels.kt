@@ -238,6 +238,10 @@ data class VideoDetailsUi(
     val sourceLabel: String = "",
     /** True when the info came from TMDB. */
     val isMatched: Boolean = false,
+    /** A movie's TMDB collection ("Dune Collection") when the library has 2+ of its films. */
+    val collectionName: String? = null,
+    /** Those films, this one included, oldest first. */
+    val collection: List<VideoCardUi> = emptyList(),
 )
 
 @Immutable
