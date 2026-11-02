@@ -236,7 +236,8 @@ class MusicService : Service() {
                     .setProgress(done),
             )
             .setShortCriticalText("${minutesLeft}m")
-            .setRequestPromotedOngoing(true)
+            // setRequestPromotedOngoing() is newer than the SDK this builds against; its extra is the same thing.
+            .addExtras(android.os.Bundle().apply { putBoolean(EXTRA_REQUEST_PROMOTED_ONGOING, true) })
             .build()
     }
 
@@ -390,3 +391,6 @@ class MusicService : Service() {
         }
     }
 }
+
+/** Notification.EXTRA_REQUEST_PROMOTED_ONGOING: asks Android 16 to show it as a Live Update. */
+private const val EXTRA_REQUEST_PROMOTED_ONGOING = "android.requestPromotedOngoing"
