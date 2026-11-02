@@ -73,7 +73,21 @@ data class Settings(
      * Liquid Glass slider sets it. The default is iOS 27's (ui.common.DEFAULT_GLASS_TINT).
      */
     val glassTint: Float = 1f,
+    /** Seconds one song fades into the next, 0 (gapless, no fade) to 8. */
+    val crossfadeSeconds: Int = 0,
+    /**
+     * The equaliser, for songs and videos alike: the name of a preset of libVLC's ("Flat",
+     * "Rock" …), [EQUALIZER_CUSTOM] for [equalizerBands], or "" for off.
+     */
+    val equalizerPreset: String = "",
+    /** The custom equaliser's ten band gains in dB (-20 to 20), comma separated; "" = all flat. */
+    val equalizerBands: String = "",
+    /** Night mode for videos: quiet dialogue louder and loud scenes softer (a compressor). */
+    val nightMode: Boolean = false,
 )
+
+/** [Settings.equalizerPreset]'s value for the person's own band gains. */
+const val EQUALIZER_CUSTOM = "Custom"
 
 interface SettingsStore {
     val settings: StateFlow<Settings>

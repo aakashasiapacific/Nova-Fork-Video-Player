@@ -74,6 +74,10 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
             putString(KEY_SUBTITLE_LANGUAGES, s.subtitleLanguages)
             putBoolean(KEY_AUTO_DOWNLOAD_SUBTITLES, s.autoDownloadSubtitles)
             putFloat(KEY_GLASS_TINT, s.glassTint)
+            putInt(KEY_CROSSFADE_SECONDS, s.crossfadeSeconds)
+            putString(KEY_EQUALIZER_PRESET, s.equalizerPreset)
+            putString(KEY_EQUALIZER_BANDS, s.equalizerBands)
+            putBoolean(KEY_NIGHT_MODE, s.nightMode)
         }
     }
 
@@ -110,6 +114,10 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
         const val KEY_AUTO_DOWNLOAD_SUBTITLES = "auto_download_subtitles"
         /** "_v2": the default moved to Tinted (owner), so a value saved under the old default is dropped. */
         const val KEY_GLASS_TINT = "glass_tint_v2"
+        const val KEY_CROSSFADE_SECONDS = "crossfade_seconds"
+        const val KEY_EQUALIZER_PRESET = "equalizer_preset"
+        const val KEY_EQUALIZER_BANDS = "equalizer_bands"
+        const val KEY_NIGHT_MODE = "night_mode"
 
         /**
          * The type [write] stores each key with. A restored backup's entry of another type is
@@ -141,6 +149,10 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
             KEY_SUBTITLE_LANGUAGES to SettingType.STRING,
             KEY_AUTO_DOWNLOAD_SUBTITLES to SettingType.BOOLEAN,
             KEY_GLASS_TINT to SettingType.FLOAT,
+            KEY_CROSSFADE_SECONDS to SettingType.INT,
+            KEY_EQUALIZER_PRESET to SettingType.STRING,
+            KEY_EQUALIZER_BANDS to SettingType.STRING,
+            KEY_NIGHT_MODE to SettingType.BOOLEAN,
         )
 
         /**
@@ -190,6 +202,10 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
                 subtitleLanguages = prefs.string(KEY_SUBTITLE_LANGUAGES) ?: defaults.subtitleLanguages,
                 autoDownloadSubtitles = prefs.boolean(KEY_AUTO_DOWNLOAD_SUBTITLES, defaults.autoDownloadSubtitles),
                 glassTint = prefs.float(KEY_GLASS_TINT, defaults.glassTint).coerceIn(0f, 1f),
+                crossfadeSeconds = prefs.int(KEY_CROSSFADE_SECONDS, defaults.crossfadeSeconds).coerceIn(0, 8),
+                equalizerPreset = prefs.string(KEY_EQUALIZER_PRESET) ?: defaults.equalizerPreset,
+                equalizerBands = prefs.string(KEY_EQUALIZER_BANDS) ?: defaults.equalizerBands,
+                nightMode = prefs.boolean(KEY_NIGHT_MODE, defaults.nightMode),
             )
         }
 
