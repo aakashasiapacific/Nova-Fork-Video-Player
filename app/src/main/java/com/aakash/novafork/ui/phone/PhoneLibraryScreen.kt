@@ -21,12 +21,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
-import com.aakash.novafork.ui.adaptive.LocalNovaDimens
 import com.aakash.novafork.ui.common.EmptyState
+import com.aakash.novafork.ui.common.IosColors
 import com.aakash.novafork.ui.common.IosIconButton
-import com.aakash.novafork.ui.common.IosSegmentedControl
 import com.aakash.novafork.ui.common.NovaDropdownMenu
 import com.aakash.novafork.ui.common.NovaIcon
+import com.aakash.novafork.ui.common.NovaMenuDivider
 import com.aakash.novafork.ui.common.NovaMenuItem
 import com.aakash.novafork.ui.common.ScanBanner
 import com.aakash.novafork.ui.model.AppActions
@@ -68,11 +68,18 @@ fun PhoneLibraryScreen(
                 IosIconButton(onClick = { actions.navigate(Route.Search) }) {
                     NovaIcon(R.drawable.ic_search, contentDescription = "Search")
                 }
-                if (library.filter.isChip) SortMenu(current = library.sort, onSelect = actions::setLibrarySort)
+                // What to show sits in this menu with the order (owner: not on the page itself).
+                // The Watchlist and Favorites pages are lists of their own, without it.
+                if (library.filter.isChip) {
+                    SortMenu(
+                        filter = library.filter,
+                        sort = library.sort,
+                        onFilter = actions::setLibraryFilter,
+                        onSort = actions::setLibrarySort,
+                    )
+                }
             },
         )
-        // The Watchlist and Favorites pages are lists of their own, without the chips.
-        if (library.filter.isChip) FilterChipsRow(library = library, onSelect = actions::setLibraryFilter)
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -90,40 +97,58 @@ fun PhoneLibraryScreen(
     }
 }
 
+/**
+ * The sort menu: "Show" (All, Movies, TV Shows) over "Sort by", a tick on the current choice of
+ * each, as iOS's pull-down menus pick values.
+ */
 @Composable
-private fun SortMenu(current: LibrarySort, onSelect: (LibrarySort) -> Unit) {
+private fun SortMenu(
+    filter: LibraryFilter,
+    sort: LibrarySort,
+    onFilter: (LibraryFilter) -> Unit,
+    onSort: (LibrarySort) -> Unit,
+) {
     var expanded by remember { mutableStateOf(false) }
     Box {
         IosIconButton(onClick = { expanded = true }) {
             NovaIcon(R.drawable.ic_sort, contentDescription = "Sort")
         }
-        NovaDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }, title = "Sort by") {
-            LibrarySort.entries.forEach { sort ->
+        NovaDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }, title = "Show") {
+            LibraryFilter.entries.filter { it.isChip }.forEach { option ->
                 NovaMenuItem(
-                    text = { Text(sort.label) },
+                    text = { Text(option.label) },
                     onClick = {
                         expanded = false
-                        onSelect(sort)
+                        onFilter(option)
                     },
-                    checked = sort == current,
+                    checked = option == filter,
+                )
+            }
+            NovaMenuDivider()
+            MenuHeading("Sort by")
+            LibrarySort.entries.forEach { option ->
+                NovaMenuItem(
+                    text = { Text(option.label) },
+                    onClick = {
+                        expanded = false
+                        onSort(option)
+                    },
+                    checked = option == sort,
                 )
             }
         }
     }
 }
 
+/** A section's small grey heading inside a menu, set as the menu's own title is. */
 @Composable
-private fun FilterChipsRow(library: LibraryUi, onSelect: (LibraryFilter) -> Unit) {
-    val dims = LocalNovaDimens.current
-    // iOS's segmented control, as the TV app's own library filters are drawn.
-    val filters = LibraryFilter.entries.filter { it.isChip }
-    IosSegmentedControl(
-        options = filters.map { it.label },
-        selectedIndex = filters.indexOf(library.filter),
-        onSelect = { onSelect(filters[it]) },
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = dims.gutter, vertical = 4.dp),
+private fun MenuHeading(text: String) {
+    Text(
+        text,
+        style = MaterialTheme.typography.bodySmall,
+        color = IosColors.SecondaryLabel,
+        maxLines = 1,
+        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 8.dp),
     )
 }
 
