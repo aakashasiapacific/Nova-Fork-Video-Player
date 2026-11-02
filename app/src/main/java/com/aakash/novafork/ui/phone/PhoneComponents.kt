@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyGridScope
@@ -42,6 +43,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -364,8 +366,26 @@ private fun WideCardLayout(
                 .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                 .pressDim(press),
         ) {
-            // A card without any 16:9 picture names its title on the placeholder.
-            LandscapeArt(artwork = artwork, title = artTitle, modifier = Modifier.fillMaxSize())
+            // A card without any 16:9 picture names its title on the placeholder. In a row that
+            // drives it, the picture drifts against the scroll inside its frame (Apple TV).
+            val parallax = LocalCardParallax.current
+            LandscapeArt(
+                artwork = artwork,
+                title = artTitle,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .then(
+                        if (parallax == null) {
+                            Modifier
+                        } else {
+                            Modifier.graphicsLayer {
+                                scaleX = ParallaxZoom
+                                scaleY = ParallaxZoom
+                                translationX = -parallax() * size.width * ParallaxShift
+                            }
+                        },
+                    ),
+            )
             if (watched) WatchedBadge(Modifier.align(Alignment.TopEnd).padding(6.dp))
             ProgressStrip(progress, Modifier.align(Alignment.BottomStart))
         }
@@ -399,6 +419,32 @@ private fun WideCardLayout(
 
 /** How far a poster or card sinks in while pressed. */
 private const val CardPressScale = 0.96f
+
+/**
+ * Where a card sits across its row, -1 (left edge) to 1 (right edge), read while drawing: a row
+ * that provides it makes its cards' pictures drift against the scroll. Null: no drift.
+ */
+internal val LocalCardParallax = compositionLocalOf<(() -> Float)?> { null }
+
+/** How far a drifting picture moves (a share of its width), and how much larger it is drawn so its edges never show. */
+private const val ParallaxShift = 0.08f
+private const val ParallaxZoom = 1f + 2f * ParallaxShift
+
+/**
+ * [LocalCardParallax] for the item at [index] of this row: its centre against the row's centre,
+ * as a share of the row's width. Reads the layout, so it belongs in a draw or layer block.
+ */
+internal fun LazyListState.parallaxAt(index: Int): () -> Float = {
+    val info = layoutInfo
+    val item = info.visibleItemsInfo.firstOrNull { it.index == index }
+    if (item == null) {
+        0f
+    } else {
+        val width = (info.viewportEndOffset - info.viewportStartOffset).coerceAtLeast(1)
+        val center = (info.viewportStartOffset + info.viewportEndOffset) / 2f
+        ((item.offset + item.size / 2f - center) / width).coerceIn(-1f, 1f)
+    }
+}
 
 /** List row for a video in a folder: 16:9 thumbnail, title, subtitle, then [trailing] (a button). */
 @Composable

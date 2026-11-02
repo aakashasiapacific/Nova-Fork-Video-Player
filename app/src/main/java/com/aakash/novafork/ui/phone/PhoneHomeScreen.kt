@@ -1,11 +1,17 @@
 package com.aakash.novafork.ui.phone
 
-import android.content.res.Configuration
 import androidx.annotation.DrawableRes
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -19,6 +25,7 @@ import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
@@ -29,6 +36,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -38,22 +46,31 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.coerceAtMost
@@ -67,27 +84,29 @@ import com.aakash.novafork.ui.common.BackdropArt
 import com.aakash.novafork.ui.common.DeviceAccessCard
 import com.aakash.novafork.ui.common.EmptyState
 import com.aakash.novafork.ui.common.EndOfListGap
+import com.aakash.novafork.ui.common.HeroTitle
+import com.aakash.novafork.ui.common.HideStatusBar
 import com.aakash.novafork.ui.common.HomeLibraryLinks
 import com.aakash.novafork.ui.common.IosColors
 import com.aakash.novafork.ui.common.IosFilledTonalButton
 import com.aakash.novafork.ui.common.LocalBottomBarSpace
 import com.aakash.novafork.ui.common.LocalHeroPreviewEnabled
-import com.aakash.novafork.ui.common.LocalStatusBarIcons
+import com.aakash.novafork.ui.common.LocalSheetDepth
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.NovaMenuItem
 import com.aakash.novafork.ui.common.OnTabReselect
+import com.aakash.novafork.ui.common.PictureStatusBar
 import com.aakash.novafork.ui.common.RatingPill
 import com.aakash.novafork.ui.common.ScanBanner
 import com.aakash.novafork.ui.common.SectionHeader
 import com.aakash.novafork.ui.common.SoftEdgeDepth
-import com.aakash.novafork.ui.common.softTopEdge
 import com.aakash.novafork.ui.common.VideoMenuBox
 import com.aakash.novafork.ui.common.bottomScrim
 import com.aakash.novafork.ui.common.deviceAccessNotice
 import com.aakash.novafork.ui.common.fadeEndEdge
 import com.aakash.novafork.ui.common.metaLine
 import com.aakash.novafork.ui.common.rememberRowSnap
-import com.aakash.novafork.ui.common.rememberTopBrightness
+import com.aakash.novafork.ui.common.softTopEdge
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.DialogUi
 import com.aakash.novafork.ui.model.HeroTarget
@@ -107,8 +126,22 @@ import kotlinx.coroutines.delay
 /** Scrolled less than this, the hero counts as on screen. */
 private const val HERO_VISIBLE_SCROLL_PX = 600
 
-/** A top of the hero brighter than this gets dark status bar icons. */
-private const val BRIGHT_TOP = 0.62f
+/** Home rests (the hero fills the screen) after this long untouched (owner: 6 seconds). */
+private const val REST_AFTER_MS = 6_000L
+
+/**
+ * Home at rest: after [REST_AFTER_MS] untouched with the hero on screen, the hero fills the
+ * screen and the bars fade (a screensaver); any touch brings everything back. The shell owns it
+ * so the tab bar can fade, and [blocked] (a dialog, Now Playing, another page) holds it off.
+ */
+@Stable
+internal class HomeRest {
+    var resting by mutableStateOf(false)
+    var blocked by mutableStateOf(false)
+}
+
+/** The shell's [HomeRest]; null where nothing rests (tablet, previews, tests). */
+internal val LocalHomeRest = staticCompositionLocalOf<HomeRest?> { null }
 
 @Composable
 fun PhoneHomeScreen(
@@ -150,16 +183,49 @@ private fun HomeFeed(home: HomeUi, scan: ScanUi, permission: PermissionUi, actio
         derivedStateOf { listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset < HERO_VISIBLE_SCROLL_PX }
     }
     val resumed = lifecycleState.isAtLeast(Lifecycle.State.RESUMED)
-    val scrolled by remember(listState) {
-        derivedStateOf { listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 0 }
-    }
-    HeroStatusBar(
-        hero = home.hero.getOrNull(pagerState.settledPage),
-        // Portrait heroes start below the status bar (clear of the punch hole): only the wide
-        // landscape hero has a picture behind it.
-        active = hasHero && heroOnScreen && LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE,
+    // The hero's picture runs under the status bar, in portrait as in landscape: its icons
+    // follow the picture (owner: no black shade under the clock).
+    PictureStatusBar(
+        model = home.hero.getOrNull(pagerState.settledPage)?.artwork?.let { it.backdropUrl ?: it.stillUrl ?: it.posterUrl },
+        active = hasHero && heroOnScreen,
     )
-    BoxWithConstraints(Modifier.fillMaxSize()) {
+    // Rest when idle: only in the real app (previews and tests never rest), at the very top of
+    // Home, resumed, with no keyboard, sheet or clip playing with sound.
+    val rest = LocalHomeRest.current
+    val sheets = LocalSheetDepth.current
+    val atTop by remember(listState) {
+        derivedStateOf { listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0 }
+    }
+    val clipWithSound = !muted && home.hero.getOrNull(pagerState.currentPage)?.previewUri != null
+    val keyboard = WindowInsets.isImeVisible
+    val canRest = rest != null && previewEnabled && hasHero && atTop && resumed && !rest.blocked &&
+        !clipWithSound && !keyboard && (sheets?.open ?: 0) == 0
+    var touches by remember { mutableIntStateOf(0) }
+    LaunchedEffect(canRest, touches) {
+        if (!canRest) {
+            rest?.resting = false
+            return@LaunchedEffect
+        }
+        delay(REST_AFTER_MS)
+        rest?.resting = true
+    }
+    DisposableEffect(rest) { onDispose { rest?.resting = false } }
+    val resting = rest?.resting == true
+    HideStatusBar(hidden = resting)
+    BoxWithConstraints(
+        Modifier
+            .fillMaxSize()
+            // Any touch anywhere on Home wakes it and starts the wait again.
+            .pointerInput(rest) {
+                awaitPointerEventScope {
+                    while (true) {
+                        awaitPointerEvent(PointerEventPass.Initial)
+                        touches++
+                        rest?.resting = false
+                    }
+                }
+            },
+    ) {
         // Portrait: the 16:9 backdrop with the poster, title and Play under it; landscape: wide.
         val portrait = maxWidth <= maxHeight
         val statusBar = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
@@ -224,9 +290,16 @@ private fun HomeFeed(home: HomeUi, scan: ScanUi, permission: PermissionUi, actio
                 HomeLibraryLinks(actions, counts = home.libraryCounts)
             }
         }
-        // Once the page scrolls, the rows passing under the clock and icons melt away softly
-        // under it (owner: no dark band), the same soft edge as every other page.
-        val shade by animateFloatAsState(if (scrolled) 1f else 0f, label = "statusShade")
+        // Once the hero has gone up past the clock, the rows passing under it melt away softly
+        // (owner: no dark band); never over the hero's own picture.
+        val edgePx = with(LocalDensity.current) { (heroHeight - statusBar - SoftEdgeDepth).toPx() }
+        val underClock by remember(listState, edgePx, hasHero) {
+            derivedStateOf {
+                listState.firstVisibleItemIndex > 0 ||
+                    listState.firstVisibleItemScrollOffset > (if (hasHero) edgePx else 0f)
+            }
+        }
+        val shade by animateFloatAsState(if (underClock) 1f else 0f, label = "statusShade")
         Box(
             Modifier
                 .align(Alignment.TopCenter)
@@ -235,22 +308,59 @@ private fun HomeFeed(home: HomeUi, scan: ScanUi, permission: PermissionUi, actio
                 .graphicsLayer { alpha = shade }
                 .background(softTopEdge()),
         )
+        HomeRestView(hero = home.hero.getOrNull(pagerState.currentPage), resting = resting)
     }
 }
 
 /**
- * Dark status bar icons over a bright top of the hero picture, light ones everywhere else (the
- * page is black). Light again when the hero scrolls away or Home is left.
+ * Home at rest: the hero's picture over the whole screen, drifting slowly, with its title small
+ * at the foot; it grows out of the hero and crossfades as the hero moves on. A touch on it only
+ * wakes Home (it does not open the title underneath).
  */
 @Composable
-private fun HeroStatusBar(hero: HeroUi?, active: Boolean) {
-    val setDarkIcons = LocalStatusBarIcons.current
-    val brightness = rememberTopBrightness(
-        hero?.artwork?.let { it.backdropUrl ?: it.stillUrl ?: it.posterUrl }.takeIf { active },
-    )
-    val dark = active && (brightness ?: 0f) > BRIGHT_TOP
-    LaunchedEffect(dark) { setDarkIcons(dark) }
-    DisposableEffect(Unit) { onDispose { setDarkIcons(false) } }
+private fun HomeRestView(hero: HeroUi?, resting: Boolean) {
+    val dims = LocalNovaDimens.current
+    AnimatedVisibility(
+        visible = resting && hero != null,
+        enter = fadeIn(tween(900)) + scaleIn(tween(900), initialScale = 0.94f, transformOrigin = TransformOrigin(0.5f, 0f)),
+        exit = fadeOut(tween(250)),
+    ) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(Color.Black)
+                .pointerInput(Unit) { detectTapGestures { } },
+        ) {
+            Crossfade(targetState = hero, animationSpec = tween(1_200), label = "restHero") { shown ->
+                if (shown != null) {
+                    Box(Modifier.fillMaxSize()) {
+                        BackdropArt(artwork = shown.artwork, modifier = Modifier.fillMaxSize().slowZoom())
+                        Box(
+                            Modifier
+                                .fillMaxSize()
+                                .background(Brush.verticalGradient(0.55f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.75f))),
+                        )
+                        Box(
+                            Modifier
+                                .align(Alignment.BottomStart)
+                                .padding(start = dims.gutter, end = dims.gutter, bottom = 56.dp)
+                                .graphicsLayer { alpha = 0.85f },
+                        ) {
+                            HeroTitle(
+                                title = shown.title,
+                                logoUrl = shown.artwork.logoUrl,
+                                textStyle = MaterialTheme.typography.titleLarge,
+                                textAlign = TextAlign.Start,
+                                logoAlignment = Alignment.BottomStart,
+                                maxWidthFraction = 0.6f,
+                                logoHeight = 40.dp,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -313,10 +423,13 @@ private fun WatchlistRow(items: List<LibraryItemUi>, actions: AppActions) {
         contentPadding = PaddingValues(horizontal = dims.gutter),
         horizontalArrangement = Arrangement.spacedBy(dims.rowSpacing),
     ) {
-        items(items, key = { it.key }) { item ->
-            when (item) {
-                is LibraryItemUi.Video -> PhoneWideVideoCard(card = item.card, onClick = { actions.openVideo(item.card.id) })
-                is LibraryItemUi.Show -> PhoneWideShowCard(show = item.card, onClick = { actions.openShow(item.card.key) })
+        itemsIndexed(items, key = { _, item -> item.key }) { index, item ->
+            // The pictures drift against the scroll inside their frames (Apple TV).
+            CompositionLocalProvider(LocalCardParallax provides remember(rowState, index) { rowState.parallaxAt(index) }) {
+                when (item) {
+                    is LibraryItemUi.Video -> PhoneWideVideoCard(card = item.card, onClick = { actions.openVideo(item.card.id) })
+                    is LibraryItemUi.Show -> PhoneWideShowCard(show = item.card, onClick = { actions.openShow(item.card.key) })
+                }
             }
         }
     }
@@ -340,7 +453,11 @@ private fun LandscapeRow(cards: List<VideoCardUi>, actions: AppActions) {
         contentPadding = PaddingValues(horizontal = dims.gutter),
         horizontalArrangement = Arrangement.spacedBy(dims.rowSpacing),
     ) {
-        items(cards) { card -> ContinueWatchingCard(card, actions) }
+        itemsIndexed(cards) { index, card ->
+            CompositionLocalProvider(LocalCardParallax provides remember(rowState, index) { rowState.parallaxAt(index) }) {
+                ContinueWatchingCard(card, actions)
+            }
+        }
     }
 }
 

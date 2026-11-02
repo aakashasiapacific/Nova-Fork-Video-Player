@@ -244,10 +244,16 @@ fun PhoneApp(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
     fun stateFor(route: Route): AppUiState =
         if (route == latestState.route) latestState else lastStates[route] ?: latestState.copy(route = route)
     val isTabRoot = state.route == rootOf(top)
+    // Home at rest (the hero over the whole screen after a few idle seconds): the tab bar fades
+    // with it. Nothing rests over a dialog, a menu, Now Playing or another page.
+    val homeRest = remember { HomeRest() }
+    SideEffect { homeRest.blocked = state.route != Route.Home || state.dialog != null || nowPlayingOpen || menuFocus.value > 0 }
+    val restFade by animateFloatAsState(if (homeRest.resting) 1f else 0f, tween(if (homeRest.resting) 900 else 250), label = "restFade")
     CompositionLocalProvider(
         LocalNowPlayingSheet provides nowPlayingSheet,
         LocalMenuFocus provides menuFocus,
         LocalTabReselect provides tabReselect,
+        LocalHomeRest provides homeRest,
     ) {
         Box(
             modifier
@@ -518,8 +524,25 @@ fun PhoneApp(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
                 onSelect = { tab ->
                     if (tab != top || state.canGoBack && state.route != rootOf(tab)) actions.selectTab(tab) else tabReselect.fire()
                 },
-                modifier = Modifier.align(Alignment.BottomCenter),
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .graphicsLayer { alpha = 1f - restFade },
             )
+            if (homeRest.resting) {
+                // The faded bar's place only wakes Home: a tab must not switch unseen.
+                Box(
+                    Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .height(barSpace)
+                        .pointerInput(Unit) {
+                            awaitEachGesture {
+                                awaitFirstDown(requireUnconsumed = false).consume()
+                                homeRest.resting = false
+                            }
+                        },
+                )
+            }
             if (music != null) {
                 val (viewModel, musicState) = music
                 ShellNowPlaying(

@@ -238,6 +238,10 @@ data class VideoDetailsUi(
     val sourceLabel: String = "",
     /** True when the info came from TMDB. */
     val isMatched: Boolean = false,
+    /** "Watched 3 days ago"; null when it was never played. */
+    val lastWatched: String? = null,
+    /** More Like This: the library's titles closest to this one, best first. */
+    val moreLikeThis: List<LibraryItemUi> = emptyList(),
 )
 
 @Immutable
@@ -285,7 +289,19 @@ data class ShowDetailsUi(
     /** "Resume S1 · E3", "Play S1 · E1" */
     val playLabel: String = "Play",
     val isMatched: Boolean = false,
+    /** "Watched yesterday", from the episode played last; null when none was. */
+    val lastWatched: String? = null,
+    /** More Like This: the library's titles closest to this show, best first. */
+    val moreLikeThis: List<LibraryItemUi> = emptyList(),
 )
+
+/** One video of the watch history: its card and when it was last played. */
+@Immutable
+data class HistoryEntryUi(val card: VideoCardUi, val playedAt: Long)
+
+/** One day of the watch history, newest first: "Today", "Yesterday", a weekday, then a date. */
+@Immutable
+data class HistoryDayUi(val title: String, val entries: List<HistoryEntryUi>)
 
 @Immutable
 data class SourceUi(
