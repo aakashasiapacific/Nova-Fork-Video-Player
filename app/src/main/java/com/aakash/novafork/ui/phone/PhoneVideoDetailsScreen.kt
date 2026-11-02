@@ -243,11 +243,6 @@ private fun PlaySection(details: VideoDetailsUi, actions: AppActions, modifier: 
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.weight(1f).clipToBounds(),
                 )
-                IosTextButton(onClick = { actions.play(details.id, startOver = true) }) {
-                    NovaIcon(R.drawable.ic_restart_alt, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text("Start Over")
-                }
             }
         } else if (endsAt != null) {
             RollingText(

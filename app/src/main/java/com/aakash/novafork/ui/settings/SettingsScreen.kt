@@ -60,7 +60,6 @@ import com.aakash.novafork.ui.adaptive.DeviceLayout
 import com.aakash.novafork.ui.common.CollapsedTitleBar
 import com.aakash.novafork.ui.common.IosColors
 import com.aakash.novafork.ui.common.NovaIcon
-import com.aakash.novafork.ui.common.glassRim
 import com.aakash.novafork.ui.common.OnTabReselect
 import com.aakash.novafork.ui.common.largeTitle
 import com.aakash.novafork.ui.common.rememberLargeTitleState
@@ -212,7 +211,7 @@ private fun AppCard(versionName: String, onClick: () -> Unit, modifier: Modifier
 
 private val AppIconSize = 58.dp
 
-/** The launcher icon as the home screen shows it: the white mark on its blue gradient square, in glass. */
+/** The launcher icon as the home screen shows it: the white mark on its blue gradient square */
 @Composable
 internal fun AppIcon(size: Dp, modifier: Modifier = Modifier) {
     val shape = RoundedCornerShape(size * 0.225f)
@@ -220,9 +219,7 @@ internal fun AppIcon(size: Dp, modifier: Modifier = Modifier) {
         modifier
             .size(size)
             .clip(shape)
-            .background(Brush.verticalGradient(listOf(LauncherTop, LauncherBottom)))
-            .glassSheen()
-            .glassRim(shape, strength = 0.9f),
+            .background(Brush.verticalGradient(listOf(LauncherTop, LauncherBottom))),
         contentAlignment = Alignment.Center,
     ) {
         // The foreground layer is drawn for a 108dp canvas with the mark in its middle 72dp.

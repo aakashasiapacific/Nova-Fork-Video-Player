@@ -759,7 +759,7 @@ class PlayerController(
         audioChoicePending = rememberedAudio != null || audioLanguage.isNotEmpty()
         val resumeAt = if (
             video != null && settings.resumePlayback && !request.startOver && !video.watched &&
-            video.positionMs > RESUME_MIN_MS
+            video.positionMs > 0L
         ) {
             video.positionMs
         } else {
@@ -1737,7 +1737,7 @@ class PlayerController(
                 mediaPlayer.setTime(target)
                 lastPositionUpdate = SystemClock.uptimeMillis()
                 _state.update { it.copy(positionMs = target) }
-                if (resumeBannerPending) showResumeBanner(target)
+                // No "Resumed at … · Start Over" pill (owner: no interruptions); it just plays on.
             }
             resumeBannerPending = false
         }

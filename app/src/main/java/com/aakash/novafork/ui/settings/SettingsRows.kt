@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
@@ -44,7 +43,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
 import com.aakash.novafork.ui.common.Hairline
-import com.aakash.novafork.ui.common.glassRim
 import com.aakash.novafork.ui.common.IosColors
 import com.aakash.novafork.ui.common.IosSwitch
 import com.aakash.novafork.ui.common.NovaDropdownMenu
@@ -188,30 +186,18 @@ internal fun RowIcon(@DrawableRes icon: Int, tile: Color = tileColor(icon)) {
 }
 
 /**
- * iOS 27's settings tile, an icon of layered glass: a rounded square in [color] shading from a
- * lighter top to a deeper foot, a soft sheen over its upper half, the glass rim (bright along the
- * top, a faint dark line outside) and the white glyph standing on its own soft shadow.
+ * iPhone Settings' tile, exactly (owner: the glass version looked like a knock-off): a flat
+ * square of solid [color] with iOS's corner, and the white glyph. No sheen, rim or shadow.
  */
 @Composable
 internal fun IconTile(@DrawableRes icon: Int, color: Color, size: Dp = TileSize) {
-    val shape = RoundedCornerShape(size * TileCornerRatio)
     Box(
         Modifier
             .size(size)
-            .clip(shape)
-            .background(
-                Brush.verticalGradient(
-                    listOf(lerp(color, Color.White, TileShine), color, lerp(color, Color.Black, TileDepth)),
-                ),
-            )
-            .glassSheen()
-            .glassRim(shape, strength = 0.9f),
+            .background(color, RoundedCornerShape(size * TileCornerRatio)),
         contentAlignment = Alignment.Center,
     ) {
-        val glyph = Modifier.size(size * 0.6f)
-        // The shadow layer: the same glyph in black, a hair lower.
-        NovaIcon(icon, contentDescription = null, tint = Color.Black.copy(alpha = 0.22f), modifier = glyph.offset(y = size * 0.025f))
-        NovaIcon(icon, contentDescription = null, tint = Color.White, modifier = glyph)
+        NovaIcon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(size * 0.66f))
     }
 }
 
@@ -229,10 +215,8 @@ internal fun Modifier.glassSheen(): Modifier = drawWithContent {
     )
 }
 
-private const val TileCornerRatio = 0.3f
-/** How much lighter the tile's top is than its colour, and how much deeper its foot is. */
-private const val TileShine = 0.2f
-private const val TileDepth = 0.14f
+/** iOS's 7pt corner on a 30pt tile. */
+private const val TileCornerRatio = 0.23f
 
 /**
  * Tile colours by meaning, in iOS 26/27's palette: files and storage blue, network indigo,

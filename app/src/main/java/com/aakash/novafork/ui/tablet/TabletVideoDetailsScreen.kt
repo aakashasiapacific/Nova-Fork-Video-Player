@@ -162,11 +162,6 @@ private fun VideoBody(details: VideoDetailsUi, actions: AppActions) {
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             TabletPlayButton(label = details.playLabel, onClick = { actions.play(details.id) })
-            if (started) {
-                IosFilledTonalButton(onClick = { actions.play(details.id, startOver = true) }, modifier = Modifier.height(48.dp)) {
-                    ButtonLabel(R.drawable.ic_restart_alt, "Start Over")
-                }
-            }
             // The rest waits in one round "…", as on the Apple TV app's iPad pages.
             var menuOpen by remember { mutableStateOf(false) }
             Box {
