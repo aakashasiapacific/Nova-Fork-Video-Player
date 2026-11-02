@@ -356,6 +356,13 @@ private fun PlayerChrome(
                         large = layout.isTablet,
                         modifier = Modifier.align(Alignment.BottomEnd),
                     )
+                    // Netflix's Skip Intro / Skip Credits, where Up Next would sit (never both).
+                    ChapterSkipButton(
+                        state = state,
+                        actions = actions,
+                        controlsVisible = controlsVisible,
+                        modifier = Modifier.align(Alignment.BottomEnd),
+                    )
                 }
             }
             val error = state.error

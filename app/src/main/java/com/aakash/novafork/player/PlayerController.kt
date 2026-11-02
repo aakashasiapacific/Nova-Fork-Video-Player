@@ -34,6 +34,7 @@ import com.aakash.novafork.sources.DownloadedSubtitles
 import com.aakash.novafork.sources.SubtitleFinder
 import com.aakash.novafork.ui.model.Artwork
 import com.aakash.novafork.ui.model.CastDeviceUi
+import com.aakash.novafork.ui.model.ChapterUi
 import com.aakash.novafork.ui.model.GestureFeedback
 import com.aakash.novafork.ui.model.PlayerActions
 import com.aakash.novafork.ui.model.PlayerUiState
@@ -144,6 +145,7 @@ class PlayerController(
         graph.library.smbCredentials(server, share)
     }
     private val subtitleDownloads = SubtitleDownloads(appContext, graph, subtitleFinder)
+    private val subtitleDelays = SubtitleDelays(appContext)
 
     /** The player screen, while one is shown. */
     private var host: Host? = null
@@ -699,6 +701,11 @@ class PlayerController(
         }
         val current = NowPlaying(uri, kind, fileName, entry)
         nowPlaying = current
+        // The timing set for this video before (owner), unless one was carried over from a reopen.
+        if (carried == null) {
+            val delayMs = subtitleDelays.get(current.videoKey)
+            if (delayMs != _state.value.subtitleDelayMs) _state.update { it.copy(subtitleDelayMs = delayMs) }
+        }
         _state.update {
             it.copy(
                 title = titles.title,
@@ -1286,6 +1293,7 @@ class PlayerController(
         // libVLC takes microseconds.
         mediaPlayer.setSpuDelay(delayMs * 1_000)
         _state.update { it.copy(subtitleDelayMs = delayMs) }
+        nowPlaying?.let { subtitleDelays.set(it.videoKey, delayMs) }
     }
 
     override fun cycleAspect() {
@@ -1641,6 +1649,8 @@ class PlayerController(
             MediaPlayer.Event.LengthChanged -> {
                 val length = event.lengthChanged.coerceAtLeast(0L)
                 _state.update { it.copy(durationMs = length) }
+                // Some containers only list their chapters once the length is known.
+                if (playbackStarted) refreshChapters()
             }
             MediaPlayer.Event.SeekableChanged -> {
                 val seekable = event.seekable
@@ -1712,6 +1722,7 @@ class PlayerController(
             val subtitleDelayMs = _state.value.subtitleDelayMs
             if (subtitleDelayMs != 0L) mediaPlayer.setSpuDelay(subtitleDelayMs * 1_000)
             refreshTracks()
+            refreshChapters()
             if (audioChoicePending) applyAudioChoice()
             trySetupSubtitles()
         }
@@ -1723,6 +1734,26 @@ class PlayerController(
             inBackground -> disableVideo()
             else -> watchForPicture()
         }
+    }
+
+    /**
+     * Reads the file's chapters (libVLC knows them once the input is open; most files have none),
+     * for the marks on the seek bar, the Chapters list and Skip Intro.
+     */
+    private fun refreshChapters() {
+        val chapters = try {
+            mediaPlayer.getChapters(-1)
+        } catch (e: Exception) {
+            Log.w(TAG, "Couldn't read the chapters", e)
+            null
+        }?.mapIndexed { index, chapter ->
+            ChapterUi(
+                name = chapter.name?.trim()?.takeIf { it.isNotEmpty() } ?: "Chapter ${index + 1}",
+                startMs = chapter.timeOffset.coerceAtLeast(0L),
+                durationMs = chapter.duration.coerceAtLeast(0L),
+            )
+        }?.sortedBy { it.startMs }.orEmpty()
+        if (chapters != _state.value.chapters) _state.update { it.copy(chapters = chapters) }
     }
 
     private fun onPaused() {

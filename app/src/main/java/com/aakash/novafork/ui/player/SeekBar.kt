@@ -1,5 +1,6 @@
 package com.aakash.novafork.ui.player
 
+import android.os.SystemClock
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
@@ -38,8 +39,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -84,6 +89,15 @@ internal fun PlayerSeekBar(
             pendingSeekMs = null
         }
     }
+
+    // Where the file's chapters start, as parts of the bar: small gaps in the track.
+    val chapterStarts = remember(state.chapters) { state.chapters.map { it.startMs }.filter { it > 0L } }
+    val marks = remember(chapterStarts, duration) {
+        if (duration > 0L) chapterStarts.map { it.toFloat() / duration }.filter { it < 1f } else emptyList()
+    }
+    // iOS's scrubbing ticks: a light one each time the drag passes a 10-second mark or a chapter.
+    val haptics = LocalHapticFeedback.current
+    val lastTick = remember { longArrayOf(0L) }
 
     val dragging = dragFraction
     val pending = pendingSeekMs
@@ -134,9 +148,18 @@ internal fun PlayerSeekBar(
             fraction = fraction,
             enabled = enabled,
             large = large,
+            marks = marks,
             onValueChange = { value ->
+                val target = (value * duration).toLong()
+                val from = dragFraction?.let { (it * duration).toLong() }
+                val now = SystemClock.uptimeMillis()
+                // At most one tick per [TICK_GAP_MS]: a fast drag over a long film passes many marks a frame.
+                if (from != null && passesMark(from, target, chapterStarts) && now - lastTick[0] >= TICK_GAP_MS) {
+                    lastTick[0] = now
+                    haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                }
                 dragFraction = value
-                actions.scrub((value * duration).toLong(), commit = false)
+                actions.scrub(target, commit = false)
             },
             onValueChangeFinished = {
                 val final = dragFraction
@@ -196,6 +219,19 @@ internal fun PlayerSeekBar(
     }
 }
 
+/** Whether a drag from [fromMs] to [toMs] passed a 10-second mark or a chapter's start. */
+private fun passesMark(fromMs: Long, toMs: Long, chapterStarts: List<Long>): Boolean {
+    if (fromMs == toMs) return false
+    val low = minOf(fromMs, toMs)
+    val high = maxOf(fromMs, toMs)
+    if (low / TICK_STEP_MS != high / TICK_STEP_MS) return true
+    return chapterStarts.any { it in (low + 1)..high }
+}
+
+/** The scrubbing ticks: one every 10 seconds of the video, at most one per 60 ms of dragging. */
+private const val TICK_STEP_MS = 10_000L
+private const val TICK_GAP_MS = 60L
+
 /** A time beside the seek bar, white; with [rolling] its digits roll as they change. */
 @Composable
 private fun TimeLabel(text: String, style: TextStyle, rolling: Boolean, alignment: Alignment, modifier: Modifier = Modifier) {
@@ -220,6 +256,8 @@ private fun SeekSlider(
     onValueChange: (Float) -> Unit,
     onValueChangeFinished: () -> Unit,
     modifier: Modifier = Modifier,
+    /** Where chapters start, 0 to 1 along the bar: cut as small gaps in the track. */
+    marks: List<Float> = emptyList(),
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val dragged by interactionSource.collectIsDraggedAsState()
@@ -261,7 +299,9 @@ private fun SeekSlider(
             Canvas(
                 Modifier
                     .fillMaxWidth()
-                    .height(trackHeight),
+                    .height(trackHeight)
+                    // Its own layer, so the chapter gaps can be cut through the track.
+                    .graphicsLayer { if (marks.isNotEmpty()) compositingStrategy = CompositingStrategy.Offscreen },
             ) {
                 val radius = CornerRadius(size.height / 2, size.height / 2)
                 drawRoundRect(color = rest, cornerRadius = radius)
@@ -275,10 +315,26 @@ private fun SeekSlider(
                         cornerRadius = radius,
                     )
                 }
+                if (marks.isNotEmpty()) {
+                    val gap = ChapterGap.toPx()
+                    val rtl = layoutDirection == LayoutDirection.Rtl
+                    marks.forEach { mark ->
+                        val x = size.width * (if (rtl) 1f - mark else mark)
+                        drawRect(
+                            color = Color.Black,
+                            topLeft = Offset(x - gap / 2f, 0f),
+                            size = Size(gap, size.height),
+                            blendMode = BlendMode.Clear,
+                        )
+                    }
+                }
             }
         },
     )
 }
+
+/** The width of the gap where a chapter starts. */
+private val ChapterGap = 2.dp
 
 /** The seek bar's thickness while it is dragged (Samsung). */
 private val ActiveTrack = 16.dp

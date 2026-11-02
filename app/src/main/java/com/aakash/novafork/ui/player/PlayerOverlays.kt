@@ -49,7 +49,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.AbsoluteAlignment
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.BiasAlignment
@@ -94,23 +96,55 @@ internal fun FeedbackOverlay(feedback: GestureFeedback?, modifier: Modifier = Mo
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 // While scrubbing a file on the phone: the frame at that point, as Samsung shows.
                 if (frame != null && shown is GestureFeedback.Seek) {
-                    Image(
-                        bitmap = frame,
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier
-                            .padding(bottom = 10.dp)
-                            .width(200.dp)
-                            .aspectRatio(frame.width.toFloat() / frame.height.coerceAtLeast(1))
-                            .clip(RoundedCornerShape(12.dp))
-                            .border(1.dp, Color.White.copy(alpha = 0.25f), RoundedCornerShape(12.dp)),
-                    )
+                    ScrubFrame(frame, Modifier.padding(bottom = 10.dp))
                 }
                 FeedbackPill(shown)
             }
         }
     }
 }
+
+/**
+ * The scrubbed-to frame. A new frame fades in over the one before ([SCRUB_FADE_MS]) rather than
+ * jumping, and the old one stays under it until it is covered, so it never flashes empty.
+ */
+@Composable
+private fun ScrubFrame(frame: ImageBitmap, modifier: Modifier = Modifier) {
+    var over by remember { mutableStateOf(frame) }
+    var under by remember { mutableStateOf<ImageBitmap?>(null) }
+    val fade = remember { Animatable(1f) }
+    LaunchedEffect(frame) {
+        if (frame !== over) {
+            under = over
+            over = frame
+            fade.snapTo(0f)
+            fade.animateTo(1f, tween(SCRUB_FADE_MS))
+            under = null
+        }
+    }
+    val shape = RoundedCornerShape(12.dp)
+    Box(
+        modifier
+            .width(200.dp)
+            .aspectRatio(over.width.toFloat() / over.height.coerceAtLeast(1))
+            .clip(shape)
+            .border(1.dp, Color.White.copy(alpha = 0.25f), shape),
+    ) {
+        under?.let { previous ->
+            Image(bitmap = previous, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+        }
+        Image(
+            bitmap = over,
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer { alpha = fade.value },
+        )
+    }
+}
+
+private const val SCRUB_FADE_MS = 120
 
 @Composable
 private fun FeedbackPill(feedback: GestureFeedback) {

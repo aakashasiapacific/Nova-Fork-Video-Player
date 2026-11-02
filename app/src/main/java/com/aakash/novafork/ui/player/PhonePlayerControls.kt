@@ -279,6 +279,10 @@ private fun playerOptions(
     if (state.queue.size > 1) {
         add(PlayerOption { PlayerIconButton(R.drawable.ic_player_queue, "Queue", { onOpenSheet(PlayerSheet.QUEUE) }) })
     }
+    // A file with chapters: their list (the seek bar marks where each starts).
+    if (state.chapters.size > 1) {
+        add(PlayerOption { PlayerIconButton(R.drawable.ic_player_chapters, "Chapters", { onOpenSheet(PlayerSheet.CHAPTERS) }) })
+    }
     if (state.canShuffle) {
         add(
             PlayerOption {

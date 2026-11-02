@@ -77,6 +77,15 @@ data class SubtitleResultUi(
     val downloaded: Boolean = false,
 )
 
+/** One chapter of the playing file, as its container names it ("Chapter 3" when it has no name). */
+@Immutable
+data class ChapterUi(
+    val name: String,
+    val startMs: Long,
+    /** 0 when the file doesn't say; the next chapter's start (or the end) then ends it. */
+    val durationMs: Long,
+)
+
 /** The "Download subtitles" list over the player; see [PlayerActions.searchSubtitles]. */
 @Immutable
 data class SubtitleSearchUi(
@@ -156,6 +165,8 @@ data class PlayerUiState(
     val castingTo: String? = null,
     /** The subtitle download list while it is open; null = closed. */
     val subtitleSearch: SubtitleSearchUi? = null,
+    /** The file's chapters in order; empty when it has none (most files). */
+    val chapters: List<ChapterUi> = emptyList(),
 )
 
 /**

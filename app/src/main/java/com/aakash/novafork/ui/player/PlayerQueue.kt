@@ -70,6 +70,7 @@ internal fun PlayerSheetContent(
     when (sheet) {
         PlayerSheet.QUEUE -> QueueOptions(state = state, actions = actions, onDismiss = onDismiss)
         PlayerSheet.CAST -> CastOptions(state = state, actions = actions, onDismiss = onDismiss)
+        PlayerSheet.CHAPTERS -> ChapterOptions(state = state, actions = actions, onDismiss = onDismiss)
     }
 }
 

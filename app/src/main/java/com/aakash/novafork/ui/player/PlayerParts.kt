@@ -65,6 +65,7 @@ internal enum class PlayerPanel { AUDIO, SUBTITLES, SPEED, ASPECT }
 internal enum class PlayerSheet(val title: String) {
     QUEUE("Queue"),
     CAST("Cast to a device"),
+    CHAPTERS("Chapters"),
 }
 
 /** Physical third of the screen a tap hit (not mirrored for RTL: right always seeks forward). */
