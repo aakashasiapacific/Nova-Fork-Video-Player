@@ -39,6 +39,7 @@ import com.aakash.novafork.ui.adaptive.LocalNovaDimens
 import com.aakash.novafork.ui.common.GlassCircle
 import com.aakash.novafork.ui.common.IosFilledTonalButton
 import com.aakash.novafork.ui.common.IosTextButton
+import com.aakash.novafork.ui.common.MetaBadges
 import com.aakash.novafork.ui.common.NovaDropdownMenu
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.NovaMenuItem
@@ -134,12 +135,14 @@ private fun VideoHeadline(details: VideoDetailsUi) {
             )
         }
         val meta = metaLine(details.year?.toString(), details.runtimeLabel, details.episodeCode)
-        if (meta.isNotEmpty() || (details.rating ?: 0f) > 0f) {
+        val badges = listOfNotNull(details.ageRating) + details.qualityBadges
+        if (meta.isNotEmpty() || badges.isNotEmpty() || (details.rating ?: 0f) > 0f) {
             Spacer(Modifier.height(12.dp))
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 if (meta.isNotEmpty()) {
                     Text(meta, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
+                MetaBadges(badges)
                 RatingPill(details.rating)
             }
         }

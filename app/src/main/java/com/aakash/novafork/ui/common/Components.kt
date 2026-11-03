@@ -7,6 +7,7 @@ import androidx.compose.animation.core.animateDecay
 import androidx.compose.animation.core.calculateTargetValue
 import androidx.compose.animation.rememberSplineBasedDecay
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.FlingBehavior
 import androidx.compose.foundation.gestures.ScrollScope
 import androidx.compose.foundation.layout.Arrangement
@@ -113,6 +114,30 @@ fun WatchedBadge(modifier: Modifier = Modifier) {
         contentAlignment = Alignment.Center,
     ) {
         Icon(painterResource(R.drawable.ic_check), contentDescription = "Watched", tint = NovaColors.Mint, modifier = Modifier.size(15.dp))
+    }
+}
+
+/** A small outlined grey tag after a details page's year and length: "4K", "HD", "PG-13". */
+@Composable
+fun MetaBadge(text: String, modifier: Modifier = Modifier) {
+    val grey = MaterialTheme.colorScheme.onSurfaceVariant
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelSmall,
+        color = grey,
+        maxLines = 1,
+        modifier = modifier
+            .border(1.dp, grey.copy(alpha = 0.7f), RoundedCornerShape(4.dp))
+            .padding(horizontal = 5.dp, vertical = 1.dp),
+    )
+}
+
+/** [badges] side by side as [MetaBadge]s; draws nothing when empty. */
+@Composable
+fun MetaBadges(badges: List<String>, modifier: Modifier = Modifier) {
+    if (badges.isEmpty()) return
+    Row(modifier, horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+        badges.forEach { MetaBadge(it) }
     }
 }
 

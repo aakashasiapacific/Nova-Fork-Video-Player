@@ -97,6 +97,7 @@ fun PhoneVideoDetailsScreen(
                     title = details.title,
                     originalTitle = details.originalTitle,
                     meta = metaLine(details.year?.toString(), details.runtimeLabel, details.episodeCode),
+                    badges = listOfNotNull(details.ageRating) + details.qualityBadges,
                     rating = details.rating,
                     genres = details.genres,
                     maxBackdropHeight = backdropHeight,

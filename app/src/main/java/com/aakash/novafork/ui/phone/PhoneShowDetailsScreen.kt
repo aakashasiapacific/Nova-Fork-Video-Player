@@ -108,6 +108,8 @@ fun PhoneShowDetailsScreen(
                         if (seasons.isNotEmpty()) countLabel(seasons.size, "season") else null,
                         if (episodeCount > 0) countLabel(episodeCount, "episode") else null,
                     ),
+                    badges = listOfNotNull(details.ageRating),
+                    note = details.nextEpisodeLabel,
                     rating = details.rating,
                     genres = details.genres,
                     maxBackdropHeight = backdropHeight,

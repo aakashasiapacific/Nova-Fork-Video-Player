@@ -40,6 +40,7 @@ import com.aakash.novafork.R
 import com.aakash.novafork.ui.adaptive.DeviceLayout
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
 import com.aakash.novafork.ui.common.IosFilledTonalButton
+import com.aakash.novafork.ui.common.MetaBadges
 import com.aakash.novafork.ui.common.NovaChip
 import com.aakash.novafork.ui.common.NovaDropdownMenu
 import com.aakash.novafork.ui.common.NovaIcon
@@ -204,12 +205,14 @@ private fun ShowHeadline(details: ShowDetailsUi) {
             if (details.seasons.isNotEmpty()) countLabel(details.seasons.size, "season") else null,
             if (episodeCount > 0) countLabel(episodeCount, "episode") else null,
         )
-        if (meta.isNotEmpty() || (details.rating ?: 0f) > 0f) {
+        val badges = listOfNotNull(details.ageRating)
+        if (meta.isNotEmpty() || badges.isNotEmpty() || (details.rating ?: 0f) > 0f) {
             Spacer(Modifier.height(12.dp))
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 if (meta.isNotEmpty()) {
                     Text(meta, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
+                MetaBadges(badges)
                 RatingPill(details.rating)
             }
         }
@@ -221,6 +224,11 @@ private fun ShowHeadline(details: ShowDetailsUi) {
             ) {
                 details.genres.forEach { TabletTag(it) }
             }
+        }
+        val next = details.nextEpisodeLabel
+        if (!next.isNullOrBlank()) {
+            Spacer(Modifier.height(12.dp))
+            Text(next, style = MaterialTheme.typography.bodyLarge)
         }
     }
 }
