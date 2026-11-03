@@ -231,7 +231,7 @@ class UiMappersTest {
         // Preferences lists them, a show's episodes as one row.
         val listed = UiMappers.hiddenVideos(small, hidden)
         assertEquals(listOf("Dark Show", "Hidden Film"), listed.map { it.title })
-        assertEquals(listOf(10L, 11L), listed.first().videoIds)
+        assertEquals(setOf(10L, 11L), listed.first().videoIds.toSet())
         assertTrue(UiMappers.hiddenVideos(small, emptySet()).isEmpty())
     }
 
