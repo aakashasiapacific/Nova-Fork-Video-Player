@@ -49,6 +49,7 @@ import coil.request.ImageRequest
 import coil.request.videoFrameMillis
 import com.aakash.novafork.R
 import com.aakash.novafork.core.format.Formats
+import com.aakash.novafork.ui.common.Motion
 import com.aakash.novafork.ui.common.playerGlass
 import com.aakash.novafork.ui.model.ChapterUi
 import com.aakash.novafork.ui.model.PlayerActions
