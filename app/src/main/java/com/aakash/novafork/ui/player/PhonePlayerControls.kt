@@ -287,6 +287,7 @@ private fun playerOptions(
     if (state.chapters.size > 1) {
         add(PlayerOption { PlayerIconButton(R.drawable.ic_player_chapters, "Chapters", { onOpenSheet(PlayerSheet.CHAPTERS) }) })
     }
+    add(PlayerOption { PlayerIconButton(R.drawable.ic_bookmark, "Bookmarks", { onOpenSheet(PlayerSheet.BOOKMARKS) }) })
     if (state.canShuffle) {
         add(
             PlayerOption {

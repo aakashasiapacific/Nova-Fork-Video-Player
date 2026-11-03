@@ -34,6 +34,7 @@ import com.aakash.novafork.data.db.VideoWithMeta
 import com.aakash.novafork.sources.DownloadedSubtitles
 import com.aakash.novafork.sources.SubtitleFinder
 import com.aakash.novafork.ui.model.Artwork
+import com.aakash.novafork.ui.model.BookmarkUi
 import com.aakash.novafork.ui.model.CastDeviceUi
 import com.aakash.novafork.ui.model.ChapterUi
 import com.aakash.novafork.ui.model.GestureFeedback
@@ -160,6 +161,8 @@ class PlayerController(
     private val subtitleDelays = SubtitleDelays(appContext)
     private val showPreferences = ShowPreferences(appContext)
     private val audioDelays = AudioDelays(appContext)
+    private val bookmarkStore = VideoBookmarkStore(appContext)
+    private var subtitleSizeJob: Job? = null
     private val videoAspects = VideoAspects(appContext)
     /** The playing episode's show, for what a show remembers (speed, audio language). */
     private var currentShowKey: String? = null
@@ -262,6 +265,9 @@ class PlayerController(
     private var rememberedSubtitle: Int? = null
     private var audioLanguage: Set<String> = emptySet()
     private var subtitleLanguage: Set<String> = emptySet()
+
+    /** The show's earlier episodes had subtitles turned off: this one starts without them too. */
+    private var showSubtitlesOff = false
     private var audioChoicePending = false
     private var externalSubtitles: List<File>? = null
     private var subtitleSetupDone = false
@@ -751,6 +757,7 @@ class PlayerController(
         }
         _state.update {
             it.copy(
+                bookmarks = bookmarkStore.bookmarks(current.videoKey).map(::bookmarkUi),
                 title = titles.title,
                 subtitle = titles.subtitle,
                 overview = entry?.meta?.overview?.takeIf { text -> text.isNotBlank() },
@@ -779,7 +786,9 @@ class PlayerController(
         audioLanguage = showPreferences.audioLanguage(currentShowKey) ?: TrackLanguages.aliases(settings.preferredAudioLanguage)
         // And the speed last chosen for it, unless a reopen carries one over.
         if (carry == null) showPreferences.rate(currentShowKey)?.let { rate -> _state.update { it.copy(rate = rate) } }
-        subtitleLanguage = TrackLanguages.aliases(settings.preferredSubtitleLanguage)
+        // Likewise the subtitle language (or none) last chosen for the show.
+        showSubtitlesOff = showPreferences.subtitlesOff(currentShowKey)
+        subtitleLanguage = showPreferences.subtitleLanguage(currentShowKey) ?: TrackLanguages.aliases(settings.preferredSubtitleLanguage)
         audioChoicePending = rememberedAudio != null || audioLanguage.isNotEmpty()
         val resumeAt = if (
             video != null && settings.resumePlayback && !request.startOver && !video.watched &&
@@ -986,6 +995,7 @@ class PlayerController(
         canEnterPictureInPicture = old.canEnterPictureInPicture,
         canRotate = old.canRotate,
         seekStepMs = seekStepMs(graph.settings.settings.value),
+        subtitleSize = graph.settings.settings.value.subtitleSize,
         volume = old.volume,
         brightness = old.brightness,
         shuffle = old.shuffle,
@@ -1335,6 +1345,10 @@ class PlayerController(
         val name = _state.value.subtitleTracks.firstOrNull { it.id == id }?.name
         showLabel(if (id == DISABLED_TRACK) "Subtitles off" else name ?: "Subtitles on")
         saveTrackChoice()
+        val show = currentShowKey
+        if (show != null) {
+            if (id == DISABLED_TRACK) showPreferences.setSubtitlesOff(show) else if (name != null) showPreferences.setSubtitleTrack(show, name)
+        }
     }
 
     override fun pickSubtitleFile() {
@@ -2244,6 +2258,8 @@ class PlayerController(
             remembered != null && embedded.any { it.id == remembered } -> mediaPlayer.setSpuTrack(remembered)
             // Most likely an external file: its track appears once the slave below is loaded.
             remembered != null -> pendingSubtitleRestore = remembered
+            // This show's earlier episodes had them off.
+            showSubtitlesOff -> mediaPlayer.setSpuTrack(DISABLED_TRACK)
             else -> {
                 val preferred = embedded.firstOrNull { TrackLanguages.matches(it.name, subtitleLanguage) }
                 if (preferred != null) {
@@ -2258,8 +2274,10 @@ class PlayerController(
             if (file.absolutePath !in addedSubtitleFiles) addSubtitleFile(file, select = file == selected)
         }
         refreshTracks()
-        maybeDownloadSubtitles(embedded, external, remembered)
-        maybeFetchMissingSubtitles(embedded, external)
+        if (!showSubtitlesOff || remembered != null) {
+            maybeDownloadSubtitles(embedded, external, remembered)
+            maybeFetchMissingSubtitles(embedded, external)
+        }
     }
 
     /**
@@ -2636,6 +2654,55 @@ class PlayerController(
         if (!released) graph.settings.update(transform)
     }
 
+    private fun bookmarkUi(bookmark: VideoBookmark) = BookmarkUi(bookmark.positionMs, bookmark.label)
+
+    override fun addBookmark() {
+        val playing = nowPlaying ?: return
+        if (released || !mediaReady) return
+        val position = currentPositionMs().coerceAtLeast(0L)
+        val saved = bookmarkStore.add(playing.videoKey, position, formatPosition(position))
+        _state.update { it.copy(bookmarks = saved.map(::bookmarkUi)) }
+        showLabel("Bookmark added")
+    }
+
+    override fun removeBookmark(positionMs: Long) {
+        val playing = nowPlaying ?: return
+        val saved = bookmarkStore.remove(playing.videoKey, positionMs)
+        _state.update { it.copy(bookmarks = saved.map(::bookmarkUi)) }
+    }
+
+    /**
+     * Keeps [percent] as the app's subtitle size at once. The size is an option of the media, so
+     * once the slider rests the playing video is opened again at the same position with it.
+     */
+    override fun setSubtitleSize(percent: Int) {
+        if (released) return
+        val size = percent.coerceIn(50, 200)
+        if (graph.settings.settings.value.subtitleSize == size) return
+        graph.settings.update { it.copy(subtitleSize = size) }
+        _state.update { it.copy(subtitleSize = size) }
+        subtitleSizeJob?.cancel()
+        subtitleSizeJob = scope.launch {
+            delay(SUBTITLE_SIZE_SETTLE_MS)
+            reopenForSubtitleSize()
+        }
+    }
+
+    private fun reopenForSubtitleSize() {
+        val request = lastRequest
+        if (released || request == null || !hasContent || !mediaReady || ended || isCasting || !playbackStarted) return
+        val current = _state.value
+        if (current.error != null) return
+        val carry = CarriedChoices(
+            audioTrack = rememberedAudio ?: carried?.audioTrack,
+            subtitleTrack = rememberedSubtitle ?: carried?.subtitleTrack,
+            subtitleDelayMs = current.subtitleDelayMs,
+        )
+        val position = currentPositionMs().takeIf { it > 0 } ?: request.startPositionMs
+        PlayerDiagnostics.record("subtitles: size changed, reopening at the same position")
+        openSession(request.copy(startPositionMs = position), carry)
+    }
+
     override fun setSleepTimer(minutes: Int) {
         if (released) return
         sleepJob?.cancel()
@@ -2749,7 +2816,8 @@ class PlayerController(
 
         /** The sleep timer's minutes left are refreshed this often; its fade lasts this long. */
         const val SLEEP_TICK_MS = 15_000L
-        const val SLEEP_FADE_MS = 6_000L
+        const val SLEEP_FADE_MS = 10_000L
+        const val SUBTITLE_SIZE_SETTLE_MS = 700L
         const val SLEEP_FADE_STEPS = 30
 
         /** The volume indicator stays this long after the last volume key, like iOS's. */

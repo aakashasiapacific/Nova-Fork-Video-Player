@@ -271,6 +271,21 @@ class PlayerActivity : ComponentActivity(), PlayerController.Host {
         controller.onHostPaused()
     }
 
+    /**
+     * Leaving the app (home, recents) while a video plays: with Settings.pipOnLeave it shrinks into
+     * the pop-up window instead of pausing or playing on as sound. Not while casting, picking a
+     * subtitle file, or when the system has no picture-in-picture.
+     */
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        val current = controller ?: return
+        if (pickingSubtitle || isInPictureInPictureMode || !pip.isSupported) return
+        if (!NovaApp.graph(this).settings.settings.value.pipOnLeave) return
+        if (!current.state.value.isPlaying || current.isCasting) return
+        PlayerDiagnostics.record("picture-in-picture: entered on leaving")
+        pip.enter()
+    }
+
     override fun onStop() {
         super.onStop()
         val playback = service ?: return

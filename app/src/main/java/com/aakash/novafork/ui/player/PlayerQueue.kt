@@ -71,6 +71,7 @@ internal fun PlayerSheetContent(
         PlayerSheet.QUEUE -> QueueOptions(state = state, actions = actions, onDismiss = onDismiss)
         PlayerSheet.CAST -> CastOptions(state = state, actions = actions, onDismiss = onDismiss)
         PlayerSheet.CHAPTERS -> ChapterOptions(state = state, actions = actions, onDismiss = onDismiss)
+        PlayerSheet.BOOKMARKS -> BookmarkOptions(state = state, actions = actions, onDismiss = onDismiss)
     }
 }
 

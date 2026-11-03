@@ -542,6 +542,16 @@ private fun playerGroups(settings: Settings, actions: AppActions): List<Settings
         footer = "Keeps a video's sound playing after you leave the player. Off: leaving pauses it.",
     ),
     SettingsGroup(
+        key = "pip-on-leave",
+        title = null,
+        rows = listOf(
+            switchRow("pip-on-leave", R.drawable.ic_picture_in_picture, "Picture in Picture on Leave", settings.pipOnLeave) { on ->
+                actions.updateSettings { it.copy(pipOnLeave = on) }
+            },
+        ),
+        footer = "Leaving the app while a video plays shrinks it into a floating window.",
+    ),
+    SettingsGroup(
         key = "tracks",
         title = "Subtitles and audio",
         rows = listOf(

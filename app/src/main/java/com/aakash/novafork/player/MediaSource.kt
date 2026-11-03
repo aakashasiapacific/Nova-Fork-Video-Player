@@ -159,6 +159,9 @@ internal object MediaSource {
         }
         val encoding = settings.subtitleEncoding.trim()
         if (encoding.isNotEmpty()) media.addOption(":subsdec-encoding=$encoding")
+        // The subtitle size is an instance option too (see VlcEngine.videoLibVLC); stated here as
+        // well, a change of it applies when the video is opened again, without a new instance.
+        media.addOption(":sub-text-scale=${settings.subtitleSize.coerceIn(50, 200)}")
     }
 
     private fun localPath(uri: String): String =

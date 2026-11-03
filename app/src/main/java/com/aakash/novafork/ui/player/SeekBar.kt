@@ -94,6 +94,8 @@ internal fun PlayerSeekBar(
     val marks = remember(chapterStarts, duration) {
         if (duration > 0L) chapterStarts.map { it.toFloat() / duration }.filter { it < 1f } else emptyList()
     }
+    // Intro, recap and credits chapters: a slightly brighter stretch of the track. Display only.
+    val highlights = remember(state.chapters, duration) { markedRanges(state.chapters, duration) }
     // iOS's scrubbing ticks: a light one each time the drag passes a 10-second mark or a chapter.
     val haptics = LocalHapticFeedback.current
     val lastTick = remember { longArrayOf(0L) }
@@ -148,6 +150,7 @@ internal fun PlayerSeekBar(
             enabled = enabled,
             large = large,
             marks = marks,
+            highlights = highlights,
             onValueChange = { value ->
                 val target = (value * duration).toLong()
                 val from = dragFraction?.let { (it * duration).toLong() }
@@ -256,6 +259,8 @@ private fun SeekSlider(
     modifier: Modifier = Modifier,
     /** Where chapters start, 0 to 1 along the bar: cut as small gaps in the track. */
     marks: List<Float> = emptyList(),
+    /** Stretches of the bar (0 to 1) drawn a little brighter: intro, recap, credits. */
+    highlights: List<ClosedFloatingPointRange<Float>> = emptyList(),
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val dragged by interactionSource.collectIsDraggedAsState()
@@ -303,6 +308,17 @@ private fun SeekSlider(
             ) {
                 val radius = CornerRadius(size.height / 2, size.height / 2)
                 drawRoundRect(color = rest, cornerRadius = radius)
+                if (enabled) {
+                    val rtl = layoutDirection == LayoutDirection.Rtl
+                    highlights.forEach { range ->
+                        val from = size.width * (if (rtl) 1f - range.endInclusive else range.start)
+                        drawRect(
+                            color = Color.White.copy(alpha = 0.28f),
+                            topLeft = Offset(from, 0f),
+                            size = Size(size.width * (range.endInclusive - range.start), size.height),
+                        )
+                    }
+                }
                 val filledWidth = size.width * progress
                 if (filledWidth > 0f) {
                     val left = if (layoutDirection == LayoutDirection.Rtl) size.width - filledWidth else 0f
