@@ -172,24 +172,9 @@ private const val TITLE_STRETCH_PX_PER_PERCENT = 4f
 private const val MAX_TITLE_STRETCH = 0.12f
 
 /**
- * A grid's items fade up one after another the first time they are shown (iOS), keyed so an item
- * scrolled away and back does not do it again; [seen] is the grid's own record.
+ * Grid items are simply there when a page opens (owner: the motion looked cheap). They used to
+ * fade up one after another, a web effect Apple never uses, and on top of the page's push it was
+ * two animations at once. Kept so call sites stay as they are.
  */
-@Composable
-internal fun Modifier.staggeredAppear(key: Any, index: Int, seen: MutableSet<Any>): Modifier {
-    val first = remember(key) { seen.add(key) && index < STAGGER_ITEMS }
-    if (!first) return this
-    val shown = remember(key) { Animatable(0f) }
-    LaunchedEffect(key) {
-        delay(index * STAGGER_STEP_MS)
-        shown.animateTo(1f, tween(durationMillis = 320, easing = FastOutSlowInEasing))
-    }
-    return graphicsLayer {
-        alpha = shown.value
-        translationY = (1f - shown.value) * 18.dp.toPx()
-    }
-}
-
-/** Only the first screenful staggers; later items are already there when scrolled to. */
-private const val STAGGER_ITEMS = 18
-private const val STAGGER_STEP_MS = 35L
+@Suppress("UNUSED_PARAMETER")
+internal fun Modifier.staggeredAppear(key: Any, index: Int, seen: MutableSet<Any>): Modifier = this

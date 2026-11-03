@@ -96,7 +96,7 @@ fun IosFilledTonalButton(
     M3FilledTonalButton(onClick, modifier.iosPressFade(source, FILLED_PRESSED_ALPHA), enabled, shape, colors, elevation, border, contentPadding, source, content)
 }
 
-/** Fades to [pressedAlpha] at once while [source] is pressed, and back over a moment on release. */
+/** Fades quickly to [pressedAlpha] while [source] is pressed, and back over a moment on release. */
 @Composable
 fun Modifier.iosPressFade(source: InteractionSource, pressedAlpha: Float): Modifier {
     val alpha = remember { Animatable(1f) }
@@ -107,7 +107,8 @@ fun Modifier.iosPressFade(source: InteractionSource, pressedAlpha: Float): Modif
                 is PressInteraction.Press -> pressed++
                 is PressInteraction.Release, is PressInteraction.Cancel -> pressed = (pressed - 1).coerceAtLeast(0)
             }
-            launch { if (pressed > 0) alpha.animateTo(pressedAlpha, snap()) else alpha.animateTo(1f, tween(RELEASE_MS)) }
+            // In quickly (a sixth of a second), out a little slower: a fade, never a jump.
+            launch { if (pressed > 0) alpha.animateTo(pressedAlpha, Motion.press()) else alpha.animateTo(1f, tween(RELEASE_MS)) }
         }
     }
     return graphicsLayer { this.alpha = alpha.value }

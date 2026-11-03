@@ -5,6 +5,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -46,7 +47,7 @@ import com.aakash.novafork.ui.audio.ShellNowPlaying
 import com.aakash.novafork.ui.audio.rememberMusicShell
 import com.aakash.novafork.ui.common.LocalBottomBarSpace
 import com.aakash.novafork.ui.common.swipeBetweenTabs
-import com.aakash.novafork.ui.common.tabSlide
+import com.aakash.novafork.ui.common.Motion
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.AppUiState
 import com.aakash.novafork.ui.model.Route
@@ -94,11 +95,13 @@ fun TabletApp(state: AppUiState, actions: AppActions, layout: DeviceLayout, modi
                                 WindowInsets.systemBars.union(WindowInsets.displayCutout).only(WindowInsetsSides.Horizontal),
                             ),
                         transitionSpec = {
-                            tabSlide(
-                                from = initialState.route.top,
-                                to = targetState.route.top,
-                                fade = fadeIn(tween(durationMillis = 240, delayMillis = 40)) togetherWith fadeOut(tween(durationMillis = 160)),
-                            )
+                            when {
+                                // Another tab: there at once (Apple TV, Apple Music).
+                                initialState.route.top != targetState.route.top -> Motion.instant()
+                                // Within a tab: iOS's push going in, undone coming back.
+                                targetState.stackDepth < initialState.stackDepth -> Motion.pop()
+                                else -> Motion.push()
+                            }
                         },
                         contentAlignment = Alignment.TopStart,
                         contentKey = { it.route.pageKey() },
@@ -111,7 +114,9 @@ fun TabletApp(state: AppUiState, actions: AppActions, layout: DeviceLayout, modi
                                 (pageState.route == Route.Home && pageState.home.hero.isNotEmpty())
                             // The tab bar stands on the right (iPhone Duo): pages leave room there,
                             // except art at the top, which runs under it.
-                            Box(if (underBar) Modifier.fillMaxSize() else Modifier.fillMaxSize().padding(end = TabletSideBarSpace)) {
+                            // Solid, so a page sliding over another never shows it through.
+                            val solid = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)
+                            Box(if (underBar) solid else solid.padding(end = TabletSideBarSpace)) {
                                 TabletPage(state = pageState, actions = actions, layout = layout)
                             }
                         }

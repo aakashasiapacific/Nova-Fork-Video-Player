@@ -324,11 +324,3 @@ internal fun Modifier.swipeBetweenTabs(
         .graphicsLayer { translationX = offset * if (enabled) 0.3f else 0.6f }
 }
 
-/** A tab change slides in from the side the new tab lies on; anything else crossfades. */
-internal fun tabSlide(from: TopDestination, to: TopDestination, fade: ContentTransform): ContentTransform {
-    val tabs = TopDestination.entries
-    if (from == to) return fade
-    val direction = if (tabs.indexOf(to) > tabs.indexOf(from)) 1 else -1
-    return (slideInHorizontally(tween(180)) { it * direction / 4 } + fadeIn(tween(150))) togetherWith
-        (slideOutHorizontally(tween(180)) { -it * direction / 4 } + fadeOut(tween(100)))
-}

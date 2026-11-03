@@ -34,6 +34,12 @@ import coil.annotation.ExperimentalCoilApi
 import coil.compose.AsyncImage
 import coil.imageLoader
 import coil.request.ImageRequest
+import coil.transition.TransitionTarget
+import coil.transition.Transition
+import coil.transition.CrossfadeTransition
+import coil.request.SuccessResult
+import coil.request.ImageResult
+import coil.decode.DataSource
 import coil.request.videoFrameMillis
 import coil.request.videoFramePercent
 import com.aakash.novafork.ui.model.Artwork
@@ -65,8 +71,11 @@ fun ArtImage(
     var loading by remember(current) { mutableStateOf(current != null) }
     var widthPx by remember { mutableIntStateOf(0) }
     Box(if (rightSizePosters) modifier.onSizeChanged { widthPx = it.width } else modifier) {
-        placeholder()
-        if (loading) Box(Modifier.fillMaxSize().shimmer())
+        // While a picture is on its way: a plain dark tile (Apple TV), not the titled stand-in,
+        // which only shows once there is no picture to come.
+        if (current == null) placeholder() else Box(Modifier.fillMaxSize().background(LoadingTile))
+        // The light sweep only for a picture that is slow to come; one from the cache never flashes it.
+        if (loading) Box(Modifier.fillMaxSize().shimmer(delayMs = SHIMMER_DELAY_MS))
         // A resizable poster waits one layout pass for its width (grids measure ahead while scrolling).
         val sized = when {
             current == null -> null
@@ -78,7 +87,8 @@ fun ArtImage(
             val model = remember(sized) {
                 ImageRequest.Builder(context)
                     .data(sized)
-                    .crossfade(ART_FADE_MS)
+                    // Fades in only when it came over the network: from the cache it is simply there.
+                    .transitionFactory(NetworkCrossfade)
                     .apply {
                         if (current == frameSource) {
                             if (frameAtMs != null) videoFrameMillis(frameAtMs) else videoFramePercent(0.1)
@@ -263,9 +273,12 @@ fun Modifier.startScrim(color: Color, endFraction: Float = 0.7f): Modifier = dra
  * in the title's own colours), then gone: one pass, not a loop, so a slow load is not a flicker.
  */
 @Composable
-internal fun Modifier.shimmer(): Modifier {
+internal fun Modifier.shimmer(delayMs: Long = 0L): Modifier {
     val sweep = remember { Animatable(-1f) }
-    LaunchedEffect(Unit) { sweep.animateTo(2f, tween(durationMillis = 1_100, easing = FastOutSlowInEasing)) }
+    LaunchedEffect(Unit) {
+        if (delayMs > 0L) kotlinx.coroutines.delay(delayMs)
+        sweep.animateTo(2f, tween(durationMillis = 1_100, easing = FastOutSlowInEasing))
+    }
     return drawWithContent {
         drawContent()
         val at = sweep.value
@@ -284,3 +297,21 @@ internal fun Modifier.shimmer(): Modifier {
 
 /** How long a poster or backdrop takes to fade in as it arrives. */
 private const val ART_FADE_MS = 250
+
+/** A picture that takes longer than this to come gets the light sweep. */
+private const val SHIMMER_DELAY_MS = 220L
+
+/** The tile under a picture that is still loading: iOS's dark secondary grey. */
+private val LoadingTile = Color(0xFF1C1C1E)
+
+/** Crossfades a picture that came over the network; one from either cache appears at once. */
+private object NetworkCrossfade : Transition.Factory {
+    private val fade = CrossfadeTransition.Factory(ART_FADE_MS)
+
+    override fun create(target: TransitionTarget, result: ImageResult): Transition =
+        if (result is SuccessResult && result.dataSource == DataSource.NETWORK) {
+            fade.create(target, result)
+        } else {
+            Transition.Factory.NONE.create(target, result)
+        }
+}

@@ -846,12 +846,28 @@ fun CollapsedTitleBar(visible: Boolean, title: String, modifier: Modifier = Modi
 }
 
 /**
- * The press (owner: snappy, like ChatGPT's app): nothing moves; the flat grey highlight of the
- * row or button is the whole feedback. Kept so call sites stay as they are.
+ * Apple TV's press (owner: a subtle shrink and dim): while held, the item settles a few percent
+ * smaller, and springs back to size on release. Never more than [MAX_PRESS_SHRINK], so it reads
+ * as a response to the finger rather than a bounce. Springs, so a quick tap that is let go
+ * mid-way turns around smoothly.
  */
-@Suppress("UNUSED_PARAMETER")
 @Composable
-fun Modifier.pressScale(source: InteractionSource, pressed: Float = 0.94f): Modifier = this
+fun Modifier.pressScale(source: InteractionSource, pressed: Float = 0.97f): Modifier {
+    val target = pressed.coerceIn(1f - MAX_PRESS_SHRINK, 1f)
+    val down by source.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        if (down) target else 1f,
+        if (down) Motion.press() else Motion.content(),
+        label = "pressScale",
+    )
+    return graphicsLayer {
+        scaleX = scale
+        scaleY = scale
+    }
+}
+
+/** The most a press shrinks anything. */
+private const val MAX_PRESS_SHRINK = 0.04f
 
 /**
  * Apple TV's poster press: while held the picture darkens a little (with [pressScale] shrinking
@@ -860,7 +876,7 @@ fun Modifier.pressScale(source: InteractionSource, pressed: Float = 0.94f): Modi
 @Composable
 fun Modifier.pressDim(source: InteractionSource): Modifier {
     val down by source.collectIsPressedAsState()
-    val dim by animateFloatAsState(if (down) 0.22f else 0f, tween(if (down) 90 else 220), label = "pressDim")
+    val dim by animateFloatAsState(if (down) 0.22f else 0f, if (down) Motion.press() else Motion.content(), label = "pressDim")
     return drawWithContent {
         drawContent()
         if (dim > 0f) drawRect(Color.Black.copy(alpha = dim))

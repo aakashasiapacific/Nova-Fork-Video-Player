@@ -132,6 +132,7 @@ import com.aakash.novafork.ui.audio.ShellNowPlaying
 import com.aakash.novafork.ui.audio.miniContentAlpha
 import com.aakash.novafork.ui.audio.rememberCoverAccent
 import com.aakash.novafork.ui.audio.rememberMusicShell
+import com.aakash.novafork.ui.common.Motion
 import com.aakash.novafork.ui.common.EndOfListGap
 import com.aakash.novafork.ui.common.Hairline
 import com.aakash.novafork.ui.common.IosColors
@@ -146,7 +147,6 @@ import com.aakash.novafork.ui.common.activeColor
 import com.aakash.novafork.ui.common.iosOverscroll
 import com.aakash.novafork.ui.common.rememberScreenCornerRadius
 import com.aakash.novafork.ui.common.tabIconRes
-import com.aakash.novafork.ui.common.tabSlide
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.AppUiState
 import com.aakash.novafork.ui.model.Route
@@ -280,6 +280,10 @@ fun PhoneApp(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
                 // Keyed by route: state updates within a page recompose it in place, while a route
                 // change animates. Seekable, so a swipe back can move it with the finger.
                 val routeState = remember { SeekableTransitionState(state.route) }
+                // Whether the coming route change goes deeper (a push) or back (a pop): read by the
+                // transition below, set here as the route changes.
+                val nav = remember { NavDirection(state.route, state.stackDepth) }
+                nav.follow(state.route, state.stackDepth)
                 val routeTransition = rememberTransition(routeState, label = "phoneRoute")
                 val transitionIdle = routeState.currentState == routeState.targetState && !routeTransition.isRunning
                 val background = MaterialTheme.colorScheme.background
@@ -335,7 +339,6 @@ fun PhoneApp(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
                     routeTransition.AnimatedContent(
                         modifier = Modifier.fillMaxSize(),
                         transitionSpec = {
-                            val fade = fadeIn(tween(durationMillis = 150)) togetherWith fadeOut(tween(durationMillis = 90))
                             val from = initialState
                             val to = targetState
                             when {
@@ -359,47 +362,37 @@ fun PhoneApp(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
                                     targetContentZIndex = -1f,
                                     sizeTransform = null,
                                 )
-                                from.top != to.top -> tabSlide(from = from.top, to = to.top, fade = fade)
-                                // A title's page (owner: the zoom out of the tapped poster or hero was
-                                // erratic): a quick, plain push like ChatGPT's, the page gliding in a
-                                // little from the right as it fades in; back undoes it.
-                                to.isTitlePage() && to != from ->
-                                    (slideInHorizontally(tween(PushMs, easing = FastOutSlowInEasing)) { it / PushShare } + fadeIn(tween(PushMs))) togetherWith
-                                        fadeOut(tween(PushOutMs))
-                                from.isTitlePage() && !to.isTitlePage() ->
-                                    fadeIn(tween(PushMs)) togetherWith
-                                        (slideOutHorizontally(tween(PushMs, easing = FastOutSlowInEasing)) { it / PushShare } + fadeOut(tween(PushOutMs)))
-                                else -> fade
+                                // Another tab: there at once, as in Apple TV and Apple Music.
+                                from.top != to.top -> Motion.instant()
+                                // Within a tab: iOS's push going in, the push undone coming back.
+                                nav.back -> Motion.pop()
+                                else -> Motion.push()
                             }
                         },
                     ) { route ->
                         val swiped = backSwipe.from == route
-                        val swipedBack = swiped && backSwipe.tab == null
+                        // A page sliding over another (a push, a pop, a swipe back) casts a soft shadow
+                        // down its left edge; side by side between tabs, none.
+                        val moving = transition.isRunning || swiped
+                        val shadow = moving && backSwipe.tab == null
                         Box(
                             Modifier
                                 .fillMaxSize()
-                                .then(
-                                    if (swiped) {
-                                        // The page being swiped away is solid, with a soft shadow down its left edge.
-                                        Modifier
-                                            .drawBehind {
-                                                if (!swipedBack) return@drawBehind
-                                                val edge = SwipeShadow.toPx()
-                                                drawRect(
-                                                    Brush.horizontalGradient(
-                                                        listOf(Color.Transparent, Color.Black.copy(alpha = 0.35f)),
-                                                        startX = -edge,
-                                                        endX = 0f,
-                                                    ),
-                                                    topLeft = Offset(-edge, 0f),
-                                                    size = Size(edge, size.height),
-                                                )
-                                            }
-                                            .background(background)
-                                    } else {
-                                        Modifier
-                                    },
-                                ),
+                                .drawBehind {
+                                    if (!shadow) return@drawBehind
+                                    val edge = SwipeShadow.toPx()
+                                    drawRect(
+                                        Brush.horizontalGradient(
+                                            listOf(Color.Transparent, Color.Black.copy(alpha = 0.35f)),
+                                            startX = -edge,
+                                            endX = 0f,
+                                        ),
+                                        topLeft = Offset(-edge, 0f),
+                                        size = Size(edge, size.height),
+                                    )
+                                }
+                                // Every page is solid, so a page sliding over another never shows it through.
+                                .background(background),
                         ) {
                             pageStates.SaveableStateProvider(route.toString()) {
                                 // iOS's edge bounce on every page; a movie or show page also closes
@@ -956,8 +949,25 @@ private fun Modifier.swipePages(
 }
 
 /** How far the page underneath starts to the left (a share of the width) and how shaded. */
-private const val UnderlayLag = 0.3f
-private const val UnderlayShade = 0.35f
+private const val UnderlayLag = Motion.UNDERLAY_LAG
+private const val UnderlayShade = Motion.UNDERLAY_SHADE
+
+/**
+ * Which way the route last moved: [back] when the back stack got shorter (Back, or a tab's page
+ * reselected), so the transition can run the push in reverse. Plain fields: it is set during
+ * composition just before the transition starts, and only the transition reads it.
+ */
+private class NavDirection(private var route: Route, private var depth: Int) {
+    var back = false
+        private set
+
+    fun follow(to: Route, toDepth: Int) {
+        if (to == route) return
+        back = toDepth < depth
+        route = to
+        depth = toDepth
+    }
+}
 private const val SwipeCommitFraction = 0.33f
 private const val SwipeFlingVelocity = 800f
 private val SwipeShadow = 14.dp
@@ -1020,7 +1030,3 @@ private fun Route.isTitlePage(): Boolean = this is Route.VideoDetails || this is
  */
 private val StatusEdgeDepth = 20.dp
 
-/** A title page's push: how long, how long the page under it takes to fade, and 1/n of the width it glides. */
-private const val PushMs = 180
-private const val PushOutMs = 110
-private const val PushShare = 8

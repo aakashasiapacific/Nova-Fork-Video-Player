@@ -386,6 +386,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
             libraryLoaded = true,
             route = route,
             canGoBack = user.backStack.size > 1,
+            stackDepth = user.backStack.size,
             previousRoute = user.backStack.getOrNull(user.backStack.size - 2),
             home = home.copy(
                 libraryCounts = LibraryCounts(

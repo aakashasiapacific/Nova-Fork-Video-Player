@@ -448,7 +448,7 @@ internal fun NewEpisodeDot(modifier: Modifier = Modifier) {
 }
 
 /** How far a poster or card sinks in while pressed. */
-private const val CardPressScale = 0.96f
+private const val CardPressScale = 0.97f
 
 /**
  * Where a card sits across its row, -1 (left edge) to 1 (right edge), read while drawing: a row
