@@ -545,7 +545,7 @@ private fun playerGroups(settings: Settings, actions: AppActions): List<Settings
         key = "pip-on-leave",
         title = null,
         rows = listOf(
-            switchRow("pip-on-leave", R.drawable.ic_picture_in_picture, "Picture in Picture on Leave", settings.pipOnLeave) { on ->
+            switchRow("pip-on-leave", R.drawable.ic_picture_in_picture_alt, "Picture in Picture on Leave", settings.pipOnLeave) { on ->
                 actions.updateSettings { it.copy(pipOnLeave = on) }
             },
         ),
