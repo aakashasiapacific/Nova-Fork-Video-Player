@@ -1,11 +1,8 @@
 package com.aakash.novafork.ui.common
 
 import androidx.annotation.DrawableRes
-import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.updateTransition
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.LocalIndication
@@ -103,12 +100,12 @@ fun NovaDropdownMenu(
             val transition = updateTransition(shown, label = "novaMenu")
             val scale by transition.animateFloat(
                 transitionSpec = {
-                    if (false isTransitioningTo true) tween<Float>(MENU_OPEN_MS, easing = FastOutSlowInEasing) else tween<Float>(MENU_CLOSE_MS)
+                    if (false isTransitioningTo true) Motion.content<Float>() else Motion.press<Float>()
                 },
                 label = "novaMenuScale",
             ) { open -> if (open) 1f else MENU_CLOSED_SCALE }
             val alpha by transition.animateFloat(
-                transitionSpec = { if (false isTransitioningTo true) tween<Float>(MENU_FADE_IN_MS) else tween<Float>(MENU_CLOSE_MS) },
+                transitionSpec = { Motion.press<Float>() },
                 label = "novaMenuAlpha",
             ) { open -> if (open) 1f else 0f }
             Surface(
@@ -325,7 +322,4 @@ private val MenuGap = 6.dp
 private val MenuVerticalMargin = 48.dp
 private val MenuSideMargin = 8.dp
 private val QuickActionSize = 44.dp
-private const val MENU_CLOSED_SCALE = 0.2f
-private const val MENU_OPEN_MS = 150
-private const val MENU_FADE_IN_MS = 90
-private const val MENU_CLOSE_MS = 100
+private const val MENU_CLOSED_SCALE = 0.9f

@@ -5,11 +5,11 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.VisibilityThreshold
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -74,6 +74,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.coerceAtMost
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -88,6 +89,7 @@ import com.aakash.novafork.ui.common.HeroTitle
 import com.aakash.novafork.ui.common.IosColors
 import com.aakash.novafork.ui.common.IosIconButton
 import com.aakash.novafork.ui.common.MetaBadges
+import com.aakash.novafork.ui.common.Motion
 import com.aakash.novafork.ui.common.NovaDropdownMenu
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.PictureStatusBar
@@ -564,7 +566,7 @@ internal fun rememberTitleCollapse(listState: LazyListState, backdropHeight: Dp)
     val gone by remember(listState, thresholdPx) {
         derivedStateOf { listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > thresholdPx }
     }
-    val shown by animateFloatAsState(if (gone) 1f else 0f, tween(200), label = "titleCollapse")
+    val shown by animateFloatAsState(if (gone) 1f else 0f, Motion.content(), label = "titleCollapse")
     return { shown }
 }
 
@@ -666,7 +668,7 @@ internal fun OverviewBlock(
             Column(
                 Modifier
                     // MORE opens the synopsis by sliding it down, LESS closes it the same way.
-                    .animateContentSize(spring(dampingRatio = 0.9f, stiffness = 380f))
+                    .animateContentSize(Motion.content(IntSize.VisibilityThreshold))
                     .clickable(
                         enabled = canToggle,
                         onClickLabel = if (expanded) "Show less" else "Show more",

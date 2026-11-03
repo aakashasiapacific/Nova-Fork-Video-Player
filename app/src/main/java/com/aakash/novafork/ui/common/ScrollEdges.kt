@@ -3,8 +3,6 @@ package com.aakash.novafork.ui.common
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.lazy.LazyListState
@@ -114,7 +112,7 @@ internal fun ScrollEdgeTitleBar(
         if (instant) {
             if (showTitle) text()
         } else {
-            AnimatedVisibility(visible = showTitle, enter = fadeIn(tween(160)), exit = fadeOut(tween(160))) { text() }
+            AnimatedVisibility(visible = showTitle, enter = fadeIn(Motion.content()), exit = fadeOut(Motion.content())) { text() }
         }
     }
 }
@@ -249,7 +247,7 @@ class CollapsingTitle {
         override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
             if (offset > 0f && offset < limit) {
                 val target = if (offset > limit / 2f) limit else 0f
-                animate(offset, target, animationSpec = spring(dampingRatio = 1f, stiffness = 600f)) { value, _ -> offset = value }
+                animate(offset, target, animationSpec = Motion.press()) { value, _ -> offset = value }
             }
             return Velocity.Zero
         }
@@ -288,7 +286,7 @@ fun rememberCollapsingTitle(): CollapsingTitle = remember { CollapsingTitle() }
 @Composable
 fun Modifier.fadeEndEdge(state: LazyListState, width: Dp = EdgeFadeWidth): Modifier {
     val more by remember(state) { derivedStateOf { state.canScrollForward } }
-    val strength by animateFloatAsState(if (more) 1f else 0f, tween(220), label = "rowEdgeFade")
+    val strength by animateFloatAsState(if (more) 1f else 0f, Motion.content(), label = "rowEdgeFade")
     val background = MaterialTheme.colorScheme.background
     return drawWithContent {
         drawContent()

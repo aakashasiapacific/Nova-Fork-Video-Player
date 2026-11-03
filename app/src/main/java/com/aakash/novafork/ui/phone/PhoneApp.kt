@@ -5,11 +5,10 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.SeekableTransitionState
-import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.VisibilityThreshold
 import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
@@ -117,6 +116,7 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.aakash.novafork.R
@@ -189,7 +189,7 @@ fun PhoneApp(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
     val zoomOrigins = remember { mutableMapOf<Route, TransformOrigin>() }
     // While a poster's menu is open the whole shell blurs and dims behind it (iOS).
     val menuFocus = remember { mutableStateOf(0) }
-    val menuDim by animateFloatAsState(if (menuFocus.value > 0) 1f else 0f, tween(220), label = "menuDim")
+    val menuDim by animateFloatAsState(if (menuFocus.value > 0) 1f else 0f, Motion.content(), label = "menuDim")
     val backSwipe = remember { BackSwipe() }
     val statusBarTop = WindowInsets.statusBars.getTop(LocalDensity.current).toFloat()
     // Not over pictures that run up under the clock (Home's hero, a title's backdrop), nor over their buttons.
@@ -223,10 +223,10 @@ fun PhoneApp(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
             }
         }
     }
-    val barClear by animateFloatAsState(if (atPageEnd) 1f else 0f, tween(220), label = "barClear")
+    val barClear by animateFloatAsState(if (atPageEnd) 1f else 0f, Motion.content(), label = "barClear")
     val barShrink by animateFloatAsState(
         targetValue = if (barCompact) 1f else 0f,
-        animationSpec = spring(dampingRatio = 0.9f, stiffness = 500f),
+        animationSpec = Motion.content(),
         label = "barShrink",
     )
     // The sunk page's corners follow the screen's own (iOS 27's concentric corners).
@@ -431,8 +431,8 @@ fun PhoneApp(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
                         .padding(bottom = navBar + TabBarHeight)
                         // Down with the bar while its names are tucked away.
                         .graphicsLayer { translationY = (TabBarHeight - CompactTabBarHeight).toPx() * barShrink },
-                    enter = slideInVertically(spring(dampingRatio = 0.9f, stiffness = 500f)) { it } + fadeIn(tween(160)),
-                    exit = slideOutVertically(tween(220)) { it } + fadeOut(tween(160)),
+                    enter = slideInVertically(Motion.page(IntOffset.VisibilityThreshold)) { it } + fadeIn(Motion.content()),
+                    exit = slideOutVertically(Motion.page(IntOffset.VisibilityThreshold)) { it } + fadeOut(Motion.press()),
                 ) {
                     // Pulled up, it opens Now Playing with the finger (Apple Music); let go early
                     // and it settles back. Swiped down behind the tab bar, it stops the music
@@ -682,8 +682,8 @@ private fun PhoneNavigationBar(
     var lastIndex by remember { mutableIntStateOf(index) }
     val forward = index >= lastIndex
     SideEffect { lastIndex = index }
-    val fast = spring<Float>(dampingRatio = 0.72f, stiffness = Spring.StiffnessMedium)
-    val slow = spring<Float>(dampingRatio = 0.8f, stiffness = Spring.StiffnessLow)
+    val fast = Motion.press<Float>()
+    val slow = Motion.content<Float>()
     val pillLeft by animateFloatAsState(index.toFloat(), animationSpec = if (forward) slow else fast, label = "tabPillLeft")
     val pillRight by animateFloatAsState(index + 1f, animationSpec = if (forward) fast else slow, label = "tabPillRight")
     Column(
@@ -742,7 +742,7 @@ private fun PhoneNavigationBar(
                                 if (!active) haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                 scope.launch {
                                     bounce.snapTo(TabBounceFrom)
-                                    bounce.animateTo(1f, tween(140))
+                                    bounce.animateTo(1f, Motion.press())
                                 }
                                 onSelect(tab)
                             },

@@ -3,8 +3,6 @@ package com.aakash.novafork.ui.common
 import androidx.annotation.DrawableRes
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
@@ -36,8 +34,8 @@ fun SymbolSwap(
     AnimatedContent(
         targetState = icon,
         transitionSpec = {
-            (scaleIn(spring(dampingRatio = 0.6f, stiffness = 600f), initialScale = 0.4f) + fadeIn(tween(140))) togetherWith
-                (scaleOut(tween(140), targetScale = 0.4f) + fadeOut(tween(110)))
+            (scaleIn(Motion.content(), initialScale = 0.85f) + fadeIn(Motion.press())) togetherWith
+                (scaleOut(Motion.press(), targetScale = 0.85f) + fadeOut(Motion.press()))
         },
         label = "symbolSwap",
     ) { shown ->
@@ -55,8 +53,8 @@ fun Modifier.popOnChange(key: Any?): Modifier = composed {
     LaunchedEffect(key) {
         if (key != last) {
             last = key
-            scale.animateTo(PopScale, spring(stiffness = 1_400f))
-            scale.animateTo(1f, spring(dampingRatio = 0.4f, stiffness = 500f))
+            scale.animateTo(PopScale, Motion.press())
+            scale.animateTo(1f, Motion.content())
         }
     }
     graphicsLayer {

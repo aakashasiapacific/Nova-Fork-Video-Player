@@ -2,8 +2,6 @@ package com.aakash.novafork.ui.common
 
 import androidx.annotation.DrawableRes
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
@@ -69,8 +67,8 @@ internal fun IosHudHost(state: HudState, modifier: Modifier = Modifier) {
     AnimatedVisibility(
         visible = visible,
         modifier = modifier,
-        enter = scaleIn(spring(dampingRatio = 0.7f, stiffness = 600f), initialScale = 0.8f) + fadeIn(tween(120)),
-        exit = scaleOut(tween(260), targetScale = 0.9f) + fadeOut(tween(260)),
+        enter = scaleIn(Motion.content(), initialScale = 0.9f) + fadeIn(Motion.press()),
+        exit = scaleOut(Motion.press(), targetScale = 0.9f) + fadeOut(Motion.press()),
     ) {
         val current = shown ?: return@AnimatedVisibility
         Column(

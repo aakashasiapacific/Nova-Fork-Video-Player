@@ -2,7 +2,6 @@ package com.aakash.novafork.ui.tablet
 
 import androidx.annotation.DrawableRes
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
@@ -63,6 +62,7 @@ import com.aakash.novafork.ui.common.IosFilledTonalButton
 import com.aakash.novafork.ui.common.IosIconButton
 import com.aakash.novafork.ui.common.IosProgressBar
 import com.aakash.novafork.ui.common.IosSpinner
+import com.aakash.novafork.ui.common.Motion
 import com.aakash.novafork.ui.common.NovaDropdownMenu
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.NovaMenuItem
@@ -128,7 +128,7 @@ internal fun TabletBrowseScreen(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxHeight(),
-            transitionSpec = { fadeIn(tween(durationMillis = 220, delayMillis = 30)) togetherWith fadeOut(tween(durationMillis = 120)) },
+            transitionSpec = { fadeIn(Motion.content()) togetherWith fadeOut(Motion.press()) },
             contentKey = { it.route },
             label = "browsePane",
         ) { pane ->
