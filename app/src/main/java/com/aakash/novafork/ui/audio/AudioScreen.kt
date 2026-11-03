@@ -95,6 +95,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
@@ -105,6 +106,7 @@ import com.aakash.novafork.data.db.MusicPlaylistRow
 import com.aakash.novafork.data.db.SongEntity
 import com.aakash.novafork.data.music.Album
 import com.aakash.novafork.data.music.Artist
+import com.aakash.novafork.data.music.AutoPlaylist
 import com.aakash.novafork.data.music.MusicLibrary
 import com.aakash.novafork.data.music.MusicLibraryData
 import com.aakash.novafork.data.music.MusicScanState
@@ -187,6 +189,7 @@ private const val GENRES = "genres"
 private const val ALBUM = "album:"
 private const val ARTIST = "artist:"
 private const val GENRE = "genre:"
+private const val AUTO = "auto:"
 private const val STACK_SEPARATOR = "\u0001"
 
 /** How many songs the Recently Played page lists. */
@@ -240,6 +243,7 @@ fun AudioContent(
         stackText = ""
     }
     var addingSong by remember { mutableStateOf<SongEntity?>(null) }
+    var infoSong by remember { mutableStateOf<SongEntity?>(null) }
     BackHandler(enabled = stack.isNotEmpty() || openPlaylist != null) { back() }
 
     val page = if (openPlaylist != null) "playlist:${openPlaylist.id}" else stack.lastOrNull() ?: HOME
@@ -257,6 +261,7 @@ fun AudioContent(
         onBack = ::back,
         onOpen = ::open,
         onAdd = { addingSong = it },
+        onInfo = { infoSong = it },
         favorites = favorites.toSet(),
         isPlaying = player.isPlaying,
     )
@@ -309,12 +314,15 @@ fun AudioContent(
                 ?.let { AlbumPage(it, ctx) } ?: Missing(ctx)
             shown.startsWith(ARTIST) -> library.artists.firstOrNull { it.key == shown.removePrefix(ARTIST) }
                 ?.let { ArtistPage(it, ctx) } ?: Missing(ctx)
+            shown.startsWith(AUTO) -> AutoPlaylist.entries.firstOrNull { it.name == shown.removePrefix(AUTO) }
+                ?.let { AutoPlaylistPage(it, ctx) } ?: Missing(ctx)
             shown.startsWith(GENRE) -> library.genres.firstOrNull { it.name == shown.removePrefix(GENRE) }
                 ?.let { SongsPage(it.name, it.songs, ctx) } ?: Missing(ctx)
             else -> Missing(ctx)
         }
     }
 
+    infoSong?.let { song -> SongInfoSheet(song = song, onDismiss = { infoSong = null }) }
     addingSong?.let { song ->
         AddToPlaylistDialog(
             song = song,
@@ -338,6 +346,8 @@ private class PageContext(
     val onBack: () -> Unit,
     val onOpen: (String) -> Unit,
     val onAdd: (SongEntity) -> Unit,
+    /** A song's "Song Info" sheet. */
+    val onInfo: (SongEntity) -> Unit,
     /** Starred songs: a small star in their rows, Favorite or Unfavorite in their menus. */
     val favorites: Set<Long> = emptySet(),
     /** The playing song's bars move only while it plays. */
@@ -356,6 +366,7 @@ private fun pageTitle(page: String, library: MusicLibraryData): String = when {
     page.startsWith(ALBUM) -> library.albums.firstOrNull { it.key == page.removePrefix(ALBUM) }?.title ?: "Back"
     page.startsWith(ARTIST) -> library.artists.firstOrNull { it.key == page.removePrefix(ARTIST) }?.name ?: "Back"
     page.startsWith(GENRE) -> page.removePrefix(GENRE)
+    page.startsWith(AUTO) -> AutoPlaylist.entries.firstOrNull { it.name == page.removePrefix(AUTO) }?.title ?: "Back"
     else -> "Back"
 }
 
@@ -456,6 +467,8 @@ private fun LibraryHome(
 
 @Composable
 private fun PlaylistsPage(playlists: List<MusicPlaylistRow>, ctx: PageContext) {
+    // The automatic playlists that have songs now; they follow the library.
+    val automatic = remember(ctx.library) { AutoPlaylist.withSongs(ctx.library) }
     AudioPage("Playlists") {
         header("Playlists", ctx)
         // Apple Music's first row: a blue "+" tile and New Playlist….
@@ -485,6 +498,16 @@ private fun PlaylistsPage(playlists: List<MusicPlaylistRow>, ctx: PageContext) {
                         ctx.actions.createPlaylist(name)
                     },
                     onDismiss = { naming = false },
+                )
+            }
+        }
+        automatic.forEach { (kind, songs) ->
+            row("auto:${kind.name}") {
+                ListRow(
+                    title = kind.title,
+                    subtitle = if (songs.size == 1) "1 song" else "${songs.size} songs",
+                    art = { Box(Modifier.size(56.dp).clip(RoundedCornerShape(6.dp))) { AutoPlaylistCover(kind, small = true) } },
+                    onClick = { ctx.onOpen(AUTO + kind.name) },
                 )
             }
         }
@@ -667,15 +690,25 @@ private fun AlbumPage(album: Album, ctx: PageContext) {
                 val genre = album.songs.firstNotNullOfOrNull { it.genre }
                 // Apple Music's caps line: "ROCK · 1975".
                 val details = listOfNotNull(genre, album.year?.toString()).joinToString(" · ").uppercase()
-                if (details.isNotEmpty()) {
-                    Text(
-                        details,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        letterSpacing = 0.2.sp,
-                        color = Color.White.copy(alpha = 0.55f),
-                        modifier = Modifier.padding(top = 6.dp),
-                    )
+                // Its songs all lossless (read lazily for m4a): Apple Music's grey "Lossless" tag beside it.
+                val lossless = rememberAlbumLossless(album)
+                if (details.isNotEmpty() || lossless) {
+                    Row(
+                        Modifier.padding(top = 6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        if (details.isNotEmpty()) {
+                            Text(
+                                details,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                letterSpacing = 0.2.sp,
+                                color = Color.White.copy(alpha = 0.55f),
+                            )
+                        }
+                        if (lossless) LosslessBadge("Lossless")
+                    }
                 }
             }
         }
@@ -863,6 +896,68 @@ private fun PlaylistPage(playlist: OpenPlaylist, ctx: PageContext) {
         }
         // As on an album, Apple Music ends a playlist with its length.
         if (playlist.songs.isNotEmpty()) row("footer") { Footer(playlist.songs) }
+    }
+}
+
+/**
+ * An automatic playlist ([AutoPlaylist]): like a playlist's page but with nothing to edit or delete,
+ * its songs picked by the library itself.
+ */
+@Composable
+private fun AutoPlaylistPage(kind: AutoPlaylist, ctx: PageContext) {
+    val songs = remember(ctx.library, kind) { kind.songs(ctx.library) }
+    AudioPage(kind.title) {
+        row("back") { BackRow(ctx) { close -> QueueItems(songs, ctx, close) } }
+        row("cover") {
+            Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+                Box(
+                    Modifier
+                        .padding(top = 8.dp)
+                        .fillMaxWidth(0.72f)
+                        .aspectRatio(1f)
+                        .shadow(18.dp, RoundedCornerShape(10.dp))
+                        .clip(RoundedCornerShape(10.dp)),
+                ) {
+                    AutoPlaylistCover(kind, small = false)
+                }
+                Text(kind.title, fontSize = 22.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 18.dp))
+            }
+        }
+        if (songs.isEmpty()) {
+            row("empty") { Hint("Nothing here yet. This playlist fills itself as you listen.") }
+        } else {
+            row("play") { PlayShuffle(songs, ctx.actions) }
+        }
+        songRows(songs, ctx)
+        if (songs.isNotEmpty()) row("footer") { Footer(songs) }
+    }
+}
+
+/** An automatic playlist's generated cover: a gradient tile with its name, [small] for list rows. */
+@Composable
+private fun AutoPlaylistCover(kind: AutoPlaylist, small: Boolean) {
+    val colors = when (kind) {
+        AutoPlaylist.TOP_PLAYED -> listOf(NovaColors.AppleMusicRed, Color(0xFF7A1C3A))
+        AutoPlaylist.RECENTLY_ADDED -> listOf(Color(0xFF5E5CE6), Color(0xFF2A2A72))
+        AutoPlaylist.RECENTLY_PLAYED -> listOf(Color(0xFF30B0C7), Color(0xFF1B5E6E))
+    }
+    val size: TextUnit = if (small) 10.sp else 24.sp
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(Brush.linearGradient(colors))
+            .padding(if (small) 5.dp else 16.dp),
+        contentAlignment = Alignment.BottomStart,
+    ) {
+        Text(
+            kind.title,
+            fontSize = size,
+            lineHeight = size * 1.1f,
+            fontWeight = FontWeight.Bold,
+            color = Color.White,
+            maxLines = if (small) 3 else 4,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 
@@ -1340,6 +1435,14 @@ private fun SongMenu(
             onClick = {
                 onDismiss()
                 ctx.onOpen(ARTIST + song.artistKey)
+            },
+        )
+        NovaMenuItem(
+            text = { Text("Song Info") },
+            leadingIcon = { NovaIcon(R.drawable.ic_info, contentDescription = null) },
+            onClick = {
+                onDismiss()
+                ctx.onInfo(song)
             },
         )
         if (onRemove != null) {

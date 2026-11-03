@@ -179,6 +179,8 @@ fun NowPlayingHost(
     upNext: List<SongEntity> = emptyList(),
     menu: (@Composable ColumnScope.(close: () -> Unit) -> Unit)? = null,
     sheet: NowPlayingSheet? = null,
+    /** "Lossless" / "Hi-Res Lossless" under the title; null = none. */
+    quality: String? = null,
 ) {
     LaunchedEffect(player.active) { if (!player.active && open) onDismiss() }
     // One number, [NowPlayingSheet.openFraction], moves everything in the same frame: the sheet's
@@ -224,6 +226,7 @@ fun NowPlayingHost(
             onDismiss = onDismiss,
             favorite = favorite,
             upNext = upNext,
+            quality = quality,
             menu = menu,
             progress = { state.openFraction },
             onDragBy = { delta ->
@@ -433,6 +436,9 @@ fun ShellNowPlaying(
     val song = remember(player.nowPlaying?.songId, library) { library.songs.firstOrNull { it.id == player.nowPlaying?.songId } }
     var adding by remember { mutableStateOf<SongEntity?>(null) }
     var equalizing by remember { mutableStateOf(false) }
+    var showingInfo by remember { mutableStateOf(false) }
+    // Read lazily, so the sample rate and depth (Hi-Res) can follow the tag shown from the name.
+    val info = rememberAudioInfo(song)
     NowPlayingHost(
         open = open,
         player = player,
@@ -441,6 +447,7 @@ fun ShellNowPlaying(
         upNext = rememberUpNext(viewModel, player),
         onDismiss = onDismiss,
         sheet = sheet,
+        quality = song?.let { losslessLabel(it, info) },
         menu = song?.let { current ->
             { close ->
                 NovaMenuItem(
@@ -472,6 +479,14 @@ fun ShellNowPlaying(
                     },
                 )
                 NovaMenuItem(
+                    text = { Text("Song Info") },
+                    leadingIcon = { NovaIcon(R.drawable.ic_info, contentDescription = null) },
+                    onClick = {
+                        close()
+                        showingInfo = true
+                    },
+                )
+                NovaMenuItem(
                     text = { Text("Equaliser") },
                     leadingIcon = { NovaIcon(R.drawable.ic_tune, contentDescription = null) },
                     onClick = {
@@ -486,6 +501,11 @@ fun ShellNowPlaying(
         val settings by viewModel.settings.collectAsStateWithLifecycle()
         AudioTheme {
             EqualizerSheet(settings = settings, onUpdate = viewModel::updateSettings, onDismiss = { equalizing = false })
+        }
+    }
+    if (showingInfo) {
+        song?.let { current ->
+            AudioTheme { SongInfoSheet(song = current, onDismiss = { showingInfo = false }) }
         }
     }
     adding?.let { picked ->
@@ -675,6 +695,8 @@ fun NowPlayingScreen(
     favorite: Boolean = false,
     /** The songs queued after this one (see [rememberUpNext]). */
     upNext: List<SongEntity> = emptyList(),
+    /** Apple Music's grey "Lossless" / "Hi-Res Lossless" tag under the title; null = none. */
+    quality: String? = null,
     /** Apple Music's "…" beside the star; null = none (previews). */
     menu: (@Composable ColumnScope.(close: () -> Unit) -> Unit)? = null,
     /** How far it is open, 0 to 1 ([NowPlayingHost] moves it), read while drawing; 1 stands still. */
@@ -758,7 +780,7 @@ fun NowPlayingScreen(
                     ) { BigCover(player) }
                     Spacer(Modifier.height(12.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        SongTitles(player, Modifier.weight(1f), small = true)
+                        SongTitles(player, Modifier.weight(1f), small = true, quality = quality)
                         if (now != null) FavoriteButton(favorite) { actions.toggleFavorite(now.songId) }
                         if (menu != null) NowPlayingMore(menu)
                     }
@@ -796,7 +818,7 @@ fun NowPlayingScreen(
                     // Lyrics and the queue keep the song in a small header, as in Apple Music.
                     Row(Modifier.padding(top = 8.dp, bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                         Cover(now?.artUri, size = 64, corner = 8)
-                        SongTitles(player, Modifier.weight(1f).padding(start = 14.dp), small = true)
+                        SongTitles(player, Modifier.weight(1f).padding(start = 14.dp), small = true, quality = quality)
                         if (now != null) FavoriteButton(favorite) { actions.toggleFavorite(now.songId) }
                         if (menu != null) NowPlayingMore(menu)
                     }
@@ -821,7 +843,7 @@ fun NowPlayingScreen(
                 }
                 if (pane == NowPlayingPane.ART) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        SongTitles(player, Modifier.weight(1f))
+                        SongTitles(player, Modifier.weight(1f), quality = quality)
                         if (now != null) FavoriteButton(favorite) { actions.toggleFavorite(now.songId) }
                         if (menu != null) NowPlayingMore(menu)
                     }
@@ -902,7 +924,7 @@ private fun NowPlayingButtons(
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun SongTitles(player: MusicPlayerState, modifier: Modifier = Modifier, small: Boolean = false) {
+private fun SongTitles(player: MusicPlayerState, modifier: Modifier = Modifier, small: Boolean = false, quality: String? = null) {
     val now = player.nowPlaying
     Column(modifier) {
         Text(
@@ -922,6 +944,7 @@ private fun SongTitles(player: MusicPlayerState, modifier: Modifier = Modifier, 
             overflow = if (error != null) TextOverflow.Ellipsis else TextOverflow.Clip,
             modifier = if (error != null) Modifier else Modifier.basicMarquee(initialDelayMillis = 2_000),
         )
+        if (quality != null && error == null) LosslessBadge(quality, Modifier.padding(top = 4.dp), onDark = true)
     }
 }
 
