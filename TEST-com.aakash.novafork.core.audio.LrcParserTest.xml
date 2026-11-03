@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.aakash.novafork.core.audio.LrcParserTest" tests="10" skipped="0" failures="0" errors="0" timestamp="2026-11-03T16:13:31.314Z" hostname="runnervm48cm3" time="0.034">
+  <properties/>
+  <testcase name="offsetMovesEveryLine" classname="com.aakash.novafork.core.audio.LrcParserTest" time="0.016"/>
+  <testcase name="oneTextWithSeveralTimesBecomesSeveralLines" classname="com.aakash.novafork.core.audio.LrcParserTest" time="0.001"/>
+  <testcase name="keepsEmptyTimedLinesAsBreaks" classname="com.aakash.novafork.core.audio.LrcParserTest" time="0.0"/>
+  <testcase name="dropsWordTimesOfEnhancedLrc" classname="com.aakash.novafork.core.audio.LrcParserTest" time="0.004"/>
+  <testcase name="onlyTagsMeansNoLyrics" classname="com.aakash.novafork.core.audio.LrcParserTest" time="0.001"/>
+  <testcase name="readsTimedLinesInOrder" classname="com.aakash.novafork.core.audio.LrcParserTest" time="0.0"/>
+  <testcase name="plainTextIsUnsynced" classname="com.aakash.novafork.core.audio.LrcParserTest" time="0.004"/>
+  <testcase name="acceptsOtherTimeSpellings" classname="com.aakash.novafork.core.audio.LrcParserTest" time="0.001"/>
+  <testcase name="activeIndexFollowsThePosition" classname="com.aakash.novafork.core.audio.LrcParserTest" time="0.0"/>
+  <testcase name="keepsWordTimesOfEnhancedLrcOnTheirWords" classname="com.aakash.novafork.core.audio.LrcParserTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

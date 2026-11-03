@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.aakash.novafork.core.tmdb.TmdbCertificationTest" tests="8" skipped="0" failures="0" errors="0" timestamp="2026-11-03T16:13:36.259Z" hostname="runnervm48cm3" time="0.039">
+  <properties/>
+  <testcase name="theatricalReleaseWinsInsideACountry" classname="com.aakash.novafork.core.tmdb.TmdbCertificationTest" time="0.007"/>
+  <testcase name="movieUsesTheDeviceCountryThenTheUs" classname="com.aakash.novafork.core.tmdb.TmdbCertificationTest" time="0.0"/>
+  <testcase name="nextEpisodeLabelUsesTheLocalePattern" classname="com.aakash.novafork.core.tmdb.TmdbCertificationTest" time="0.007"/>
+  <testcase name="showUsesTheDeviceCountryThenTheUs" classname="com.aakash.novafork.core.tmdb.TmdbCertificationTest" time="0.005"/>
+  <testcase name="nextEpisodeLabelIsNullWhenPastMissingOrUnreadable" classname="com.aakash.novafork.core.tmdb.TmdbCertificationTest" time="0.001"/>
+  <testcase name="nextEpisodeDecodesWhenPresentOrNull" classname="com.aakash.novafork.core.tmdb.TmdbCertificationTest" time="0.004"/>
+  <testcase name="nextEpisodeLabelOmitsTheYearThisYear" classname="com.aakash.novafork.core.tmdb.TmdbCertificationTest" time="0.014"/>
+  <testcase name="movieWithoutAnyCertificationIsNull" classname="com.aakash.novafork.core.tmdb.TmdbCertificationTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

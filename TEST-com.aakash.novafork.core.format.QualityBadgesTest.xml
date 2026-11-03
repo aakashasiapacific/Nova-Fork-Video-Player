@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.aakash.novafork.core.format.QualityBadgesTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-11-03T16:13:31.457Z" hostname="runnervm48cm3" time="0.01">
+  <properties/>
+  <testcase name="otherBadgesOnlyFromKnownTraits" classname="com.aakash.novafork.core.format.QualityBadgesTest" time="0.006"/>
+  <testcase name="fourKFromWidthOrHeight" classname="com.aakash.novafork.core.format.QualityBadgesTest" time="0.004"/>
+  <testcase name="hdOnlyWhenNotFourK" classname="com.aakash.novafork.core.format.QualityBadgesTest" time="0.0"/>
+  <testcase name="nothingForSmallOrUnknownSizes" classname="com.aakash.novafork.core.format.QualityBadgesTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

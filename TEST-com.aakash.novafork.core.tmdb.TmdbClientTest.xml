@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.aakash.novafork.core.tmdb.TmdbClientTest" tests="34" skipped="0" failures="0" errors="0" timestamp="2026-11-03T16:13:36.308Z" hostname="runnervm48cm3" time="3.271">
+  <properties/>
+  <testcase name="readAccessTokenIsSentAsBearerHeader" classname="com.aakash.novafork.core.tmdb.TmdbClientTest" time="0.025"/>
+  <testcase name="networkErrorsAreRetried" classname="com.aakash.novafork.core.tmdb.TmdbClientTest" time="0.041"/>
+  <testcase name="decodesMovieSearchResults" classname="com.aakash.novafork.core.tmdb.TmdbClientTest" time="0.011"/>
+  <testcase name="findMovieReturnsNullWithoutAConfidentMatch" classname="com.aakash.novafork.core.tmdb.TmdbClientTest" time="0.014"/>
+  <testcase name="findMovieRetriesTheTitleBeforeASubtitle" classname="com.aakash.novafork.core.tmdb.TmdbClientTest" time="0.116"/>
+  <testcase name="serverErrorsAreRetried" classname="com.aakash.novafork.core.tmdb.TmdbClientTest" time="0.081"/>
+  <testcase name="clientErrorsAreNotRetried" classname="com.aakash.novafork.core.tmdb.TmdbClientTest" time="0.013"/>
+  <testcase name="requestsBeyondTheRateLimitWait" classname="com.aakash.novafork.core.tmdb.TmdbClientTest" time="0.508"/>
+  <testcase name="searchMovieSendsQueryYearAndLanguage" classname="com.aakash.novafork.core.tmdb.TmdbClientTest" time="0.014"/>
+  <testcase name="defaultsFollowTmdbLimits" classname="com.aakash.novafork.core.tmdb.TmdbClientTest" time="0.004"/>
+  <testcase name="imageUrlHelpers" classname="com.aakash.novafork.core.tmdb.TmdbClientTest" time="0.003"/>
+  <testcase name="decodesSeasonDetails" classname="com.aakash.novafork.core.tmdb.TmdbClientTest" time="0.012"/>
+  <testcase name="cancellationCancelsTheHttpCall" classname="com.aakash.novafork.core.tmdb.TmdbClientTest" time="0.019"/>
+  <testcase name="unauthorizedBecomesTmdbExceptionWithStatusMessage" classname="com.aakash.novafork.core.tmdb.TmdbClientTest" time="0.005"/>
+  <testcase name="errorWithoutJsonBodyStillCarriesTheCode" classname="com.aakash.novafork.core.tmdb.TmdbClientTest" time="0.124"/>
+  <testcase name="findMovieFallsBackToASearchWithoutYear" classname="com.aakash.novafork.core.tmdb.TmdbClientTest" time="0.097"/>
+  <testcase name="retriesWaitBetweenAttempts" classname="com.aakash.novafork.core.tmdb.TmdbClientTest" time="0.613"/>
+  <testcase name="searchTvSendsFirstAirDateYear" classname="com.aakash.novafork.core.tmdb.TmdbClientTest" time="0.014"/>
+  <testcase name="findMoviePicksTheBestCandidateOfTheYearSearch" classname="com.aakash.novafork.core.tmdb.TmdbClientTest" time="0.052"/>
+  <testcase name="decodesTvDetails" classname="com.aakash.novafork.core.tmdb.TmdbClientTest" time="0.016"/>
+  <testcase name="networkErrorIsThrownAfterTwoRetries" classname="com.aakash.novafork.core.tmdb.TmdbClientTest" time="0.042"/>
+  <testcase name="v3KeyIsSentAsQueryParameter" classname="com.aakash.novafork.core.tmdb.TmdbClientTest" time="0.007"/>
+  <testcase name="testCredentialsCallsConfiguration" classname="com.aakash.novafork.core.tmdb.TmdbClientTest" time="0.051"/>
+  <testcase name="rateLimitIsRetriedOnceAfterRetryAfter" classname="com.aakash.novafork.core.tmdb.TmdbClientTest" time="1.014"/>
+  <testcase name="findShowUsesTheYearFirst" classname="com.aakash.novafork.core.tmdb.TmdbClientTest" time="0.049"/>
+  <testcase name="secondRateLimitFails" classname="com.aakash.novafork.core.tmdb.TmdbClientTest" time="0.048"/>
+  <testcase name="credentialTypeIsDetected" classname="com.aakash.novafork.core.tmdb.TmdbClientTest" time="0.001"/>
+  <testcase name="decodesMovieDetails" classname="com.aakash.novafork.core.tmdb.TmdbClientTest" time="0.01"/>
+  <testcase name="detailsPickTheTitleLogoInTheAppLanguage" classname="com.aakash.novafork.core.tmdb.TmdbClientTest" time="0.008"/>
+  <testcase name="malformedJsonBecomesIOException" classname="com.aakash.novafork.core.tmdb.TmdbClientTest" time="0.005"/>
+  <testcase name="missingCredentialsDisableTheClient" classname="com.aakash.novafork.core.tmdb.TmdbClientTest" time="0.002"/>
+  <testcase name="findShowDropsTheCountrySuffixAndPrefersThatCountry" classname="com.aakash.novafork.core.tmdb.TmdbClientTest" time="0.224"/>
+  <testcase name="searchMovieWithoutYearOmitsTheParameter" classname="com.aakash.novafork.core.tmdb.TmdbClientTest" time="0.011"/>
+  <testcase name="blankQueryMakesNoRequest" classname="com.aakash.novafork.core.tmdb.TmdbClientTest" time="0.003"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[Nov 03, 2026 4:13:37 PM okhttp3.mockwebserver.MockWebServer$SocketHandler handle
+WARNING: MockWebServer[43765] connection from /127.0.0.1 didn't make a request
+]]></system-err>
+</testsuite>
