@@ -351,8 +351,20 @@ private fun PhoneHeroPage(hero: HeroUi, preview: Boolean, muted: Boolean, action
                     modifier = Modifier.padding(top = 10.dp),
                 )
             }
-            Spacer(Modifier.height(18.dp))
-            HeroActions(hero = hero, play = play, actions = actions)
+            if (!wide) {
+                Spacer(Modifier.height(18.dp))
+                HeroActions(hero = hero, play = play, actions = actions)
+            }
+        }
+        if (wide) {
+            // Tablets and landscape (owner): Play, star and "+" on the right, level with the title's foot.
+            Box(
+                Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(end = 32.dp, bottom = HeroContentBottom),
+            ) {
+                HeroActions(hero = hero, play = play, actions = actions)
+            }
         }
     }
 }

@@ -158,16 +158,15 @@ internal fun ShowCardUi.subtitleLine(): String = metaLine(
  * for new videos ([onRefresh]), silently, with a tick when letting go will.
  */
 @Composable
+@Suppress("UNUSED_PARAMETER")
 internal fun TabletPullToRefresh(
     onRefresh: () -> Unit,
     modifier: Modifier = Modifier,
     content: @Composable BoxScope.() -> Unit,
 ) {
-    val pull = remember { mutableFloatStateOf(0f) }
-    val readPull = remember { { pull.floatValue } }
-    CompositionLocalProvider(LocalPagePull provides readPull) {
-        Box(modifier.iosOverscroll(pullState = pull, onPullRefresh = onRefresh), content = content)
-    }
+    // No rubber bounce or stretching titles on a tablet (owner); the library still refreshes
+    // itself each time the app opens.
+    Box(modifier, content = content)
 }
 
 
