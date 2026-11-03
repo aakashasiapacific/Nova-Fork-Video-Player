@@ -97,6 +97,7 @@ import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.PosterArt
 import com.aakash.novafork.ui.common.ProgressStrip
 import com.aakash.novafork.ui.common.RollingText
+import com.aakash.novafork.ui.common.ShowMenuBox
 import com.aakash.novafork.ui.common.VideoMenuBox
 import com.aakash.novafork.ui.common.WatchedBadge
 import com.aakash.novafork.ui.common.iosScrollIndicator
@@ -257,6 +258,7 @@ internal fun PhoneShowCard(
     show: ShowCardUi,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    onLongClick: (() -> Unit)? = null,
 ) {
     PosterCardLayout(
         title = show.title,
@@ -266,7 +268,7 @@ internal fun PhoneShowCard(
         modifier = modifier,
         progress = null,
         watched = show.episodeCount > 0 && show.unwatchedCount == 0,
-        onLongClick = null,
+        onLongClick = onLongClick,
     )
 }
 
@@ -329,6 +331,7 @@ internal fun PhoneWideShowCard(
     show: ShowCardUi,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    onLongClick: (() -> Unit)? = null,
 ) {
     WideCardLayout(
         title = show.title,
@@ -337,6 +340,7 @@ internal fun PhoneWideShowCard(
         artTitle = show.title,
         onClick = onClick,
         modifier = modifier,
+        onLongClick = onLongClick,
         progress = null,
         watched = show.episodeCount > 0 && show.unwatchedCount == 0,
     )
@@ -676,7 +680,9 @@ internal fun PhoneLibraryGrid(
                 ) { openMenu ->
                     SelectablePosterCard(item.card, actions, openMenu)
                 }
-                is LibraryItemUi.Show -> PhoneShowCard(item.card, onClick = { actions.openShow(item.card.key) }, modifier = appear)
+                is LibraryItemUi.Show -> ShowMenuBox(showKey = item.card.key, actions = actions, modifier = appear) { openMenu ->
+                    PhoneShowCard(item.card, onClick = { actions.openShow(item.card.key) }, onLongClick = openMenu)
+                }
             }
         }
         footer()

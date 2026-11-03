@@ -21,6 +21,7 @@ import com.aakash.novafork.ui.model.EpisodeUi
 import com.aakash.novafork.ui.model.FolderUi
 import com.aakash.novafork.ui.model.HeroTarget
 import com.aakash.novafork.ui.model.HeroUi
+import com.aakash.novafork.ui.model.HiddenItemUi
 import com.aakash.novafork.ui.model.HistoryDayUi
 import com.aakash.novafork.ui.model.HistoryEntryUi
 import com.aakash.novafork.ui.model.HomeUi
@@ -252,6 +253,58 @@ object UiMappers {
                     LibraryItemUi.Video(copy.card.copy(subtitle = where.ifEmpty { copy.video.fileName }))
                 }
             }
+
+    /**
+     * An actor's or director's page: every movie and show of the library whose cast or directors
+     * (creators, for shows) include [name] (exact name, any case), newest first.
+     */
+    fun person(index: LibraryIndex, name: String): List<LibraryItemUi> {
+        val wanted = name.trim()
+        if (wanted.isEmpty()) return emptyList()
+        fun credited(meta: MetadataEntity?): Boolean =
+            creditNames(meta?.castNames).any { it.equals(wanted, ignoreCase = true) } ||
+                creditNames(meta?.directors).any { it.equals(wanted, ignoreCase = true) }
+        val found = ArrayList<Pair<Long, LibraryItemUi>>()
+        index.movies.filter { credited(it.meta) }.mapTo(found) { it.video.dateAdded to LibraryItemUi.Video(it.card) }
+        index.shows.filter { credited(it.meta) }.mapTo(found) { it.latestAdded to LibraryItemUi.Show(it.card) }
+        return found.sortedByDescending { it.first }.map { it.second }
+    }
+
+    /**
+     * The videos hidden from the library that still exist, as Preferences lists them: a show's
+     * hidden episodes are one row, every other video its own. By title.
+     */
+    fun hiddenVideos(index: LibraryIndex, hidden: Set<Long>): List<HiddenItemUi> {
+        if (hidden.isEmpty()) return emptyList()
+        val items = ArrayList<HiddenItemUi>()
+        val episodes = LinkedHashMap<String, MutableList<IndexedVideo>>()
+        for (video in index.allVideos) {
+            if (video.id !in hidden) continue
+            val showKey = video.showKey
+            if (showKey != null) {
+                episodes.getOrPut(showKey) { ArrayList() }.add(video)
+            } else {
+                items += HiddenItemUi(
+                    key = "v:${video.id}",
+                    title = video.title,
+                    subtitle = video.card.subtitle,
+                    artwork = video.card.artwork,
+                    videoIds = listOf(video.id),
+                )
+            }
+        }
+        for ((key, list) in episodes) {
+            val first = list.first()
+            items += HiddenItemUi(
+                key = "s:$key",
+                title = first.showTitle ?: first.title,
+                subtitle = countLabel(list.size, "episode"),
+                artwork = first.card.artwork,
+                videoIds = list.map { it.id },
+            )
+        }
+        return items.sortedWith(compareBy(NaturalOrder) { sortKeyOf(it.title) })
+    }
 
     private fun duplicateKey(video: IndexedVideo): String? {
         val row = video.video
@@ -677,7 +730,7 @@ object UiMappers {
 
     fun browse(index: LibraryIndex, scan: ScanState, playlists: List<PlaylistWithCount> = emptyList()): BrowseUi = BrowseUi(
         sources = sources(index, scan),
-        streams = index.videos.filter { it.kind == MediaKind.STREAM }.map { it.card },
+        streams = index.allVideos.filter { it.kind == MediaKind.STREAM }.map { it.card },
         playlists = playlists(index, playlists),
     )
 
@@ -745,7 +798,7 @@ object UiMappers {
         val prefix = if (dir.isEmpty()) "" else "$dir/"
         val subfolderCounts = HashMap<String, Int>()
         val here = ArrayList<IndexedVideo>()
-        for (video in index.videos) {
+        for (video in index.allVideos) {
             if (video.video.sourceId != sourceId) continue
             val folder = video.relativeFolder
             if (folder == dir) {
@@ -852,7 +905,7 @@ object UiMappers {
         val dir = path.trim('/')
         val prefix = if (dir.isEmpty()) "" else "$dir/"
         val counts = HashMap<String, Int>()
-        for (video in index.videos) {
+        for (video in index.allVideos) {
             if (video.video.sourceId != sourceId) continue
             val folder = video.relativeFolder
             if (folder == dir || !folder.startsWith(prefix)) continue
@@ -1040,3 +1093,7 @@ object UiMappers {
 /** "1 season", "3 seasons". */
 private fun countLabel(count: Int, singular: String, plural: String = singular + "s"): String =
     "$count ${if (count == 1) singular else plural}"
+
+/** The names of a comma-separated cast or director list ("A, B, C"), trimmed. */
+internal fun creditNames(names: String?): List<String> =
+    names.orEmpty().split(',').map { it.trim() }.filter { it.isNotEmpty() }

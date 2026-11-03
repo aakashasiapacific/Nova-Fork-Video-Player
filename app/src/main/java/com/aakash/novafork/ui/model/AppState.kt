@@ -42,15 +42,22 @@ sealed interface Route {
 
     /** One section of Preferences on its own page (phone), as iOS Settings opens its rows. */
     data class SettingsPage(val section: String) : Route
+
+    /** An actor's or director's page: the library's movies and shows with [name] in their credits. */
+    data class Person(val name: String) : Route
+
+    /** Preferences › Hidden Videos: what was hidden from the library, each with "Unhide". */
+    data object HiddenVideos : Route
 }
 
 /** The tab a route belongs to (for highlighting the nav bar / rail). */
 val Route.top: TopDestination
     get() = when (this) {
-        Route.Home, Route.Library, Route.ContinueWatching, Route.History, is Route.VideoDetails, is Route.ShowDetails, is Route.Playlist ->
-            TopDestination.VIDEO
+        Route.Home, Route.Library, Route.ContinueWatching, Route.History, is Route.VideoDetails, is Route.ShowDetails, is Route.Playlist,
+        is Route.Person,
+        -> TopDestination.VIDEO
         // Sources are under Settings.
-        Route.Browse, is Route.BrowseDir, Route.Settings, is Route.SettingsPage -> TopDestination.SETTINGS
+        Route.Browse, is Route.BrowseDir, Route.Settings, is Route.SettingsPage, Route.HiddenVideos -> TopDestination.SETTINGS
         Route.Audio -> TopDestination.AUDIO
         Route.Search -> TopDestination.SEARCH
     }
@@ -277,6 +284,10 @@ data class AppUiState(
     val playlist: PlaylistDetailsUi? = null,
     /** The History page (route History): played videos by day, newest first. */
     val history: List<HistoryDayUi> = emptyList(),
+    /** An actor's or director's page (route Person): the library's movies and shows they are credited in, newest first. */
+    val person: List<LibraryItemUi> = emptyList(),
+    /** Hidden Videos (route HiddenVideos): what was hidden from the library. */
+    val hidden: List<HiddenItemUi> = emptyList(),
     val search: SearchUi = SearchUi(),
     val settings: SettingsUi = SettingsUi(),
     val scan: ScanUi = ScanUi(),
@@ -326,6 +337,18 @@ interface AppActions {
 
     /** Takes one search out of the recent searches (swiped away). */
     fun forgetSearch(query: String) {}
+
+    /** Opens the page of an actor or director: the library's titles with [name] in their credits. */
+    fun openPerson(name: String) = navigate(Route.Person(name))
+
+    /** Hides a video from the library's screens (Browse still lists it); nothing is deleted. */
+    fun hideVideo(videoId: Long) {}
+
+    /** Hides a show (all its episodes) from the library's screens. */
+    fun hideShow(showKey: String) {}
+
+    /** Brings hidden videos back into the library. */
+    fun unhideVideos(videoIds: List<Long>) {}
 
     /** Opens the library (under the Video tab) showing [filter]. */
     fun openLibrary(filter: LibraryFilter) {

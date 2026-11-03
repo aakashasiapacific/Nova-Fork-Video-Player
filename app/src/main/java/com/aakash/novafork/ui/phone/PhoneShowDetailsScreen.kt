@@ -156,6 +156,7 @@ fun PhoneShowDetailsScreen(
                     Credits(
                         lines = listOf("Starring" to details.starring, "Created by" to details.createdBy),
                         modifier = Modifier.padding(top = 12.dp),
+                        onName = actions::openPerson,
                     )
                 }
             }

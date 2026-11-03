@@ -600,6 +600,17 @@ private fun PhonePage(state: AppUiState, actions: AppActions) {
             actions = actions,
             modifier = pageModifier,
         )
+        is Route.Person -> PhonePersonScreen(
+            name = route.name,
+            items = state.person,
+            actions = actions,
+            modifier = pageModifier,
+        )
+        Route.HiddenVideos -> PhoneHiddenVideosScreen(
+            items = state.hidden,
+            actions = actions,
+            modifier = pageModifier,
+        )
         is Route.Playlist -> PhonePlaylistScreen(
             playlist = state.playlist?.takeIf { it.id == route.playlistId },
             actions = actions,

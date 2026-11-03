@@ -15,6 +15,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -63,7 +64,9 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -560,27 +563,62 @@ internal fun PhoneDetailsLoading(onBack: () -> Unit, modifier: Modifier = Modifi
 
 /**
  * Who made a title, under its synopsis as Apple TV's iPhone pages list it: each role ("Starring",
- * "Director") in white, the names after it in grey; roles without names are left out.
+ * "Director") in white, the names after it in grey; roles without names are left out. With
+ * [onName], tapping a name opens that person's page.
  */
 @Composable
-internal fun Credits(lines: List<Pair<String, String?>>, modifier: Modifier = Modifier) {
+internal fun Credits(lines: List<Pair<String, String?>>, modifier: Modifier = Modifier, onName: ((String) -> Unit)? = null) {
     val shown = lines.mapNotNull { (label, names) -> names?.let { label to it } }
     if (shown.isEmpty()) return
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        shown.forEach { (label, names) ->
-            Text(
-                buildAnnotatedString {
-                    withStyle(SpanStyle(color = Color.White, fontWeight = FontWeight.SemiBold)) { append(label) }
-                    append("  ")
-                    append(names)
-                },
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
+        shown.forEach { (label, names) -> CreditLine(label, names, onName) }
     }
+}
+
+/** One name of a credits line and where it sits in the line's text. */
+private class NameSpan(val name: String, val start: Int, val end: Int)
+
+/** The names of "A, B, C" with their positions, [base] being where the list starts in the line. */
+private fun nameSpans(names: String, base: Int): List<NameSpan> {
+    val spans = ArrayList<NameSpan>()
+    var from = 0
+    for (part in names.split(',')) {
+        val name = part.trim()
+        if (name.isNotEmpty()) {
+            val start = base + from + (part.length - part.trimStart().length)
+            spans += NameSpan(name, start, start + name.length)
+        }
+        from += part.length + 1
+    }
+    return spans
+}
+
+@Composable
+private fun CreditLine(label: String, names: String, onName: ((String) -> Unit)?) {
+    val spans = remember(label, names) { nameSpans(names, base = label.length + 2) }
+    var layout by remember { mutableStateOf<TextLayoutResult?>(null) }
+    Text(
+        buildAnnotatedString {
+            withStyle(SpanStyle(color = Color.White, fontWeight = FontWeight.SemiBold)) { append(label) }
+            append("  ")
+            append(names)
+        },
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        maxLines = 2,
+        overflow = TextOverflow.Ellipsis,
+        onTextLayout = { layout = it },
+        modifier = if (onName == null) {
+            Modifier
+        } else {
+            Modifier.pointerInput(spans) {
+                detectTapGestures { position ->
+                    val offset = layout?.getOffsetForPosition(position) ?: return@detectTapGestures
+                    spans.firstOrNull { offset >= it.start && offset < it.end }?.let { onName(it.name) }
+                }
+            }
+        },
+    )
 }
 
 /** Tagline and an overview clamped to a few lines with a More/Less toggle. */

@@ -120,6 +120,7 @@ fun PhoneVideoDetailsScreen(
                     Credits(
                         lines = listOf("Starring" to details.starring, "Director" to details.directedBy),
                         modifier = Modifier.padding(top = 12.dp),
+                        onName = actions::openPerson,
                     )
                 }
             }
