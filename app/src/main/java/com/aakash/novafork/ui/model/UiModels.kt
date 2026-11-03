@@ -118,7 +118,7 @@ data class HeroUi(
     val progress: Float? = null,
     /** What the Play button plays (the movie, or the next-up episode of a show). */
     val playVideoId: Long? = null,
-    /** "Play", "Resume", "Play S2 · E4". */
+    /** "Play", "Resume · 1h 41m left", "Play S2 · E4". */
     val playLabel: String = "Play",
     /**
      * The local file (content:// or file://) the hero plays as a preview, from [previewStartMs]:
@@ -143,6 +143,8 @@ data class HeroUi(
 data class HomeUi(
     val hero: List<HeroUi> = emptyList(),
     val continueWatching: List<VideoCardUi> = emptyList(),
+    /** Up Next: the next unwatched episode of each show being watched, not already in [continueWatching]; newest activity first. */
+    val upNext: List<VideoCardUi> = emptyList(),
     /** Movies, shows and videos saved with the hero's "+", most recently added first. */
     val watchlist: List<LibraryItemUi> = emptyList(),
     val recentlyAdded: List<VideoCardUi> = emptyList(),
@@ -231,7 +233,7 @@ data class VideoDetailsUi(
     val progress: Float? = null,
     val positionMs: Long = 0,
     val durationMs: Long? = null,
-    /** "Resume from 42:10" / "Play" */
+    /** "Resume · 1h 41m left" / "Play" */
     val playLabel: String = "Play",
     val watched: Boolean = false,
     // Episode context
@@ -314,7 +316,7 @@ data class ShowDetailsUi(
     val seasons: List<SeasonUi> = emptyList(),
     /** First unwatched / in-progress episode. */
     val nextUp: EpisodeUi? = null,
-    /** "Resume S1 · E3", "Play S1 · E1" */
+    /** "Resume · 42m left", "Play S1 · E1" */
     val playLabel: String = "Play",
     val isMatched: Boolean = false,
     /** "Watched yesterday", from the episode played last; null when none was. */

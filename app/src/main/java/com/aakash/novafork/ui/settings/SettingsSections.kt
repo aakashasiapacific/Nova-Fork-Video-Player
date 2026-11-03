@@ -33,6 +33,8 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
 import com.aakash.novafork.data.AspectMode
+import com.aakash.novafork.data.DetailsHeaderStyle
+import com.aakash.novafork.data.HeroStyle
 import com.aakash.novafork.data.HwDecoding
 import com.aakash.novafork.data.LayoutMode
 import com.aakash.novafork.data.Settings
@@ -615,6 +617,27 @@ private fun appearanceGroups(settings: Settings, actions: AppActions): List<Sett
             ) { mode -> actions.updateSettings { it.copy(layoutMode = mode) } },
         ),
         footer = "Automatic uses the tablet layout from 600dp wide.",
+    ),
+    SettingsGroup(
+        key = "headers",
+        title = null,
+        rows = listOf(
+            choiceRow(
+                "heroStyle",
+                R.drawable.ic_movie,
+                "Home hero",
+                HeroStyle.entries.map { Option(it, it.label) },
+                settings.heroStyle,
+            ) { style -> actions.updateSettings { it.copy(heroStyle = style) } },
+            choiceRow(
+                "detailsHeader",
+                R.drawable.ic_tv,
+                "Title page header",
+                DetailsHeaderStyle.entries.map { Option(it, it.label) },
+                settings.detailsHeaderStyle,
+            ) { style -> actions.updateSettings { it.copy(detailsHeaderStyle = style) } },
+        ),
+        footer = "Backdrop is Apple TV's look: the picture fills the top and the title sits over it.",
     ),
     SettingsGroup(
         key = "glass",

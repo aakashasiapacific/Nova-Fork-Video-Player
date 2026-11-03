@@ -84,6 +84,8 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
             putBoolean(KEY_SUBTITLE_BACKGROUND, s.subtitleBackground)
             putInt(KEY_SUBTITLE_MARGIN, s.subtitleMargin)
             putBoolean(KEY_HAPTICS, s.haptics)
+            putString(KEY_HERO_STYLE, s.heroStyle.name)
+            putString(KEY_DETAILS_HEADER_STYLE, s.detailsHeaderStyle.name)
         }
     }
 
@@ -130,6 +132,8 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
         const val KEY_SUBTITLE_BACKGROUND = "subtitle_background"
         const val KEY_SUBTITLE_MARGIN = "subtitle_margin"
         const val KEY_HAPTICS = "haptics"
+        const val KEY_HERO_STYLE = "hero_style"
+        const val KEY_DETAILS_HEADER_STYLE = "details_header_style"
 
         /**
          * The type [write] stores each key with. A restored backup's entry of another type is
@@ -171,6 +175,8 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
             KEY_SUBTITLE_BACKGROUND to SettingType.BOOLEAN,
             KEY_SUBTITLE_MARGIN to SettingType.INT,
             KEY_HAPTICS to SettingType.BOOLEAN,
+            KEY_HERO_STYLE to SettingType.STRING,
+            KEY_DETAILS_HEADER_STYLE to SettingType.STRING,
         )
 
         /**
@@ -230,6 +236,8 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
                 subtitleBackground = prefs.boolean(KEY_SUBTITLE_BACKGROUND, defaults.subtitleBackground),
                 subtitleMargin = prefs.int(KEY_SUBTITLE_MARGIN, defaults.subtitleMargin).coerceIn(0, 300),
                 haptics = prefs.boolean(KEY_HAPTICS, defaults.haptics),
+                heroStyle = enumOrDefault(prefs.string(KEY_HERO_STYLE), defaults.heroStyle),
+                detailsHeaderStyle = enumOrDefault(prefs.string(KEY_DETAILS_HEADER_STYLE), defaults.detailsHeaderStyle),
             )
         }
 

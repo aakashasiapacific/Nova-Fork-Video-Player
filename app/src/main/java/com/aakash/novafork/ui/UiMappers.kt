@@ -10,6 +10,7 @@ import com.aakash.novafork.data.ScanState
 import com.aakash.novafork.data.db.MetadataEntity
 import com.aakash.novafork.data.db.SourceEntity
 import com.aakash.novafork.data.db.SourceType
+import com.aakash.novafork.data.db.VideoEntity
 import com.aakash.novafork.data.music.MusicLibrary
 import com.aakash.novafork.data.music.MusicLibraryData
 import com.aakash.novafork.data.music.MusicSearch
@@ -63,6 +64,7 @@ object UiMappers {
     private const val CAST_WEIGHT = 3
     private const val RECENTLY_ADDED_LIMIT = 30
     private const val HERO_LIMIT = 6
+    private const val UP_NEXT_LIMIT = 15
     /** Newest movies and shows considered for the hero before the backdrop preference is applied. */
     private const val HERO_RECENT_CANDIDATES = 12
     private const val SEARCH_LIMIT = 60
@@ -85,6 +87,7 @@ object UiMappers {
                 }
                 if (hasNewEpisode(index, video)) card.copy(newEpisode = true) else card
             },
+            upNext = upNext(index, inProgress),
             recentlyAdded = recentlyAdded(index),
             movies = index.movies.sortedWith(TITLE_ORDER).map { it.card },
             shows = index.shows.map { it.card },
@@ -100,6 +103,32 @@ object UiMappers {
             .sortedByDescending { it.video.lastPlayedAt ?: 0L }
             .distinctBy { it.showKey ?: "v:${it.id}" }
             .take(CONTINUE_WATCHING_LIMIT)
+
+    /**
+     * Apple TV's Up Next: for each show with a watched or partly watched episode, the episode to
+     * watch next (the first unwatched one after the episode touched last), the show touched most
+     * recently first. A show whose episode is still partly watched is already in Continue
+     * Watching ([continuing]) and is left out here.
+     */
+    private fun upNext(index: LibraryIndex, continuing: List<IndexedVideo>): List<VideoCardUi> {
+        val inRow = continuing.mapTo(HashSet()) { it.id }
+        return index.shows
+            .mapNotNull { show ->
+                val last = show.episodes
+                    .filter { it.inProgress || it.video.watched }
+                    .maxByOrNull { it.video.lastPlayedAt ?: 0L }
+                    ?: return@mapNotNull null
+                val next = if (last.inProgress) {
+                    last
+                } else {
+                    show.episodes.drop(show.episodes.indexOf(last) + 1).firstOrNull { !it.video.watched }
+                }
+                if (next == null || next.id in inRow) null else (last.video.lastPlayedAt ?: 0L) to next.card
+            }
+            .sortedByDescending { it.first }
+            .take(UP_NEXT_LIMIT)
+            .map { it.second }
+    }
 
     /**
      * Apple TV's blue dot: the episode after [video] (the one being watched) reached the library
@@ -184,7 +213,7 @@ object UiMappers {
             genres = genresOf(show.meta),
             progress = video.card.progress,
             playVideoId = video.id,
-            playLabel = playLabel(resume = true, code = code),
+            playLabel = resumeLabel(video.video),
         )
     }
 
@@ -205,7 +234,7 @@ object UiMappers {
             genres = genres,
             progress = video.card.progress,
             playVideoId = video.id,
-            playLabel = if (video.inProgress) "Resume" else "Play",
+            playLabel = if (video.inProgress) resumeLabel(video.video) else "Play",
         )
     }
 
@@ -488,7 +517,7 @@ object UiMappers {
             progress = item.card.progress,
             positionMs = if (item.inProgress) video.positionMs else 0L,
             durationMs = item.card.durationMs,
-            playLabel = if (item.inProgress) "Resume from ${Formats.clock(video.positionMs)}" else "Play",
+            playLabel = if (item.inProgress) resumeLabel(video) else "Play",
             watched = video.watched,
             showKey = item.showKey,
             showTitle = item.showTitle,
@@ -718,14 +747,17 @@ object UiMappers {
     }
 
     private fun showPlayLabel(next: IndexedVideo): String =
-        playLabel(
-            resume = next.inProgress,
-            code = episodeLabel(next.video.season, next.video.episode, next.video.episodeEnd),
-        )
+        if (next.inProgress) {
+            resumeLabel(next.video)
+        } else {
+            val code = episodeLabel(next.video.season, next.video.episode, next.video.episodeEnd)
+            if (code == null) "Play" else "Play $code"
+        }
 
-    private fun playLabel(resume: Boolean, code: String?): String {
-        val verb = if (resume) "Resume" else "Play"
-        return if (code == null) verb else "$verb $code"
+    /** The Resume button's label: "Resume · 1h 41m left"; just "Resume" while the length is unknown. */
+    private fun resumeLabel(video: VideoEntity): String {
+        val duration = video.durationMs?.takeIf { it > 0 } ?: return "Resume"
+        return "Resume · ${Formats.remaining(video.positionMs, duration)}"
     }
 
     // Browse

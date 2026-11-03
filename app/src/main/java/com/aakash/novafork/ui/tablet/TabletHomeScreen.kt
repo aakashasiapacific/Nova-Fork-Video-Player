@@ -63,7 +63,9 @@ import com.aakash.novafork.ui.common.LandscapeArt
 import com.aakash.novafork.ui.common.LocalHeroPreviewEnabled
 import com.aakash.novafork.ui.common.RatingPill
 import com.aakash.novafork.ui.common.ScanBanner
-import com.aakash.novafork.ui.common.SectionHeader
+import com.aakash.novafork.ui.common.HomeHeaderGap
+import com.aakash.novafork.ui.common.HomeSectionGap
+import com.aakash.novafork.ui.common.HomeSectionHeader
 import com.aakash.novafork.ui.common.VideoMenuBox
 import com.aakash.novafork.ui.common.bottomScrim
 import com.aakash.novafork.ui.common.deviceAccessNotice
@@ -175,14 +177,21 @@ private fun HomeFeed(home: HomeUi, scan: ScanUi, permission: PermissionUi, layou
             }
             if (home.continueWatching.isNotEmpty()) {
                 item(key = "continue", contentType = "landscapeRow") {
-                    HomeSection(title = "Continue Watching", onSeeAll = { actions.navigate(Route.ContinueWatching) }) {
+                    HomeSection(title = "Continue Watching", onOpen = { actions.navigate(Route.ContinueWatching) }) {
                         ContinueWatchingRow(home.continueWatching, actions)
+                    }
+                }
+            }
+            if (home.upNext.isNotEmpty()) {
+                item(key = "upNext", contentType = "landscapeRow") {
+                    HomeSection(title = "Up Next") {
+                        UpNextRow(home.upNext, actions)
                     }
                 }
             }
             if (home.watchlist.isNotEmpty()) {
                 item(key = "watchlist", contentType = "landscapeRow") {
-                    HomeSection(title = "Watchlist", onSeeAll = { actions.openLibrary(LibraryFilter.WATCHLIST) }) {
+                    HomeSection(title = "Watchlist", onOpen = { actions.openLibrary(LibraryFilter.WATCHLIST) }) {
                         WatchlistRow(home.watchlist, actions)
                     }
                 }
@@ -195,16 +204,10 @@ private fun HomeFeed(home: HomeUi, scan: ScanUi, permission: PermissionUi, layou
 }
 
 @Composable
-private fun HomeSection(title: String, onSeeAll: (() -> Unit)? = null, content: @Composable () -> Unit) {
-    val dims = LocalNovaDimens.current
-    Column(Modifier.padding(top = dims.sectionSpacing)) {
-        SectionHeader(
-            title = title,
-            modifier = Modifier.padding(start = dims.gutter, end = dims.gutter - 8.dp),
-            actionLabel = if (onSeeAll != null) "See all" else null,
-            onAction = onSeeAll,
-        )
-        Spacer(Modifier.height(8.dp))
+private fun HomeSection(title: String, onOpen: (() -> Unit)? = null, content: @Composable () -> Unit) {
+    Column(Modifier.padding(top = HomeSectionGap)) {
+        // The rows keep 6dp of their own above their cards, so the gap is that much shorter.
+        HomeSectionHeader(title = title, onOpen = onOpen, gapBelow = HomeHeaderGap - 6.dp)
         content()
     }
 }
@@ -245,6 +248,31 @@ private fun WatchlistRow(items: List<LibraryItemUi>, actions: AppActions) {
 
 @Composable
 private fun ContinueWatchingRow(cards: List<VideoCardUi>, actions: AppActions) {
+    val dims = LocalNovaDimens.current
+    val rowState = rememberLazyListState()
+    LazyRow(
+        state = rowState,
+        // The card peeking in at the end fades into the page (iOS 27).
+        modifier = Modifier.fadeEndEdge(rowState),
+        contentPadding = PaddingValues(horizontal = dims.gutter, vertical = 6.dp),
+        horizontalArrangement = Arrangement.spacedBy(dims.rowSpacing),
+    ) {
+        items(cards, key = { it.id }) { card ->
+            VideoMenuBox(videoId = card.id, title = card.primaryLine(), actions = actions) { openMenu ->
+                TabletLandscapeCard(
+                    card = card,
+                    onClick = { actions.play(card.id) },
+                    onLongClick = openMenu,
+                    modifier = Modifier.width(dims.landscapeCardWidth),
+                )
+            }
+        }
+    }
+}
+
+/** The next episode of each show being watched; a tap plays it. */
+@Composable
+private fun UpNextRow(cards: List<VideoCardUi>, actions: AppActions) {
     val dims = LocalNovaDimens.current
     val rowState = rememberLazyListState()
     LazyRow(
