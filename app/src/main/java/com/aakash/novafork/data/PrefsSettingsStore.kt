@@ -85,6 +85,7 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
             putInt(KEY_SUBTITLE_MARGIN, s.subtitleMargin)
             putBoolean(KEY_HAPTICS, s.haptics)
             putBoolean(KEY_PIP_ON_LEAVE, s.pipOnLeave)
+            putBoolean(KEY_REQUIRE_FINGERPRINT, s.requireFingerprint)
         }
     }
 
@@ -132,6 +133,7 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
         const val KEY_SUBTITLE_MARGIN = "subtitle_margin"
         const val KEY_HAPTICS = "haptics"
         const val KEY_PIP_ON_LEAVE = "pip_on_leave"
+        const val KEY_REQUIRE_FINGERPRINT = "require_fingerprint"
 
         /**
          * The type [write] stores each key with. A restored backup's entry of another type is
@@ -174,6 +176,7 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
             KEY_SUBTITLE_MARGIN to SettingType.INT,
             KEY_HAPTICS to SettingType.BOOLEAN,
             KEY_PIP_ON_LEAVE to SettingType.BOOLEAN,
+            KEY_REQUIRE_FINGERPRINT to SettingType.BOOLEAN,
         )
 
         /**
@@ -234,6 +237,7 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
                 subtitleMargin = prefs.int(KEY_SUBTITLE_MARGIN, defaults.subtitleMargin).coerceIn(0, 300),
                 haptics = prefs.boolean(KEY_HAPTICS, defaults.haptics),
                 pipOnLeave = prefs.boolean(KEY_PIP_ON_LEAVE, defaults.pipOnLeave),
+                requireFingerprint = prefs.boolean(KEY_REQUIRE_FINGERPRINT, defaults.requireFingerprint),
             )
         }
 

@@ -1,6 +1,7 @@
 package com.aakash.novafork.ui.settings
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -26,11 +27,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
 import com.aakash.novafork.ui.common.IosSpinner
 import com.aakash.novafork.ui.common.IosSwitch
+import com.aakash.novafork.ui.common.IosColors
 import com.aakash.novafork.ui.common.IosTextButton
+import com.aakash.novafork.ui.common.NovaDropdownMenu
+import com.aakash.novafork.ui.common.NovaIcon
+import com.aakash.novafork.ui.common.NovaMenuItem
 import com.aakash.novafork.ui.common.NovaAlertDialog
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.RestorePreviewUi
@@ -48,9 +54,78 @@ internal fun backupGroup(actions: AppActions): SettingsGroup = SettingsGroup(
     rows = listOf(
         SettingsRow("backup-save", "Back Up", R.drawable.ic_storage, IosPalette.Green) { shape -> BackupRow(shape, actions) },
         SettingsRow("backup-restore", "Restore", R.drawable.ic_restart_alt) { shape -> RestoreRow(shape, actions) },
+        SettingsRow("backup-auto", "Automatic Backup", R.drawable.ic_history) { shape -> AutoBackupRow(shape, actions) },
+        SettingsRow("backup-folder", "Backup Folder", R.drawable.ic_folder) { shape -> BackupFolderRow(shape, actions) },
     ),
-    footer = "Saves settings, sources, history, matches and playlists to a file. Restoring adds to what is here.",
+    footer = "Saves settings, sources, history, matches and playlists to a file. Restoring adds to what is here. " +
+        "Automatic backups are kept in the folder you pick, without passwords; the last 4 stay.",
 )
+
+private val AutoOptions = listOf(Option(false, "Off"), Option(true, "Weekly"))
+
+/** "Automatic Backup": Off or Weekly, with the day of the last one under the title. */
+@Composable
+private fun AutoBackupRow(shape: Shape, actions: AppActions) {
+    val backup by actions.backupState().collectAsState()
+    var open by remember { mutableStateOf(false) }
+    val last = backup.lastAutoAt
+    val current = AutoOptions.first { it.value == backup.autoWeekly }.label
+    RowSurface(shape = shape, onClick = { open = true }, minHeight = TwoLineRowHeight) {
+        RowIcon(R.drawable.ic_history)
+        Column(Modifier.weight(1f)) {
+            RowTitle("Automatic Backup")
+            if (backup.autoWeekly) {
+                Text(
+                    text = if (last == null) "No automatic backup yet" else "Last automatic backup: ${shortDate(last)}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = IosColors.SecondaryLabel,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+        Box {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                RowValue(current)
+                NovaIcon(R.drawable.ic_chevron_up_down, contentDescription = null, tint = IosColors.SecondaryLabel, modifier = Modifier.size(14.dp))
+            }
+            NovaDropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+                AutoOptions.forEach { option ->
+                    NovaMenuItem(
+                        text = { Text(option.label) },
+                        leadingIcon = {
+                            Box(Modifier.size(18.dp), contentAlignment = Alignment.Center) {
+                                if (option.value == backup.autoWeekly) {
+                                    NovaIcon(R.drawable.ic_check, contentDescription = "Selected", modifier = Modifier.size(16.dp))
+                                }
+                            }
+                        },
+                        onClick = {
+                            open = false
+                            if (option.value != backup.autoWeekly) {
+                                actions.setAutoBackup(option.value)
+                                // Weekly needs a place to write to.
+                                if (option.value && backup.autoFolderName == null) actions.pickBackupFolder()
+                            }
+                        },
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** "Backup Folder": where automatic backups go; a tap picks another. */
+@Composable
+private fun BackupFolderRow(shape: Shape, actions: AppActions) {
+    val backup by actions.backupState().collectAsState()
+    RowSurface(shape = shape, onClick = actions::pickBackupFolder) {
+        RowIcon(R.drawable.ic_folder)
+        RowTitle("Backup Folder", Modifier.weight(1f))
+        RowValue(backup.autoFolderName ?: "Not set")
+        RowChevron()
+    }
+}
 
 /** "Back Up", with the day of the last backup in grey (or a spinner while one is made). */
 @Composable
@@ -196,5 +271,8 @@ private fun count(n: Int, one: String, many: String): String = if (n == 1) "1 $o
 
 private fun dateTime(epochMs: Long): String =
     DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(epochMs))
+
+private fun shortDate(epochMs: Long): String =
+    java.text.SimpleDateFormat("d MMM", java.util.Locale.getDefault()).format(Date(epochMs))
 
 private fun date(epochMs: Long): String = DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(epochMs))

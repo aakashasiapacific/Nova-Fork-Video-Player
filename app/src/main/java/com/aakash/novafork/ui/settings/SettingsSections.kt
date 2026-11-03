@@ -660,6 +660,7 @@ private fun aboutGroups(state: SettingsUi, actions: AppActions): List<SettingsGr
         ),
         footer = "Shows what Nova sees in each source, to copy or share.",
     ),
+    whatsNewGroup(state.versionName),
     SettingsGroup(
         key = "credits",
         title = "Credits",

@@ -235,6 +235,12 @@ data class BackupUi(
     val confirm: RestorePreviewUi? = null,
     /** Entries of a restore (watch history, matches, playlist items) still waiting for their videos to be scanned. */
     val waiting: Int = 0,
+    /** Automatic backup: weekly into [autoFolderName]. */
+    val autoWeekly: Boolean = false,
+    /** Name of the folder automatic backups go to; null = none picked yet. */
+    val autoFolderName: String? = null,
+    /** When the last automatic backup was written (epoch ms); null = never. */
+    val lastAutoAt: Long? = null,
 )
 
 /** What a backup file holds, shown before restoring it. */
@@ -531,6 +537,12 @@ interface AppActions {
 
     /** Forgets the backup waiting in [BackupUi.confirm]. */
     fun cancelRestore() {}
+
+    /** Automatic backup: Off or Weekly (it needs a folder, see [pickBackupFolder]). */
+    fun setAutoBackup(weekly: Boolean) {}
+
+    /** Picks the folder automatic backups are written to (system folder picker). */
+    fun pickBackupFolder() {}
 }
 
 /** No-op actions for previews and screenshot tests. */
