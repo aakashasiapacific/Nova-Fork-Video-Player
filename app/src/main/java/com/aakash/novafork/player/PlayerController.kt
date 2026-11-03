@@ -151,6 +151,9 @@ class PlayerController(
     }
     private val subtitleDownloads = SubtitleDownloads(appContext, graph, subtitleFinder)
     private val subtitleDelays = SubtitleDelays(appContext)
+    private val showPreferences = ShowPreferences(appContext)
+    /** The playing episode's show, for what a show remembers (speed, audio language). */
+    private var currentShowKey: String? = null
 
     /** The player screen, while one is shown. */
     private var host: Host? = null
@@ -754,7 +757,11 @@ class PlayerController(
         val carry = carried
         rememberedAudio = carry?.audioTrack ?: video?.audioTrackId
         rememberedSubtitle = carry?.subtitleTrack ?: video?.subtitleTrackId
-        audioLanguage = TrackLanguages.aliases(settings.preferredAudioLanguage)
+        currentShowKey = video?.showKey
+        // A show's own audio language (owner: remembered per show) before the general preference.
+        audioLanguage = showPreferences.audioLanguage(currentShowKey) ?: TrackLanguages.aliases(settings.preferredAudioLanguage)
+        // And the speed last chosen for it, unless a reopen carries one over.
+        if (carry == null) showPreferences.rate(currentShowKey)?.let { rate -> _state.update { it.copy(rate = rate) } }
         subtitleLanguage = TrackLanguages.aliases(settings.preferredSubtitleLanguage)
         audioChoicePending = rememberedAudio != null || audioLanguage.isNotEmpty()
         val resumeAt = if (
@@ -1290,6 +1297,8 @@ class PlayerController(
         val name = _state.value.audioTracks.firstOrNull { it.id == id }?.name
         showLabel(if (id == DISABLED_TRACK) "Audio off" else name ?: "Audio track changed")
         saveTrackChoice()
+        val show = currentShowKey
+        if (show != null && name != null && id != DISABLED_TRACK) showPreferences.setAudioTrack(show, name)
     }
 
     override fun selectSubtitleTrack(id: Int) {
@@ -1339,6 +1348,7 @@ class PlayerController(
         val clamped = rate.coerceIn(MIN_RATE, MAX_RATE)
         mediaPlayer.setRate(clamped)
         _state.update { it.copy(rate = clamped) }
+        currentShowKey?.let { showPreferences.setRate(it, clamped) }
         showLabel(PlayerText.rateLabel(clamped))
     }
 
