@@ -72,7 +72,8 @@ private fun LibraryLink(@DrawableRes icon: Int, label: String, last: Boolean = f
                     style = MaterialTheme.typography.bodyLarge,
                     color = IosColors.SecondaryLabel,
                     maxLines = 1,
-                    modifier = Modifier.padding(start = 8.dp, end = 6.dp),
+                    // It pops once when it changes (a favourite added), as iOS badges do.
+                    modifier = Modifier.padding(start = 8.dp, end = 6.dp).popOnChange(count),
                 )
             }
             NovaIcon(R.drawable.ic_chevron_right, contentDescription = null, tint = IosColors.TertiaryLabel)

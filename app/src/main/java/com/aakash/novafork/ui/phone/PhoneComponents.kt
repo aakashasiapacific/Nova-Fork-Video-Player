@@ -927,4 +927,4 @@ internal fun RowScope.ButtonContent(@DrawableRes icon: Int, label: String) {
 }
 
 /** How far a finished episode's row fades back. */
-private const val WatchedEpisodeAlpha = 0.55f
+private const val WatchedEpisodeAlpha = 0.42f
