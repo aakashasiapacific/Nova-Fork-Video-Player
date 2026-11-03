@@ -163,6 +163,9 @@ class PlayerController(
     private val audioDelays = AudioDelays(appContext)
     private val bookmarkStore = VideoBookmarkStore(appContext)
     private var subtitleSizeJob: Job? = null
+
+    /** A video paused when its subtitle size changed stays paused after it reopens. */
+    private var pauseAfterReopen = false
     private val videoAspects = VideoAspects(appContext)
     /** The playing episode's show, for what a show remembers (speed, audio language). */
     private var currentShowKey: String? = null
@@ -1738,7 +1741,13 @@ class PlayerController(
                     _state.update { it.copy(isBuffering = buffering) }
                 }
             }
-            MediaPlayer.Event.Playing -> onPlaying()
+            MediaPlayer.Event.Playing -> {
+                // Reopened for a new subtitle size while paused: set up as usual, then back to paused.
+                val repause = pauseAfterReopen
+                pauseAfterReopen = false
+                onPlaying()
+                if (repause) pause()
+            }
             MediaPlayer.Event.Paused -> onPaused()
             MediaPlayer.Event.Stopped -> onStopped()
             MediaPlayer.Event.EndReached -> onEndReached()
@@ -2700,6 +2709,7 @@ class PlayerController(
         )
         val position = currentPositionMs().takeIf { it > 0 } ?: request.startPositionMs
         PlayerDiagnostics.record("subtitles: size changed, reopening at the same position")
+        pauseAfterReopen = !mediaPlayer.isPlaying
         openSession(request.copy(startPositionMs = position), carry)
     }
 
