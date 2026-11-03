@@ -4,6 +4,7 @@ import android.app.ActivityOptions
 import android.app.RecoverableSecurityException
 import android.content.ActivityNotFoundException
 import android.content.ContentResolver
+import android.content.ContentValues
 import android.content.ContentUris
 import android.content.Intent
 import android.content.IntentSender
@@ -36,11 +37,14 @@ import com.aakash.novafork.data.backup.BackupManager
 import com.aakash.novafork.player.PlayerIntents
 import com.aakash.novafork.ui.audio.LocalMusicEnabled
 import com.aakash.novafork.ui.common.LocalHeroPreviewEnabled
+import com.aakash.novafork.ui.common.FileRenames
 import com.aakash.novafork.ui.common.LocalStatusBarIcons
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.DialogUi
 import com.aakash.novafork.ui.model.TopDestination
 import com.aakash.novafork.widget.ContinueWatchingWidget
+import java.io.File
+import java.io.IOException
 import java.time.LocalDate
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.distinctUntilChangedBy
@@ -77,6 +81,19 @@ class MainActivity : ComponentActivity() {
 
     private val backupOpener = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) viewModel.readBackup(uri)
+    }
+
+    /** The device video waiting for the user's yes to change its file (see [startDeviceRename]). */
+    private var pendingRename: DeviceRename? = null
+
+    private val renameAccess = registerForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
+        val rename = pendingRename ?: return@registerForActivityResult
+        pendingRename = null
+        if (result.resultCode == RESULT_OK) {
+            applyDeviceRename(rename, mayAsk = false)
+        } else {
+            viewModel.showMessage(FileRenames.FAILED)
+        }
     }
 
     private val actions: AppActions by lazy {
@@ -199,6 +216,11 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.deviceRenameRequests.collect { startDeviceRename(it) }
+            }
+        }
         val askedOnce = uiPrefs.getBoolean(KEY_ASKED_STORAGE, false)
         if (savedInstanceState == null && !askedOnce && !StoragePermissions.hasAnyVideoAccess(this)) {
             requestStoragePermission()
@@ -318,6 +340,86 @@ class MainActivity : ComponentActivity() {
         } catch (e: SecurityException) {
             false
         }
+
+    // Renaming a device video's file
+
+    /**
+     * Android 11+ asks once through the system's write request (a dialog the user answers);
+     * before that the rename is tried at once and, on Android 10, a [RecoverableSecurityException]
+     * carries the same kind of question. The library row follows only after MediaStore agreed.
+     */
+    private fun startDeviceRename(rename: DeviceRename) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+            applyDeviceRename(rename, mayAsk = true)
+            return
+        }
+        try {
+            askToRename(rename, MediaStore.createWriteRequest(contentResolver, listOf(Uri.parse(rename.uri))).intentSender)
+        } catch (e: Exception) {
+            Log.w(TAG, "No write request for ${rename.uri}", e)
+            viewModel.showMessage(FileRenames.FAILED)
+        }
+    }
+
+    private fun askToRename(rename: DeviceRename, sender: IntentSender) {
+        pendingRename = rename
+        try {
+            renameAccess.launch(IntentSenderRequest.Builder(sender).build())
+        } catch (e: ActivityNotFoundException) {
+            pendingRename = null
+            viewModel.showMessage(FileRenames.FAILED)
+        }
+    }
+
+    /** Renames in MediaStore; with [mayAsk], Android 10's "allow this app to change" question may come first. */
+    private fun applyDeviceRename(rename: DeviceRename, mayAsk: Boolean) {
+        lifecycleScope.launch {
+            val newName = try {
+                withContext(Dispatchers.IO) { renameInMediaStore(Uri.parse(rename.uri), rename.newFileName) }
+            } catch (e: SecurityException) {
+                val sender = if (mayAsk && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && e is RecoverableSecurityException) {
+                    e.userAction.actionIntent.intentSender
+                } else {
+                    null
+                }
+                if (sender != null) {
+                    askToRename(rename, sender)
+                    return@launch
+                }
+                Log.w(TAG, "Not allowed to rename ${rename.uri}", e)
+                null
+            } catch (e: Exception) {
+                Log.w(TAG, "Couldn't rename ${rename.uri}", e)
+                null
+            }
+            if (newName != null) viewModel.finishDeviceRename(rename.videoId, newName) else viewModel.showMessage(FileRenames.FAILED)
+        }
+    }
+
+    /**
+     * Gives the video [uri] the file name [newName] and returns the name it ended up with (the
+     * system may add " (1)" if one exists). Before Android 10 the file itself is renamed first
+     * (WRITE_EXTERNAL_STORAGE), as MediaStore only edits its row there. Never replaces a file.
+     */
+    @Suppress("DEPRECATION")
+    private fun renameInMediaStore(uri: Uri, newName: String): String {
+        val values = ContentValues()
+        values.put(MediaStore.MediaColumns.DISPLAY_NAME, newName)
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+            val path = contentResolver.query(uri, arrayOf(MediaStore.MediaColumns.DATA), null, null, null)
+                ?.use { cursor -> if (cursor.moveToFirst()) cursor.getString(0) else null }
+                ?: throw IOException("No file behind $uri")
+            val file = File(path)
+            val target = File(file.parentFile, newName)
+            if (target.exists() || !file.renameTo(target)) throw IOException("Couldn't rename $path")
+            values.put(MediaStore.MediaColumns.DATA, target.absolutePath)
+        }
+        if (contentResolver.update(uri, values, null, null) < 1) throw IOException("MediaStore kept the old name of $uri")
+        return contentResolver.query(uri, arrayOf(MediaStore.MediaColumns.DISPLAY_NAME), null, null, null)
+            ?.use { cursor -> if (cursor.moveToFirst()) cursor.getString(0) else null }
+            ?.takeIf { it.isNotBlank() }
+            ?: newName
+    }
 
     // Folder picker
 

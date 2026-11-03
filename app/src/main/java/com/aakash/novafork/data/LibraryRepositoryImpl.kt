@@ -929,6 +929,22 @@ class LibraryRepositoryImpl(
         reportRemote(RemoteReport(videoId, positionMs = 0L, durationMs = null, finished = watched))
     }
 
+    override suspend fun renameVideoFile(videoId: Long, newFileName: String, newUri: String?) {
+        withContext(Dispatchers.IO) {
+            val old = videoDao.byId(videoId) ?: return@withContext
+            val renamed = old.copy(fileName = newFileName, uri = newUri ?: old.uri)
+            // A manual Identify outranks the file name, as in a rescan (refreshed).
+            val updated = if (old.matchState == MatchState.MANUAL) {
+                renamed
+            } else {
+                renamed.withParse(parseName(newFileName, old.folder.split('/').filter { it.isNotEmpty() }.asReversed()))
+            }
+            videoDao.update(updated)
+        }
+        // The new name may match something else; the matcher looks again.
+        enricher.request()
+    }
+
     // Progress on media servers
 
     private class RemoteReport(val videoId: Long, val positionMs: Long, val durationMs: Long?, val finished: Boolean)

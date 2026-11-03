@@ -41,6 +41,8 @@ import com.aakash.novafork.ui.common.NovaDropdownMenu
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.NovaMenuItem
 import com.aakash.novafork.ui.common.RatingPill
+import com.aakash.novafork.ui.common.RenameFileDialog
+import com.aakash.novafork.ui.common.RenameFileMenuItem
 import com.aakash.novafork.ui.common.metaLine
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.MediaKind
@@ -156,6 +158,14 @@ private fun VideoBody(details: VideoDetailsUi, actions: AppActions) {
     val dims = LocalNovaDimens.current
     val isStream = details.kind == MediaKind.STREAM
     val started = (details.progress ?: 0f) > 0f
+    var renaming by remember { mutableStateOf(false) }
+    if (renaming) {
+        RenameFileDialog(
+            fileName = details.fileName,
+            onRename = { actions.renameVideoFile(details.id, it) },
+            onDismiss = { renaming = false },
+        )
+    }
     Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
         FlowRow(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -208,6 +218,7 @@ private fun VideoBody(details: VideoDetailsUi, actions: AppActions) {
                             actions.addToPlaylist(listOf(details.id), details.title)
                         },
                     )
+                    RenameFileMenuItem(details, close = { menuOpen = false }, onRename = { renaming = true })
                 }
             }
         }

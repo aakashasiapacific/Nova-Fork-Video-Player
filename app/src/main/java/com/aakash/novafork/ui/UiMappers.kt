@@ -386,6 +386,11 @@ object UiMappers {
             // An episode's page leaves it to its show's page.
             moreLikeThis = if (isMovie) moreLikeThis(index, meta, item.title) else emptyList(),
             downloadable = item.kind != MediaKind.STREAM && VideoDownloads.canDownload(item.source?.type),
+            renamable = item.kind != MediaKind.STREAM && when (item.source?.type) {
+                SourceType.DEVICE -> video.uri.startsWith("content://")
+                SourceType.SMB -> true
+                else -> false
+            },
         ).let { details ->
             val collection = if (isMovie) collectionOf(index, meta) else emptyList()
             if (collection.size < 2) {

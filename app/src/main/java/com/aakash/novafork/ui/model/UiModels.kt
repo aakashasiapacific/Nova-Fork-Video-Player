@@ -248,6 +248,8 @@ data class VideoDetailsUi(
     val collection: List<VideoCardUi> = emptyList(),
     /** On a share or media server the app can copy it from into Movies/Nova Fork. */
     val downloadable: Boolean = false,
+    /** A device (MediaStore) or SMB file the app can rename on disk: shows "Rename File…". */
+    val renamable: Boolean = false,
 )
 
 @Immutable

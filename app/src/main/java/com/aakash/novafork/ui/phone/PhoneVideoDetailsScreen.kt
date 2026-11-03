@@ -23,6 +23,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -46,6 +50,8 @@ import com.aakash.novafork.ui.common.LocalBottomBarSpace
 import com.aakash.novafork.ui.common.LocalHud
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.NovaMenuItem
+import com.aakash.novafork.ui.common.RenameFileDialog
+import com.aakash.novafork.ui.common.RenameFileMenuItem
 import com.aakash.novafork.ui.common.RollingText
 import com.aakash.novafork.ui.common.SectionHeader
 import com.aakash.novafork.ui.common.metaLine
@@ -64,6 +70,14 @@ fun PhoneVideoDetailsScreen(
     modifier: Modifier = Modifier,
 ) {
     val dims = LocalNovaDimens.current
+    var renaming by remember { mutableStateOf(false) }
+    if (renaming) {
+        RenameFileDialog(
+            fileName = details.fileName,
+            onRename = { actions.renameVideoFile(details.id, it) },
+            onDismiss = { renaming = false },
+        )
+    }
     BoxWithConstraints(modifier.fillMaxSize()) {
         val backdropHeight = detailsBackdropHeight(maxHeight)
         val listState = rememberLazyListState()
@@ -195,6 +209,7 @@ fun PhoneVideoDetailsScreen(
                     },
                 )
                 DownloadMenuItem(details, close)
+                RenameFileMenuItem(details, close, onRename = { renaming = true })
             },
         )
     }
