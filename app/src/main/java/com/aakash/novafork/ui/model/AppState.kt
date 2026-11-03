@@ -254,6 +254,8 @@ private val IdleBackupState: StateFlow<BackupUi> = MutableStateFlow(BackupUi())
 
 @Immutable
 data class AppUiState(
+    /** False until the library has been read once (the launch screen stays up until then). */
+    val libraryLoaded: Boolean = false,
     val route: Route = Route.Home,
     /** The tab the current page was opened from (details opened from Library keep Library highlighted). */
     val tab: TopDestination = TopDestination.VIDEO,

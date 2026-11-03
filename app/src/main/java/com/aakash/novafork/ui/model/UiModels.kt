@@ -170,6 +170,9 @@ enum class LibraryFilter(val label: String) {
     /** The hero's "+" list and its star list: their own Library pages, not filter chips. */
     WATCHLIST("Watchlist"),
     FAVORITES("Favorites"),
+
+    /** Films and episodes stored more than once, opened from Preferences (nothing is deleted). */
+    DUPLICATES("Duplicates"),
     ;
 
     /** Shown as a chip on the Library page (Videos left the library; the lists have pages). */
@@ -410,12 +413,14 @@ data class SearchUi(
     val songs: List<MusicResultUi> = emptyList(),
     val albums: List<MusicResultUi> = emptyList(),
     val artists: List<MusicResultUi> = emptyList(),
+    /** Songs whose lyrics hold the query, the matching line as the subtitle. */
+    val lyrics: List<MusicResultUi> = emptyList(),
     /** Searches the user ran, newest first, shown while the field is empty. */
     val recent: List<String> = emptyList(),
     /** While the field is empty: every video, newest first, by the month it arrived. */
     val browse: List<TimelineMonth> = emptyList(),
 ) {
-    val hasMusic: Boolean get() = songs.isNotEmpty() || albums.isNotEmpty() || artists.isNotEmpty()
+    val hasMusic: Boolean get() = songs.isNotEmpty() || albums.isNotEmpty() || artists.isNotEmpty() || lyrics.isNotEmpty()
     val isEmpty: Boolean get() = results.isEmpty() && !hasMusic
 }
 

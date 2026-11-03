@@ -219,6 +219,7 @@ private fun emptyContentFor(filter: LibraryFilter): EmptyContent = when (filter)
     LibraryFilter.VIDEOS -> EmptyContent("No other videos")
     LibraryFilter.WATCHLIST -> EmptyContent("Your Watchlist is empty")
     LibraryFilter.FAVORITES -> EmptyContent("No favorites yet")
+    LibraryFilter.DUPLICATES -> EmptyContent("No duplicates found")
 }
 
 /**

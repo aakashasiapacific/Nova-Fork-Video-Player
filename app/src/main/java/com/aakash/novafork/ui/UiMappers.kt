@@ -213,6 +213,48 @@ object UiMappers {
 
     // Library
 
+    /**
+     * Videos stored more than once: the same matched film, the same episode of a show, or an
+     * unmatched file with the same title and length. Each copy shows where it lives and its size.
+     */
+    fun duplicates(index: LibraryIndex): List<LibraryItemUi> =
+        index.videos
+            .groupBy(::duplicateKey)
+            .filterKeys { it != null }
+            .values
+            .filter { it.size > 1 }
+            .sortedBy { it.first().sortKey.lowercase() }
+            .flatMap { copies ->
+                copies.map { copy ->
+                    val where = listOfNotNull(
+                        copy.card.sourceLabel,
+                        copy.relativeFolder.ifEmpty { null },
+                        copy.video.sizeBytes?.let(::shortSize),
+                    ).joinToString(" · ")
+                    LibraryItemUi.Video(copy.card.copy(subtitle = where.ifEmpty { copy.video.fileName }))
+                }
+            }
+
+    private fun duplicateKey(video: IndexedVideo): String? {
+        val row = video.video
+        return when {
+            video.showKey != null && row.season != null && row.episode != null ->
+                "e:${video.showKey}:${row.season}:${row.episode}"
+            video.kind == MediaKind.MOVIE && video.meta != null -> "m:${video.meta.key}"
+            video.kind == MediaKind.STREAM -> null
+            else -> {
+                val title = row.parsedTitle.lowercase().filter { it.isLetterOrDigit() }
+                val length = row.durationMs?.let { it / 5_000 } ?: row.sizeBytes ?: return null
+                if (title.isEmpty()) null else "f:$title:${row.parsedYear}:$length"
+            }
+        }
+    }
+
+    private fun shortSize(bytes: Long): String = when {
+        bytes >= 1L shl 30 -> String.format(java.util.Locale.US, "%.1f GB", bytes / (1L shl 30).toDouble())
+        else -> "${bytes / (1L shl 20)} MB"
+    }
+
     fun library(
         index: LibraryIndex,
         filter: LibraryFilter,
@@ -229,7 +271,7 @@ object UiMappers {
             LibraryFilter.SHOWS -> shows
             LibraryFilter.VIDEOS -> videos
             // Built from their saved keys by the view model.
-            LibraryFilter.WATCHLIST, LibraryFilter.FAVORITES -> emptyList()
+            LibraryFilter.WATCHLIST, LibraryFilter.FAVORITES, LibraryFilter.DUPLICATES -> emptyList()
         }
         val timelineMonths = if (filter == LibraryFilter.ALL && sort == LibrarySort.RECENT) timeline(index, now, zone) else emptyList()
         val timeline = timelineMonths.flatMap { it.cards }
@@ -892,8 +934,34 @@ object UiMappers {
                     round = true,
                 )
             },
+            lyrics = lyricHits(music, needle, found.songs.mapTo(HashSet()) { it.id }),
         )
     }
+
+    /** Songs with a lyric line holding [needle] (not already a title hit), the line as subtitle. */
+    private fun lyricHits(music: MusicLibraryData, needle: String, skip: Set<Long>): List<MusicResultUi> {
+        if (needle.length < MIN_LYRICS_QUERY || music.lyrics.isEmpty()) return emptyList()
+        val hits = music.songs.mapNotNull { song ->
+            if (song.id in skip) return@mapNotNull null
+            val line = music.lyrics[song.id]?.firstOrNull { it.contains(needle, ignoreCase = true) } ?: return@mapNotNull null
+            song to line
+        }.take(LYRICS_LIMIT)
+        val ids = hits.map { it.first.id }
+        return hits.mapIndexed { i, (song, line) ->
+            MusicResultUi(
+                key = "lyric:${song.id}",
+                title = song.title,
+                subtitle = listOfNotNull("\u201C$line\u201D", song.artist ?: song.albumArtist).joinToString(" · "),
+                artUri = MusicLibrary.artUri(song),
+                songIds = ids,
+                startIndex = i,
+            )
+        }
+    }
+
+    /** A sung line needs a few letters before matching means anything. */
+    private const val MIN_LYRICS_QUERY = 4
+    private const val LYRICS_LIMIT = 20
 
     /** Cast or director (creator, for shows) names of a TMDB title contain [needle]. */
     private fun creditsMatch(meta: MetadataEntity?, needle: String): Boolean {

@@ -310,6 +310,7 @@ private fun LibraryEmpty(filter: LibraryFilter, actions: AppActions, modifier: M
                 LibraryFilter.VIDEOS, LibraryFilter.ALL -> "No videos yet"
                 LibraryFilter.WATCHLIST -> "Your Watchlist is empty"
                 LibraryFilter.FAVORITES -> "No favorites yet"
+                LibraryFilter.DUPLICATES -> "No duplicates found"
             }
             EmptyState(
                 icon = R.drawable.ic_filter_list,

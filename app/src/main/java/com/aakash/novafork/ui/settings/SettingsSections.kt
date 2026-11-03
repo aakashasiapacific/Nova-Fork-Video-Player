@@ -51,6 +51,7 @@ import com.aakash.novafork.ui.common.sourceTypeIcon
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.DialogUi
 import com.aakash.novafork.ui.model.KeyStatus
+import com.aakash.novafork.ui.model.LibraryFilter
 import com.aakash.novafork.ui.model.Route
 import com.aakash.novafork.ui.model.SettingsUi
 import com.aakash.novafork.ui.model.SourceUi
@@ -90,6 +91,7 @@ private fun libraryGroups(state: SettingsUi, actions: AppActions): List<Settings
                     actions.updateSettings { it.copy(scanDeviceStorage = on) }
                 },
                 actionRow("browse", R.drawable.ic_folder_open, "Browse sources and playlists") { actions.navigate(Route.Browse) },
+                actionRow("duplicates", R.drawable.ic_video_library, "Find duplicates") { actions.openLibrary(LibraryFilter.DUPLICATES) },
                 SettingsRow("all-files", "All files access", R.drawable.ic_folder_special) { shape ->
                     AllFilesAccessRow(
                         shape = shape,

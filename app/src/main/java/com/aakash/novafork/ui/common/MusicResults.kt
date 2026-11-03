@@ -38,6 +38,7 @@ fun LazyGridScope.musicSearchResults(search: SearchUi, onPlay: (MusicResultUi) -
     section("Songs", search.songs, onPlay)
     section("Albums", search.albums, onPlay)
     section("Artists", search.artists, onPlay)
+    section("Lyrics", search.lyrics, onPlay)
 }
 
 private fun LazyGridScope.section(title: String, results: List<MusicResultUi>, onPlay: (MusicResultUi) -> Unit) {

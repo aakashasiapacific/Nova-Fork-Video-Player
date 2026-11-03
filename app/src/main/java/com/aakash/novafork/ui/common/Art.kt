@@ -28,7 +28,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import android.content.Context
+import androidx.compose.ui.layout.onSizeChanged
+import coil.annotation.ExperimentalCoilApi
 import coil.compose.AsyncImage
+import coil.imageLoader
 import coil.request.ImageRequest
 import coil.request.videoFrameMillis
 import coil.request.videoFramePercent
@@ -50,6 +54,8 @@ fun ArtImage(
     alignment: Alignment = Alignment.Center,
     /** Grab [frameSource]'s frame at this time instead of 10% in. */
     frameAtMs: Long? = null,
+    /** TMDB posters: load the smallest poster size that still fills the card (smoother grids). */
+    rightSizePosters: Boolean = false,
     placeholder: @Composable () -> Unit,
 ) {
     val context = LocalContext.current
@@ -57,13 +63,21 @@ fun ArtImage(
     val current = candidates.getOrNull(index)
     // A soft sweep of light while the picture loads, instead of a flat grey box.
     var loading by remember(current) { mutableStateOf(current != null) }
-    Box(modifier) {
+    var widthPx by remember { mutableIntStateOf(0) }
+    Box(if (rightSizePosters) modifier.onSizeChanged { widthPx = it.width } else modifier) {
         placeholder()
         if (loading) Box(Modifier.fillMaxSize().shimmer())
-        if (current != null) {
-            val model = remember(current) {
+        // A resizable poster waits one layout pass for its width (grids measure ahead while scrolling).
+        val sized = when {
+            current == null -> null
+            !rightSizePosters || current == frameSource -> current
+            widthPx == 0 -> null
+            else -> remember(current, rightSizedPoster(current, widthPx)) { cachedOrSized(context, current, widthPx) }
+        }
+        if (sized != null) {
+            val model = remember(sized) {
                 ImageRequest.Builder(context)
-                    .data(current)
+                    .data(sized)
                     .crossfade(ART_FADE_MS)
                     .apply {
                         if (current == frameSource) {
@@ -102,9 +116,38 @@ fun PosterArt(
         contentDescription = title,
         modifier = modifier,
         frameSource = artwork.frameSource,
+        rightSizePosters = true,
     ) {
         ArtPlaceholder(seed = artwork.seed.ifEmpty { title }, title = if (showTitleOnPlaceholder) title else null)
     }
+}
+
+/** TMDB poster widths, smallest first (all are real TMDB poster sizes). */
+private val POSTER_WIDTHS = intArrayOf(185, 342, 500)
+private const val TMDB_POSTER_MARKER = "/t/p/w500/"
+
+/**
+ * [url] with its TMDB size swapped for the smallest poster width that still fills [widthPx]; never
+ * larger than the w500 it was asked with. Other URLs come back unchanged.
+ */
+internal fun rightSizedPoster(url: String, widthPx: Int): String {
+    val at = url.indexOf(TMDB_POSTER_MARKER)
+    if (at < 0 || widthPx <= 0) return url
+    val width = POSTER_WIDTHS.firstOrNull { it >= widthPx } ?: return url
+    return url.replaceRange(at, at + TMDB_POSTER_MARKER.length, "/t/p/w$width/")
+}
+
+/** The right-sized poster, unless the full one is already on disk (so offline art never goes missing). */
+@OptIn(ExperimentalCoilApi::class)
+private fun cachedOrSized(context: Context, url: String, widthPx: Int): String {
+    val sized = rightSizedPoster(url, widthPx)
+    if (sized == url) return url
+    val cached = try {
+        context.imageLoader.diskCache?.openSnapshot(url)?.use { true } ?: false
+    } catch (e: Exception) {
+        false
+    }
+    return if (cached) url else sized
 }
 
 /** 16:9 art for episode/continue-watching cards: still, backdrop, a frame of the video, placeholder. */

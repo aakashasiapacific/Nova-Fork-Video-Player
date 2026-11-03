@@ -46,6 +46,8 @@ data class MusicLibraryData(
     val genres: List<Genre> = emptyList(),
     /** Albums, newest first. */
     val recentlyAdded: List<Album> = emptyList(),
+    /** Lyric lines by song id, for searching by a sung line; filled in shortly after start. */
+    val lyrics: Map<Long, List<String>> = emptyMap(),
 )
 
 /** Pure grouping of songs into albums, artists and genres (unit-tested). */

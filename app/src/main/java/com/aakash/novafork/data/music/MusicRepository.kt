@@ -274,6 +274,21 @@ class MusicRepository(
         if (durationMs > 0) songDao.fillDuration(songId, durationMs)
     }
 
+    /** Lyric lines read so far, by .lrc uri, so a library change doesn't reread every file. */
+    private val lyricsTextCache = java.util.concurrent.ConcurrentHashMap<String, List<String>>()
+
+    /** The plain lyric lines of [songs] that have lyrics, by song id (for lyrics search). */
+    suspend fun lyricsText(songs: List<SongEntity>): Map<Long, List<String>> {
+        val out = HashMap<Long, List<String>>()
+        for (song in songs) {
+            val uri = song.lyricsUri ?: continue
+            val lines = lyricsTextCache[uri]
+                ?: lyrics(song)?.lines.orEmpty().map { it.text.trim() }.filter { it.isNotEmpty() }.also { lyricsTextCache[uri] = it }
+            if (lines.isNotEmpty()) out[song.id] = lines
+        }
+        return out
+    }
+
     /** The song's .lrc lyrics; null when it has none or the file can't be read. */
     suspend fun lyrics(song: SongEntity): Lyrics? {
         val uri = song.lyricsUri ?: return null

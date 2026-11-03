@@ -93,6 +93,7 @@ import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.transformLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -198,8 +199,25 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
         }
     }
 
+    private val duplicatesMemo = Memo<LibraryIndex, List<LibraryItemUi>> { index -> UiMappers.duplicates(index) }
+
     /** The music library, for search (one search over videos and music). */
-    private val musicLibrary: Flow<MusicLibraryData> = graph.music.observeLibrary().onStart { emit(MusicLibraryData()) }
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private val musicLibrary: Flow<MusicLibraryData> = graph.music.observeLibrary()
+        .onStart { emit(MusicLibraryData()) }
+        .transformLatest { music ->
+            // Lyrics are read after start-up settles, then kept, so search can find a sung line.
+            emit(music.copy(lyrics = lastLyrics))
+            val withLyrics = music.songs.filter { it.lyricsUri != null }
+            kotlinx.coroutines.delay(if (lastLyrics.isEmpty()) LYRICS_FIRST_INDEX_MS else LYRICS_REINDEX_MS)
+            val lyrics = graph.music.lyricsText(withLyrics)
+            if (lyrics != lastLyrics) {
+                lastLyrics = lyrics
+                emit(music.copy(lyrics = lyrics))
+            }
+        }
+
+    @Volatile private var lastLyrics: Map<Long, List<String>> = emptyMap()
     private val remoteDirMemo = Memo<RemoteDirInput, BrowseDirUi> { (index, source, path, listings) ->
         UiMappers.remoteDir(index, source, path, listings)
     }
@@ -324,6 +342,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
             )
         }
         return AppUiState(
+            libraryLoaded = true,
             route = route,
             canGoBack = user.backStack.size > 1,
             previousRoute = user.backStack.getOrNull(user.backStack.size - 2),
@@ -336,6 +355,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
             library = when (user.filter) {
                 LibraryFilter.WATCHLIST -> LibraryUi(filter = user.filter, sort = user.sort, items = watchlistMemo[index to saved])
                 LibraryFilter.FAVORITES -> LibraryUi(filter = user.filter, sort = user.sort, items = favoritesMemo[index to starred])
+                LibraryFilter.DUPLICATES -> LibraryUi(filter = user.filter, sort = user.sort, items = duplicatesMemo[index])
                 else -> libraryMemo[Triple(index, user.filter, user.sort)]
             },
             browse = browse,
@@ -1667,6 +1687,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
     }
 
     private companion object {
+        /** Lyrics search: the first read waits for start-up, later ones for a burst of changes. */
+        const val LYRICS_FIRST_INDEX_MS = 4_000L
+        const val LYRICS_REINDEX_MS = 1_000L
+
         const val KEY_RECENT_SEARCHES = "recent"
         val TRAILING_YEAR = Regex("""\s*\(?(19|20)\d{2}\)?$""")
 

@@ -74,4 +74,29 @@ class MusicSearchTest {
         assertTrue(search.results.isEmpty())
         assertTrue(!search.isEmpty)
     }
+
+    @Test
+    fun aSungLineFindsItsSong() {
+        val halo = library.songs.single { it.title == "Halo" }
+        val withLyrics = library.copy(lyrics = mapOf(halo.id to listOf("Remember those walls I built", "Everywhere I'm looking now")))
+        val index = LibraryIndex.build(emptyList(), emptyList(), preferLocalArtwork = false)
+        val search = UiMappers.search(index, "walls i built", withLyrics)
+        val hit = search.lyrics.single()
+        assertEquals("Halo", hit.title)
+        assertEquals("\u201CRemember those walls I built\u201D · Beyoncé", hit.subtitle)
+        assertTrue(search.hasMusic)
+        // Short queries don't search lyrics; a title hit isn't listed twice.
+        assertTrue(UiMappers.search(index, "wal", withLyrics).lyrics.isEmpty())
+        assertTrue(UiMappers.search(index, "halo", withLyrics.copy(lyrics = mapOf(halo.id to listOf("halo halo")))).lyrics.isEmpty())
+    }
+
+    @Test
+    fun postersLoadAtTheSizeTheirCardNeeds() {
+        val url = "https://image.tmdb.org/t/p/w500/abc.jpg"
+        assertEquals("https://image.tmdb.org/t/p/w185/abc.jpg", com.aakash.novafork.ui.common.rightSizedPoster(url, 150))
+        assertEquals("https://image.tmdb.org/t/p/w342/abc.jpg", com.aakash.novafork.ui.common.rightSizedPoster(url, 330))
+        assertEquals(url, com.aakash.novafork.ui.common.rightSizedPoster(url, 480))
+        assertEquals(url, com.aakash.novafork.ui.common.rightSizedPoster(url, 900))
+        assertEquals("file:///poster.jpg", com.aakash.novafork.ui.common.rightSizedPoster("file:///poster.jpg", 100))
+    }
 }

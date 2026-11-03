@@ -168,6 +168,24 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    /**
+     * Cold start: the first frame waits (at most [COLD_START_HOLD_MS]) for the library, so Home
+     * opens already filled instead of flashing empty rows under the launch screen's fade.
+     */
+    private fun holdLaunchScreenUntilLoaded() {
+        val content = findViewById<android.view.View>(android.R.id.content)
+        val giveUpAt = android.os.SystemClock.uptimeMillis() + COLD_START_HOLD_MS
+        content.viewTreeObserver.addOnPreDrawListener(
+            object : android.view.ViewTreeObserver.OnPreDrawListener {
+                override fun onPreDraw(): Boolean {
+                    val ready = viewModel.state.value.libraryLoaded || android.os.SystemClock.uptimeMillis() >= giveUpAt
+                    if (ready) content.viewTreeObserver.removeOnPreDrawListener(this)
+                    return ready
+                }
+            },
+        )
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
@@ -204,6 +222,7 @@ class MainActivity : ComponentActivity() {
                     }
             }
         }
+        holdLaunchScreenUntilLoaded()
         if (savedInstanceState == null) openShortcut(intent)
         lifecycleScope.launch {
             // Queues resolve in the background (folder, season, playlist); play each one once.
@@ -477,6 +496,7 @@ class MainActivity : ComponentActivity() {
 
         /** How long the launch screen takes to fade into Home. */
         const val SPLASH_FADE_MS = 260L
+        const val COLD_START_HOLD_MS = 800L
 
         /** The navigation bar scrim enableEdgeToEdge uses on Android 8.0, which has no dark nav icons. */
         val DARK_SCRIM = Color.argb(0x80, 0x1b, 0x1b, 0x1b)
