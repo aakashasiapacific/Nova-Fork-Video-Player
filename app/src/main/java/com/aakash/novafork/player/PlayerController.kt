@@ -1338,6 +1338,14 @@ class PlayerController(
         }
     }
 
+    override fun stepFrame(forward: Boolean) {
+        if (released || !_state.value.seekable) return
+        if (mediaPlayer.isPlaying) pause()
+        // libVLC 3 has no frame step backwards; a seek of one frame (24 fps) each way does both alike.
+        val target = clampPosition(currentPositionMs() + if (forward) FRAME_MS else -FRAME_MS)
+        seekInternal(target)
+    }
+
     override fun holdSpeed(on: Boolean) {
         if (released) return
         // Not the chosen speed: nothing is saved, and letting go puts the chosen one back.
@@ -2696,6 +2704,7 @@ class PlayerController(
         const val POSITION_UPDATE_INTERVAL_MS = 250L
         const val RESUME_MIN_MS = 10_000L
         const val HOLD_RATE = 2f
+        const val FRAME_MS = 42L
         const val RESUME_BANNER_MS = 6_000L
         const val GESTURE_FEEDBACK_MS = 600L
         const val LABEL_MS = 1_200L

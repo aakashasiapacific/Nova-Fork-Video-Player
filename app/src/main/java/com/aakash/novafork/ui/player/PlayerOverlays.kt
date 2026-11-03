@@ -82,9 +82,18 @@ import com.aakash.novafork.ui.theme.NovaColors
 
 private val TabularNumbers = TextStyle(fontFeatureSettings = "tnum")
 
+/** How near the end scrubbing has to be for the seek pill to name what plays next. */
+private const val NEXT_NAME_WITHIN_MS = 60_000L
+
 /** Centred pill for seek / label feedback; fades out after the state clears it. */
 @Composable
-internal fun FeedbackOverlay(feedback: GestureFeedback?, modifier: Modifier = Modifier, frame: ImageBitmap? = null) {
+internal fun FeedbackOverlay(
+    feedback: GestureFeedback?,
+    modifier: Modifier = Modifier,
+    frame: ImageBitmap? = null,
+    next: String? = null,
+    durationMs: Long = 0L,
+) {
     val shown = rememberLatestNonNull(feedback)
     AnimatedVisibility(
         visible = feedback != null,
@@ -99,6 +108,16 @@ internal fun FeedbackOverlay(feedback: GestureFeedback?, modifier: Modifier = Mo
                     ScrubFrame(frame, Modifier.padding(bottom = 10.dp))
                 }
                 FeedbackPill(shown)
+                if (next != null && shown is GestureFeedback.Seek && durationMs > 0L && shown.targetMs >= durationMs - NEXT_NAME_WITHIN_MS) {
+                    Text(
+                        text = "Next: $next",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.White.copy(alpha = 0.8f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
+                }
             }
         }
     }

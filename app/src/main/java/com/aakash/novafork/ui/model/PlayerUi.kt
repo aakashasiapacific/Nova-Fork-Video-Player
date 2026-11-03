@@ -220,6 +220,9 @@ interface PlayerActions {
     fun setSubtitleDelay(delayMs: Long)
     fun setAudioDelay(delayMs: Long) {}
 
+    /** One frame on ([forward]) or back, paused, for a still to capture. */
+    fun stepFrame(forward: Boolean) {}
+
     /** Holding the picture: 2× while [on], back to the chosen speed when let go. */
     fun holdSpeed(on: Boolean) {}
 

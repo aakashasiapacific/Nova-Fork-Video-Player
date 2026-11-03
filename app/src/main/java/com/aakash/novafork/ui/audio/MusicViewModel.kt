@@ -80,7 +80,7 @@ class MusicViewModel(app: Application) : AndroidViewModel(app), AudioActions {
     override fun rescan() = music.rescanInBackground()
 
     override fun play(songs: List<SongEntity>, index: Int, shuffle: Boolean) {
-        player.playSongs(songs.map { it.id }, index, shuffle)
+        player.playSongs(songs.map { it.id }, index, shuffle, artists = songs.associate { it.id to it.artistKey })
     }
 
     override fun enqueue(songs: List<SongEntity>, next: Boolean) = player.enqueue(songs.map { it.id }, next)

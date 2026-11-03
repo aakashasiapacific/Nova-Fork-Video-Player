@@ -299,6 +299,11 @@ private fun PlayerChrome(
             FeedbackOverlay(
                 feedback = state.feedback,
                 frame = state.scrubFrame,
+                // Scrubbing into the last minute: what plays after this, by name.
+                next = state.queue.getOrNull(state.queueIndex + 1)?.let { item ->
+                    listOfNotNull(item.title, item.subtitle).joinToString(" · ")
+                },
+                durationMs = state.durationMs,
                 modifier = Modifier
                     .align(BiasAlignment(horizontalBias = 0f, verticalBias = feedbackBias))
                     .padding(horizontal = 24.dp),

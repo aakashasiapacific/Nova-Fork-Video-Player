@@ -350,7 +350,7 @@ class PlayerActivity : ComponentActivity(), PlayerController.Host {
      * A keyboard's shortcuts in the player (owner), as YouTube's and VLC's: Space or K plays and
      * pauses; ← → (or J L) go back and forward 10 s; ↑ ↓ change the volume and M mutes; N and P
      * play the next and previous; F changes fit or zoom; [ and ] slow down and speed up; 0 to 9
-     * jump to that tenth of the video. A media keyboard's play, next and previous keys work too.
+     * jump to that tenth of the video; , and . step one frame back or on. A media keyboard's play, next and previous keys work too.
      */
     private fun onPlayerShortcut(keyCode: Int, event: KeyEvent): Boolean {
         val player = controller ?: return false
@@ -368,6 +368,8 @@ class PlayerActivity : ComponentActivity(), PlayerController.Host {
             KeyEvent.KEYCODE_N, KeyEvent.KEYCODE_MEDIA_NEXT -> if (event.repeatCount == 0 && state.hasNext) player.playNext()
             KeyEvent.KEYCODE_P, KeyEvent.KEYCODE_MEDIA_PREVIOUS -> if (event.repeatCount == 0) player.playPrevious()
             KeyEvent.KEYCODE_F -> if (event.repeatCount == 0) player.cycleAspect()
+            KeyEvent.KEYCODE_COMMA -> player.stepFrame(forward = false)
+            KeyEvent.KEYCODE_PERIOD -> player.stepFrame(forward = true)
             KeyEvent.KEYCODE_LEFT_BRACKET -> player.setRate(state.rate - KEY_RATE_STEP)
             KeyEvent.KEYCODE_RIGHT_BRACKET -> player.setRate(state.rate + KEY_RATE_STEP)
             in KeyEvent.KEYCODE_0..KeyEvent.KEYCODE_9 -> {

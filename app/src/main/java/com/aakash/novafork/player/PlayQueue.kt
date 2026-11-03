@@ -144,6 +144,20 @@ internal class PlayQueue(private val random: Random = Random.Default) {
         position = order.indexOf(newIndex[current]).coerceAtLeast(0)
     }
 
-    private fun shuffledOrder(first: Int): List<Int> =
-        listOf(first) + ids.indices.filter { it != first }.shuffled(random)
+    /**
+     * What an item belongs to for shuffling (a song's artist): a shuffle never plays two of the
+     * same in a row while another can go between (owner: smart shuffle). Nothing by default.
+     */
+    var groupOf: (Long) -> String? = { null }
+
+    private fun shuffledOrder(first: Int): List<Int> {
+        val rest = ids.indices.filter { it != first }.shuffled(random).toMutableList()
+        val result = mutableListOf(first)
+        while (rest.isNotEmpty()) {
+            val last = groupOf(ids[result.last()])
+            val pick = rest.indexOfFirst { last == null || groupOf(ids[it]) != last }.coerceAtLeast(0)
+            result += rest.removeAt(pick)
+        }
+        return result
+    }
 }

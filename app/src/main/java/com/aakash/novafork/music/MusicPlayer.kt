@@ -110,7 +110,9 @@ class MusicPlayer(
     private val _state = MutableStateFlow(MusicPlayerState())
     val state: StateFlow<MusicPlayerState> = _state.asStateFlow()
 
-    private val queue = PlayQueue()
+    /** Each queued song's artist, for smart shuffle (see [PlayQueue.groupOf]). */
+    private val artistOf = HashMap<Long, String>()
+    private val queue = PlayQueue().also { it.groupOf = { id -> artistOf[id] } }
     private var mediaPlayer: MediaPlayer? = null
     private var descriptor: ParcelFileDescriptor? = null
     private var loadJob: Job? = null
@@ -229,7 +231,8 @@ class MusicPlayer(
      * Plays [songIds] (in library order) starting with [startIndex]; with [shuffle] the rest
      * follow in random order. Replaces what was queued.
      */
-    fun playSongs(songIds: List<Long>, startIndex: Int = 0, shuffle: Boolean = false) {
+    fun playSongs(songIds: List<Long>, startIndex: Int = 0, shuffle: Boolean = false, artists: Map<Long, String> = emptyMap()) {
+        artistOf.putAll(artists)
         if (songIds.isEmpty()) return
         queue.set(songIds, startIndex, shuffle)
         pendingSeekMs = 0L
