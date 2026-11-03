@@ -342,7 +342,40 @@ class PlayerActivity : ComponentActivity(), PlayerController.Host {
             volumeKeyHandled = true
             return true
         }
+        if (!isInPictureInPictureMode && onPlayerShortcut(keyCode, event)) return true
         return super.onKeyDown(keyCode, event)
+    }
+
+    /**
+     * A keyboard's shortcuts in the player (owner), as YouTube's and VLC's: Space or K plays and
+     * pauses; ← → (or J L) go back and forward 10 s; ↑ ↓ change the volume and M mutes; N and P
+     * play the next and previous; F changes fit or zoom; [ and ] slow down and speed up; 0 to 9
+     * jump to that tenth of the video. A media keyboard's play, next and previous keys work too.
+     */
+    private fun onPlayerShortcut(keyCode: Int, event: KeyEvent): Boolean {
+        val player = controller ?: return false
+        if (event.isCtrlPressed || event.isAltPressed || event.isMetaPressed) return false
+        val state = player.state.value
+        when (keyCode) {
+            KeyEvent.KEYCODE_SPACE, KeyEvent.KEYCODE_K, KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> {
+                if (event.repeatCount == 0) player.togglePlay()
+            }
+            KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_J -> player.seekBy(-KEY_SEEK_MS)
+            KeyEvent.KEYCODE_DPAD_RIGHT, KeyEvent.KEYCODE_L -> player.seekBy(KEY_SEEK_MS)
+            KeyEvent.KEYCODE_DPAD_UP -> player.onVolumeKey(KeyEvent.KEYCODE_VOLUME_UP)
+            KeyEvent.KEYCODE_DPAD_DOWN -> player.onVolumeKey(KeyEvent.KEYCODE_VOLUME_DOWN)
+            KeyEvent.KEYCODE_M -> if (event.repeatCount == 0) player.onVolumeKey(KeyEvent.KEYCODE_VOLUME_MUTE)
+            KeyEvent.KEYCODE_N, KeyEvent.KEYCODE_MEDIA_NEXT -> if (event.repeatCount == 0 && state.hasNext) player.playNext()
+            KeyEvent.KEYCODE_P, KeyEvent.KEYCODE_MEDIA_PREVIOUS -> if (event.repeatCount == 0) player.playPrevious()
+            KeyEvent.KEYCODE_F -> if (event.repeatCount == 0) player.cycleAspect()
+            KeyEvent.KEYCODE_LEFT_BRACKET -> player.setRate(state.rate - KEY_RATE_STEP)
+            KeyEvent.KEYCODE_RIGHT_BRACKET -> player.setRate(state.rate + KEY_RATE_STEP)
+            in KeyEvent.KEYCODE_0..KeyEvent.KEYCODE_9 -> {
+                if (state.durationMs > 0L) player.seekTo(state.durationMs * (keyCode - KeyEvent.KEYCODE_0) / 10)
+            }
+            else -> return false
+        }
+        return true
     }
 
     override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {
@@ -492,3 +525,7 @@ class PlayerActivity : ComponentActivity(), PlayerController.Host {
         const val KEY_VIDEO_ID = "player_video_id"
     }
 }
+
+/** A keyboard's ← and →, and the speed [ and ] change by. */
+private const val KEY_SEEK_MS = 10_000L
+private const val KEY_RATE_STEP = 0.25f

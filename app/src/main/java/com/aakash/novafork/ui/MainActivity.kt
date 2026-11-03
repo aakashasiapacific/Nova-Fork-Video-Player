@@ -376,4 +376,26 @@ class MainActivity : ComponentActivity() {
         /** The navigation bar scrim enableEdgeToEdge uses on Android 8.0, which has no dark nav icons. */
         val DARK_SCRIM = Color.argb(0x80, 0x1b, 0x1b, 0x1b)
     }
+
+    /**
+     * A keyboard in the library (owner): Ctrl+1 to 4 open Video, Audio, Preferences and Search, and
+     * / or Ctrl+F opens Search. Tab and the arrow keys move between items and Enter opens one.
+     */
+    override fun onKeyDown(keyCode: Int, event: android.view.KeyEvent): Boolean {
+        val tabs = com.aakash.novafork.ui.model.TopDestination.entries
+        val tab = when {
+            event.isCtrlPressed && keyCode in android.view.KeyEvent.KEYCODE_1..android.view.KeyEvent.KEYCODE_4 ->
+                tabs.getOrNull(keyCode - android.view.KeyEvent.KEYCODE_1)
+            event.isCtrlPressed && keyCode == android.view.KeyEvent.KEYCODE_F -> com.aakash.novafork.ui.model.TopDestination.SEARCH
+            keyCode == android.view.KeyEvent.KEYCODE_SLASH && currentFocus !is android.widget.EditText ->
+                com.aakash.novafork.ui.model.TopDestination.SEARCH
+            else -> null
+        }
+        if (tab != null) {
+            viewModel.selectTab(tab)
+            return true
+        }
+        return super.onKeyDown(keyCode, event)
+    }
+
 }
