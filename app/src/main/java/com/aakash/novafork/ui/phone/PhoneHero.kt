@@ -11,7 +11,6 @@ import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -97,6 +96,7 @@ import com.aakash.novafork.ui.common.IosButton
 import com.aakash.novafork.ui.common.IosColors
 import com.aakash.novafork.ui.common.IosIconButton
 import com.aakash.novafork.ui.common.LocalGlassTint
+import com.aakash.novafork.ui.common.Motion
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.PosterArt
 import com.aakash.novafork.ui.common.RatingPill
@@ -180,7 +180,7 @@ internal fun PhoneHeroPager(
         pagerState.animateScrollToPage((pagerState.currentPage + 1) % heroes.size)
     }
     val targetHeight = pageHeight?.let { forPage -> heroes.getOrNull(pagerState.currentPage)?.let(forPage) } ?: height
-    val shownHeight by animateDpAsState(targetHeight, tween(durationMillis = 320), label = "heroHeight")
+    val shownHeight by animateDpAsState(targetHeight, Motion.content(), label = "heroHeight")
     Box(
         Modifier
             .fillMaxWidth()
@@ -616,8 +616,8 @@ private fun RoundHeroButton(
     // iOS 27's glass buttons: a pale see-through disc, as clear as Preferences' Glass slider
     // says, with the bright-topped iOS 27 rim; a colour fill (an "on" state) hides the rim.
     val glassTint = LocalGlassTint.current.coerceIn(0f, 1f)
-    val container by animateColorAsState(fill ?: Color.White.copy(alpha = 0.08f + 0.16f * glassTint), tween(220), label = "heroButtonFill")
-    val rim by animateFloatAsState(if (fill == null) 1f else 0f, tween(220), label = "heroButtonRim")
+    val container by animateColorAsState(fill ?: Color.White.copy(alpha = 0.08f + 0.16f * glassTint), Motion.press(), label = "heroButtonFill")
+    val rim by animateFloatAsState(if (fill == null) 1f else 0f, Motion.press(), label = "heroButtonRim")
     IosIconButton(
         onClick = {
             haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
@@ -639,13 +639,13 @@ private fun RoundHeroButton(
         AnimatedContent(
             targetState = icon,
             transitionSpec = {
-                (scaleIn(spring(dampingRatio = 0.42f, stiffness = 520f), initialScale = 0.3f) + fadeIn(tween(90))) togetherWith
-                    (scaleOut(tween(120), targetScale = 0.3f) + fadeOut(tween(90)))
+                (scaleIn(Motion.content(), initialScale = 0.85f) + fadeIn(Motion.press())) togetherWith
+                    (scaleOut(Motion.press(), targetScale = 0.85f) + fadeOut(Motion.press()))
             },
             label = "heroButtonIcon",
         ) { shownIcon ->
             val angle by transition.animateFloat(
-                transitionSpec = { spring(dampingRatio = 0.6f, stiffness = 420f) },
+                transitionSpec = { Motion.content() },
                 label = "heroButtonTurn",
             ) { if (turn && it != EnterExitState.Visible) -90f else 0f }
             NovaIcon(shownIcon, contentDescription = null, modifier = Modifier.size(22.dp).graphicsLayer { rotationZ = angle })

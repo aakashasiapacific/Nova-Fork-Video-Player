@@ -2,8 +2,6 @@ package com.aakash.novafork.ui.phone
 
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -52,6 +50,7 @@ import com.aakash.novafork.ui.common.EndOfListGap
 import com.aakash.novafork.ui.common.IosButton
 import com.aakash.novafork.ui.common.IosColors
 import com.aakash.novafork.ui.common.LocalBottomBarSpace
+import com.aakash.novafork.ui.common.Motion
 import com.aakash.novafork.ui.common.NovaDropdownMenu
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.NovaMenuItem
@@ -176,10 +175,10 @@ fun PhoneShowDetailsScreen(
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 // The name crossfades to the new season; the chevron turns while open.
-                                Crossfade(targetState = season?.title ?: "Episodes", animationSpec = tween(200), label = "seasonTitle") { title ->
+                                Crossfade(targetState = season?.title ?: "Episodes", animationSpec = Motion.content(), label = "seasonTitle") { title ->
                                     Text(title, style = MaterialTheme.typography.titleLarge, maxLines = 2)
                                 }
-                                val turn by animateFloatAsState(if (seasonMenu) 180f else 0f, spring(dampingRatio = 0.7f, stiffness = 500f), label = "seasonChevron")
+                                val turn by animateFloatAsState(if (seasonMenu) 180f else 0f, Motion.content(), label = "seasonChevron")
                                 NovaIcon(
                                     R.drawable.ic_expand_more,
                                     contentDescription = null,
@@ -249,7 +248,7 @@ fun PhoneShowDetailsScreen(
                         actions = actions,
                         // Another season's episodes fade in as it is picked.
                         modifier = Modifier
-                            .animateItem(fadeInSpec = tween(260), placementSpec = null, fadeOutSpec = null)
+                            .animateItem(fadeInSpec = Motion.content(), placementSpec = null, fadeOutSpec = null)
                             .swipeSeasons(
                                 hasPrevious = seasonIndex > 0,
                                 hasNext = seasonIndex < seasons.lastIndex,

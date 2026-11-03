@@ -2,12 +2,10 @@ package com.aakash.novafork.ui.common
 
 import androidx.annotation.DrawableRes
 import androidx.compose.animation.ContentTransform
-import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
@@ -35,6 +33,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -111,8 +110,8 @@ internal fun NovaTabCapsule(selected: TopDestination, onSelect: (TopDestination)
         var lastActive by remember { mutableStateOf(active) }
         val forward = active >= lastActive
         SideEffect { lastActive = active }
-        val fast = spring<Dp>(dampingRatio = 0.72f, stiffness = Spring.StiffnessMedium)
-        val slow = spring<Dp>(dampingRatio = 0.8f, stiffness = Spring.StiffnessLow)
+        val fast = Motion.press<Dp>()
+        val slow = Motion.content<Dp>()
         val left by animateDpAsState(slot * active, animationSpec = if (forward) slow else fast, label = "tabPillLeft")
         val right by animateDpAsState(slot * (active + 1), animationSpec = if (forward) fast else slow, label = "tabPillRight")
         Box(
@@ -244,11 +243,22 @@ internal fun TopDestination.activeColor(): Color =
 /** A tab's icon; the selected one pops in with a short spring. */
 @Composable
 private fun TabIcon(tab: TopDestination, active: Boolean, tint: Color) {
-    val scale by animateFloatAsState(
+    val base by animateFloatAsState(
         targetValue = if (active) 1f else 0.9f,
-        animationSpec = spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessMedium),
+        animationSpec = Motion.content(),
         label = "tabIcon",
     )
+    // The owner's tap bounce: one soft dip as the tab is chosen, then settling back; no overshoot.
+    val dip = remember { Animatable(1f) }
+    LaunchedEffect(active) {
+        if (active) {
+            dip.animateTo(0.88f, Motion.press())
+            dip.animateTo(1f, Motion.content())
+        } else {
+            dip.snapTo(1f)
+        }
+    }
+    val scale = base * dip.value
     NovaIcon(
         tab.tabIconRes(),
         contentDescription = null,
@@ -311,7 +321,7 @@ internal fun Modifier.swipeBetweenTabs(
                         haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                         select(target)
                     } else {
-                        scope.launch { animate(offset, 0f, animationSpec = spring(dampingRatio = 0.8f)) { value, _ -> offset = value } }
+                        scope.launch { animate(offset, 0f, animationSpec = Motion.content()) { value, _ -> offset = value } }
                     }
                 },
                 onDragCancel = { offset = 0f },

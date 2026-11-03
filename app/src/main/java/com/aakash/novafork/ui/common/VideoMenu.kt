@@ -2,7 +2,6 @@ package com.aakash.novafork.ui.common
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
@@ -209,7 +208,7 @@ fun ContextMenuLift(
     copyBackground: Color? = null,
     content: @Composable (copy: Boolean) -> Unit,
 ) {
-    val lift by animateFloatAsState(if (open) 1f + (grow - 1f) / 2f else 1f, spring(dampingRatio = 0.6f, stiffness = 500f), label = "menuLift")
+    val lift by animateFloatAsState(if (open) 1f + (grow - 1f) / 2f else 1f, Motion.content(), label = "menuLift")
     val focus = LocalMenuFocus.current
     val haptics = LocalHapticFeedback.current
     LaunchedEffect(open) { if (open) haptics.performHapticFeedback(HapticFeedbackType.LongPress) }
@@ -237,7 +236,7 @@ fun ContextMenuLift(
             val position = remember(padPx) { OverAnchor(padPx) }
             Popup(popupPositionProvider = position, properties = PopupProperties(focusable = false, clippingEnabled = false)) {
                 val growing = remember { Animatable(1f) }
-                LaunchedEffect(Unit) { growing.animateTo(grow, spring(dampingRatio = 0.6f, stiffness = 400f)) }
+                LaunchedEffect(Unit) { growing.animateTo(grow, Motion.content()) }
                 Box(
                     Modifier
                         .size(with(density) { size.width.toDp() } + pad * 2, with(density) { size.height.toDp() } + pad * 2)

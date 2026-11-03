@@ -1,7 +1,6 @@
 package com.aakash.novafork.ui.common
 
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -213,7 +212,7 @@ fun Modifier.sinkBehindSheets(): Modifier = composed {
     val depth = LocalSheetDepth.current ?: return@composed Modifier
     val sunk by animateFloatAsState(
         targetValue = if (depth.open > 0) 1f else 0f,
-        animationSpec = spring(dampingRatio = 0.9f, stiffness = 380f),
+        animationSpec = Motion.page(),
         label = "sheetSink",
     )
     val corner = rememberScreenCornerRadius()

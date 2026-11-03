@@ -2,8 +2,7 @@ package com.aakash.novafork.ui.common
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.SizeTransform
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.VisibilityThreshold
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
@@ -46,12 +45,12 @@ fun RollingText(
                     transitionSpec = {
                         if (initialState.isDigit() && targetState.isDigit()) {
                             val up = targetState > initialState
-                            val roll = spring<IntOffset>(dampingRatio = 0.85f, stiffness = 500f)
-                            (slideInVertically(roll) { h -> if (up) h else -h } + fadeIn(tween(180))) togetherWith
-                                (slideOutVertically(roll) { h -> if (up) -h else h } + fadeOut(tween(140))) using
+                            val roll = Motion.content(IntOffset.VisibilityThreshold)
+                            (slideInVertically(roll) { h -> if (up) h else -h } + fadeIn(Motion.content())) togetherWith
+                                (slideOutVertically(roll) { h -> if (up) -h else h } + fadeOut(Motion.press())) using
                                 SizeTransform(clip = true)
                         } else {
-                            fadeIn(tween(180)) togetherWith fadeOut(tween(140)) using SizeTransform(clip = true)
+                            fadeIn(Motion.content()) togetherWith fadeOut(Motion.press()) using SizeTransform(clip = true)
                         }
                     },
                     label = "rollingChar",

@@ -4,14 +4,13 @@ import androidx.annotation.DrawableRes
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.VisibilityThreshold
 import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -108,6 +107,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpOffset
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import com.aakash.novafork.R
@@ -168,14 +168,14 @@ fun IosSwitch(
     val track by animateColorAsState(if (checked) MaterialTheme.colorScheme.primary else IosColors.SwitchOff, label = "switchTrack")
     // Where each end of the knob is along its travel, 0 (off) to 1 (on), each on its own spring.
     val target = if (checked) 1f else 0f
-    val lead = spring<Float>(dampingRatio = 0.72f, stiffness = 900f)
-    val follow = spring<Float>(dampingRatio = 0.8f, stiffness = 320f)
+    val lead = Motion.press<Float>()
+    val follow = Motion.content<Float>()
     val startEnd by animateFloatAsState(target, animationSpec = if (checked) follow else lead, label = "switchKnobStart")
     val endEnd by animateFloatAsState(target, animationSpec = if (checked) lead else follow, label = "switchKnobEnd")
     val sliding = kotlin.math.abs(startEnd - target) > 0.02f || kotlin.math.abs(endEnd - target) > 0.02f
     val glass by animateFloatAsState(
         targetValue = if (enabled && (pressed || sliding)) 1f else 0f,
-        animationSpec = spring(dampingRatio = 0.8f, stiffness = 600f),
+        animationSpec = Motion.press(),
         label = "switchGlass",
     )
     val toggle = if (onCheckedChange != null) {
@@ -460,8 +460,8 @@ fun IosSegmentedControl(
         var lastIndex by remember { mutableIntStateOf(shownIndex) }
         val forward = shownIndex >= lastIndex
         SideEffect { lastIndex = shownIndex }
-        val lead = spring<Dp>(dampingRatio = 0.62f, stiffness = Spring.StiffnessMedium)
-        val follow = spring<Dp>(dampingRatio = 0.8f, stiffness = Spring.StiffnessLow)
+        val lead = Motion.press<Dp>()
+        val follow = Motion.content<Dp>()
         val left by animateDpAsState(slot * shownIndex, animationSpec = if (forward) follow else lead, label = "segmentPillLeft")
         val right by animateDpAsState(slot * (shownIndex + 1), animationSpec = if (forward) lead else follow, label = "segmentPillRight")
         if (index >= 0) {
@@ -638,8 +638,8 @@ fun IosToastHost(message: String?, onShown: () -> Unit, modifier: Modifier = Mod
     AnimatedVisibility(
         visible = visible,
         modifier = modifier,
-        enter = slideInVertically(spring(dampingRatio = 0.8f, stiffness = 500f)) { -it * 2 } + fadeIn(),
-        exit = slideOutVertically(tween(220)) { -it * 2 } + fadeOut(tween(180)),
+        enter = slideInVertically(Motion.content(IntOffset.VisibilityThreshold)) { -it * 2 } + fadeIn(Motion.content()),
+        exit = slideOutVertically(Motion.press(IntOffset.VisibilityThreshold)) { -it * 2 } + fadeOut(Motion.press()),
     ) {
         Text(
             text = shown.orEmpty(),
@@ -758,7 +758,7 @@ fun SwipeToDelete(
     LaunchedEffect(armed) { if (armed) haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove) }
     fun settle(target: Float, then: () -> Unit = {}) {
         scope.launch {
-            animate(offset, target, animationSpec = spring(dampingRatio = 0.85f, stiffness = 600f)) { value, _ -> offset = value }
+            animate(offset, target, animationSpec = Motion.press()) { value, _ -> offset = value }
             then()
         }
     }
@@ -841,7 +841,7 @@ private val SwipePillGap = 6.dp
  */
 @Composable
 fun CollapsedTitleBar(visible: Boolean, title: String, modifier: Modifier = Modifier) {
-    val edge by animateFloatAsState(if (visible) 1f else 0f, tween(200), label = "collapsedTitleEdge")
+    val edge by animateFloatAsState(if (visible) 1f else 0f, Motion.content(), label = "collapsedTitleEdge")
     ScrollEdgeTitleBar(title = title, showTitle = visible, edge = { edge }, modifier = modifier)
 }
 

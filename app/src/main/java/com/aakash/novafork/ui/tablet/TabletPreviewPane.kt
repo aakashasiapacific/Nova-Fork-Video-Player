@@ -1,7 +1,6 @@
 package com.aakash.novafork.ui.tablet
 
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
@@ -41,6 +40,7 @@ import com.aakash.novafork.R
 import com.aakash.novafork.ui.common.BackdropArt
 import com.aakash.novafork.ui.common.IosTextButton
 import com.aakash.novafork.ui.common.LandscapeArt
+import com.aakash.novafork.ui.common.Motion
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.ProgressStrip
 import com.aakash.novafork.ui.common.RatingPill
@@ -83,7 +83,7 @@ internal fun TabletPreviewPane(
         // Keyed by item: details arriving for the same item update in place, a new item fades in.
         AnimatedContent(
             targetState = PaneContent(previewKey, item, video, show),
-            transitionSpec = { fadeIn(tween(durationMillis = 220)) togetherWith fadeOut(tween(durationMillis = 120)) },
+            transitionSpec = { fadeIn(Motion.content()) togetherWith fadeOut(Motion.press()) },
             contentKey = { it.key },
             label = "previewPane",
         ) { content ->

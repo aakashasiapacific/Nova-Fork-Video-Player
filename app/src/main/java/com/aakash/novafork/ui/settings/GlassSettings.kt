@@ -2,7 +2,6 @@ package com.aakash.novafork.ui.settings
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -48,6 +47,7 @@ import androidx.compose.ui.semantics.setProgress
 import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
 import com.aakash.novafork.ui.common.IosColors
+import com.aakash.novafork.ui.common.Motion
 import com.aakash.novafork.ui.theme.IosPalette
 
 /**
@@ -143,7 +143,7 @@ internal fun IosSlider(
     val finished by rememberUpdatedState(onValueChangeFinished)
     val knobScale by animateFloatAsState(
         targetValue = if (held) 1.15f else 1f,
-        animationSpec = spring(dampingRatio = 0.6f, stiffness = 700f),
+        animationSpec = Motion.press(),
         label = "sliderKnobScale",
     )
     val knobColor by animateColorAsState(if (held) KnobGlass else Color.White, label = "sliderKnobColor")
