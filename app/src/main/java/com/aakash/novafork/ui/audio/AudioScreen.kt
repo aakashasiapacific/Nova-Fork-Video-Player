@@ -679,7 +679,21 @@ private fun AlbumPage(album: Album, ctx: PageContext) {
             }
         }
         row("play") { PlayShuffle(album.songs, ctx.actions) }
+        // Albums on more than one disc get Apple Music's "Disc 1", "Disc 2" over each disc's tracks.
+        val discs = album.songs.mapNotNull { it.discNumber }.distinct()
         album.songs.forEachIndexed { index, song ->
+            val disc = song.discNumber
+            if (discs.size > 1 && disc != null && (index == 0 || album.songs[index - 1].discNumber != disc)) {
+                row("disc:$disc") {
+                    Text(
+                        "Disc $disc",
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color.White.copy(alpha = 0.55f),
+                        modifier = Modifier.padding(top = 18.dp, bottom = 4.dp),
+                    )
+                }
+            }
             row("t:${song.id}") {
                 TrackRow(song = song, ctx = ctx, onClick = { ctx.actions.play(album.songs, index, false) })
             }

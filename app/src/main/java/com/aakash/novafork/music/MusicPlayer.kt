@@ -112,6 +112,8 @@ class MusicPlayer(
 
     /** Each queued song's artist, for smart shuffle (see [PlayQueue.groupOf]). */
     private val artistOf = HashMap<Long, String>()
+    /** Each queued song's album, so an album played in order is never crossfaded (gapless albums). */
+    private val albumOf = HashMap<Long, String>()
     private val queue = PlayQueue().also { it.groupOf = { id -> artistOf[id] } }
     private var mediaPlayer: MediaPlayer? = null
     private var descriptor: ParcelFileDescriptor? = null
@@ -231,8 +233,15 @@ class MusicPlayer(
      * Plays [songIds] (in library order) starting with [startIndex]; with [shuffle] the rest
      * follow in random order. Replaces what was queued.
      */
-    fun playSongs(songIds: List<Long>, startIndex: Int = 0, shuffle: Boolean = false, artists: Map<Long, String> = emptyMap()) {
+    fun playSongs(
+        songIds: List<Long>,
+        startIndex: Int = 0,
+        shuffle: Boolean = false,
+        artists: Map<Long, String> = emptyMap(),
+        albums: Map<Long, String> = emptyMap(),
+    ) {
         artistOf.putAll(artists)
+        albumOf.putAll(albums)
         if (songIds.isEmpty()) return
         queue.set(songIds, startIndex, shuffle)
         pendingSeekMs = 0L
@@ -659,8 +668,13 @@ class MusicPlayer(
             val next = queue.nextPosition(wrap = state.repeat == RepeatMode.ALL) ?: return
             val nextId = queue.idAt(next) ?: return
             if (nextId == queue.currentId) return
-            crossfadeJob = scope.launch { crossfadeInto(next, nextId, fadeMs) }
-            return
+            // An album playing in order runs on without a fade (owner: gapless albums), as live and
+            // classical albums need; the preload below makes it seamless.
+            val sameAlbum = !queue.shuffled && queue.currentId?.let { albumOf[it] }?.let { it == albumOf[nextId] } == true
+            if (!sameAlbum) {
+                crossfadeJob = scope.launch { crossfadeInto(next, nextId, fadeMs) }
+                return
+            }
         }
         if (preloadJob != null || preloaded != null || duration - positionMs > PRELOAD_BEFORE_END_MS) return
         val nextId = if (state.repeat == RepeatMode.ONE) {
