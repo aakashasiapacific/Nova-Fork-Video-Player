@@ -295,6 +295,7 @@ internal fun PhoneLandscapeCard(
         progress = card.progress,
         watched = card.watched,
         rollingSubtitle = rollingSubtitle,
+        newEpisode = card.newEpisode,
     )
 }
 
@@ -354,6 +355,7 @@ private fun WideCardLayout(
     onLongClick: (() -> Unit)? = null,
     width: Dp = LocalNovaDimens.current.landscapeCardWidth,
     rollingSubtitle: Boolean = false,
+    newEpisode: Boolean = false,
 ) {
     val shape = RoundedCornerShape(LocalNovaDimens.current.cardRadius)
     val press = remember { MutableInteractionSource() }
@@ -393,6 +395,7 @@ private fun WideCardLayout(
                     ),
             )
             if (watched) WatchedBadge(Modifier.align(Alignment.TopEnd).padding(6.dp))
+        if (newEpisode) NewEpisodeDot(Modifier.align(Alignment.TopStart).padding(8.dp))
             ProgressStrip(progress, Modifier.align(Alignment.BottomStart))
         }
         Spacer(Modifier.height(8.dp))
@@ -428,6 +431,16 @@ private fun WideCardLayout(
         }
         Spacer(Modifier.height(4.dp))
     }
+}
+
+/** Apple TV's small blue dot: this show has a new episode to watch. */
+@Composable
+internal fun NewEpisodeDot(modifier: Modifier = Modifier) {
+    Box(
+        modifier
+            .size(10.dp)
+            .background(NovaColors.IosBlue, CircleShape),
+    )
 }
 
 /** How far a poster or card sinks in while pressed. */

@@ -15,6 +15,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -249,6 +251,21 @@ private fun VideoBody(details: VideoDetailsUi, actions: AppActions) {
                     onLongClick = { actions.openVideo(next.id) },
                     modifier = Modifier.width(dims.landscapeCardWidth),
                 )
+            }
+        }
+        if (details.extras.isNotEmpty()) {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("Extras", style = MaterialTheme.typography.titleLarge)
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(dims.rowSpacing)) {
+                    items(details.extras, key = { it.id }) { card ->
+                        TabletLandscapeCard(
+                            card = card,
+                            onClick = { actions.play(card.id) },
+                            onLongClick = { actions.openVideo(card.id) },
+                            modifier = Modifier.width(dims.landscapeCardWidth),
+                        )
+                    }
+                }
             }
         }
     }

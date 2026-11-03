@@ -1,6 +1,7 @@
 package com.aakash.novafork.ui
 
 import com.aakash.novafork.core.format.Formats
+import com.aakash.novafork.core.library.VideoFiles
 import com.aakash.novafork.core.smb.SmbUris
 import com.aakash.novafork.core.tmdb.TmdbClient
 import com.aakash.novafork.data.PlaylistWithCount
@@ -75,11 +76,12 @@ object UiMappers {
             continueWatching = inProgress.map { video ->
                 // A file on the phone shows the moment it was left, as Apple TV's Up Next does.
                 val art = video.card.artwork
-                if (art.frameSource != null && video.video.positionMs > 0) {
+                val card = if (art.frameSource != null && video.video.positionMs > 0) {
                     video.card.copy(artwork = art.copy(frameAtMs = video.video.positionMs))
                 } else {
                     video.card
                 }
+                if (hasNewEpisode(index, video)) card.copy(newEpisode = true) else card
             },
             recentlyAdded = recentlyAdded(index),
             movies = index.movies.sortedWith(TITLE_ORDER).map { it.card },
@@ -92,10 +94,23 @@ object UiMappers {
     /** Partly watched videos, last played first, one per show. */
     private fun continueWatching(index: LibraryIndex): List<IndexedVideo> =
         index.videos
-            .filter { it.inProgress }
+            .filter { it.inProgress && it.id !in index.extraIds }
             .sortedByDescending { it.video.lastPlayedAt ?: 0L }
             .distinctBy { it.showKey ?: "v:${it.id}" }
             .take(CONTINUE_WATCHING_LIMIT)
+
+    /**
+     * Apple TV's blue dot: the episode after [video] (the one being watched) reached the library
+     * after its show was last played, so there is something new to watch. Derived from the
+     * episodes' dateAdded and lastPlayedAt, so nothing is stored.
+     */
+    internal fun hasNewEpisode(index: LibraryIndex, video: IndexedVideo): Boolean {
+        val show = video.showKey?.let { index.showsByKey[it] } ?: return false
+        val lastPlayed = show.episodes.maxOf { it.video.lastPlayedAt ?: 0L }
+        if (lastPlayed <= 0L) return false
+        val next = nextEpisode(index, video) ?: return false
+        return !next.video.watched && next.video.dateAdded > lastPlayed
+    }
 
     /** Newest first; a show's new episodes collapse into one card for its newest episode. */
     private fun recentlyAdded(index: LibraryIndex): List<VideoCardUi> {
@@ -103,6 +118,7 @@ object UiMappers {
         val seenShows = HashSet<String>()
         for (video in index.videos) {
             if (cards.size == RECENTLY_ADDED_LIMIT) break
+            if (video.id in index.extraIds) continue
             val showKey = video.showKey
             if (showKey == null) {
                 cards += video.card
@@ -297,6 +313,7 @@ object UiMappers {
     private fun timeline(index: LibraryIndex, now: Long, zone: ZoneId): List<TimelineMonth> {
         val today = Instant.ofEpochMilli(now).atZone(zone).toLocalDate()
         return index.videos
+            .filter { it.id !in index.extraIds }
             .sortedWith(compareByDescending<IndexedVideo> { it.video.dateAdded }.thenBy(NaturalOrder) { it.sortKey })
             .map { video ->
                 val card = video.card
@@ -339,6 +356,10 @@ object UiMappers {
         val sortKey: String,
         val year: Int?,
         val rating: Float?,
+        /** File size in bytes (a show: all its episodes). */
+        val size: Long,
+        /** File modified time (a show: its newest episode); falls back to when it was added. */
+        val modified: Long,
     )
 
     private fun videoEntry(video: IndexedVideo) = Entry(
@@ -347,6 +368,8 @@ object UiMappers {
         sortKey = video.sortKey,
         year = video.card.year,
         rating = video.card.rating,
+        size = video.video.sizeBytes ?: 0L,
+        modified = modifiedOf(video),
     )
 
     private fun showEntry(show: IndexedShow) = Entry(
@@ -355,7 +378,11 @@ object UiMappers {
         sortKey = show.sortKey,
         year = show.card.year,
         rating = show.card.rating,
+        size = show.episodes.sumOf { it.video.sizeBytes ?: 0L },
+        modified = show.episodes.maxOf(::modifiedOf),
     )
+
+    private fun modifiedOf(video: IndexedVideo): Long = video.video.dateModified ?: video.video.dateAdded
 
     private val ENTRY_TITLE_ORDER: Comparator<Entry> = compareBy(NaturalOrder) { it.sortKey }
 
@@ -364,6 +391,8 @@ object UiMappers {
         LibrarySort.TITLE -> ENTRY_TITLE_ORDER
         LibrarySort.YEAR -> compareBy<Entry, Int?>(nullsLast(reverseOrder<Int>())) { it.year }.then(ENTRY_TITLE_ORDER)
         LibrarySort.RATING -> compareBy<Entry, Float?>(nullsLast(reverseOrder<Float>())) { it.rating }.then(ENTRY_TITLE_ORDER)
+        LibrarySort.SIZE -> compareByDescending<Entry> { it.size }.then(ENTRY_TITLE_ORDER)
+        LibrarySort.MODIFIED -> compareByDescending<Entry> { it.modified }.then(ENTRY_TITLE_ORDER)
     }
 
     private val TITLE_ORDER: Comparator<IndexedVideo> = compareBy(NaturalOrder) { it.sortKey }
@@ -427,6 +456,7 @@ object UiMappers {
             lastWatched = video.lastPlayedAt?.let { watchedLabel(it) },
             // An episode's page leaves it to its show's page.
             moreLikeThis = if (isMovie) moreLikeThis(index, meta, item.title) else emptyList(),
+            extras = index.extrasByMovie[item.id].orEmpty().map(::extraCard),
             downloadable = item.kind != MediaKind.STREAM && VideoDownloads.canDownload(item.source?.type),
             renamable = item.kind != MediaKind.STREAM && when (item.source?.type) {
                 SourceType.DEVICE -> video.uri.startsWith("content://")
@@ -442,6 +472,14 @@ object UiMappers {
             }
         }
     }
+
+    /** An extra on its movie's page: named by its file (the TMDB title would repeat the movie's), with its length. */
+    private fun extraCard(extra: IndexedVideo): VideoCardUi = extra.card.copy(
+        title = VideoFiles.baseName(extra.video.fileName).ifBlank { extra.title },
+        subtitle = runtimeLabel(extra.video, null),
+        year = null,
+        rating = null,
+    )
 
     /**
      * The library's films in [meta]'s TMDB collection, one card per title (its first copy),
@@ -886,6 +924,7 @@ object UiMappers {
         val entries = ArrayList<Entry>()
         val showKeys = LinkedHashSet<String>()
         for (video in index.videos) {
+            if (video.id in index.extraIds) continue
             val matches = video.title.contains(needle, ignoreCase = true) ||
                 video.showTitle?.contains(needle, ignoreCase = true) == true ||
                 video.video.fileName.contains(needle, ignoreCase = true) ||

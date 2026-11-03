@@ -65,6 +65,8 @@ data class VideoCardUi(
     val sourceLabel: String? = null,
     /** The source the video belongs to (lets a saved stream be removed). */
     val sourceId: Long? = null,
+    /** Continue Watching: its show's next episode arrived after the show was last watched (Apple TV's blue dot). */
+    val newEpisode: Boolean = false,
 )
 
 @Immutable
@@ -179,7 +181,16 @@ enum class LibraryFilter(val label: String) {
     val isChip: Boolean get() = this == ALL || this == MOVIES || this == SHOWS
 }
 
-enum class LibrarySort(val label: String) { RECENT("Recently Added"), TITLE("Title"), YEAR("Year"), RATING("Rating") }
+enum class LibrarySort(val label: String) {
+    RECENT("Recently Added"),
+    TITLE("Title"),
+    YEAR("Year"),
+    RATING("Rating"),
+    /** Largest first; a show counts all its episodes. */
+    SIZE("Size"),
+    /** Newest first; a show counts its newest episode. */
+    MODIFIED("Date Modified"),
+}
 
 @Immutable
 data class LibraryUi(
@@ -245,6 +256,8 @@ data class VideoDetailsUi(
     val lastWatched: String? = null,
     /** More Like This: the library's titles closest to this one, best first. */
     val moreLikeThis: List<LibraryItemUi> = emptyList(),
+    /** A movie's trailers, featurettes and other bonus videos found beside it; tapping one plays it. */
+    val extras: List<VideoCardUi> = emptyList(),
     /** A movie's TMDB collection ("Dune Collection") when the library has 2+ of its films. */
     val collectionName: String? = null,
     /** Those films, this one included, oldest first. */
