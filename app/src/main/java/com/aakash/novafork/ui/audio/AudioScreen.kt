@@ -11,6 +11,7 @@ import androidx.compose.animation.core.StartOffset
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.VisibilityThreshold
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -94,6 +95,7 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.sp
@@ -129,6 +131,7 @@ import com.aakash.novafork.ui.common.IosTextButton
 import com.aakash.novafork.ui.common.LocalBottomBarSpace
 import com.aakash.novafork.ui.common.LocalHud
 import com.aakash.novafork.ui.common.LocalPagePull
+import com.aakash.novafork.ui.common.Motion
 import com.aakash.novafork.ui.common.NovaAlertDialog
 import com.aakash.novafork.ui.common.NovaDropdownMenu
 import com.aakash.novafork.ui.common.NovaIcon
@@ -292,8 +295,8 @@ fun AudioContent(
             .graphicsLayer { translationX = backSwipe * 0.6f },
         transitionSpec = {
             val forward = targetState != HOME && (initialState == HOME || targetState.length >= initialState.length)
-            (slideInHorizontally(tween(180)) { if (forward) it / 4 else -it / 4 } + fadeIn(tween(150))) togetherWith
-                (slideOutHorizontally(tween(180)) { if (forward) -it / 4 else it / 4 } + fadeOut(tween(100)))
+            (slideInHorizontally(Motion.page(IntOffset.VisibilityThreshold)) { if (forward) it / 4 else -it / 4 } + fadeIn(Motion.page<Float>())) togetherWith
+                (slideOutHorizontally(Motion.page(IntOffset.VisibilityThreshold)) { if (forward) -it / 4 else it / 4 } + fadeOut(Motion.press<Float>()))
         },
         label = "audioPage",
     ) { shown ->

@@ -11,6 +11,7 @@ import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.SpringSpec
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.VisibilityThreshold
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -129,6 +130,7 @@ import com.aakash.novafork.music.SleepTimer
 import com.aakash.novafork.ui.common.EqualizerSheet
 import com.aakash.novafork.ui.common.IosColors
 import com.aakash.novafork.ui.common.IosIconButton
+import com.aakash.novafork.ui.common.Motion
 import com.aakash.novafork.ui.common.NovaDropdownMenu
 import com.aakash.novafork.ui.common.NovaMenuDivider
 import com.aakash.novafork.ui.common.NovaIcon
@@ -605,7 +607,7 @@ fun MiniPlayerBar(
                             actions.previous()
                         }
                     }
-                    animate(swipe, 0f, velocity, spring(dampingRatio = 0.7f, stiffness = 500f)) { value, _ -> swipe = value }
+                    animate(swipe, 0f, velocity, Motion.content<Float>()) { value, _ -> swipe = value }
                 },
             )
             .padding(start = if (docked) 16.dp else 10.dp, end = 6.dp),
@@ -803,7 +805,7 @@ fun NowPlayingScreen(
                 ) {
                     AnimatedContent(
                         targetState = side,
-                        transitionSpec = { fadeIn(tween(220)) togetherWith fadeOut(tween(160)) },
+                        transitionSpec = { fadeIn(Motion.content<Float>()) togetherWith fadeOut(Motion.press<Float>()) },
                         label = "nowPlayingSide",
                     ) { shown ->
                         if (shown == NowPlayingPane.LYRICS) LyricsPane(player, actions) else QueuePane(player, actions, upNext)
@@ -831,7 +833,7 @@ fun NowPlayingScreen(
                 ) {
                     AnimatedContent(
                         targetState = pane,
-                        transitionSpec = { fadeIn(tween(220)) togetherWith fadeOut(tween(160)) },
+                        transitionSpec = { fadeIn(Motion.content<Float>()) togetherWith fadeOut(Motion.press<Float>()) },
                         label = "nowPlayingPane",
                     ) { shown ->
                         when (shown) {
@@ -1005,10 +1007,10 @@ private fun BigCover(player: MusicPlayerState) {
     // forward with a deep one.
     val scale = animateFloatAsState(
         if (player.isPlaying) 1f else 0.8f,
-        spring(dampingRatio = 0.62f, stiffness = 300f),
+        Motion.content<Float>(),
         label = "coverScale",
     )
-    val shadow = animateDpAsState(if (player.isPlaying) 30.dp else 8.dp, spring(stiffness = 300f), label = "coverShadow")
+    val shadow = animateDpAsState(if (player.isPlaying) 30.dp else 8.dp, Motion.content<Dp>(), label = "coverShadow")
     val sheet = LocalNowPlayingSheet.current
     // The flying cover starts from, and lands on, this one's size and shadow as they are at that
     // moment, so nothing jumps as the hand-over happens.
@@ -1066,9 +1068,9 @@ private fun BigCover(player: MusicPlayerState) {
                         fadeIn(tween(ALBUM_FADE_MS)) togetherWith fadeOut(tween(ALBUM_FADE_MS))
                     } else {
                         val forward = targetState.index >= initialState.index
-                        val slide = spring<IntOffset>(dampingRatio = 0.9f, stiffness = 420f)
-                        (slideInHorizontally(slide) { if (forward) it else -it } + fadeIn(tween(160))) togetherWith
-                            (slideOutHorizontally(slide) { if (forward) -it else it } + fadeOut(tween(160)))
+                        val slide = Motion.page(IntOffset.VisibilityThreshold)
+                        (slideInHorizontally(slide) { if (forward) it else -it } + fadeIn(Motion.content<Float>())) togetherWith
+                            (slideOutHorizontally(slide) { if (forward) -it else it } + fadeOut(Motion.press<Float>()))
                     }
                 },
                 contentKey = { it.songId },
@@ -1131,11 +1133,11 @@ private fun LyricsPane(player: MusicPlayerState, actions: AudioActions) {
                     2 -> 0.34f
                     else -> 0.24f
                 },
-                tween(450),
+                Motion.content<Float>(),
                 label = "lyricAlpha",
             )
-            val scale by animateFloatAsState(if (distance == 0) 1f else 0.94f, spring(dampingRatio = 0.8f, stiffness = 250f), label = "lyricScale")
-            val blur by animateDpAsState((distance.coerceAtMost(3) * 1.4f).dp, tween(450), label = "lyricBlur")
+            val scale by animateFloatAsState(if (distance == 0) 1f else 0.94f, Motion.content<Float>(), label = "lyricScale")
+            val blur by animateDpAsState((distance.coerceAtMost(3) * 1.4f).dp, Motion.content<Dp>(), label = "lyricBlur")
             val sung = lyrics.synced && !browsing && index == active && line.text.isNotEmpty()
             val shown = if (sung) {
                 val next = lyrics.lines.getOrNull(index + 1)?.timeMs
@@ -1281,10 +1283,10 @@ private fun QueuePane(player: MusicPlayerState, actions: AudioActions, upNext: L
                     dragFrom > dragTo && index in dragTo until dragFrom -> rowHeight
                     else -> 0f
                 },
-                spring(dampingRatio = 0.85f, stiffness = 600f),
+                Motion.press<Float>(),
                 label = "queueShift",
             )
-            val lift by animateFloatAsState(if (dragged) 1.03f else 1f, spring(dampingRatio = 0.6f, stiffness = 500f), label = "queueLift")
+            val lift by animateFloatAsState(if (dragged) 1.03f else 1f, Motion.press<Float>(), label = "queueLift")
             val reorder = Modifier.pointerInput(index, upNext.size) {
                 detectDragGesturesAfterLongPress(
                     onDragStart = {
@@ -1420,8 +1422,8 @@ private fun Scrubber(player: MusicPlayerState, actions: AudioActions) {
     // While held, the times grow and brighten so they can be read past the thumb, and the ends
     // of the song give a light tick, as Apple Music's scrubber does.
     val held = scrubbing != null
-    val grow by animateFloatAsState(if (held) 1.2f else 1f, spring(dampingRatio = 0.7f, stiffness = 400f), label = "timeGrow")
-    val timeAlpha by animateFloatAsState(if (held) 1f else 0.6f, tween(150), label = "timeAlpha")
+    val grow by animateFloatAsState(if (held) 1.2f else 1f, Motion.press<Float>(), label = "timeGrow")
+    val timeAlpha by animateFloatAsState(if (held) 1f else 0.6f, Motion.press<Float>(), label = "timeAlpha")
     val haptics = LocalHapticFeedback.current
     val atEnd = scrubbing?.let { it <= 0f || it >= 1f } == true
     LaunchedEffect(atEnd) { if (atEnd) haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove) }
@@ -1479,7 +1481,7 @@ private fun ThinSlider(
 ) {
     var held by remember { mutableStateOf(false) }
     val thickness by animateDpAsState(if (held) 10.dp else 6.dp, label = "sliderThickness")
-    val knob by animateFloatAsState(if (held) 1f else 0f, spring(dampingRatio = 0.6f, stiffness = 500f), label = "glassKnob")
+    val knob by animateFloatAsState(if (held) 1f else 0f, Motion.press<Float>(), label = "glassKnob")
     BoxWithConstraints(
         modifier
             .fillMaxWidth()
@@ -1594,7 +1596,7 @@ private fun SleepButton(sleep: SleepTimer?, actions: AudioActions) {
             moonDrop.snapTo(1f)
             moonAlpha.snapTo(0f)
             launch { moonAlpha.animateTo(1f, tween(MOON_MS)) }
-            moonDrop.animateTo(0f, spring(dampingRatio = 0.7f, stiffness = 220f))
+            moonDrop.animateTo(0f, Motion.content<Float>())
         } else {
             launch { moonAlpha.animateTo(0f, tween(MOON_MS)) }
             moonDrop.animateTo(1f, tween(MOON_MS))

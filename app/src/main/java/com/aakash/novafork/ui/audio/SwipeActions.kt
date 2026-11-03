@@ -2,7 +2,6 @@ package com.aakash.novafork.ui.audio
 
 import androidx.annotation.DrawableRes
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -33,6 +32,7 @@ import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
 import com.aakash.novafork.ui.common.IosColors
+import com.aakash.novafork.ui.common.Motion
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.theme.NovaColors
 import kotlin.math.abs
@@ -99,7 +99,7 @@ internal fun SwipeActionsRow(
                         if (armed) {
                             if (x > 0f) playNext() else remove?.invoke()
                         }
-                        scope.launch { offset.animateTo(0f, spring(dampingRatio = 0.8f, stiffness = 500f)) }
+                        scope.launch { offset.animateTo(0f, Motion.content<Float>()) }
                     }
                 },
             content = content,
