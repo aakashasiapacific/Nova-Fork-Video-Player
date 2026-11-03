@@ -1,6 +1,15 @@
 package com.aakash.novafork.ui.phone
 
 import androidx.annotation.DrawableRes
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.Alignment
+import com.aakash.novafork.ui.common.IosTextButton
+import com.aakash.novafork.ui.common.LocalBottomBarSpace
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -54,6 +63,9 @@ fun PhoneLibraryScreen(
         }
     }
 
+    // Select (owner: batch actions): tick several videos, then act on all of them at once.
+    var selection by remember { mutableStateOf<VideoSelection?>(null) }
+    BackHandler(enabled = selection != null) { selection = null }
     Column(modifier.fillMaxSize()) {
         PhoneTopBar(
             title = when {
@@ -64,7 +76,12 @@ fun PhoneLibraryScreen(
             },
             onBack = actions::back,
             actions = {
-                IosIconButton(onClick = { actions.navigate(Route.Search) }) {
+                if (library.items.isNotEmpty()) {
+                    IosTextButton(onClick = { selection = if (selection == null) VideoSelection() else null }) {
+                        Text(if (selection == null) "Select" else "Done")
+                    }
+                }
+                if (selection == null) IosIconButton(onClick = { actions.navigate(Route.Search) }) {
                     NovaIcon(R.drawable.ic_search, contentDescription = "Search")
                 }
                 // What to show sits in this menu with the order (owner: not on the page itself).
@@ -84,13 +101,23 @@ fun PhoneLibraryScreen(
                 .fillMaxWidth()
                 .weight(1f),
         ) {
-            if (library.items.isEmpty()) {
-                LibraryEmpty(filter = library.filter, actions = actions)
-            } else if (library.timelineMonths.isNotEmpty()) {
-                // All videos, newest first, under month headings (each card says the day it arrived).
-                PhoneTimelineGrid(months = library.timelineMonths, actions = actions, state = gridState)
-            } else {
-                PhoneLibraryGrid(items = library.items, actions = actions, state = gridState)
+            CompositionLocalProvider(LocalVideoSelection provides selection) {
+                if (library.items.isEmpty()) {
+                    LibraryEmpty(filter = library.filter, actions = actions)
+                } else if (library.timelineMonths.isNotEmpty()) {
+                    // All videos, newest first, under month headings (each card says the day it arrived).
+                    PhoneTimelineGrid(months = library.timelineMonths, actions = actions, state = gridState)
+                } else {
+                    PhoneLibraryGrid(items = library.items, actions = actions, state = gridState)
+                }
+            }
+            selection?.let { picked ->
+                SelectionBar(
+                    picked = picked,
+                    actions = actions,
+                    onDone = { selection = null },
+                    modifier = Modifier.align(Alignment.BottomCenter),
+                )
             }
         }
     }
@@ -173,4 +200,43 @@ private fun emptyContentFor(filter: LibraryFilter): EmptyContent = when (filter)
     LibraryFilter.VIDEOS -> EmptyContent("No other videos")
     LibraryFilter.WATCHLIST -> EmptyContent("Your Watchlist is empty")
     LibraryFilter.FAVORITES -> EmptyContent("No favorites yet")
+}
+
+/**
+ * What to do with the ticked videos: mark them watched, put them on the Watchlist (an episode puts
+ * its show), or add them to a playlist; each ends the selection. Floats over the grid's foot.
+ */
+@Composable
+private fun SelectionBar(picked: VideoSelection, actions: AppActions, onDone: () -> Unit, modifier: Modifier = Modifier) {
+    val ids = picked.selected.toList()
+    Row(
+        modifier
+            .padding(bottom = LocalBottomBarSpace.current + 12.dp, start = 16.dp, end = 16.dp)
+            .fillMaxWidth()
+            .background(IosColors.Popover, RoundedCornerShape(percent = 50))
+            .padding(horizontal = 8.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceEvenly,
+    ) {
+        Text(
+            if (ids.isEmpty()) "Select videos" else "${ids.size} selected",
+            style = MaterialTheme.typography.bodyMedium,
+            color = IosColors.SecondaryLabel,
+            modifier = Modifier.padding(start = 8.dp),
+        )
+        IosTextButton(enabled = ids.isNotEmpty(), onClick = {
+            ids.forEach { actions.setWatched(it, true) }
+            onDone()
+        }) { Text("Watched") }
+        IosTextButton(enabled = ids.isNotEmpty(), onClick = {
+            ids.mapNotNull { actions.saveKeyFor(it) }.distinct()
+                .filterNot { actions.isOnWatchlist(it) }
+                .forEach { actions.toggleWatchlist(it) }
+            onDone()
+        }) { Text("Watchlist") }
+        IosTextButton(enabled = ids.isNotEmpty(), onClick = {
+            actions.addToPlaylist(ids)
+            onDone()
+        }) { Text("Playlist") }
+    }
 }

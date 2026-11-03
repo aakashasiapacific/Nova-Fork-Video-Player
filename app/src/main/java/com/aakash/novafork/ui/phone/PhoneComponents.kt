@@ -1,5 +1,9 @@
 package com.aakash.novafork.ui.phone
 
+import androidx.compose.runtime.Stable
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.staticCompositionLocalOf
+import com.aakash.novafork.ui.common.IosCheckCircle
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -657,7 +661,7 @@ internal fun PhoneLibraryGrid(
                     showDetails = false,
                     modifier = appear,
                 ) { openMenu ->
-                    PhonePosterCard(item.card, onClick = { actions.openVideo(item.card.id) }, onLongClick = openMenu)
+                    SelectablePosterCard(item.card, actions, openMenu)
                 }
                 is LibraryItemUi.Show -> PhoneShowCard(item.card, onClick = { actions.openShow(item.card.key) }, modifier = appear)
             }
@@ -702,7 +706,7 @@ internal fun PhoneTimelineGrid(
                 itemsIndexed(month.cards, key = { _, card -> "v:" + card.id }) { index, card ->
                     val appear = Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null).staggeredAppear("v:" + card.id, index, seen)
                     VideoMenuBox(videoId = card.id, title = card.displayTitle(), actions = actions, showDetails = false, modifier = appear) { openMenu ->
-                        PhonePosterCard(card, onClick = { actions.openVideo(card.id) }, onLongClick = openMenu)
+                        SelectablePosterCard(card, actions, openMenu)
                     }
                 }
             }
@@ -964,3 +968,40 @@ internal fun RowScope.ButtonContent(@DrawableRes icon: Int, label: String) {
 
 /** How far a finished episode's row fades back. */
 private const val WatchedEpisodeAlpha = 0.42f
+
+/**
+ * Picking several videos at once (owner): while a page selects ([LocalVideoSelection]), a tap or
+ * a hold ticks a video instead of opening it, and a tick circle shows on every poster.
+ */
+@Stable
+internal class VideoSelection {
+    val selected = mutableStateListOf<Long>()
+
+    fun toggle(videoId: Long) {
+        if (!selected.remove(videoId)) selected += videoId
+    }
+}
+
+/** The page's selection while it is selecting; null otherwise. */
+internal val LocalVideoSelection = staticCompositionLocalOf<VideoSelection?> { null }
+
+/** A poster that opens its video, or, while selecting, ticks it. */
+@Composable
+private fun SelectablePosterCard(card: VideoCardUi, actions: AppActions, openMenu: () -> Unit) {
+    val selection = LocalVideoSelection.current
+    if (selection == null) {
+        PhonePosterCard(card, onClick = { actions.openVideo(card.id) }, onLongClick = openMenu)
+        return
+    }
+    val checked = card.id in selection.selected
+    Box {
+        PhonePosterCard(card, onClick = { selection.toggle(card.id) }, onLongClick = { selection.toggle(card.id) })
+        IosCheckCircle(
+            checked = checked,
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(8.dp)
+                .background(Color.Black.copy(alpha = if (checked) 0f else 0.35f), CircleShape),
+        )
+    }
+}
