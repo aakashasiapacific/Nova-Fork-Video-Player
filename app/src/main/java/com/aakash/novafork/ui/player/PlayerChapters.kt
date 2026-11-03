@@ -134,6 +134,7 @@ internal enum class ChapterSkip(val label: String) {
 }
 
 private val IntroName = Regex("""\b(intro|opening|op)\b""", RegexOption.IGNORE_CASE)
+private val RecapName = Regex("""\b(recap|previously)\b""", RegexOption.IGNORE_CASE)
 private val CreditsName = Regex("""\b(credits|ending|outro|ed)\b""", RegexOption.IGNORE_CASE)
 
 /**
@@ -173,6 +174,13 @@ internal fun ChapterSkipButton(
         null
     } else {
         chapterSkip(state.chapters, index, state.durationMs)
+    }
+    // A chapter named as a recap ("Recap", "Previously on …") is skipped by itself, without a
+    // button (owner: no interruptions). Not while locked or casting.
+    val recap = index >= 0 && !state.locked && state.castingTo == null &&
+        RecapName.containsMatchIn(state.chapters.getOrNull(index)?.name.orEmpty())
+    LaunchedEffect(index, recap) {
+        if (recap) actions.seekTo(chapterEndMs(state.chapters, index, state.durationMs))
     }
     var fresh by remember { mutableStateOf(false) }
     LaunchedEffect(index, skip) {
