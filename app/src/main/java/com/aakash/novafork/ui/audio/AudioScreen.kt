@@ -108,6 +108,7 @@ import com.aakash.novafork.data.music.Artist
 import com.aakash.novafork.data.music.MusicLibrary
 import com.aakash.novafork.data.music.MusicLibraryData
 import com.aakash.novafork.data.music.MusicScanState
+import com.aakash.novafork.data.music.SimilarSongs
 import com.aakash.novafork.music.MusicPlayerState
 import com.aakash.novafork.music.SongPulse
 import com.aakash.novafork.music.SongPulses
@@ -1005,30 +1006,10 @@ private fun PlaySimilarItem(album: Album, ctx: PageContext, close: () -> Unit) {
 /**
  * Songs like [album]'s from the library itself (owner): other albums by the same artist, then the
  * same genre, then songs from within five years of it, each scored and shuffled a little; never
- * the album's own songs, at most [SIMILAR_SONGS].
+ * the album's own songs, at most [SIMILAR_SONGS]. See [SimilarSongs].
  */
-private fun similarSongs(album: Album, library: MusicLibraryData): List<SongEntity> {
-    val own = album.songs.map { it.id }.toSet()
-    val artists = album.songs.map { it.artistKey }.toSet()
-    val genres = album.songs.mapNotNull { it.genre?.lowercase()?.takeIf { g -> g.isNotBlank() } }.toSet()
-    val year = album.songs.mapNotNull { it.year }.firstOrNull()
-    return library.songs
-        .asSequence()
-        .filter { it.id !in own }
-        .map { song ->
-            var score = 0
-            if (song.artistKey in artists) score += 3
-            if (song.genre?.lowercase() in genres) score += 2
-            if (year != null && song.year != null && kotlin.math.abs(song.year - year) <= 5) score += 1
-            song to score
-        }
-        .filter { it.second > 0 }
-        .shuffled()
-        .sortedByDescending { it.second }
-        .take(SIMILAR_SONGS)
-        .map { it.first }
-        .toList()
-}
+private fun similarSongs(album: Album, library: MusicLibraryData): List<SongEntity> =
+    SimilarSongs.pick(album.songs, library.songs, exclude = album.songs.map { it.id }.toSet(), limit = SIMILAR_SONGS)
 
 private const val SIMILAR_SONGS = 50
 
