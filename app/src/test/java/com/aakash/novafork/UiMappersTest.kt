@@ -801,6 +801,57 @@ class UiMappersTest {
         lastPlayedAt = lastPlayedAt,
     )
 
+    // Extras, new episodes, more sorts
+
+    @Test
+    fun extrasLeaveTheGridsAndSitOnTheirMoviesPage() {
+        val movie = video(1, DEVICE, "content://media/1/Heat.mkv", kind = VideoKind.MOVIE).copy(folder = "Movies/Heat")
+        val extra = video(2, DEVICE, "content://media/2/Making of.mkv").copy(folder = "Movies/Heat/Extras")
+        val orphan = video(3, DEVICE, "content://media/3/Clip.mkv").copy(folder = "Other/Extras")
+        val small = LibraryIndex.build(listOf(row(movie), row(extra), row(orphan)), listOf(device), preferLocalArtwork = false)
+
+        val ids = UiMappers.library(small, LibraryFilter.ALL, LibrarySort.RECENT).items
+            .map { (it as LibraryItemUi.Video).card.id }
+        assertEquals("the matched extra is gone, the unmatched one stays", listOf(3L, 1L), ids)
+        assertFalse(2L in small.home.recentlyAdded.map { it.id })
+        assertFalse(2L in small.home.videos.map { it.id })
+        assertTrue(UiMappers.search(small, "Making").results.isEmpty())
+        assertEquals(listOf(2L), requireNotNull(UiMappers.videoDetails(small, 1)).extras.map { it.id })
+        assertEquals("named by its file", "Making of", requireNotNull(UiMappers.videoDetails(small, 1)).extras.single().title)
+        assertTrue(requireNotNull(UiMappers.videoDetails(small, 3)).extras.isEmpty())
+    }
+
+    @Test
+    fun aShowGetsTheNewEpisodeDotWhenItsNextEpisodeArrivesAfterItWasWatched() {
+        val watching = episode(id = 1, season = 1, episode = 1, positionMs = 60_000, lastPlayedAt = 5_000)
+        fun home(next: VideoEntity) = LibraryIndex
+            .build(listOf(row(watching), row(next)), listOf(nas), preferLocalArtwork = false)
+            .home.continueWatching.single()
+
+        val old = episode(id = 2, season = 1, episode = 2).copy(dateAdded = 2_000)
+        assertFalse("already there when it was watched", home(old).newEpisode)
+        val fresh = old.copy(dateAdded = 9_000)
+        assertTrue(home(fresh).newEpisode)
+        assertFalse("a watched next episode is not new", home(fresh.copy(watched = true)).newEpisode)
+    }
+
+    @Test
+    fun sortsBySizeAndDateModified() {
+        val big = video(1, DEVICE, "content://media/1/A.mkv", kind = VideoKind.MOVIE).copy(sizeBytes = 100, dateModified = 5_000)
+        val bigger = video(2, DEVICE, "content://media/2/B.mkv", kind = VideoKind.MOVIE).copy(sizeBytes = 300, dateModified = 1_000)
+        val ep1 = episode(id = 3, season = 1, episode = 1).copy(sizeBytes = 120, dateModified = 7_000)
+        val ep2 = episode(id = 4, season = 1, episode = 2).copy(sizeBytes = 130, dateModified = 2_000)
+        val mixed = LibraryIndex.build(
+            listOf(row(big), row(bigger), row(ep1), row(ep2)),
+            listOf(device, nas),
+            preferLocalArtwork = false,
+        )
+        fun keys(sort: LibrarySort) = UiMappers.library(mixed, LibraryFilter.ALL, sort).items.map { it.key }
+
+        assertEquals("a show counts all its episodes", listOf("v:2", "s:name:show", "v:1"), keys(LibrarySort.SIZE))
+        assertEquals("a show counts its newest episode", listOf("s:name:show", "v:1", "v:2"), keys(LibrarySort.MODIFIED))
+    }
+
     @Test
     fun recentSearchesPutTheNewestFirstWithoutRepeats() {
         val recent = listOf("dune", "Queen", "beatles")

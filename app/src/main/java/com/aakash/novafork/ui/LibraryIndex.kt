@@ -1,6 +1,7 @@
 package com.aakash.novafork.ui
 
 import com.aakash.novafork.core.format.Formats
+import com.aakash.novafork.core.library.ExtraFiles
 import com.aakash.novafork.core.library.LibraryKeys
 import com.aakash.novafork.core.library.VideoFiles
 import com.aakash.novafork.core.smb.SmbUris
@@ -73,7 +74,12 @@ class LibraryIndex(
     val shows: List<IndexedShow>,
     val sources: List<SourceEntity>,
     val preferLocalArtwork: Boolean,
+    /** Movie id → its extras (trailers, featurettes...), in file-name order. They are also in [videos]. */
+    val extrasByMovie: Map<Long, List<IndexedVideo>> = emptyMap(),
 ) {
+    /** Extras that found their movie: shown on its page only, never as items of their own. */
+    val extraIds: Set<Long> = extrasByMovie.values.flatMapTo(HashSet<Long>()) { list -> list.map { it.id } }
+
     val videosById: Map<Long, IndexedVideo> = videos.associateBy { it.id }
     val showsByKey: Map<String, IndexedShow> = shows.associateBy { it.key }
     val sourcesById: Map<Long, SourceEntity> = sources.associateBy { it.id }
@@ -83,10 +89,11 @@ class LibraryIndex(
     val videosByUri: Map<String, IndexedVideo> by lazy { videos.associateBy { it.video.uri } }
 
     /** Movies from device, folders and shares (matched movie streams stay with the streams). Newest first. */
-    val movies: List<IndexedVideo> = videos.filter { it.kind == MediaKind.MOVIE }
+    val movies: List<IndexedVideo> = videos.filter { it.kind == MediaKind.MOVIE && it.id !in extraIds }
 
     /** Home videos, unidentified files and streams. Newest first. */
-    val otherVideos: List<IndexedVideo> = videos.filter { it.kind == MediaKind.VIDEO || it.kind == MediaKind.STREAM }
+    val otherVideos: List<IndexedVideo> =
+        videos.filter { (it.kind == MediaKind.VIDEO || it.kind == MediaKind.STREAM) && it.id !in extraIds }
 
     /** Home only changes with the library, so it is built once per index rather than per UI event. */
     val home: HomeUi by lazy { UiMappers.home(this) }
@@ -115,12 +122,33 @@ class LibraryIndex(
             val shows = episodesByShow
                 .map { (key, episodes) -> buildShow(key, episodes, preferLocalArtwork, seasonPosters) }
                 .sortedWith(compareBy(NaturalOrder) { it.sortKey })
-            return LibraryIndex(videos, shows, sources, preferLocalArtwork)
+            return LibraryIndex(videos, shows, sources, preferLocalArtwork, extrasOf(videos))
         }
     }
 }
 
 // Building
+
+/** Matched extras by movie id (see [ExtraFiles]), each movie's in file-name order. */
+private fun extrasOf(videos: List<IndexedVideo>): Map<Long, List<IndexedVideo>> {
+    val candidates = videos.filter { it.kind == MediaKind.MOVIE || it.kind == MediaKind.VIDEO }
+    val matches = ExtraFiles.match(
+        candidates.map { ExtraFiles.Entry(it.id, it.video.sourceId, it.video.folder, it.video.fileName, it.kind == MediaKind.MOVIE) },
+    )
+    if (matches.isEmpty()) return emptyMap()
+    val byId = candidates.associateBy { it.id }
+    return candidates
+        .filter { extra ->
+            val movieId = matches[extra.id] ?: return@filter false
+            val movie = byId[movieId] ?: return@filter false
+            // A film identified as a different title is a real film in an "Other" folder, not a bonus.
+            val own = extra.meta?.key
+            val owner = movie.meta?.key
+            own == null || owner == null || own == owner
+        }
+        .sortedWith(compareBy(NaturalOrder) { it.video.fileName })
+        .groupBy { matches.getValue(it.id) }
+}
 
 private fun indexVideo(
     row: VideoWithMeta,

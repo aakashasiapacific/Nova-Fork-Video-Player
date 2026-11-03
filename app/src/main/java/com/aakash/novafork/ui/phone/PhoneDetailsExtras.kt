@@ -59,6 +59,36 @@ internal fun CollectionRow(details: VideoDetailsUi, actions: AppActions, modifie
     }
 }
 
+/** A movie's trailers, featurettes and other bonus videos as landscape cards; tapping one plays it. */
+@Composable
+internal fun ExtrasRow(details: VideoDetailsUi, actions: AppActions, modifier: Modifier = Modifier) {
+    val dims = LocalNovaDimens.current
+    val rowState = rememberLazyListState()
+    Column(modifier.padding(top = dims.sectionSpacing)) {
+        SectionHeader(
+            title = "Extras",
+            modifier = Modifier.padding(start = dims.gutter, end = dims.gutter, bottom = 10.dp),
+        )
+        LazyRow(
+            state = rowState,
+            flingBehavior = rememberRowSnap(rowState),
+            modifier = Modifier.fadeEndEdge(rowState),
+            contentPadding = PaddingValues(horizontal = dims.gutter),
+            horizontalArrangement = Arrangement.spacedBy(dims.rowSpacing),
+        ) {
+            items(details.extras, key = { it.id }) { card ->
+                PhoneLandscapeCard(
+                    card = card,
+                    onClick = { actions.play(card.id) },
+                    onLongClick = { actions.openVideo(card.id) },
+                    title = card.title,
+                    subtitle = card.subtitle,
+                )
+            }
+        }
+    }
+}
+
 /** "Downloading 42%" and its bar while this video copies to the phone; nothing otherwise. */
 @Composable
 internal fun DownloadStatus(details: VideoDetailsUi, modifier: Modifier = Modifier) {

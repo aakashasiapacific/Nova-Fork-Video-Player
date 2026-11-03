@@ -497,6 +497,15 @@ internal fun TabletLandscapeCard(
             }
         }
         if (card.watched) WatchedBadge(Modifier.align(Alignment.TopEnd).padding(10.dp))
+        if (card.newEpisode) {
+            Box(
+                Modifier
+                    .align(Alignment.TopStart)
+                    .padding(12.dp)
+                    .size(12.dp)
+                    .background(NovaColors.IosBlue, CircleShape),
+            )
+        }
         ProgressStrip(card.progress, Modifier.align(Alignment.BottomCenter), height = 4.dp)
     }
 }

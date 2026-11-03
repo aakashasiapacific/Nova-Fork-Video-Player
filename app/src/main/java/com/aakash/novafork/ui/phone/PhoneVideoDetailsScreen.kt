@@ -156,6 +156,9 @@ fun PhoneVideoDetailsScreen(
             if (details.collection.isNotEmpty()) {
                 item(key = "collection") { CollectionRow(details, actions) }
             }
+            if (details.extras.isNotEmpty()) {
+                item(key = "extras") { ExtrasRow(details, actions) }
+            }
             // An unidentified video is usually not a movie or show at all: no nagging card;
             // Identify stays in the ⋮ menu.
             item(key = "file") {
