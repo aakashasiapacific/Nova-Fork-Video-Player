@@ -5,12 +5,14 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -34,6 +36,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextStyle
@@ -41,6 +45,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
+import coil.request.videoFrameMillis
 import com.aakash.novafork.R
 import com.aakash.novafork.core.format.Formats
 import com.aakash.novafork.ui.common.playerGlass
@@ -63,6 +70,7 @@ internal fun ChapterOptions(state: PlayerUiState, actions: PlayerActions, onDism
         itemsIndexed(chapters, key = { index, chapter -> "$index:${chapter.startMs}" }) { index, chapter ->
             ChapterRow(
                 chapter = chapter,
+                frameSource = state.chapterFrameSource,
                 playing = index == current,
                 onClick = {
                     onDismiss()
@@ -74,7 +82,7 @@ internal fun ChapterOptions(state: PlayerUiState, actions: PlayerActions, onDism
 }
 
 @Composable
-private fun ChapterRow(chapter: ChapterUi, playing: Boolean, onClick: () -> Unit) {
+private fun ChapterRow(chapter: ChapterUi, frameSource: String?, playing: Boolean, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -95,6 +103,10 @@ private fun ChapterRow(chapter: ChapterUi, playing: Boolean, onClick: () -> Unit
             }
         }
         Spacer(Modifier.width(10.dp))
+        if (frameSource != null) {
+            ChapterPicture(frameSource, chapter.startMs)
+            Spacer(Modifier.width(12.dp))
+        }
         Text(
             text = chapter.name,
             style = MaterialTheme.typography.bodyLarge,
@@ -111,6 +123,42 @@ private fun ChapterRow(chapter: ChapterUi, playing: Boolean, onClick: () -> Unit
         )
     }
 }
+
+/**
+ * The video's frame at a chapter's start, small and rounded, grabbed lazily and cached by Coil.
+ * Gone altogether when the frame can't be read, so the row is the plain one.
+ */
+@Composable
+private fun ChapterPicture(frameSource: String, startMs: Long) {
+    val context = LocalContext.current
+    var failed by remember(frameSource, startMs) { mutableStateOf(false) }
+    if (failed) return
+    val request = remember(frameSource, startMs) {
+        // The frame time is part of the cache keys: every chapter is a different picture of one file.
+        ImageRequest.Builder(context)
+            .data(frameSource)
+            .videoFrameMillis(startMs)
+            .memoryCacheKey("$frameSource@$startMs")
+            .diskCacheKey("$frameSource@$startMs")
+            .size(ChapterPictureWidthPx, ChapterPictureHeightPx)
+            .build()
+    }
+    AsyncImage(
+        model = request,
+        contentDescription = null,
+        contentScale = ContentScale.Crop,
+        onError = { failed = true },
+        modifier = Modifier
+            .padding(vertical = 6.dp)
+            .width(76.dp)
+            .aspectRatio(16f / 9f)
+            .clip(RoundedCornerShape(8.dp))
+            .background(Color.White.copy(alpha = 0.08f)),
+    )
+}
+
+private const val ChapterPictureWidthPx = 256
+private const val ChapterPictureHeightPx = 144
 
 /** The chapter [positionMs] is in; -1 before the first one, or with no chapters. */
 internal fun currentChapterIndex(chapters: List<ChapterUi>, positionMs: Long): Int =

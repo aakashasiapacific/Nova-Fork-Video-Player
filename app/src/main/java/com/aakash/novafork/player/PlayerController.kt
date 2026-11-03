@@ -24,6 +24,7 @@ import com.aakash.novafork.core.opensubtitles.OpenSubtitlesLanguages
 import com.aakash.novafork.core.opensubtitles.SubtitleResult
 import com.aakash.novafork.core.smb.SmbUris
 import com.aakash.novafork.data.AspectMode
+import com.aakash.novafork.data.Connectivity
 import com.aakash.novafork.data.HwDecoding
 import com.aakash.novafork.data.Settings
 import com.aakash.novafork.data.SmbCredentials
@@ -754,6 +755,7 @@ class PlayerController(
                 subtitle = titles.subtitle,
                 overview = entry?.meta?.overview?.takeIf { text -> text.isNotBlank() },
                 finished = false,
+                chapterFrameSource = chapterFrameSourceOf(current),
             )
         }
         if (entry != null) {
@@ -965,6 +967,13 @@ class PlayerController(
         carried = null
         savedVideoTrack = null
         _videoSize.value = null
+    }
+
+    /** Where chapter pictures come from: the file itself when it is on this device (as for the scrub frames), else none. */
+    private fun chapterFrameSourceOf(playing: NowPlaying): String? = when (playing.kind) {
+        UriKind.CONTENT -> playing.uri
+        UriKind.FILE -> if (playing.uri.startsWith("/")) "file://${playing.uri}" else playing.uri
+        UriKind.SMB, UriKind.NETWORK -> null
     }
 
     private fun freshState(old: PlayerUiState, title: String): PlayerUiState = PlayerUiState(
@@ -2250,6 +2259,7 @@ class PlayerController(
         }
         refreshTracks()
         maybeDownloadSubtitles(embedded, external, remembered)
+        maybeFetchMissingSubtitles(embedded, external)
     }
 
     /**
@@ -2376,6 +2386,51 @@ class PlayerController(
                     GestureFeedback.Label("Couldn't download subtitles: ${SubtitleDownloadRules.errorMessage(e)}"),
                     MESSAGE_LABEL_MS,
                 )
+            }
+        }
+    }
+
+    /**
+     * With "Fetch missing subtitles" on (and the loud automatic download off): when the video has
+     * no subtitle in the first wanted language, fetches the best one and adds it to the subtitle
+     * menu, not turned on and without any message. Tried once per video; failures only reach the log.
+     */
+    private fun maybeFetchMissingSubtitles(embedded: List<MediaPlayer.TrackDescription>, external: List<File>) {
+        val current = nowPlaying ?: return
+        val settings = graph.settings.settings.value
+        if (!settings.fetchMissingSubtitles || settings.autoDownloadSubtitles || !subtitleDownloads.hasKey) return
+        if (!Connectivity(appContext).isOnline || subtitleDownloads.quietAttempted(current.videoKey)) return
+        val missing = SubtitleDownloadRules.quietLanguages(subtitleDownloads.languages(settings)) { language ->
+            val aliases = SubtitleDownloadRules.aliases(language)
+            embedded.any { TrackLanguages.matches(it.name, aliases) } ||
+                external.any { SubtitleDownloadRules.fileIsInLanguage(it.name, current.fileName, aliases) }
+        }
+        if (missing.isEmpty()) return
+        val forSession = session
+        autoSubtitleJob?.cancel()
+        autoSubtitleJob = scope.launch {
+            try {
+                val target = current.subtitleTarget
+                val best = when (val pick = subtitleDownloads.autoPick(target, missing)) {
+                    is SubtitleDownloadRules.AutoPick.Download -> pick.result
+                    SubtitleDownloadRules.AutoPick.Settle -> {
+                        subtitleDownloads.markQuietAttempt(current.videoKey)
+                        return@launch
+                    }
+                    // Not sure to fit yet: a later play, once the library matched the video, tries again.
+                    SubtitleDownloadRules.AutoPick.Later -> return@launch
+                }
+                subtitleDownloads.markQuietAttempt(current.videoKey)
+                val file = subtitleDownloads.download(target, best)
+                if (released || session != forSession || !mediaReady) return@launch
+                if (file.absolutePath !in addedSubtitleFiles && addSubtitleFile(file, select = false)) {
+                    PlayerDiagnostics.record("subtitles: fetched quietly")
+                    refreshTracks()
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.w(TAG, "Quiet subtitle fetch failed", e)
             }
         }
     }

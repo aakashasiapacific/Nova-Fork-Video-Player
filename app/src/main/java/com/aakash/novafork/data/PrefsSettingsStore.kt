@@ -73,6 +73,7 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
             putString(KEY_OPENSUBTITLES_PASSWORD, s.opensubtitlesPassword)
             putString(KEY_SUBTITLE_LANGUAGES, s.subtitleLanguages)
             putBoolean(KEY_AUTO_DOWNLOAD_SUBTITLES, s.autoDownloadSubtitles)
+            putBoolean(KEY_FETCH_MISSING_SUBTITLES, s.fetchMissingSubtitles)
             putFloat(KEY_GLASS_TINT, s.glassTint)
             putInt(KEY_CROSSFADE_SECONDS, s.crossfadeSeconds)
             putString(KEY_EQUALIZER_PRESET, s.equalizerPreset)
@@ -116,6 +117,7 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
         const val KEY_OPENSUBTITLES_PASSWORD = "opensubtitles_password"
         const val KEY_SUBTITLE_LANGUAGES = "subtitle_languages"
         const val KEY_AUTO_DOWNLOAD_SUBTITLES = "auto_download_subtitles"
+        const val KEY_FETCH_MISSING_SUBTITLES = "fetch_missing_subtitles"
         /** "_v2": the default moved to Tinted (owner), so a value saved under the old default is dropped. */
         const val KEY_GLASS_TINT = "glass_tint_v2"
         const val KEY_CROSSFADE_SECONDS = "crossfade_seconds"
@@ -156,6 +158,7 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
             KEY_OPENSUBTITLES_PASSWORD to SettingType.STRING,
             KEY_SUBTITLE_LANGUAGES to SettingType.STRING,
             KEY_AUTO_DOWNLOAD_SUBTITLES to SettingType.BOOLEAN,
+            KEY_FETCH_MISSING_SUBTITLES to SettingType.BOOLEAN,
             KEY_GLASS_TINT to SettingType.FLOAT,
             KEY_CROSSFADE_SECONDS to SettingType.INT,
             KEY_EQUALIZER_PRESET to SettingType.STRING,
@@ -213,6 +216,7 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
                 opensubtitlesPassword = prefs.string(KEY_OPENSUBTITLES_PASSWORD) ?: defaults.opensubtitlesPassword,
                 subtitleLanguages = prefs.string(KEY_SUBTITLE_LANGUAGES) ?: defaults.subtitleLanguages,
                 autoDownloadSubtitles = prefs.boolean(KEY_AUTO_DOWNLOAD_SUBTITLES, defaults.autoDownloadSubtitles),
+                fetchMissingSubtitles = prefs.boolean(KEY_FETCH_MISSING_SUBTITLES, defaults.fetchMissingSubtitles),
                 glassTint = prefs.float(KEY_GLASS_TINT, defaults.glassTint).coerceIn(0f, 1f),
                 crossfadeSeconds = prefs.int(KEY_CROSSFADE_SECONDS, defaults.crossfadeSeconds).coerceIn(0, 8),
                 equalizerPreset = prefs.string(KEY_EQUALIZER_PRESET) ?: defaults.equalizerPreset,

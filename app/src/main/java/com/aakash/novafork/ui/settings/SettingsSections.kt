@@ -522,12 +522,17 @@ private fun playerGroups(settings: Settings, actions: AppActions): List<Settings
             choiceRow("subtitle-language", R.drawable.ic_subtitles, "Subtitle language", TrackLanguages, settings.preferredSubtitleLanguage) { language ->
                 actions.updateSettings { it.copy(preferredSubtitleLanguage = language) }
             },
+            switchRow("fetch-missing-subtitles", R.drawable.ic_subtitles, "Fetch missing subtitles", settings.fetchMissingSubtitles) { on ->
+                actions.updateSettings { it.copy(fetchMissingSubtitles = on) }
+            },
             choiceRow("audio-language", R.drawable.ic_audiotrack, "Audio language", TrackLanguages, settings.preferredAudioLanguage) { language ->
                 actions.updateSettings { it.copy(preferredAudioLanguage = language) }
             },
         ),
         footer = "Auto-load picks up .srt and other subtitle files next to a video. Change the encoding if " +
-            "subtitles show garbled letters. The languages are chosen first when a video has several tracks.",
+            "subtitles show garbled letters. The languages are chosen first when a video has several tracks. " +
+            "Fetch missing subtitles adds one from OpenSubtitles to the subtitle menu, quietly, when a video has " +
+            "none in your language (needs the OpenSubtitles key in Subtitle downloads).",
     ),
     SettingsGroup(
         key = "subtitle-style",

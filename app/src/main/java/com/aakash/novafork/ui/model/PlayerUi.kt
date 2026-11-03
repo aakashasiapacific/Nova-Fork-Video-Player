@@ -182,6 +182,8 @@ data class PlayerUiState(
     val subtitleSearch: SubtitleSearchUi? = null,
     /** The file's chapters in order; empty when it has none (most files). */
     val chapters: List<ChapterUi> = emptyList(),
+    /** A file:// or content:// URI to grab chapter pictures from (files on the phone only, like [scrubFrame]); null = none. */
+    val chapterFrameSource: String? = null,
     /** Night mode (Settings.nightMode): voices lifted, booms softened. */
     val nightMode: Boolean = false,
     /** The equaliser is on (a preset or the person's own bands). */
