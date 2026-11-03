@@ -20,7 +20,7 @@ data class TmdbReleaseDates(val results: List<TmdbReleaseCountry> = emptyList())
             (releases.firstOrNull { it.type == THEATRICAL } ?: releases.firstOrNull())?.certification?.trim()
         }
 
-    private companion object {
+    companion object {
         const val THEATRICAL = 3
     }
 }
