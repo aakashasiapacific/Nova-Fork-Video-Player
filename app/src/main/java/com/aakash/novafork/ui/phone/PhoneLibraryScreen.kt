@@ -28,6 +28,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
 import com.aakash.novafork.ui.common.IosColors
@@ -76,23 +77,27 @@ fun PhoneLibraryScreen(
             },
             onBack = actions::back,
             actions = {
-                if (library.items.isNotEmpty()) {
-                    IosTextButton(onClick = { selection = if (selection == null) VideoSelection() else null }) {
-                        Text(if (selection == null) "Select" else "Done")
+                val picking = selection
+                if (picking != null) {
+                    // Selecting: only Done, so nothing crowds the title (owner).
+                    IosTextButton(onClick = { selection = null }) {
+                        Text("Done", fontWeight = FontWeight.SemiBold)
                     }
-                }
-                if (selection == null) IosIconButton(onClick = { actions.navigate(Route.Search) }) {
-                    NovaIcon(R.drawable.ic_search, contentDescription = "Search")
-                }
-                // What to show sits in this menu with the order (owner: not on the page itself).
-                // The Watchlist and Favorites pages are lists of their own, without it.
-                if (library.filter.isChip) {
-                    SortMenu(
-                        filter = library.filter,
-                        sort = library.sort,
-                        onFilter = actions::setLibraryFilter,
-                        onSort = actions::setLibrarySort,
-                    )
+                } else {
+                    IosIconButton(onClick = { actions.navigate(Route.Search) }) {
+                        NovaIcon(R.drawable.ic_search, contentDescription = "Search")
+                    }
+                    // What to show and Select sit in this menu with the order (owner: not on the page
+                    // itself). The Watchlist and Favorites pages are lists of their own, without it.
+                    if (library.filter.isChip) {
+                        SortMenu(
+                            filter = library.filter,
+                            sort = library.sort,
+                            onFilter = actions::setLibraryFilter,
+                            onSort = actions::setLibrarySort,
+                            onSelect = if (library.items.isNotEmpty()) ({ selection = VideoSelection() }) else null,
+                        )
+                    }
                 }
             },
         )
@@ -133,13 +138,27 @@ private fun SortMenu(
     sort: LibrarySort,
     onFilter: (LibraryFilter) -> Unit,
     onSort: (LibrarySort) -> Unit,
+    /** Starts picking videos (Select), when there are any. */
+    onSelect: (() -> Unit)? = null,
 ) {
     var expanded by remember { mutableStateOf(false) }
     Box {
         IosIconButton(onClick = { expanded = true }) {
             NovaIcon(R.drawable.ic_sort, contentDescription = "Sort")
         }
-        NovaDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }, title = "Show") {
+        NovaDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            if (onSelect != null) {
+                NovaMenuItem(
+                    text = { Text("Select Videos") },
+                    leadingIcon = { NovaIcon(R.drawable.ic_check_circle, contentDescription = null) },
+                    onClick = {
+                        expanded = false
+                        onSelect()
+                    },
+                )
+                NovaMenuDivider()
+            }
+            MenuHeading("Show")
             LibraryFilter.entries.filter { it.isChip }.forEach { option ->
                 NovaMenuItem(
                     text = { Text(option.label) },
