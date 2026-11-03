@@ -235,6 +235,8 @@ object UiMappers {
      */
     fun duplicates(index: LibraryIndex): List<LibraryItemUi> =
         index.videos
+            // A trailer named after its film is a bonus, not a second copy.
+            .filter { it.id !in index.extraIds }
             .groupBy(::duplicateKey)
             .filterKeys { it != null }
             .values
