@@ -16,6 +16,7 @@ import com.aakash.novafork.data.SettingsStore
 import com.aakash.novafork.data.SmbBrowser
 import com.aakash.novafork.data.SourceModule
 import com.aakash.novafork.data.SourceScanner
+import com.aakash.novafork.data.TitleExtras
 import com.aakash.novafork.data.backup.PendingRestore
 import com.aakash.novafork.data.db.NovaDatabase
 import com.aakash.novafork.data.db.SourceType
@@ -64,6 +65,9 @@ class AppGraph(val app: Application) {
             language = { settings.settings.value.tmdbLanguage },
         )
     }
+
+    /** Age ratings and next episode dates from TMDB, cached for the details pages. */
+    val titleExtras: TitleExtras by lazy { TitleExtras(app, tmdb, appScope) }
 
     val smb: SmbBrowser by lazy {
         SmbBrowserImpl(credentialsFor = { host, share -> library.smbCredentials(host, share) })

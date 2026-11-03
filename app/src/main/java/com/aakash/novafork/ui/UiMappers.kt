@@ -1,6 +1,7 @@
 package com.aakash.novafork.ui
 
 import com.aakash.novafork.core.format.Formats
+import com.aakash.novafork.core.format.QualityBadges
 import com.aakash.novafork.core.library.VideoFiles
 import com.aakash.novafork.core.smb.SmbUris
 import com.aakash.novafork.core.tmdb.TmdbClient
@@ -451,6 +452,7 @@ object UiMappers {
             location = locationOf(item),
             sizeLabel = video.sizeBytes?.takeIf { it > 0 }?.let(Formats::size),
             resolutionLabel = resolutionLabel(video.width, video.height),
+            qualityBadges = QualityBadges.of(video.width, video.height),
             sourceLabel = item.source?.let(::sourceLabel).orEmpty(),
             isMatched = meta != null,
             starring = meta?.castNames.nonBlank(),

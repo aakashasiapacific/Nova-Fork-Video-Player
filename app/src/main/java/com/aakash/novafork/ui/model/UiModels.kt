@@ -266,6 +266,10 @@ data class VideoDetailsUi(
     val downloadable: Boolean = false,
     /** A device (MediaStore) or SMB file the app can rename on disk: shows "Rename File…". */
     val renamable: Boolean = false,
+    /** "4K", "HD", "5.1"…: only what the stored file facts say for sure (see QualityBadges). */
+    val qualityBadges: List<String> = emptyList(),
+    /** A movie's age rating ("PG-13") once TMDB has told; null until known. */
+    val ageRating: String? = null,
 )
 
 @Immutable
@@ -317,6 +321,10 @@ data class ShowDetailsUi(
     val lastWatched: String? = null,
     /** More Like This: the library's titles closest to this show, best first. */
     val moreLikeThis: List<LibraryItemUi> = emptyList(),
+    /** The show's age rating ("TV-MA") once TMDB has told; null until known. */
+    val ageRating: String? = null,
+    /** "New episode Fri, 7 Nov" when TMDB knows the next air date and it is not past; null otherwise. */
+    val nextEpisodeLabel: String? = null,
 )
 
 /** One video of the watch history: its card and when it was last played. */

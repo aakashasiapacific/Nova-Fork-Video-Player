@@ -82,6 +82,18 @@ class TmdbClient(
     suspend fun tv(id: Int): TmdbTvDetails =
         get("tv/$id", detailParams(), TmdbTvDetails.serializer()).let { it.copy(logoPath = it.images.logo(logoLanguage())) }
 
+    /** The age rating of a movie ("PG-13") for [country], else the US one; null when TMDB has none. */
+    suspend fun movieCertification(id: Int, country: String): String? =
+        get("movie/$id/release_dates", emptyList(), TmdbReleaseDates.serializer()).certification(country)
+
+    /** The age rating of a show ("TV-MA") for [country], else the US one; null when TMDB has none. */
+    suspend fun tvCertification(id: Int, country: String): String? =
+        get("tv/$id/content_ratings", emptyList(), TmdbContentRatings.serializer()).certification(country)
+
+    /** The episode of a show that TMDB says airs next (see [TmdbEpisode.airDate]), or null. */
+    suspend fun tvNextEpisode(id: Int): TmdbEpisode? =
+        get("tv/$id", listOf("language" to language()), TmdbTvNextEpisode.serializer()).nextEpisodeToAir
+
     private fun logoLanguage(): String = language().substringBefore('-').lowercase()
 
     /** Every poster and backdrop TMDB has for a title, for "Change artwork" (any language). */

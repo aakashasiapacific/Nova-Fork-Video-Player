@@ -3,6 +3,7 @@ package com.aakash.novafork.ui
 import android.app.Application
 import android.content.ContentResolver
 import android.net.Uri
+import android.text.format.DateFormat
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -13,6 +14,7 @@ import com.aakash.novafork.core.jellyfin.ServerSecrets
 import com.aakash.novafork.core.library.LibraryKeys
 import com.aakash.novafork.core.plex.PlexResource
 import com.aakash.novafork.core.smb.SmbUris
+import com.aakash.novafork.core.tmdb.NextEpisodeLabel
 import com.aakash.novafork.core.tmdb.TmdbDisabledException
 import com.aakash.novafork.core.tmdb.TmdbException
 import com.aakash.novafork.data.IdentifyType
@@ -65,12 +67,14 @@ import com.aakash.novafork.ui.model.Route
 import com.aakash.novafork.ui.model.SearchUi
 import com.aakash.novafork.ui.model.ServerLibraryUi
 import com.aakash.novafork.ui.model.SettingsUi
+import com.aakash.novafork.ui.model.ShowDetailsUi
 import com.aakash.novafork.ui.model.SmbForm
 import com.aakash.novafork.ui.model.SourceUi
 import com.aakash.novafork.ui.model.SpaceUsage
 import com.aakash.novafork.ui.model.StoredFile
 import com.aakash.novafork.ui.model.TopDestination
 import com.aakash.novafork.ui.model.UpnpServerUi
+import com.aakash.novafork.ui.model.VideoDetailsUi
 import com.aakash.novafork.ui.model.WatchStats
 import com.aakash.novafork.ui.model.spaceByFolder
 import com.aakash.novafork.ui.model.watchStats
@@ -78,6 +82,8 @@ import com.aakash.novafork.ui.model.withRecentSearch
 import java.io.FileNotFoundException
 import java.io.IOException
 import java.io.OutputStream
+import java.time.LocalDate
+import java.util.Locale
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
@@ -266,7 +272,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
         library.scanState,
         settingsStore.settings,
         local,
-        combine(playlists, musicLibrary, watchlist, videoFavorites) { lists, music, saved, starred ->
+        // The last input only makes the page rebuild when a rating or air date arrives (see TitleExtras).
+        combine(playlists, musicLibrary, watchlist, videoFavorites, graph.titleExtras.changes) { lists, music, saved, starred, _ ->
             Saved(lists, music, saved, starred)
         },
     ) { index, scan, settings, user, extra ->
@@ -387,8 +394,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
             },
             browse = browse,
             browseDir = (route as? Route.BrowseDir)?.let { browseDirFor(index, it, user.listings, scan) },
-            videoDetails = videoId?.let { UiMappers.videoDetails(index, it) },
-            showDetails = showKey?.let { UiMappers.showDetails(index, it) },
+            videoDetails = videoId?.let { withAgeRating(index, it, UiMappers.videoDetails(index, it)) },
+            showDetails = showKey?.let { withShowExtras(index, it, UiMappers.showDetails(index, it)) },
             previewKey = previewKey,
             history = if (route == Route.History) UiMappers.history(index, user.historyHidden) else emptyList(),
             playlist = openPlaylist?.let { UiMappers.playlistDetails(index, it.id, it.name, lists.openVideoIds) },
@@ -409,6 +416,29 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
             dialog = user.dialog,
             message = user.message,
             crashReport = user.crashReport,
+        )
+    }
+
+    /** A movie's page with its cached age rating; asks TMDB for it when it isn't cached. */
+    private fun withAgeRating(index: LibraryIndex, videoId: Long, details: VideoDetailsUi?): VideoDetailsUi? {
+        val key = index.videosById[videoId]?.takeIf { it.kind == MediaKind.MOVIE }?.meta?.key
+        if (details == null || key == null) return details
+        graph.titleExtras.request(key)
+        return details.copy(ageRating = graph.titleExtras.certification(key))
+    }
+
+    /** A show's page with its cached age rating and next episode date; asks TMDB for what isn't cached. */
+    private fun withShowExtras(index: LibraryIndex, showKey: String, details: ShowDetailsUi?): ShowDetailsUi? {
+        val key = index.showsByKey[showKey]?.meta?.key
+        if (details == null || key == null) return details
+        val extras = graph.titleExtras
+        extras.request(key)
+        val locale = Locale.getDefault()
+        return details.copy(
+            ageRating = extras.certification(key),
+            nextEpisodeLabel = NextEpisodeLabel.of(extras.nextAirDate(key), LocalDate.now(), locale) { skeleton ->
+                DateFormat.getBestDateTimePattern(locale, skeleton)
+            },
         )
     }
 

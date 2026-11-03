@@ -84,6 +84,7 @@ import com.aakash.novafork.ui.common.Hairline
 import com.aakash.novafork.ui.common.HeroTitle
 import com.aakash.novafork.ui.common.IosColors
 import com.aakash.novafork.ui.common.IosIconButton
+import com.aakash.novafork.ui.common.MetaBadges
 import com.aakash.novafork.ui.common.NovaDropdownMenu
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.PictureStatusBar
@@ -333,6 +334,10 @@ internal fun PhoneDetailsHeader(
     originalTitle: String? = null,
     maxBackdropHeight: Dp = Dp.Infinity,
     scrolled: () -> Float = { 0f },
+    /** Outlined tags after [meta]: age rating, "4K"… */
+    badges: List<String> = emptyList(),
+    /** A line under the genres, e.g. "New episode Fri, 7 Nov". */
+    note: String? = null,
 ) {
     // The backdrop melts into the page's tint (see rememberDetailsTint) rather than ending in black.
     BackdropPosterHeader(
@@ -363,13 +368,19 @@ internal fun PhoneDetailsHeader(
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        if (meta.isNotEmpty()) {
+        if (meta.isNotEmpty() || badges.isNotEmpty()) {
             Spacer(Modifier.height(4.dp))
-            Text(
-                text = meta,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (meta.isNotEmpty()) {
+                    Text(
+                        text = meta,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.weight(1f, fill = false),
+                    )
+                }
+                MetaBadges(badges)
+            }
         }
         if (rating != null && rating > 0f) {
             Spacer(Modifier.height(8.dp))
@@ -383,6 +394,14 @@ internal fun PhoneDetailsHeader(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
+            )
+        }
+        if (!note.isNullOrBlank()) {
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = note,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurface,
             )
         }
     }
