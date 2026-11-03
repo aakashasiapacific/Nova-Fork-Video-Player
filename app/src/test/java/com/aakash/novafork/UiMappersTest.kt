@@ -107,6 +107,32 @@ class UiMappersTest {
     }
 
     @Test
+    fun upNextIsTheNextUnwatchedEpisodeOfShowsBeingWatched() {
+        // The Office has watched episodes and nothing partly watched; Severance and Panchayat are
+        // in Continue Watching already, Shōgun was never started.
+        val upNext = index.home.upNext
+        assertEquals(listOf(OFFICE_S2E4), upNext.map { it.id })
+        assertEquals("S2 · E4", upNext.single().subtitle)
+        assertEquals("The Fire", upNext.single().title)
+        assertTrue(upNext.none { it.id in index.home.continueWatching.map { card -> card.id } })
+    }
+
+    @Test
+    fun upNextOrdersByLatestActivityAndIsCapped() {
+        // Twenty shows, each with episode 1 watched; the later the show was watched, the earlier it comes.
+        val rows = (1..20).flatMap { n ->
+            val key = "name:show$n"
+            listOf(
+                row(episode(id = n * 10L, season = 1, episode = 1, lastPlayedAt = n * 1_000L).copy(showKey = key, parsedTitle = "Show $n", watched = true)),
+                row(episode(id = n * 10L + 1, season = 1, episode = 2).copy(showKey = key, parsedTitle = "Show $n")),
+            )
+        }
+        val upNext = UiMappers.home(LibraryIndex.build(rows, listOf(nas), preferLocalArtwork = false)).upNext
+        assertEquals(15, upNext.size)
+        assertEquals(listOf(201L, 191L, 181L), upNext.take(3).map { it.id })
+    }
+
+    @Test
     fun homeRows() {
         val home = index.home
         assertFalse(home.isEmpty)
@@ -143,10 +169,10 @@ class UiMappersTest {
             hero.map { it.target },
         )
         val dune = hero[0]
-        assertEquals("Resume", dune.playLabel)
+        assertEquals("Resume · 1h 41m left", dune.playLabel)
         assertEquals("2024 · 2h 47m · Science Fiction, Adventure", dune.metaLine)
         val severance = hero[1]
-        assertEquals("Resume S2 · E3", severance.playLabel)
+        assertEquals("Resume · 20m left", severance.playLabel)
         assertEquals(SEVERANCE_S2E3, severance.playVideoId)
         assertEquals("S2 · E3 · Who Is Alive?", severance.metaLine)
         assertEquals("Play S1 · E1", hero[4].playLabel)
@@ -357,7 +383,7 @@ class UiMappersTest {
         assertEquals(listOf("E1", "E2", "E3", "E4"), details.seasons[1].episodes.map { it.code })
         assertEquals("https://image.tmdb.org/t/p/w500/severance-s2.jpg", details.seasons[1].posterUrl)
         assertEquals(SEVERANCE_S2E3, details.nextUp?.videoId)
-        assertEquals("Resume S2 · E3", details.playLabel)
+        assertEquals("Resume · 20m left", details.playLabel)
         assertTrue(details.isMatched)
     }
 
@@ -517,7 +543,7 @@ class UiMappersTest {
         assertEquals("Long live the fighters.", dune.tagline)
         assertEquals("2h 47m", dune.runtimeLabel)
         assertEquals(listOf("Science Fiction", "Adventure"), dune.genres)
-        assertEquals("Resume from 1:05:12", dune.playLabel)
+        assertEquals("Resume · 1h 41m left", dune.playLabel)
         assertEquals("Movies › Sci-Fi", dune.location)
         assertEquals("18.4 GB", dune.sizeLabel)
         assertEquals("3840×1606 · 4K", dune.resolutionLabel)
@@ -536,7 +562,7 @@ class UiMappersTest {
         assertEquals("2025-01-31", episode.airDate)
         assertEquals(2025, episode.year)
         assertEquals("52m", episode.runtimeLabel)
-        assertEquals("Resume from 31:40", episode.playLabel)
+        assertEquals("Resume · 20m left", episode.playLabel)
         assertEquals(SEVERANCE_S2E4, episode.nextEpisode?.id)
         assertEquals("NAS · Media › TV/Severance/Season 2", episode.location)
         assertNull("show taglines are not episode taglines", episode.tagline)

@@ -33,12 +33,9 @@ import com.aakash.novafork.ui.theme.NovaColors
  */
 @Composable
 fun HomeLibraryLinks(actions: AppActions, modifier: Modifier = Modifier, counts: LibraryCounts = LibraryCounts()) {
-    val dims = LocalNovaDimens.current
-    Column(modifier.fillMaxWidth().padding(top = dims.sectionSpacing)) {
-        SectionHeader(
-            title = "Library",
-            modifier = Modifier.padding(start = dims.gutter, end = 4.dp, bottom = 4.dp),
-        )
+    Column(modifier.fillMaxWidth().padding(top = HomeSectionGap)) {
+        // The rows carry their own padding, so less than the usual gap sits under the title.
+        HomeSectionHeader(title = "Library", gapBelow = HomeHeaderGap - 8.dp)
         LibraryLink(R.drawable.ic_star, "Favorites", count = counts.favorites) { actions.openLibrary(LibraryFilter.FAVORITES) }
         LibraryLink(R.drawable.ic_video_library, "All Videos", count = counts.all) {
             actions.openLibrary(LibraryFilter.ALL)

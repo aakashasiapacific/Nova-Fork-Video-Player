@@ -18,6 +18,7 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsDraggedAsState
@@ -84,6 +85,7 @@ import androidx.compose.ui.unit.dp
 import coil.imageLoader
 import coil.request.ImageRequest
 import com.aakash.novafork.R
+import com.aakash.novafork.data.HeroStyle
 import com.aakash.novafork.ui.adaptive.LocalDeviceLayout
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
 import com.aakash.novafork.ui.audio.coverColors
@@ -96,14 +98,14 @@ import com.aakash.novafork.ui.common.IosButton
 import com.aakash.novafork.ui.common.IosColors
 import com.aakash.novafork.ui.common.IosIconButton
 import com.aakash.novafork.ui.common.LocalGlassTint
+import com.aakash.novafork.ui.common.LocalHeroStyle
 import com.aakash.novafork.ui.common.Motion
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.PosterArt
-import com.aakash.novafork.ui.common.RatingPill
 import com.aakash.novafork.ui.common.glassRim
+import com.aakash.novafork.ui.common.metaLine
 import com.aakash.novafork.ui.common.popOnChange
 import com.aakash.novafork.ui.common.pressScale
-import com.aakash.novafork.ui.common.resumeFill
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.Artwork
 import com.aakash.novafork.ui.model.HeroTarget
@@ -111,6 +113,7 @@ import com.aakash.novafork.ui.model.HeroUi
 import com.aakash.novafork.ui.theme.IosPalette
 import com.aakash.novafork.ui.theme.NovaColors
 import kotlinx.coroutines.delay
+import java.util.Locale
 
 /** A hero without a preview moves on after this long, like Apple TV's. */
 internal const val HERO_AUTO_ADVANCE_MS = 3_500L
@@ -128,10 +131,11 @@ private val DotsRowHeight = 44.dp
 
 /**
  * The Home hero: from the very top of the screen (under a clear status bar) down to [height],
- * swiped page by page. On a phone each page looks like the title's own page: backdrop on top,
- * poster with title, meta line and highlight beside it, then a white Play pill and a round "+"
- * (watchlist). The dots are white and grey, the active one a pill that fills as the
- * auto-advance timer runs; the mute button for clips sits at the end of their row.
+ * swiped page by page. On a phone each page follows Preferences › Appearance › Home hero
+ * ([HeroStyle]): the full-bleed backdrop with the title over its foot, a large poster on a dimmed
+ * wash of the backdrop, or the backdrop with the poster card inset beside the title; then the
+ * Play pill, the star and the round "+" (watchlist). The dots are thin and quiet, the active one
+ * white; the mute button for clips sits at the end of their row.
  *
  * [wide] (tablets, landscape phones): the backdrop fills the hero and the title, logo and
  * buttons sit at the lower left, as on the iPad.
@@ -219,7 +223,6 @@ internal fun PhoneHeroPager(
                 PagerDots(
                     count = heroes.size,
                     current = pagerState.currentPage,
-                    fill = timer.value,
                     modifier = Modifier.align(Alignment.Center),
                 )
             }
@@ -312,25 +315,15 @@ private fun PhoneHeroPage(hero: HeroUi, preview: Boolean, muted: Boolean, action
                 maxWidthFraction = if (wide) 0.8f else 0.72f,
                 logoHeight = if (wide) 110.dp else 96.dp,
             )
-            val rating = hero.rating
-            val meta = hero.metaLine
-            if ((rating != null && rating > 0f) || !meta.isNullOrBlank()) {
-                Row(
-                    Modifier.padding(top = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    RatingPill(rating, onImage = true)
-                    if (!meta.isNullOrBlank()) {
-                        Text(
-                            text = meta,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = Color.White.copy(alpha = 0.72f),
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                }
+            heroMeta(hero)?.let { meta ->
+                Text(
+                    text = meta,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color.White.copy(alpha = 0.72f),
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = 10.dp),
+                )
             }
             highlightOf(hero)?.let { highlight ->
                 Text(
@@ -372,9 +365,10 @@ private fun PhoneHeroPage(hero: HeroUi, preview: Boolean, muted: Boolean, action
 }
 
 /**
- * The phone hero in the style of a title's own page (the owner's pick): the landscape backdrop
- * across the top, fading into the black page, then the poster on the left with the title (its
- * logo when TMDB has one), meta line and highlight beside it, and the Play pill and "+" below.
+ * The phone hero, by Preferences › Appearance › Home hero: [HeroStyle.BACKDROP] (Apple TV: the
+ * backdrop full-bleed, title and meta over its foot), [HeroStyle.POSTER] (a large poster on a
+ * dimmed wash of the backdrop) or [HeroStyle.BOTH] (the title page's header: backdrop, then the
+ * poster on the left with the title beside it). The Play pill and "+" sit below in all three.
  */
 @Composable
 private fun DetailsStyleHeroPage(
@@ -390,12 +384,12 @@ private fun DetailsStyleHeroPage(
         FrameHeroPage(hero = hero, openTarget = openTarget, play = play, actions = actions)
         return
     }
+    val style = LocalHeroStyle.current
     // The page behind the hero carries on the backdrop's own colour (owner: the poster's clashed
     // with the backdrop): the shade of the backdrop's foot, fading into black above Continue
     // Watching, so the picture flows into it.
     val tint = rememberArtTint(hero.artwork.backdropUrl ?: hero.artwork.stillUrl ?: hero.artwork.posterUrl)
     val shown by animateColorAsState(tint, tween(600), label = "heroTint")
-    // The same header as the title's own page, so opening it keeps everything in place.
     Column(
         Modifier
             .fillMaxSize()
@@ -410,54 +404,10 @@ private fun DetailsStyleHeroPage(
             )
             .clickable(onClickLabel = "Details", onClick = openTarget),
     ) {
-        BackdropPosterHeader(
-            artwork = hero.artwork,
-            title = hero.title,
-            drift = true,
-            fadeTo = Color.Transparent,
-        ) {
-            HeroTitle(
-                title = hero.title,
-                logoUrl = hero.artwork.logoUrl,
-                textStyle = MaterialTheme.typography.headlineSmall,
-                textAlign = TextAlign.Start,
-                logoAlignment = Alignment.BottomStart,
-                maxWidthFraction = 1f,
-                logoHeight = 48.dp,
-            )
-            val meta = hero.metaLine
-            if (!meta.isNullOrBlank()) {
-                Text(
-                    text = meta,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Color.White.copy(alpha = 0.72f),
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(top = 4.dp),
-                )
-            }
-            // Rating and "Continue Watching" share a line, so the block stays short.
-            val rating = hero.rating
-            val highlight = highlightOf(hero)
-            if ((rating != null && rating > 0f) || highlight != null) {
-                Row(
-                    Modifier.padding(top = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    RatingPill(rating, onImage = true)
-                    if (highlight != null) {
-                        Text(
-                            text = highlight,
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                }
-            }
+        when (style) {
+            HeroStyle.BACKDROP -> BackdropHeroHeader(hero)
+            HeroStyle.POSTER -> PosterHeroHeader(hero)
+            HeroStyle.BOTH -> BothHeroHeader(hero)
         }
         HeroActions(
             hero = hero,
@@ -466,6 +416,180 @@ private fun DetailsStyleHeroPage(
             fillPlay = true,
             modifier = Modifier.padding(start = dims.gutter, end = dims.gutter, top = HeroActionsGap),
         )
+    }
+}
+
+/** The one meta line: "★ 8.2 · 2024 · 2h 47m · Drama" (the rating as plain text); null when empty. */
+private fun heroMeta(hero: HeroUi): String? {
+    val rating = hero.rating?.takeIf { it > 0f }?.let { String.format(Locale.US, "★ %.1f", it) }
+    return metaLine(rating, hero.metaLine).ifEmpty { null }
+}
+
+/** Fades the picture drawn in this layer out towards its foot (a mask), so it melts into the tint below. */
+private fun Modifier.fadeOutFoot(from: Float): Modifier = this
+    .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+    .drawWithContent {
+        drawContent()
+        drawRect(Brush.verticalGradient(from to Color.Black, 1f to Color.Transparent), blendMode = BlendMode.DstIn)
+    }
+
+/** Apple TV's hero: the backdrop fills the width and a square below the status bar; the title and meta sit over its foot. */
+@Composable
+private fun BackdropHeroHeader(hero: HeroUi) {
+    val dims = LocalNovaDimens.current
+    val statusBar = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        Box(Modifier.fillMaxWidth().height(backdropHeaderHeight(statusBar, maxWidth))) {
+            Box(Modifier.fillMaxSize().fadeOutFoot(from = 0.7f)) {
+                PortraitHeroArt(artwork = hero.artwork, modifier = Modifier.fillMaxSize().slowZoom())
+                // Under the text: darker towards the foot.
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(
+                                0f to Color.Transparent,
+                                0.45f to Color.Transparent,
+                                0.9f to Color.Black.copy(alpha = 0.7f),
+                            ),
+                        ),
+                )
+            }
+            Column(
+                Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .padding(start = dims.gutter, end = dims.gutter, bottom = 12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                HeroTitle(
+                    title = hero.title,
+                    logoUrl = hero.artwork.logoUrl,
+                    textStyle = MaterialTheme.typography.headlineMedium,
+                    textAlign = TextAlign.Center,
+                    logoAlignment = Alignment.BottomCenter,
+                    maxWidthFraction = 0.7f,
+                    logoHeight = 84.dp,
+                )
+                heroMeta(hero)?.let { meta ->
+                    Text(
+                        text = meta,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.White.copy(alpha = 0.78f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(top = 6.dp),
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** A large centred poster on a dark, blurred wash of the backdrop, with the title and meta under it. */
+@Composable
+private fun PosterHeroHeader(hero: HeroUi) {
+    val dims = LocalNovaDimens.current
+    val statusBar = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    val posterShape = RoundedCornerShape(dims.cardRadius)
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val posterWidth = heroPosterWidth(maxWidth)
+        Box(Modifier.fillMaxWidth().height(posterHeaderHeight(statusBar, maxWidth))) {
+            Box(Modifier.fillMaxSize().fadeOutFoot(from = 0.75f)) {
+                WideHeroArt(artwork = hero.artwork, modifier = Modifier.fillMaxSize().blur(40.dp))
+                Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.55f)))
+            }
+            Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+                Spacer(Modifier.height(statusBar + PosterTop))
+                Box(
+                    Modifier
+                        .width(posterWidth)
+                        .aspectRatio(2f / 3f)
+                        .shadow(16.dp, posterShape)
+                        .clip(posterShape)
+                        .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                        .border(1.dp, Color.White.copy(alpha = 0.12f), posterShape),
+                ) {
+                    PosterArt(artwork = hero.artwork, title = hero.title, modifier = Modifier.fillMaxSize())
+                }
+                Column(
+                    Modifier
+                        .padding(top = PosterTitleGap)
+                        .height(PosterTitleBlock)
+                        .padding(horizontal = dims.gutter),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                ) {
+                    HeroTitle(
+                        title = hero.title,
+                        logoUrl = hero.artwork.logoUrl,
+                        textStyle = MaterialTheme.typography.headlineSmall,
+                        textAlign = TextAlign.Center,
+                        logoAlignment = Alignment.BottomCenter,
+                        maxWidthFraction = 0.7f,
+                        logoHeight = 52.dp,
+                    )
+                    heroMeta(hero)?.let { meta ->
+                        Text(
+                            text = meta,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Color.White.copy(alpha = 0.72f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(top = 4.dp),
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** Today's layout: the backdrop, then the poster card on the left with the title and meta beside it. */
+@Composable
+private fun BothHeroHeader(hero: HeroUi) {
+    BackdropPosterHeader(
+        artwork = hero.artwork,
+        title = hero.title,
+        drift = true,
+        fadeTo = Color.Transparent,
+    ) {
+        HeroTitle(
+            title = hero.title,
+            logoUrl = hero.artwork.logoUrl,
+            textStyle = MaterialTheme.typography.headlineSmall,
+            textAlign = TextAlign.Start,
+            logoAlignment = Alignment.BottomStart,
+            maxWidthFraction = 1f,
+            logoHeight = 48.dp,
+        )
+        heroMeta(hero)?.let { meta ->
+            Text(
+                text = meta,
+                style = MaterialTheme.typography.bodyMedium,
+                color = Color.White.copy(alpha = 0.72f),
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+        }
+    }
+}
+
+/** Portrait key art when TMDB has it, else the backdrop, cropped from the top: what fills a square hero. */
+@Composable
+private fun PortraitHeroArt(artwork: Artwork, modifier: Modifier = Modifier) {
+    val candidates = listOfNotNull(artwork.tallUrl, artwork.backdropUrl, artwork.stillUrl, artwork.frameSource, artwork.posterUrl).distinct()
+    ArtImage(
+        candidates = candidates,
+        contentDescription = null,
+        modifier = modifier,
+        frameSource = artwork.frameSource,
+        alignment = Alignment.TopCenter,
+    ) {
+        ArtPlaceholder(seed = artwork.seed, title = null, modifier = Modifier.fillMaxSize())
     }
 }
 
@@ -534,14 +658,34 @@ private val HeroButtonHeight = 50.dp
 /** The dots sit this far under the Play row (owner: no empty band under the hero). */
 private val HeroDotsGap = 16.dp
 
+/** The Play row, then the dots (centred in their row, which ends [HeroDotsBottom] above the hero's bottom). */
+private val HeroFoot = HeroActionsGap + HeroButtonHeight + HeroDotsGap + DotsRowHeight / 2 + HeroDotsBottom
+
+private val PosterTop = 12.dp
+private val PosterTitleGap = 14.dp
+private val PosterTitleBlock = 84.dp
+
+/** The Backdrop hero's picture: a square below the status bar's top (it runs under the bar). */
+private fun backdropHeaderHeight(statusBar: Dp, width: Dp): Dp = statusBar + width
+
+private fun heroPosterWidth(width: Dp): Dp = minOf(width * 0.56f, 260.dp)
+
+private fun posterHeaderHeight(statusBar: Dp, width: Dp): Dp =
+    statusBar + PosterTop + heroPosterWidth(width) * 1.5f + PosterTitleGap + PosterTitleBlock
+
 /**
- * How tall the phone hero is below its 16:9 backdrop, sized to what is in it and no more: the
- * poster's part under the backdrop, the Play row, then the dots (centred in their row, which
- * ends [HeroDotsBottom] above the hero's bottom). The hero's height is the status bar plus
- * width × 9/16 plus this.
+ * How tall the phone hero is in portrait, sized to what is in it and no more: with
+ * [HeroStyle.BOTH] the status bar plus the 16:9 backdrop plus the poster's part under it
+ * ([heroBelowBackdrop]); the other styles their own header; then the Play row and the dots.
  */
-internal fun heroBelowBackdrop(posterWidth: Dp): Dp =
-    posterWidth * 1.5f - PosterOverlap + HeroActionsGap + HeroButtonHeight + HeroDotsGap + DotsRowHeight / 2 + HeroDotsBottom
+internal fun heroHeightFor(style: HeroStyle, statusBar: Dp, width: Dp, posterWidth: Dp): Dp = when (style) {
+    HeroStyle.BOTH -> statusBar + width * 9f / 16f + heroBelowBackdrop(posterWidth)
+    HeroStyle.BACKDROP -> backdropHeaderHeight(statusBar, width) + HeroFoot
+    HeroStyle.POSTER -> posterHeaderHeight(statusBar, width) + HeroFoot
+}
+
+/** What [HeroStyle.BOTH] needs below its 16:9 backdrop: the poster's part under it, the Play row, the dots. */
+internal fun heroBelowBackdrop(posterWidth: Dp): Dp = posterWidth * 1.5f - PosterOverlap + HeroFoot
 
 /**
  * The hero's buttons: the blue Play pill, a round star (Favorites) and a round "+" (Watchlist).
@@ -563,8 +707,7 @@ private fun HeroActions(
             interactionSource = playPress,
             modifier = (if (fillPlay) Modifier.weight(1f) else Modifier.widthIn(min = 160.dp, max = 240.dp))
                 .height(50.dp)
-                .pressScale(playPress)
-                .resumeFill(hero.progress),
+                .pressScale(playPress),
             colors = ButtonDefaults.buttonColors(containerColor = NovaColors.IosBlue, contentColor = Color.White),
             contentPadding = PaddingValues(horizontal = 16.dp),
         ) {
@@ -671,43 +814,29 @@ private fun WideHeroArt(artwork: Artwork, modifier: Modifier = Modifier, alignme
     }
 }
 
-/** The bold line under the meta line: Apple TV's "#1 in Comedy"; ours says where you are. */
-private fun highlightOf(hero: HeroUi): String? {
-    val progress = hero.progress
-    return when {
-        progress != null && progress > 0f -> "Continue Watching"
-        hero.onWatchlist -> "On your Watchlist"
-        else -> null
-    }
-}
+/** The bold line under the meta line on a wide hero: Apple TV's "#1 in Comedy"; ours says it is on your Watchlist. */
+private fun highlightOf(hero: HeroUi): String? = if (hero.onWatchlist) "On your Watchlist" else null
 
-/** White and grey only: the active dot stretches into a pill that fills as the timer runs. */
+/** Thin iOS page dots: the current one white, the rest 30% white. */
 @Composable
-private fun PagerDots(count: Int, current: Int, fill: Float, modifier: Modifier = Modifier) {
+private fun PagerDots(count: Int, current: Int, modifier: Modifier = Modifier) {
     Row(
         modifier,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        horizontalArrangement = Arrangement.spacedBy(7.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         repeat(count) { index ->
-            val selected = index == current
-            val width by animateDpAsState(if (selected) 22.dp else 6.dp, label = "pagerDot")
+            val color by animateColorAsState(
+                if (index == current) Color.White else Color.White.copy(alpha = 0.3f),
+                Motion.press(),
+                label = "pagerDot",
+            )
             Box(
                 Modifier
-                    .height(6.dp)
-                    .width(width)
+                    .size(5.dp)
                     .clip(CircleShape)
-                    .background(Color.White.copy(alpha = 0.35f)),
-            ) {
-                if (selected) {
-                    Box(
-                        Modifier
-                            .fillMaxHeight()
-                            .fillMaxWidth(fill.coerceIn(0.15f, 1f))
-                            .background(Color.White),
-                    )
-                }
-            }
+                    .background(color),
+            )
         }
     }
 }

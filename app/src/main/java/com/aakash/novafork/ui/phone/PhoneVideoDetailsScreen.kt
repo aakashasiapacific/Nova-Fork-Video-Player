@@ -57,7 +57,6 @@ import com.aakash.novafork.ui.common.RollingText
 import com.aakash.novafork.ui.common.SectionHeader
 import com.aakash.novafork.ui.common.metaLine
 import com.aakash.novafork.ui.common.rememberEndsAt
-import com.aakash.novafork.ui.common.resumeFill
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.MediaKind
 import com.aakash.novafork.ui.model.VideoDetailsUi
@@ -230,9 +229,7 @@ private fun PlaySection(details: VideoDetailsUi, actions: AppActions, modifier: 
                 onClick = { actions.play(details.id) },
                 modifier = Modifier
                     .weight(1f)
-                    .height(52.dp)
-                    // How far it was watched shows in the button itself, as on Apple TV.
-                    .resumeFill(details.progress),
+                    .height(52.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = rememberPlayColor(details.artwork, NovaColors.IosBlue),
                     contentColor = Color.White,

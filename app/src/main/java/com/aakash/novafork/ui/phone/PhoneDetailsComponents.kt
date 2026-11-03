@@ -87,7 +87,9 @@ import com.aakash.novafork.ui.common.BackdropArt
 import com.aakash.novafork.ui.common.Hairline
 import com.aakash.novafork.ui.common.HeroTitle
 import com.aakash.novafork.ui.common.IosColors
+import com.aakash.novafork.data.DetailsHeaderStyle
 import com.aakash.novafork.ui.common.IosIconButton
+import com.aakash.novafork.ui.common.LocalDetailsHeaderStyle
 import com.aakash.novafork.ui.common.MetaBadges
 import com.aakash.novafork.ui.common.Motion
 import com.aakash.novafork.ui.common.NovaDropdownMenu
@@ -112,7 +114,8 @@ internal fun detailsBackdropHeight(pageHeight: Dp): Dp = pageHeight * 0.5f
  * the backdrop at 16:9 (at most [maxBackdropHeight]) below the status bar, with a sliver of it
  * running under the bar (unshaded: the bar's icons follow the picture, [DetailsStatusBar]), fading
  * into the page; the poster reaching [PosterOverlap] up into
- * the faded edge; [info] beside the poster, starting below the picture.
+ * the faded edge; [info] beside the poster, starting below the picture. Without the poster
+ * ([showPoster] false) [info] sits over the foot of the backdrop instead.
  */
 @Composable
 internal fun BackdropPosterHeader(
@@ -128,6 +131,8 @@ internal fun BackdropPosterHeader(
     scrolled: () -> Float = { 0f },
     /** A title's page: holding the poster shows it large ([ArtViewer]). */
     enlargePoster: Boolean = false,
+    /** False (Preferences › Title page header › Backdrop): no poster; [info] sits over the backdrop's foot. */
+    showPoster: Boolean = true,
     info: @Composable ColumnScope.() -> Unit,
 ) {
     val dims = LocalNovaDimens.current
@@ -187,6 +192,31 @@ internal fun BackdropPosterHeader(
                         ),
                     ),
             )
+        }
+        if (!showPoster) {
+            Box(Modifier.fillMaxWidth().height(backdropHeight)) {
+                // Darker towards the foot, so the white text reads over any picture.
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(
+                                0f to Color.Transparent,
+                                0.4f to Color.Transparent,
+                                0.8f to Color.Black.copy(alpha = 0.6f),
+                                1f to Color.Black.copy(alpha = 0.3f),
+                            ),
+                        ),
+                )
+                Column(
+                    Modifier
+                        .align(Alignment.BottomStart)
+                        .fillMaxWidth()
+                        .padding(start = dims.gutter, end = dims.gutter, bottom = 14.dp),
+                    content = info,
+                )
+            }
+            return@BoxWithConstraints
         }
         Row(
             Modifier
@@ -344,6 +374,9 @@ internal fun PhoneDetailsHeader(
     /** A line under the genres, e.g. "New episode Fri, 7 Nov". */
     note: String? = null,
 ) {
+    // Backdrop: the title and meta sit over the picture, so their colours are the picture's.
+    val overImage = LocalDetailsHeaderStyle.current == DetailsHeaderStyle.BACKDROP
+    val secondary = if (overImage) Color.White.copy(alpha = 0.78f) else MaterialTheme.colorScheme.onSurfaceVariant
     // The backdrop melts into the page's tint (see rememberDetailsTint) rather than ending in black.
     BackdropPosterHeader(
         artwork = artwork,
@@ -353,6 +386,7 @@ internal fun PhoneDetailsHeader(
         fadeTo = Color.Transparent,
         scrolled = scrolled,
         enlargePoster = true,
+        showPoster = !overImage,
     ) {
         // The title's TMDB logo, as on Home's hero (owner): the same artwork on both pages.
         HeroTitle(
@@ -368,7 +402,7 @@ internal fun PhoneDetailsHeader(
             Text(
                 text = originalTitle,
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = secondary,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -380,7 +414,7 @@ internal fun PhoneDetailsHeader(
                     Text(
                         text = meta,
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = secondary,
                         modifier = Modifier.weight(1f, fill = false),
                     )
                 }
@@ -389,14 +423,14 @@ internal fun PhoneDetailsHeader(
         }
         if (rating != null && rating > 0f) {
             Spacer(Modifier.height(8.dp))
-            RatingPill(rating)
+            RatingPill(rating, onImage = overImage)
         }
         if (genres.isNotEmpty()) {
             Spacer(Modifier.height(8.dp))
             Text(
                 text = genres.joinToString(", "),
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = secondary,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -406,7 +440,7 @@ internal fun PhoneDetailsHeader(
             Text(
                 text = note,
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurface,
+                color = if (overImage) Color.White else MaterialTheme.colorScheme.onSurface,
             )
         }
     }

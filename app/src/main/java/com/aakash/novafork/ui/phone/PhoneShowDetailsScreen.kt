@@ -57,7 +57,6 @@ import com.aakash.novafork.ui.common.NovaMenuItem
 import com.aakash.novafork.ui.common.SectionHeader
 import com.aakash.novafork.ui.common.VideoMenuBox
 import com.aakash.novafork.ui.common.metaLine
-import com.aakash.novafork.ui.common.resumeFill
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.EpisodeUi
 import com.aakash.novafork.ui.model.ShowDetailsUi
@@ -122,8 +121,7 @@ fun PhoneShowDetailsScreen(
                         enabled = nextUp != null,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(52.dp)
-                            .resumeFill(nextUp?.progress),
+                            .height(52.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = rememberPlayColor(details.artwork, MaterialTheme.colorScheme.primary),
                             contentColor = Color.White,

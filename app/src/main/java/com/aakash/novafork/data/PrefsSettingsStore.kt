@@ -87,6 +87,8 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
             putBoolean(KEY_HAPTICS, s.haptics)
             putBoolean(KEY_PIP_ON_LEAVE, s.pipOnLeave)
             putBoolean(KEY_REQUIRE_FINGERPRINT, s.requireFingerprint)
+            putString(KEY_HERO_STYLE, s.heroStyle.name)
+            putString(KEY_DETAILS_HEADER_STYLE, s.detailsHeaderStyle.name)
         }
     }
 
@@ -136,6 +138,8 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
         const val KEY_HAPTICS = "haptics"
         const val KEY_PIP_ON_LEAVE = "pip_on_leave"
         const val KEY_REQUIRE_FINGERPRINT = "require_fingerprint"
+        const val KEY_HERO_STYLE = "hero_style"
+        const val KEY_DETAILS_HEADER_STYLE = "details_header_style"
 
         /**
          * The type [write] stores each key with. A restored backup's entry of another type is
@@ -180,6 +184,8 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
             KEY_HAPTICS to SettingType.BOOLEAN,
             KEY_PIP_ON_LEAVE to SettingType.BOOLEAN,
             KEY_REQUIRE_FINGERPRINT to SettingType.BOOLEAN,
+            KEY_HERO_STYLE to SettingType.STRING,
+            KEY_DETAILS_HEADER_STYLE to SettingType.STRING,
         )
 
         /**
@@ -242,6 +248,8 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
                 haptics = prefs.boolean(KEY_HAPTICS, defaults.haptics),
                 pipOnLeave = prefs.boolean(KEY_PIP_ON_LEAVE, defaults.pipOnLeave),
                 requireFingerprint = prefs.boolean(KEY_REQUIRE_FINGERPRINT, defaults.requireFingerprint),
+                heroStyle = enumOrDefault(prefs.string(KEY_HERO_STYLE), defaults.heroStyle),
+                detailsHeaderStyle = enumOrDefault(prefs.string(KEY_DETAILS_HEADER_STYLE), defaults.detailsHeaderStyle),
             )
         }
 

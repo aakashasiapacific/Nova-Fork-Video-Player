@@ -89,7 +89,6 @@ import com.aakash.novafork.ui.common.EndOfListGap
 import com.aakash.novafork.ui.common.HeroTitle
 import com.aakash.novafork.ui.common.HideStatusBar
 import com.aakash.novafork.ui.common.HomeLibraryLinks
-import com.aakash.novafork.ui.common.IosColors
 import com.aakash.novafork.ui.common.IosFilledTonalButton
 import com.aakash.novafork.ui.common.LocalBottomBarSpace
 import com.aakash.novafork.ui.common.LocalHeroPreviewEnabled
@@ -100,7 +99,9 @@ import com.aakash.novafork.ui.common.OnTabReselect
 import com.aakash.novafork.ui.common.PictureStatusBar
 import com.aakash.novafork.ui.common.RatingPill
 import com.aakash.novafork.ui.common.ScanBanner
-import com.aakash.novafork.ui.common.SectionHeader
+import com.aakash.novafork.ui.common.HomeSectionGap
+import com.aakash.novafork.ui.common.LocalHeroStyle
+import com.aakash.novafork.ui.common.HomeSectionHeader
 import com.aakash.novafork.ui.common.SoftEdgeDepth
 import com.aakash.novafork.ui.common.ShowMenuBox
 import com.aakash.novafork.ui.common.VideoMenuBox
@@ -235,7 +236,7 @@ private fun HomeFeed(home: HomeUi, scan: ScanUi, permission: PermissionUi, actio
         // Portrait: the 16:9 backdrop with the poster, title and Play under it; landscape: wide.
         val portrait = maxWidth <= maxHeight
         val statusBar = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-        val heroHeight = if (portrait) statusBar + maxWidth * 9f / 16f + heroBelowBackdrop(dims.detailPosterWidth) else maxHeight * 0.85f
+        val heroHeight = if (portrait) heroHeightFor(LocalHeroStyle.current, statusBar, maxWidth, dims.detailPosterWidth) else maxHeight * 0.85f
         LazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize(),
@@ -281,11 +282,18 @@ private fun HomeFeed(home: HomeUi, scan: ScanUi, permission: PermissionUi, actio
                     }
                 }
             }
+            if (home.upNext.isNotEmpty()) {
+                item(key = "upNext", contentType = "landscapeRow") {
+                    HomeSection(title = "Up Next", topPadding = if (home.continueWatching.isEmpty()) 0.dp else null) {
+                        UpNextRow(home.upNext, actions)
+                    }
+                }
+            }
             if (home.watchlist.isNotEmpty()) {
                 item(key = "watchlist", contentType = "landscapeRow") {
                     HomeSection(
                         title = "Watchlist",
-                        topPadding = if (home.continueWatching.isEmpty()) 0.dp else null,
+                        topPadding = if (home.continueWatching.isEmpty() && home.upNext.isEmpty()) 0.dp else null,
                         onOpen = { actions.openLibrary(LibraryFilter.WATCHLIST) },
                     ) {
                         WatchlistRow(home.watchlist, actions)
@@ -376,42 +384,14 @@ private fun HomeRestView(hero: HeroUi?, resting: Boolean) {
 @Composable
 private fun HomeSection(
     title: String,
-    onSeeAll: (() -> Unit)? = null,
     /** Space above the title; null = the usual gap between sections. */
     topPadding: Dp? = null,
     /** The whole list behind the row: the title then reads "Watchlist ›" and opens it (Apple TV). */
     onOpen: (() -> Unit)? = null,
     content: @Composable () -> Unit,
 ) {
-    val dims = LocalNovaDimens.current
-    Column(Modifier.fillMaxWidth().padding(top = topPadding ?: dims.sectionSpacing)) {
-        if (onOpen != null) {
-            Row(
-                Modifier
-                    .padding(start = dims.gutter - 4.dp, bottom = 6.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .clickable(onClickLabel = "Open $title", onClick = onOpen)
-                    .padding(horizontal = 4.dp, vertical = 2.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(title, style = MaterialTheme.typography.titleLarge, maxLines = 1)
-                NovaIcon(
-                    R.drawable.ic_chevron_right,
-                    contentDescription = null,
-                    tint = IosColors.SecondaryLabel,
-                    modifier = Modifier.padding(start = 2.dp).size(20.dp),
-                )
-            }
-        } else {
-            SectionHeader(
-                title = title,
-                modifier = Modifier
-                    .padding(start = dims.gutter, end = 4.dp)
-                    .padding(bottom = if (onSeeAll == null) 10.dp else 0.dp),
-                actionLabel = if (onSeeAll != null) "See all" else null,
-                onAction = onSeeAll,
-            )
-        }
+    Column(Modifier.fillMaxWidth().padding(top = topPadding ?: HomeSectionGap)) {
+        HomeSectionHeader(title = title, onOpen = onOpen)
         content()
     }
 }
@@ -447,6 +427,29 @@ private fun WatchlistRow(items: List<LibraryItemUi>, actions: AppActions) {
 internal fun continueCaption(card: VideoCardUi): String? {
     val left = remainingLabel(card) ?: return card.displaySubtitle()
     return if (card.kind == MediaKind.EPISODE) metaLine(card.displaySubtitle(), left).ifEmpty { null } else left
+}
+
+/** The next episode of each show being watched: plays on a tap, captioned "S2 · E4 · Title". */
+@Composable
+private fun UpNextRow(cards: List<VideoCardUi>, actions: AppActions) {
+    val dims = LocalNovaDimens.current
+    val rowState = rememberLazyListState()
+    LazyRow(
+        state = rowState,
+        flingBehavior = rememberRowSnap(rowState),
+        // The card peeking in at the end fades into the page (iOS 27).
+        modifier = Modifier.fadeEndEdge(rowState),
+        contentPadding = PaddingValues(horizontal = dims.gutter),
+        horizontalArrangement = Arrangement.spacedBy(dims.rowSpacing),
+    ) {
+        itemsIndexed(cards, key = { _, card -> card.id }) { index, card ->
+            CompositionLocalProvider(LocalCardParallax provides remember(rowState, index) { rowState.parallaxAt(index) }) {
+                VideoMenuBox(videoId = card.id, title = card.displayTitle(), actions = actions) { openMenu ->
+                    PhoneLandscapeCard(card = card, onClick = { actions.play(card.id) }, onLongClick = openMenu)
+                }
+            }
+        }
+    }
 }
 
 @Composable

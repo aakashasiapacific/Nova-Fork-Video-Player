@@ -15,6 +15,27 @@ enum class HwDecoding(val label: String) { AUTO("Automatic"), DISABLED("Software
 
 enum class ThemeMode(val label: String) { DARK("Dark"), LIGHT("Light"), SYSTEM("Follow system") }
 
+/** Preferences › Appearance › Home hero: what the Home hero's picture is made of. */
+enum class HeroStyle(val label: String) {
+    /** Apple TV: the full-bleed backdrop, title and meta over its foot; no poster card. */
+    BACKDROP("Backdrop"),
+
+    /** A large centred poster over a dimmed, blurred wash of the backdrop. */
+    POSTER("Poster"),
+
+    /** The backdrop with the poster card inset on the left, the title beside it. */
+    BOTH("Both"),
+}
+
+/** Preferences › Appearance › Title page header: the top of a movie, episode or show page. */
+enum class DetailsHeaderStyle(val label: String) {
+    /** The full-bleed backdrop with the title, meta and buttons over and below its foot. */
+    BACKDROP("Backdrop"),
+
+    /** The backdrop with the poster beside the title. */
+    POSTER_AND_BACKDROP("Poster and backdrop"),
+}
+
 /** Mirrors libVLC MediaPlayer.ScaleType, in the order the player's aspect button cycles through. */
 enum class AspectMode(val label: String) {
     BEST_FIT("Fit"),
@@ -111,6 +132,10 @@ data class Settings(
     val haptics: Boolean = true,
     /** Opening Hidden Videos asks for a fingerprint or the screen lock first. */
     val requireFingerprint: Boolean = false,
+    /** The Home hero's look; see [HeroStyle]. */
+    val heroStyle: HeroStyle = HeroStyle.BACKDROP,
+    /** The top of a title's page; see [DetailsHeaderStyle]. */
+    val detailsHeaderStyle: DetailsHeaderStyle = DetailsHeaderStyle.BACKDROP,
 )
 
 /** [Settings.equalizerPreset]'s value for the person's own band gains. */

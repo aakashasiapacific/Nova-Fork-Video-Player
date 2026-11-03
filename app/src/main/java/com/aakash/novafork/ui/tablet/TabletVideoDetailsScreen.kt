@@ -37,9 +37,11 @@ import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
 import com.aakash.novafork.ui.adaptive.DeviceLayout
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
+import com.aakash.novafork.data.DetailsHeaderStyle
 import com.aakash.novafork.ui.common.GlassCircle
 import com.aakash.novafork.ui.common.IosFilledTonalButton
 import com.aakash.novafork.ui.common.IosTextButton
+import com.aakash.novafork.ui.common.LocalDetailsHeaderStyle
 import com.aakash.novafork.ui.common.MetaBadges
 import com.aakash.novafork.ui.common.NovaDropdownMenu
 import com.aakash.novafork.ui.common.NovaIcon
@@ -67,6 +69,8 @@ internal fun TabletVideoDetailsScreen(
     modifier: Modifier = Modifier,
 ) {
     val dims = LocalNovaDimens.current
+    // Backdrop (Preferences › Appearance › Title page header): no poster beside the title.
+    val withPoster = LocalDetailsHeaderStyle.current == DetailsHeaderStyle.POSTER_AND_BACKDROP
     Box(modifier.fillMaxSize()) {
         TabletDetailsBackdrop(details.artwork)
         Column(
@@ -82,14 +86,14 @@ internal fun TabletVideoDetailsScreen(
                 ),
         ) {
             TabletBackButton(onClick = actions::back)
-            Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.height(if (withPoster) 20.dp else 96.dp))
             if (layout.isExpanded) {
                 Row(horizontalArrangement = Arrangement.spacedBy(40.dp)) {
                     Column(
                         Modifier.width(dims.detailPosterWidth),
                         verticalArrangement = Arrangement.spacedBy(20.dp),
                     ) {
-                        TabletDetailsPoster(details.artwork, details.title, dims.detailPosterWidth)
+                        if (withPoster) TabletDetailsPoster(details.artwork, details.title, dims.detailPosterWidth)
                         VideoFileCard(details, Modifier.fillMaxWidth())
                     }
                     Column(
@@ -104,8 +108,10 @@ internal fun TabletVideoDetailsScreen(
                 }
             } else {
                 Row(verticalAlignment = Alignment.Bottom) {
-                    TabletDetailsPoster(details.artwork, details.title, CompactDetailPosterWidth)
-                    Spacer(Modifier.width(28.dp))
+                    if (withPoster) {
+                        TabletDetailsPoster(details.artwork, details.title, CompactDetailPosterWidth)
+                        Spacer(Modifier.width(28.dp))
+                    }
                     Column(Modifier.weight(1f)) { VideoHeadline(details) }
                 }
                 Spacer(Modifier.height(28.dp))
