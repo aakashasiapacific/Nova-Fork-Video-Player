@@ -79,20 +79,18 @@ fun RatingPill(rating: Float?, modifier: Modifier = Modifier, onImage: Boolean =
     }
 }
 
-/**
- * Progress on a card, as Apple TV draws it: a rounded bar inset from the picture's bottom edge
- * on a translucent track. Draws nothing for null/0.
- */
+/** Progress on a card: a thin bar along the picture's bottom edge. Draws nothing for null/0. */
 @Composable
-fun ProgressStrip(progress: Float?, modifier: Modifier = Modifier, height: Dp = 4.dp) {
+fun ProgressStrip(progress: Float?, modifier: Modifier = Modifier, height: Dp = 3.dp) {
     if (progress == null || progress <= 0f) return
+    // Owner: along the very bottom edge of the picture, edge to edge (Apple TV, Netflix), not a
+    // floating capsule inside it. The card's rounded corners clip its ends. A dark track keeps the
+    // unwatched part readable over bright art.
     Box(
         modifier
-            .padding(horizontal = 8.dp, vertical = 7.dp)
             .fillMaxWidth()
             .height(height)
-            .clip(CircleShape)
-            .background(Color.White.copy(alpha = 0.3f)),
+            .background(Color.Black.copy(alpha = 0.45f)),
     ) {
         Box(
             Modifier

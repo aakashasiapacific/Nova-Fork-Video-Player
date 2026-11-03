@@ -676,16 +676,6 @@ private fun PhoneNavigationBar(
     val haptics = LocalHapticFeedback.current
     val scope = rememberCoroutineScope()
     val tabs = TopDestination.entries
-    // iOS 26's liquid pill: the edge in front races to the new tab, the one behind follows a beat
-    // later, so the pill stretches as it travels and settles back into shape. In tab slots.
-    val index = tabs.indexOf(selected)
-    var lastIndex by remember { mutableIntStateOf(index) }
-    val forward = index >= lastIndex
-    SideEffect { lastIndex = index }
-    val fast = Motion.press<Float>()
-    val slow = Motion.content<Float>()
-    val pillLeft by animateFloatAsState(index.toFloat(), animationSpec = if (forward) slow else fast, label = "tabPillLeft")
-    val pillRight by animateFloatAsState(index + 1f, animationSpec = if (forward) fast else slow, label = "tabPillRight")
     Column(
         modifier
             .fillMaxWidth()
@@ -701,22 +691,7 @@ private fun PhoneNavigationBar(
                     val placeable = measurable.measure(constraints.copy(minHeight = height, maxHeight = height))
                     layout(placeable.width, height) { placeable.place(0, 0) }
                 }
-                .clipToBounds()
-                .drawBehind {
-                    val slot = size.width / tabs.size
-                    val inset = TabPillInset.toPx()
-                    val top = TabPillInsetVertical.toPx()
-                    val pillHeight = size.height - top * 2
-                    val pillWidth = (pillRight - pillLeft) * slot - inset * 2
-                    if (pillHeight > 0f && pillWidth > 0f) {
-                        drawRoundRect(
-                            color = TabPillColor,
-                            topLeft = Offset(pillLeft * slot + inset, top),
-                            size = Size(pillWidth, pillHeight),
-                            cornerRadius = CornerRadius(pillHeight / 2f, pillHeight / 2f),
-                        )
-                    }
-                },
+                .clipToBounds(),
         ) {
             tabs.forEach { tab ->
                 val active = tab == selected
@@ -725,8 +700,6 @@ private fun PhoneNavigationBar(
                     tab == TopDestination.AUDIO && audioTint != null -> audioTint
                     else -> tab.activeColor()
                 }
-                // iOS 17's symbol bounce: the tapped tab's icon dips and springs back.
-                val bounce = remember { Animatable(1f) }
                 Column(
                     Modifier
                         .weight(1f)
@@ -740,10 +713,6 @@ private fun PhoneNavigationBar(
                             indication = null,
                             onClick = {
                                 if (!active) haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                scope.launch {
-                                    bounce.snapTo(TabBounceFrom)
-                                    bounce.animateTo(1f, Motion.press())
-                                }
                                 onSelect(tab)
                             },
                             onLongClickLabel = if (tab == TopDestination.AUDIO && onHoldAudio != null) "Open Now Playing" else null,
@@ -760,13 +729,11 @@ private fun PhoneNavigationBar(
                     // From the top, so the icon stays put as the bar shortens under its name.
                     verticalArrangement = Arrangement.Top,
                 ) {
+                    // Owner: ultra fast and snappy. Tapping a tab only colours its icon and name;
+                    // nothing slides between tabs and nothing bounces.
                     val iconModifier = Modifier
                         .padding(top = TabIconTop)
                         .size(25.dp)
-                        .graphicsLayer {
-                            scaleX = bounce.value
-                            scaleY = bounce.value
-                        }
                     if (tab == TopDestination.AUDIO && musicPlaying) {
                         Box(iconModifier, contentAlignment = Alignment.Center) {
                             // Apple Music's red, on any tab (owner).
@@ -994,10 +961,6 @@ private val TabIconTop = 6.dp
 /** How far a tab's name sinks as it fades away. */
 private val TabLabelDrop = 6.dp
 
-/** The selected tab's glass pill: inset from its slot's sides and from the bar's top and bottom. */
-private val TabPillInset = 8.dp
-private val TabPillInsetVertical = 4.dp
-private val TabPillColor = Color.White.copy(alpha = 0.1f)
 
 /** Pulled up past this share of the screen (or flicked), the mini player opens Now Playing. */
 private const val MiniPullOpen = 0.18f
@@ -1006,8 +969,6 @@ private const val MiniFlingVelocity = 900f
 /** How far the docked mini player is swiped down before letting go stops the music. */
 private val MiniDismissDrag = 44.dp
 
-/** How small a tapped tab's icon dips before it springs back. */
-private const val TabBounceFrom = 0.8f
 
 /** iOS's dark tab bar material: near-black and a little see-through. */
 private val DockColor = Color(0xF2121214)

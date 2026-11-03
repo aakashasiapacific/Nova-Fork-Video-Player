@@ -214,15 +214,15 @@ private fun PosterCardLayout(
             Text(
                 text = searchHighlighted(title),
                 style = MaterialTheme.typography.titleSmall,
-                maxLines = 2,
+                maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            // Always present so cards in a row or grid line up.
+            // Always present, one line each (Apple TV), so cards in a row or grid line up tidily.
             Text(
                 text = subtitle.orEmpty(),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 2,
+                maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
             Spacer(Modifier.height(4.dp))
@@ -399,17 +399,17 @@ private fun WideCardLayout(
                     ),
             )
             if (watched) WatchedBadge(Modifier.align(Alignment.TopEnd).padding(6.dp))
-        if (newEpisode) NewEpisodeDot(Modifier.align(Alignment.TopStart).padding(8.dp))
+            if (newEpisode) NewEpisodeDot(Modifier.align(Alignment.TopStart).padding(8.dp))
             ProgressStrip(progress, Modifier.align(Alignment.BottomStart))
         }
         Spacer(Modifier.height(8.dp))
-        // Two lines of title and one of caption are always reserved, so every card in a row ends
-        // at the same height and the row neither jumps nor ragged-edges as titles change.
+        // One line of title and one of caption (Apple TV): every card in a row ends at the same
+        // height, with no empty line between a short title and its caption.
         Text(
             text = title,
             style = MaterialTheme.typography.titleSmall,
-            minLines = 2,
-            maxLines = 2,
+            minLines = 1,
+            maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
         if (rollingSubtitle) {

@@ -69,7 +69,7 @@ internal val TabletSideBarSpace = TabletSideBarWidth + 16.dp
 /**
  * iPhone Duo's tab bar on its big screen (owner): the four tabs stand in a slim glass bar along
  * the right edge, centred top to bottom, each an icon over its name; the chosen one in its
- * colour on a soft pill. Pages keep [TabletSideBarSpace] free on the right for it.
+ * colour. Pages keep [TabletSideBarSpace] free on the right for it.
  */
 @Composable
 internal fun TabletSideBar(
@@ -94,7 +94,7 @@ internal fun TabletSideBar(
                 Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(percent = 50))
-                    .background(if (active) Color.White.copy(alpha = 0.12f) else Color.Transparent)
+                    // Only the colour marks the chosen tab (owner: no pill).
                     .selectable(
                         selected = active,
                         role = Role.Tab,

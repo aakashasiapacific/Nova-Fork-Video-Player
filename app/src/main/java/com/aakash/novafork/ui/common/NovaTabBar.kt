@@ -105,22 +105,7 @@ internal fun NovaTabCapsule(selected: TopDestination, onSelect: (TopDestination)
         val slot = maxWidth / tabs.size
         val widthPx = constraints.maxWidth.toFloat().coerceAtLeast(1f)
         val active = dragX?.let { x -> (x / widthPx * tabs.size).toInt().coerceIn(0, tabs.lastIndex) } ?: tabs.indexOf(selected)
-        // iOS 26's liquid pill: the edge in front races to the new tab, the one behind follows a
-        // beat later, so the pill stretches as it travels and settles back into shape.
-        var lastActive by remember { mutableStateOf(active) }
-        val forward = active >= lastActive
-        SideEffect { lastActive = active }
-        val fast = Motion.press<Dp>()
-        val slow = Motion.content<Dp>()
-        val left by animateDpAsState(slot * active, animationSpec = if (forward) slow else fast, label = "tabPillLeft")
-        val right by animateDpAsState(slot * (active + 1), animationSpec = if (forward) fast else slow, label = "tabPillRight")
-        Box(
-            Modifier
-                .offset(x = left)
-                .size(width = (right - left).coerceAtLeast(slot * 0.5f), height = maxHeight)
-                .clip(RoundedCornerShape(percent = 50))
-                .background(SelectedPillColor),
-        )
+        // Owner: ultra fast and snappy. The chosen tab only takes its colour; no pill travels.
         Row(Modifier.fillMaxSize()) {
             tabs.forEachIndexed { index, tab ->
                 val isActive = index == active
@@ -231,7 +216,6 @@ private val PillInset = 5.dp
 private val GlassFill = Color(0xFF1C1C1E)
 private val RimWidth = 1.dp
 private const val PlayerMinTint = 0.8f
-private val SelectedPillColor = Color(0xFF3A3A3C)
 
 /**
  * The selected tab's colour, as the owner chose: Video, Search and Preferences iOS blue, Audio
@@ -240,36 +224,10 @@ private val SelectedPillColor = Color(0xFF3A3A3C)
 internal fun TopDestination.activeColor(): Color =
     if (this == TopDestination.AUDIO) NovaColors.AppleMusicRed else NovaColors.IosBlue
 
-/** A tab's icon; the selected one pops in with a short spring. */
+/** A tab's icon: the selected one in its colour, at once, with no movement (owner). */
 @Composable
 private fun TabIcon(tab: TopDestination, active: Boolean, tint: Color) {
-    val base by animateFloatAsState(
-        targetValue = if (active) 1f else 0.9f,
-        animationSpec = Motion.content(),
-        label = "tabIcon",
-    )
-    // The owner's tap bounce: one soft dip as the tab is chosen, then settling back; no overshoot.
-    val dip = remember { Animatable(1f) }
-    LaunchedEffect(active) {
-        if (active) {
-            dip.animateTo(0.88f, Motion.press())
-            dip.animateTo(1f, Motion.content())
-        } else {
-            dip.snapTo(1f)
-        }
-    }
-    val scale = base * dip.value
-    NovaIcon(
-        tab.tabIconRes(),
-        contentDescription = null,
-        tint = tint,
-        modifier = Modifier
-            .size(24.dp)
-            .graphicsLayer {
-                scaleX = scale
-                scaleY = scale
-            },
-    )
+    NovaIcon(tab.tabIconRes(), contentDescription = null, tint = tint, modifier = Modifier.size(24.dp))
 }
 
 @DrawableRes

@@ -325,7 +325,7 @@ internal fun TabletPosterCard(
                 watched -> WatchedBadge(Modifier.align(Alignment.TopEnd).padding(8.dp))
                 badge != null -> ImageLabel(badge, Modifier.align(Alignment.TopEnd).padding(8.dp), emphasized = true)
             }
-            ProgressStrip(progress, Modifier.align(Alignment.BottomCenter), height = 4.dp)
+            ProgressStrip(progress, Modifier.align(Alignment.BottomCenter))
         }
         Spacer(Modifier.height(10.dp))
         Text(
@@ -506,7 +506,7 @@ internal fun TabletLandscapeCard(
                     .background(NovaColors.IosBlue, CircleShape),
             )
         }
-        ProgressStrip(card.progress, Modifier.align(Alignment.BottomCenter), height = 4.dp)
+        ProgressStrip(card.progress, Modifier.align(Alignment.BottomCenter))
     }
 }
 
@@ -564,7 +564,7 @@ internal fun TabletStillCard(
             if (cornerLabel != null) {
                 ImageLabel(cornerLabel, Modifier.align(Alignment.BottomEnd).padding(start = 10.dp, end = 10.dp, bottom = 12.dp))
             }
-            ProgressStrip(progress, Modifier.align(Alignment.BottomCenter), height = 4.dp)
+            ProgressStrip(progress, Modifier.align(Alignment.BottomCenter))
         }
         Spacer(Modifier.height(10.dp))
         Text(
