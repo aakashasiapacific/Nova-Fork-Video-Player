@@ -21,7 +21,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
-import com.aakash.novafork.ui.common.EmptyState
 import com.aakash.novafork.ui.common.IosColors
 import com.aakash.novafork.ui.common.IosIconButton
 import com.aakash.novafork.ui.common.NovaDropdownMenu
@@ -156,47 +155,22 @@ private fun MenuHeading(text: String) {
 private fun LibraryEmpty(filter: LibraryFilter, actions: AppActions) {
     val content = emptyContentFor(filter)
     CenteredScrollable {
-        EmptyState(
-            icon = content.icon,
-            title = content.title,
-            body = content.body,
-            actionLabel = if (filter == LibraryFilter.ALL) "Add a Folder" else null,
-            onAction = if (filter == LibraryFilter.ALL) actions::addFolder else null,
+        PhoneEmptyLine(
+            text = content.title,
+            // Only a library with nothing at all has an obvious next step: a source to scan.
+            actionLabel = if (filter == LibraryFilter.ALL) "Add a source" else null,
+            onAction = if (filter == LibraryFilter.ALL) ({ actions.navigate(Route.Browse) }) else null,
         )
     }
 }
 
-private class EmptyContent(@DrawableRes val icon: Int, val title: String, val body: String)
+private class EmptyContent(val title: String)
 
 private fun emptyContentFor(filter: LibraryFilter): EmptyContent = when (filter) {
-    LibraryFilter.ALL -> EmptyContent(
-        R.drawable.ic_video_library,
-        "Nothing here yet",
-        "Videos from your device, folders and network shares show up here after a scan.",
-    )
-    LibraryFilter.MOVIES -> EmptyContent(
-        R.drawable.ic_movie,
-        "No movies yet",
-        "Movies are recognised from names like “Dune (2021).mkv”. Use Identify on a video to match it by hand.",
-    )
-    LibraryFilter.SHOWS -> EmptyContent(
-        R.drawable.ic_tv,
-        "No TV shows yet",
-        "Episodes are grouped into shows from names like “Show.S01E02.mkv”.",
-    )
-    LibraryFilter.VIDEOS -> EmptyContent(
-        R.drawable.ic_video_file,
-        "No other videos",
-        "Home videos, unidentified files and saved streams appear here.",
-    )
-    LibraryFilter.WATCHLIST -> EmptyContent(
-        R.drawable.ic_bookmark,
-        "Your Watchlist is empty",
-        "Tap + on the Home hero to save something for later.",
-    )
-    LibraryFilter.FAVORITES -> EmptyContent(
-        R.drawable.ic_star,
-        "No favorites yet",
-        "Tap the star on the Home hero to add a movie, show or video.",
-    )
+    LibraryFilter.ALL -> EmptyContent("Nothing here yet")
+    LibraryFilter.MOVIES -> EmptyContent("No movies yet")
+    LibraryFilter.SHOWS -> EmptyContent("No TV shows yet")
+    LibraryFilter.VIDEOS -> EmptyContent("No other videos")
+    LibraryFilter.WATCHLIST -> EmptyContent("Your Watchlist is empty")
+    LibraryFilter.FAVORITES -> EmptyContent("No favorites yet")
 }

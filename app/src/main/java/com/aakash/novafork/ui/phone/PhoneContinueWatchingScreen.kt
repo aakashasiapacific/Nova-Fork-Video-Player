@@ -15,7 +15,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
-import com.aakash.novafork.ui.common.EmptyState
 import com.aakash.novafork.ui.common.EndOfListGap
 import com.aakash.novafork.ui.common.LocalBottomBarSpace
 import com.aakash.novafork.ui.common.iosScrollIndicator
@@ -38,11 +37,7 @@ internal fun PhoneContinueWatchingScreen(
         PhoneTopBar(title = "Continue Watching", onBack = actions::back)
         if (cards.isEmpty()) {
             CenteredScrollable {
-                EmptyState(
-                    icon = R.drawable.ic_history,
-                    title = "Nothing in progress",
-                    body = "Videos you stop partway through show up here.",
-                )
+                PhoneEmptyLine("Nothing in progress")
             }
         } else {
             val state = rememberLazyGridState()

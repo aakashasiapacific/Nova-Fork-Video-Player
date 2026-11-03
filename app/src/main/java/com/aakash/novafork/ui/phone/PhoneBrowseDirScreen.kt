@@ -114,11 +114,7 @@ private fun BrowseDirContent(dir: BrowseDirUi, permission: PermissionUi, actions
             )
         }
         isEmpty -> CenteredScrollable {
-            EmptyState(
-                icon = R.drawable.ic_folder_open,
-                title = "No videos here",
-                body = "This folder has no videos or subfolders.",
-            )
+            PhoneEmptyLine("No videos in this folder")
         }
         else -> LazyColumn(
             modifier = Modifier.fillMaxSize(),

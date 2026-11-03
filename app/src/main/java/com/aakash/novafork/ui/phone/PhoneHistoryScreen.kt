@@ -15,7 +15,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
-import com.aakash.novafork.ui.common.EmptyState
 import com.aakash.novafork.ui.common.EndOfListGap
 import com.aakash.novafork.ui.common.IosColors
 import com.aakash.novafork.ui.common.LocalBottomBarSpace
@@ -42,11 +41,7 @@ internal fun PhoneHistoryScreen(
         PhoneTopBar(title = "History", onBack = actions::back)
         if (entries.isEmpty()) {
             CenteredScrollable {
-                EmptyState(
-                    icon = R.drawable.ic_history,
-                    title = "No History",
-                    body = "Videos you play show up here.",
-                )
+                PhoneEmptyLine("No history yet")
             }
         } else {
             val state = rememberLazyListState()
