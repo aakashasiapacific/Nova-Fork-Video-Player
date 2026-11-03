@@ -74,6 +74,13 @@ internal fun TrackSheet(
                         emptyText = "No audio tracks",
                         onSelect = actions::selectAudioTrack,
                     )
+                    // For earbuds that lag: kept per Bluetooth device.
+                    SubtitleDelayRow(
+                        delayMs = state.audioDelayMs,
+                        onChange = actions::setAudioDelay,
+                        title = "Audio delay",
+                        what = "the sound",
+                    )
                 }
                 TAB_SUBTITLES -> {
                     OptionHeader("Subtitles")

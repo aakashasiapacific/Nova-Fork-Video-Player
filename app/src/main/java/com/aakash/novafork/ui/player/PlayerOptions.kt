@@ -134,16 +134,22 @@ internal fun AddSubtitleRow(onClick: () -> Unit, modifier: Modifier = Modifier) 
 
 /** "Subtitle delay" with −/+ 100 ms steps; positive shows subtitles later. */
 @Composable
-internal fun SubtitleDelayRow(delayMs: Long, onChange: (Long) -> Unit, modifier: Modifier = Modifier) {
+internal fun SubtitleDelayRow(
+    delayMs: Long,
+    onChange: (Long) -> Unit,
+    modifier: Modifier = Modifier,
+    title: String = "Subtitle delay",
+    what: String = "subtitles",
+) {
     Column(modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-        Text(text = "Subtitle delay", style = MaterialTheme.typography.bodyLarge)
+        Text(text = title, style = MaterialTheme.typography.bodyLarge)
         Row(
             modifier = Modifier.padding(top = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             FilledTonalIconButton(
                 onClick = { onChange(delayMs - SUBTITLE_DELAY_STEP_MS) },
-                modifier = Modifier.semantics { contentDescription = "Show subtitles 100 ms earlier" },
+                modifier = Modifier.semantics { contentDescription = "Play $what 100 ms earlier" },
             ) {
                 Text(text = "−", style = MaterialTheme.typography.titleLarge)
             }
@@ -155,7 +161,7 @@ internal fun SubtitleDelayRow(delayMs: Long, onChange: (Long) -> Unit, modifier:
             )
             FilledTonalIconButton(
                 onClick = { onChange(delayMs + SUBTITLE_DELAY_STEP_MS) },
-                modifier = Modifier.semantics { contentDescription = "Show subtitles 100 ms later" },
+                modifier = Modifier.semantics { contentDescription = "Play $what 100 ms later" },
             ) {
                 Text(text = "+", style = MaterialTheme.typography.titleLarge)
             }

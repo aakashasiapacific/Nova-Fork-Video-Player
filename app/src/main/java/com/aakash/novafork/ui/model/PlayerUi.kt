@@ -134,6 +134,8 @@ data class PlayerUiState(
     /** 0.25 – 4.0 */
     val rate: Float = 1f,
     val subtitleDelayMs: Long = 0,
+    /** The sound's delay for the output playing (a Bluetooth device's own), ms; later when positive. */
+    val audioDelayMs: Long = 0,
     /** Lock: hides everything but an unlock button and ignores gestures. */
     val locked: Boolean = false,
     val inPictureInPicture: Boolean = false,
@@ -216,6 +218,7 @@ interface PlayerActions {
     /** Opens the system file picker for an external subtitle file. */
     fun pickSubtitleFile()
     fun setSubtitleDelay(delayMs: Long)
+    fun setAudioDelay(delayMs: Long) {}
 
     fun cycleAspect()
     fun setAspect(mode: AspectMode)

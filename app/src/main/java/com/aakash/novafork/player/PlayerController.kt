@@ -152,6 +152,7 @@ class PlayerController(
     private val subtitleDownloads = SubtitleDownloads(appContext, graph, subtitleFinder)
     private val subtitleDelays = SubtitleDelays(appContext)
     private val showPreferences = ShowPreferences(appContext)
+    private val audioDelays = AudioDelays(appContext)
     /** The playing episode's show, for what a show remembers (speed, audio language). */
     private var currentShowKey: String? = null
 
@@ -1323,6 +1324,14 @@ class PlayerController(
         }
     }
 
+    override fun setAudioDelay(delayMs: Long) {
+        if (released) return
+        // libVLC takes microseconds; kept for the Bluetooth device (or speaker) playing now.
+        mediaPlayer.setAudioDelay(delayMs * 1_000)
+        _state.update { it.copy(audioDelayMs = delayMs) }
+        audioDelays.set(audioDelays.currentOutput(), delayMs)
+    }
+
     override fun setSubtitleDelay(delayMs: Long) {
         if (released) return
         // libVLC takes microseconds.
@@ -1754,6 +1763,10 @@ class PlayerController(
         if (firstStart) {
             val rate = _state.value.rate
             if (rate != 1f) mediaPlayer.setRate(rate)
+            // The delay set for these earbuds (or the speaker) before.
+            val audioDelayMs = audioDelays.get(audioDelays.currentOutput())
+            if (audioDelayMs != 0L) mediaPlayer.setAudioDelay(audioDelayMs * 1_000)
+            _state.update { it.copy(audioDelayMs = audioDelayMs) }
             // libVLC keeps the delay per input: one set while opening (or carried over) applies now.
             val subtitleDelayMs = _state.value.subtitleDelayMs
             if (subtitleDelayMs != 0L) mediaPlayer.setSpuDelay(subtitleDelayMs * 1_000)
