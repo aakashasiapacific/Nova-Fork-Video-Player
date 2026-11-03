@@ -192,7 +192,8 @@ fun PhoneApp(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
     val menuDim by animateFloatAsState(if (menuFocus.value > 0) 1f else 0f, tween(220), label = "menuDim")
     val backSwipe = remember { BackSwipe() }
     val statusBarTop = WindowInsets.statusBars.getTop(LocalDensity.current).toFloat()
-    val statusFade = state.route != Route.Home
+    // Not over pictures that run up under the clock (Home's hero, a title's backdrop), nor over their buttons.
+    val statusFade = state.route != Route.Home && !state.route.isTitlePage()
     val tabReselect = remember { TabReselect() }
     // iOS 15's scroll edge: at the very end of a page the bars turn clear (their line goes too);
     // as soon as content scrolls back under them they are dark again.
