@@ -142,6 +142,8 @@ private fun libraryGroups(state: SettingsUi, actions: AppActions): List<Settings
             footer = "Looks for new, changed and removed videos in every source. Nova also does this quietly each time it opens.",
         ),
         downloadsGroup(actions),
+        storageGroup(state.space),
+        watchStatsGroup(state.watch),
         backupGroup(actions),
     )
 }
@@ -558,8 +560,12 @@ private fun playerGroups(settings: Settings, actions: AppActions): List<Settings
             choiceRow("crossfade", R.drawable.ic_music_notes, "Crossfade", CrossfadeChoices, settings.crossfadeSeconds) { seconds ->
                 actions.updateSettings { it.copy(crossfadeSeconds = seconds) }
             },
+            switchRow("music-autoplay", R.drawable.ic_repeat, "Autoplay", settings.musicAutoplay, tile = IosPalette.Pink) { on ->
+                actions.updateSettings { it.copy(musicAutoplay = on) }
+            },
         ),
-        footer = "Each song fades into the next over this many seconds. Off: songs follow with no gap.",
+        footer = "Each song fades into the next over this many seconds. Off: songs follow with no gap. " +
+            "Autoplay keeps the music going with similar songs from your library when the queue ends.",
     ),
 ) + subtitleDownloadGroups(settings, actions)
 

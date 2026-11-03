@@ -490,6 +490,10 @@ data class SettingsUi(
     val allFilesAccess: Boolean = false,
     /** Android 11+: the toggle opens the system screen. Older: covered by the storage permission. */
     val canRequestAllFilesAccess: Boolean = false,
+    /** Preferences' Storage group: the files by folder. Filled only while a settings page is open. */
+    val space: SpaceUsage = SpaceUsage(),
+    /** Preferences' Watch Stats group. Filled only while a settings page is open. */
+    val watch: WatchStats = WatchStats(),
 )
 
 @Immutable

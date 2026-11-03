@@ -1279,63 +1279,74 @@ private fun QueuePane(player: MusicPlayerState, actions: AudioActions, upNext: L
                     dragOffset += amount.y
                 }
             }
-            Row(
-                Modifier
-                    .onSizeChanged { rowHeight = it.height.toFloat().coerceAtLeast(1f) }
-                    .zIndex(if (dragged) 1f else 0f)
-                    .graphicsLayer {
-                        translationY = if (dragged) dragOffset else shift
-                        scaleX = lift
-                        scaleY = lift
-                        shadowElevation = if (dragged) 12.dp.toPx() else 0f
-                        shape = RoundedCornerShape(8.dp)
-                    }
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(if (dragged) Color.White.copy(alpha = 0.12f) else Color.Transparent)
-                    .then(reorder)
-                    .clickable { actions.skipAhead(index + 1) }
-                    .padding(vertical = 7.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Cover(MusicLibrary.artUri(song), size = 44, corner = 6)
-                Column(Modifier.weight(1f).padding(start = 12.dp)) {
-                    Text(song.title, fontSize = 16.sp, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Column {
+                if (index == player.autoplayFrom) {
                     Text(
-                        song.artist ?: song.albumArtist ?: "Unknown artist",
+                        "Autoplay",
                         fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
                         color = Color.White.copy(alpha = 0.6f),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(top = 12.dp, bottom = 4.dp),
                     )
                 }
-                // Apple Music's handle: dragging it moves the song straight away.
-                NovaIcon(
-                    R.drawable.ic_drag_handle,
-                    contentDescription = "Move ${song.title}",
-                    tint = Color.White.copy(alpha = 0.5f),
-                    modifier = Modifier
-                        .padding(start = 8.dp)
-                        .size(40.dp)
-                        .pointerInput(index, upNext.size) {
-                            detectVerticalDragGestures(
-                                onDragStart = {
-                                    dragFrom = index
-                                    dragOffset = 0f
-                                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                                },
-                                onDragEnd = { drop() },
-                                onDragCancel = {
-                                    dragFrom = -1
-                                    dragOffset = 0f
-                                },
-                            ) { change, amount ->
-                                change.consume()
-                                dragOffset += amount
-                            }
+                Row(
+                    Modifier
+                        .onSizeChanged { rowHeight = it.height.toFloat().coerceAtLeast(1f) }
+                        .zIndex(if (dragged) 1f else 0f)
+                        .graphicsLayer {
+                            translationY = if (dragged) dragOffset else shift
+                            scaleX = lift
+                            scaleY = lift
+                            shadowElevation = if (dragged) 12.dp.toPx() else 0f
+                            shape = RoundedCornerShape(8.dp)
                         }
-                        .padding(10.dp),
-                )
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(if (dragged) Color.White.copy(alpha = 0.12f) else Color.Transparent)
+                        .then(reorder)
+                        .clickable { actions.skipAhead(index + 1) }
+                        .padding(vertical = 7.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Cover(MusicLibrary.artUri(song), size = 44, corner = 6)
+                    Column(Modifier.weight(1f).padding(start = 12.dp)) {
+                        Text(song.title, fontSize = 16.sp, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(
+                            song.artist ?: song.albumArtist ?: "Unknown artist",
+                            fontSize = 13.sp,
+                            color = Color.White.copy(alpha = 0.6f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    // Apple Music's handle: dragging it moves the song straight away.
+                    NovaIcon(
+                        R.drawable.ic_drag_handle,
+                        contentDescription = "Move ${song.title}",
+                        tint = Color.White.copy(alpha = 0.5f),
+                        modifier = Modifier
+                            .padding(start = 8.dp)
+                            .size(40.dp)
+                            .pointerInput(index, upNext.size) {
+                                detectVerticalDragGestures(
+                                    onDragStart = {
+                                        dragFrom = index
+                                        dragOffset = 0f
+                                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    },
+                                    onDragEnd = { drop() },
+                                    onDragCancel = {
+                                        dragFrom = -1
+                                        dragOffset = 0f
+                                    },
+                                ) { change, amount ->
+                                    change.consume()
+                                    dragOffset += amount
+                                }
+                            }
+                            .padding(10.dp),
+                    )
+                }
             }
         }
         item(key = "stop") {

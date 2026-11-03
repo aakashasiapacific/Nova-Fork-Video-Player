@@ -32,6 +32,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
@@ -82,6 +83,9 @@ class MusicRepository(
     /** Shown songs grouped for the Audio tab; regrouped off the main thread on every change. */
     fun observeLibrary(): Flow<MusicLibraryData> =
         songDao.observeShown().map { MusicLibrary.build(it) }.flowOn(Dispatchers.Default)
+
+    /** The songs the library shows right now, once (Autoplay chooses from them). */
+    suspend fun shownSongs(): List<SongEntity> = songDao.observeShown().first()
 
     /**
      * Rescans whenever the local sources change (one added, removed, turned on or off), starting

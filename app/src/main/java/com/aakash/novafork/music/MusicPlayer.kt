@@ -12,6 +12,7 @@ import com.aakash.novafork.data.Settings
 import com.aakash.novafork.data.db.SongEntity
 import com.aakash.novafork.data.music.MusicLibrary
 import com.aakash.novafork.data.music.MusicRepository
+import com.aakash.novafork.data.music.SimilarSongs
 import com.aakash.novafork.player.AudioEffects
 import com.aakash.novafork.player.OpenedMedia
 import com.aakash.novafork.player.PlayQueue
@@ -89,6 +90,8 @@ data class MusicPlayerState(
     val restored: Boolean = false,
     /** The songs queued after this one, in play order (the first [UP_NEXT_LIMIT]); Now Playing's queue. */
     val upNext: List<Long> = emptyList(),
+    /** Where in [upNext] the songs Autoplay added begin (they sit under an "Autoplay" heading); -1 for none. */
+    val autoplayFrom: Int = -1,
 )
 
 /**
@@ -115,6 +118,12 @@ class MusicPlayer(
     /** Each queued song's album, so an album played in order is never crossfaded (gapless albums). */
     private val albumOf = HashMap<Long, String>()
     private val queue = PlayQueue().also { it.groupOf = { id -> artistOf[id] } }
+
+    /** The songs Autoplay added to this queue (Apple Music's infinity button), so Up Next can set them apart. */
+    private val autoplayIds = HashSet<Long>()
+
+    /** Autoplay choosing songs for the end of this song; set once per song, so it looks once. */
+    private var autoplayJob: Job? = null
     private var mediaPlayer: MediaPlayer? = null
     private var descriptor: ParcelFileDescriptor? = null
     private var loadJob: Job? = null
@@ -196,6 +205,7 @@ class MusicPlayer(
             null
         } ?: return
         if (_state.value.active) return
+        autoplayIds.clear()
         queue.set(ids, position, shuffle = false)
         pendingSeekMs = resumePrefs.getLong(KEY_POSITION_MS, 0L).coerceAtLeast(0L)
         val repeat = resumePrefs.getString(KEY_REPEAT, null)?.let { runCatching { RepeatMode.valueOf(it) }.getOrNull() } ?: RepeatMode.OFF
@@ -243,6 +253,7 @@ class MusicPlayer(
         artistOf.putAll(artists)
         albumOf.putAll(albums)
         if (songIds.isEmpty()) return
+        autoplayIds.clear()
         queue.set(songIds, startIndex, shuffle)
         pendingSeekMs = 0L
         _state.update { it.copy(active = true, isBuffering = true, playRequested = true, shuffle = shuffle, restored = false) }
@@ -352,6 +363,13 @@ class MusicPlayer(
         // What comes next may have changed: a crossfade or a song opened ahead starts again.
         cancelCrossfade()
         dropPreloaded()
+        // Autoplay's songs stay last: what the person queues goes before them, and Autoplay
+        // chooses again at the end.
+        val upcoming = queue.upNext(Int.MAX_VALUE).filter { it in autoplayIds }.toSet()
+        if (upcoming.isNotEmpty()) {
+            queue.remove(upcoming)
+            autoplayIds.removeAll(upcoming)
+        }
         queue.insert(songIds, next)
         _state.update { it.withQueue() }
         saveResume()
@@ -420,6 +438,9 @@ class MusicPlayer(
         descriptor.closeQuietly()
         descriptor = null
         queue.clear()
+        autoplayIds.clear()
+        autoplayJob?.cancel()
+        autoplayJob = null
         audio.release()
         SongPulses.clear()
         ended = false
@@ -443,6 +464,7 @@ class MusicPlayer(
         skipJob?.cancel()
         ended = false
         durationSaved = false
+        autoplayJob = null
         loadJob = scope.launch {
             val song = try {
                 music.song(songId)
@@ -610,6 +632,11 @@ class MusicPlayer(
                 moveTo(next)
                 return
             }
+            // Asleep at the queue's end: Autoplay doesn't carry on.
+            if (_state.value.repeat == RepeatMode.OFF) {
+                endQueue()
+                return
+            }
         }
         val repeat = _state.value.repeat
         if (repeat == RepeatMode.ONE) {
@@ -621,10 +648,58 @@ class MusicPlayer(
             moveTo(next)
             return
         }
-        // The end of the queue: the last song stays, ready to play again.
+        if (autoplayOn()) {
+            // Autoplay had no time to choose (or found nothing yet): it chooses now and plays on.
+            val earlier = autoplayJob
+            autoplayJob = scope.launch {
+                earlier?.join()
+                val songId = queue.currentId
+                if (queue.nextPosition(wrap = false) == null) extendWithAutoplay()
+                val following = queue.nextPosition(wrap = false)
+                if (following != null && queue.currentId == songId) moveTo(following) else endQueue()
+            }
+            return
+        }
+        endQueue()
+    }
+
+    /** The end of the queue: the last song stays, ready to play again. */
+    private fun endQueue() {
         ended = true
         audio.release()
         _state.update { it.copy(isPlaying = false, isBuffering = false, playRequested = false, positionMs = 0) }
+    }
+
+    /** Autoplay is on and the queue plays through once (repeat off), as Apple Music's infinity button needs. */
+    private fun autoplayOn() = settings().musicAutoplay && _state.value.repeat == RepeatMode.OFF
+
+    /**
+     * Autoplay: appends up to [AUTOPLAY_SONGS] songs of the library like the last ones queued (see
+     * [SimilarSongs]), none already in this queue. False when the library has none to add.
+     */
+    private suspend fun extendWithAutoplay(): Boolean {
+        val library = try {
+            music.shownSongs()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.w(TAG, "Autoplay couldn't read the library", e)
+            return false
+        }
+        val queued = queue.playOrder
+        val byId = library.associateBy { it.id }
+        val seeds = queued.takeLast(AUTOPLAY_SEEDS).mapNotNull { byId[it] }
+        val picked = SimilarSongs.pick(seeds, library, exclude = queued.toSet(), limit = AUTOPLAY_SONGS)
+        if (picked.isEmpty()) return false
+        for (song in picked) {
+            artistOf[song.id] = song.artistKey
+            albumOf[song.id] = song.albumKey
+        }
+        autoplayIds += picked.map { it.id }
+        queue.insert(picked.map { it.id }, next = false)
+        _state.update { it.withQueue() }
+        saveResume()
+        return true
     }
 
     /**
@@ -660,6 +735,10 @@ class MusicPlayer(
         val state = _state.value
         val duration = state.durationMs
         if (duration <= 0L || ended || !state.playRequested) return
+        // The last song of the queue: Autoplay chooses what follows before it ends, so it follows with no gap.
+        if (autoplayJob == null && duration - positionMs <= AUTOPLAY_BEFORE_END_MS && queue.nextPosition(wrap = false) == null && state.sleep != SleepTimer.EndOfSong && autoplayOn()) {
+            autoplayJob = scope.launch { extendWithAutoplay() }
+        }
         val fadeMs = settings().crossfadeSeconds.coerceIn(0, MAX_CROSSFADE_SECONDS) * 1_000L
         if (fadeMs > 0L) {
             // Not into the same song again (repeat one), nor past a sleep timer set for the song's end.
@@ -758,6 +837,7 @@ class MusicPlayer(
         skipJob?.cancel()
         ended = false
         durationSaved = false
+        autoplayJob = null
         pendingSeekMs = 0L
         val song = next.song
         _state.update {
@@ -805,12 +885,14 @@ class MusicPlayer(
 
     private fun MusicPlayerState.withQueue(): MusicPlayerState {
         val wrap = repeat == RepeatMode.ALL
+        val upcoming = queue.upNext(UP_NEXT_LIMIT)
         return copy(
             hasNext = queue.nextPosition(wrap = repeat != RepeatMode.OFF) != null,
             hasPrevious = queue.previousPosition(wrap = wrap) != null,
             queueIndex = queue.position,
             queueSize = queue.size,
-            upNext = queue.upNext(UP_NEXT_LIMIT),
+            upNext = upcoming,
+            autoplayFrom = upcoming.indexOfFirst { it in autoplayIds },
         )
     }
 
@@ -853,6 +935,11 @@ class MusicPlayer(
         const val SKIP_AFTER_ERROR_MS = 1_500L
         const val SAVE_EVERY_MS = 5_000L
         const val UP_NEXT_LIMIT = 50
+
+        /** Autoplay: songs added at a time, the last songs it takes after, and how early it chooses. */
+        const val AUTOPLAY_SONGS = 20
+        const val AUTOPLAY_SEEDS = 5
+        const val AUTOPLAY_BEFORE_END_MS = 30_000L
 
         const val RESUME_PREFS = "music_resume"
         const val KEY_QUEUE = "queue"

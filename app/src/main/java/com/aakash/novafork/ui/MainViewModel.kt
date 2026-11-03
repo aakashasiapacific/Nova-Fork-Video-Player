@@ -57,6 +57,7 @@ import com.aakash.novafork.ui.model.LibraryUi
 import com.aakash.novafork.ui.model.MediaKind
 import com.aakash.novafork.ui.model.NetworkSourceForm
 import com.aakash.novafork.ui.model.PermissionUi
+import com.aakash.novafork.ui.model.PlayRecord
 import com.aakash.novafork.ui.model.PlexServerUi
 import com.aakash.novafork.ui.model.PlexSignInUi
 import com.aakash.novafork.ui.model.RestorePreviewUi
@@ -66,8 +67,13 @@ import com.aakash.novafork.ui.model.ServerLibraryUi
 import com.aakash.novafork.ui.model.SettingsUi
 import com.aakash.novafork.ui.model.SmbForm
 import com.aakash.novafork.ui.model.SourceUi
+import com.aakash.novafork.ui.model.SpaceUsage
+import com.aakash.novafork.ui.model.StoredFile
 import com.aakash.novafork.ui.model.TopDestination
 import com.aakash.novafork.ui.model.UpnpServerUi
+import com.aakash.novafork.ui.model.WatchStats
+import com.aakash.novafork.ui.model.spaceByFolder
+import com.aakash.novafork.ui.model.watchStats
 import com.aakash.novafork.ui.model.withRecentSearch
 import java.io.FileNotFoundException
 import java.io.IOException
@@ -164,6 +170,26 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
     // Only touched from the state combine below, which never runs concurrently with itself.
     private val libraryMemo = Memo<Triple<LibraryIndex, LibraryFilter, LibrarySort>, LibraryUi> { (index, filter, sort) ->
         UiMappers.library(index, filter, sort)
+    }
+    /** Preferences' Storage and Watch Stats, sums over the whole library; worked out only on a settings page. */
+    private val statsMemo = Memo<Pair<LibraryIndex, MusicLibraryData>, Pair<SpaceUsage, WatchStats>> { (index, music) ->
+        val names = index.sources.associate { it.id to it.name }
+        val files = index.videos.map { StoredFile(it.video.sourceId, it.video.folder, it.video.sizeBytes) } +
+            music.songs.map { StoredFile(it.sourceId, it.folder, it.sizeBytes) }
+        val records = index.videos.map {
+            PlayRecord(
+                isMovie = it.kind == MediaKind.MOVIE,
+                isEpisode = it.kind == MediaKind.EPISODE,
+                showKey = it.showKey,
+                showTitle = it.showTitle,
+                durationMs = it.video.durationMs,
+                positionMs = it.video.positionMs,
+                watched = it.video.watched,
+                playCount = it.video.playCount,
+                lastPlayedAt = it.video.lastPlayedAt,
+            )
+        }
+        spaceByFolder(files, names) to watchStats(records)
     }
     private val searchMemo = Memo<Triple<LibraryIndex, String, MusicLibraryData>, SearchUi> { (index, query, music) ->
         UiMappers.search(index, query, music)
@@ -328,6 +354,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
         val showKey = (route as? Route.ShowDetails)?.showKey
             ?: previewKey?.takeIf { it.startsWith("s:") }?.removePrefix("s:")
         val browse = UiMappers.browse(index, scan, lists.all)
+        val stats = if (route == Route.Settings || route is Route.SettingsPage) statsMemo[index to music] else null
         val openPlaylist = lists.open
         val home = if (saved.isEmpty() && starred.isEmpty()) {
             index.home
@@ -374,6 +401,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
                 sources = browse.sources,
                 allFilesAccess = user.allFilesAccess,
                 canRequestAllFilesAccess = StoragePermissions.canRequestAllFilesAccess,
+                space = stats?.first ?: SpaceUsage(),
+                watch = stats?.second ?: WatchStats(),
             ),
             scan = UiMappers.scan(scan),
             permission = user.permission.copy(deviceScanning = settings.scanDeviceStorage),

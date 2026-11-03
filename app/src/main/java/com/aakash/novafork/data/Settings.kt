@@ -81,6 +81,11 @@ data class Settings(
     /** Seconds one song fades into the next, 0 (gapless, no fade) to 8. */
     val crossfadeSeconds: Int = 0,
     /**
+     * Apple Music's Autoplay (the infinity button): when the queue runs out, songs like the ones
+     * played go on from the library itself. Off: the music stops at the end of the queue.
+     */
+    val musicAutoplay: Boolean = true,
+    /**
      * The equaliser, for songs and videos alike: the name of a preset of libVLC's ("Flat",
      * "Rock" …), [EQUALIZER_CUSTOM] for [equalizerBands], or "" for off.
      */
