@@ -473,6 +473,12 @@ interface AppActions {
     /** Plays a video of a live folder listing that the library doesn't hold (yet): [uri] as the library would store it. */
     fun playRemote(uri: String, title: String) {}
 
+    /**
+     * Renames the real file of [videoId] (a device or SMB video) to [newBaseName] plus its current
+     * extension, then updates the library. The outcome comes as a message; nothing is deleted.
+     */
+    fun renameVideoFile(videoId: Long, newBaseName: String) {}
+
     /** Opens [url] in the browser (plex.tv/link). */
     fun openWebPage(url: String) {}
 

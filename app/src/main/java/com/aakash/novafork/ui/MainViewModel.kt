@@ -41,6 +41,7 @@ import com.aakash.novafork.sources.DeviceScanner
 import com.aakash.novafork.sources.media.MediaServerSources
 import com.aakash.novafork.sources.media.PlexSignIn
 import com.aakash.novafork.sources.net.FileServerSources
+import com.aakash.novafork.ui.common.FileRenames
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.AppUiState
 import com.aakash.novafork.ui.model.BackupUi
@@ -97,6 +98,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 private const val TAG = "MainViewModel"
+
+/** A device video for MainActivity to rename in MediaStore: [uri] is its content:// address, [newFileName] the whole new name. */
+data class DeviceRename(val videoId: Long, val uri: String, val newFileName: String)
 
 /** A queue for MainActivity to start the player with (PlayerIntents.forQueue). */
 data class QueueStart(val videoIds: List<Long>, val startIndex: Int, val shuffle: Boolean)
@@ -1290,6 +1294,48 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
             local.update { state ->
                 if (state.dialog is DialogUi.LibraryDiagnostics) state.copy(dialog = DialogUi.LibraryDiagnostics(report)) else state
             }
+        }
+    }
+
+    // Renaming files: a share is renamed here; a device file needs the system's say-so, so
+    // MainActivity does it (see deviceRenameRequests, finishDeviceRename).
+
+    private val deviceRenames = Channel<DeviceRename>(Channel.BUFFERED)
+
+    /** Device videos to rename, for MainActivity to ask permission for and rename in MediaStore. */
+    val deviceRenameRequests: Flow<DeviceRename> = deviceRenames.receiveAsFlow()
+
+    override fun renameVideoFile(videoId: Long, newBaseName: String) {
+        viewModelScope.launch {
+            try {
+                val video = library.video(videoId)?.video
+                val type = library.sourceForVideo(videoId)?.type
+                val newName = video?.let { FileRenames.newFileName(it.fileName, newBaseName) }
+                if (video == null || newName == null || newName == video.fileName) return@launch
+                when {
+                    type == SourceType.SMB -> {
+                        val newUri = graph.smb.rename(video.uri, newName)
+                        library.renameVideoFile(videoId, newName, newUri)
+                        showMessage("Renamed")
+                    }
+                    type == SourceType.DEVICE && video.uri.startsWith("content://") ->
+                        deviceRenames.trySend(DeviceRename(videoId, video.uri, newName))
+                    else -> showMessage(FileRenames.FAILED)
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.w(TAG, "Couldn't rename video $videoId", e)
+                showMessage(FileRenames.FAILED)
+            }
+        }
+    }
+
+    /** MediaStore renamed the device file of [videoId]: the library row follows. */
+    fun finishDeviceRename(videoId: Long, newFileName: String) {
+        launchSafely(FileRenames.FAILED) {
+            library.renameVideoFile(videoId, newFileName)
+            showMessage("Renamed")
         }
     }
 
