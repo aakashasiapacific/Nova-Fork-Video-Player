@@ -21,6 +21,7 @@ import com.aakash.novafork.ui.adaptive.LocalDeviceLayout
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
 import com.aakash.novafork.ui.adaptive.dimensFor
 import com.aakash.novafork.ui.adaptive.rememberDeviceLayout
+import com.aakash.novafork.ui.common.HapticsSetting
 import com.aakash.novafork.ui.common.HudState
 import com.aakash.novafork.ui.common.IosHudHost
 import com.aakash.novafork.ui.common.IosTextButton
@@ -55,6 +56,7 @@ fun NovaRoot(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
             LocalGlassTint provides settings.glassTint,
             LocalSheetDepth provides remember { SheetDepth() },
         ) {
+            HapticsSetting(settings.haptics) {
             Surface(modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                 Box(Modifier.fillMaxSize().sinkBehindSheets()) {
                     if (layout.isTablet) {
@@ -74,6 +76,7 @@ fun NovaRoot(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
                 }
                 NovaDialogs(dialog = state.dialog, actions = actions, playlists = state.browse.playlists)
                 state.crashReport?.let { report -> CrashReportDialog(report, actions) }
+            }
             }
 
             BackHandler(enabled = state.canGoBack) { actions.back() }

@@ -36,6 +36,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import com.aakash.novafork.NovaApp
 import com.aakash.novafork.ui.adaptive.rememberDeviceLayout
+import com.aakash.novafork.ui.common.HapticsSetting
 import com.aakash.novafork.ui.common.LocalGlassTint
 import com.aakash.novafork.ui.player.PlayerScreen
 import com.aakash.novafork.ui.theme.NovaPlayerTheme
@@ -125,7 +126,7 @@ class PlayerActivity : ComponentActivity(), PlayerController.Host {
             val settings by graph.settings.settings.collectAsStateWithLifecycle()
             // The player's glass is as tinted as Preferences › Appearance › Glass sets the app's.
             NovaPlayerTheme {
-                CompositionLocalProvider(LocalGlassTint provides settings.glassTint) {
+                CompositionLocalProvider(LocalGlassTint provides settings.glassTint) { HapticsSetting(settings.haptics) {
                     // Until the service is bound (a moment) the window's black background shows.
                     val current = controller
                     if (current != null) {
@@ -150,7 +151,7 @@ class PlayerActivity : ComponentActivity(), PlayerController.Host {
                             )
                         }
                     }
-                }
+                } }
             }
         }
 

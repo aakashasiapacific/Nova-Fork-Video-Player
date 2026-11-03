@@ -586,6 +586,16 @@ private fun appearanceGroups(settings: Settings, actions: AppActions): List<Sett
         ),
         footer = "How see-through the glass buttons and bars are, as on iOS 27. Tinted reads best over bright pictures.",
     ),
+    SettingsGroup(
+        key = "haptics",
+        title = null,
+        rows = listOf(
+            switchRow("haptics", R.drawable.ic_tune, "Haptics", settings.haptics) { on ->
+                actions.updateSettings { it.copy(haptics = on) }
+            },
+        ),
+        footer = "The light ticks when you tap tabs, flip switches, swipe and scrub.",
+    ),
 )
 
 // About

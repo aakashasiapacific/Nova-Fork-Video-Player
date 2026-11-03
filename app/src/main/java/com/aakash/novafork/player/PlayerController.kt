@@ -159,6 +159,7 @@ class PlayerController(
     private val subtitleDelays = SubtitleDelays(appContext)
     private val showPreferences = ShowPreferences(appContext)
     private val audioDelays = AudioDelays(appContext)
+    private val videoAspects = VideoAspects(appContext)
     /** The playing episode's show, for what a show remembers (speed, audio language). */
     private var currentShowKey: String? = null
 
@@ -739,6 +740,13 @@ class PlayerController(
         if (carried == null) {
             val delayMs = subtitleDelays.get(current.videoKey)
             if (delayMs != _state.value.subtitleDelayMs) _state.update { it.copy(subtitleDelayMs = delayMs) }
+        }
+        // And the fit or zoom picked for it before (owner).
+        videoAspects.get(current.videoKey)?.let { mode ->
+            if (mode != _state.value.aspect) {
+                mediaPlayer.setVideoScale(mode.toScaleType())
+                _state.update { it.copy(aspect = mode) }
+            }
         }
         _state.update {
             it.copy(
@@ -1330,6 +1338,13 @@ class PlayerController(
         }
     }
 
+    override fun holdSpeed(on: Boolean) {
+        if (released) return
+        // Not the chosen speed: nothing is saved, and letting go puts the chosen one back.
+        mediaPlayer.setRate(if (on) HOLD_RATE else _state.value.rate)
+        if (on) showLabel("2× speed")
+    }
+
     override fun setAudioDelay(delayMs: Long) {
         if (released) return
         // libVLC takes microseconds; kept for the Bluetooth device (or speaker) playing now.
@@ -1355,6 +1370,7 @@ class PlayerController(
         if (released) return
         mediaPlayer.setVideoScale(mode.toScaleType())
         _state.update { it.copy(aspect = mode) }
+        nowPlaying?.let { videoAspects.set(it.videoKey, mode) }
         showLabel(mode.label)
     }
 
@@ -2679,6 +2695,7 @@ class PlayerController(
         const val SAVE_INTERVAL_MS = 10_000L
         const val POSITION_UPDATE_INTERVAL_MS = 250L
         const val RESUME_MIN_MS = 10_000L
+        const val HOLD_RATE = 2f
         const val RESUME_BANNER_MS = 6_000L
         const val GESTURE_FEEDBACK_MS = 600L
         const val LABEL_MS = 1_200L

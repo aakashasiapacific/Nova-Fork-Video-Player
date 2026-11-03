@@ -70,7 +70,22 @@ internal fun PlayerGestureLayer(
                 if (locked) {
                     detectTapGestures(onTap = { currentOnLockedTap() })
                 } else {
+                    var boosted = false
                     detectTapGestures(
+                        // Holding anywhere plays at 2× until the finger lifts (owner).
+                        onPress = {
+                            tryAwaitRelease()
+                            if (boosted) {
+                                boosted = false
+                                currentActions.holdSpeed(false)
+                            }
+                        },
+                        onLongPress = {
+                            if (currentState.isPlaying) {
+                                boosted = true
+                                currentActions.holdSpeed(true)
+                            }
+                        },
                         onDoubleTap = { offset -> currentOnDoubleTap(tapZone(offset.x, size.width.toFloat())) },
                         onTap = { offset -> currentOnTap(tapZone(offset.x, size.width.toFloat())) },
                     )

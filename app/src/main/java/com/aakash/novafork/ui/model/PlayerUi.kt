@@ -220,6 +220,9 @@ interface PlayerActions {
     fun setSubtitleDelay(delayMs: Long)
     fun setAudioDelay(delayMs: Long) {}
 
+    /** Holding the picture: 2× while [on], back to the chosen speed when let go. */
+    fun holdSpeed(on: Boolean) {}
+
     fun cycleAspect()
     fun setAspect(mode: AspectMode)
     fun setRate(rate: Float)

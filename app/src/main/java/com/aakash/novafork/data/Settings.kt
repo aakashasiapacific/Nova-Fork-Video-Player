@@ -90,6 +90,8 @@ data class Settings(
     val subtitleBackground: Boolean = false,
     /** How far above the bottom of the picture subtitles sit, in px of the video (0 = libVLC's own). */
     val subtitleMargin: Int = 0,
+    /** The small ticks on taps, swipes and switches; off silences every one. */
+    val haptics: Boolean = true,
 )
 
 /** [Settings.equalizerPreset]'s value for the person's own band gains. */
