@@ -978,7 +978,7 @@ private fun NowPlayingMore(menu: @Composable ColumnScope.(close: () -> Unit) -> 
  */
 @Composable
 private fun FavoriteButton(favorite: Boolean, onClick: () -> Unit) {
-    val label = if (favorite) "Remove from Favorites" else "Add to Favorites"
+    val label = if (favorite) "Remove from Favourites" else "Add to Favourites"
     Box(
         Modifier
             .padding(start = 12.dp)
@@ -1145,13 +1145,7 @@ private fun LyricsPane(player: MusicPlayerState, actions: AudioActions) {
             } else {
                 AnnotatedString(line.text.ifEmpty { "♪" })
             }
-            Text(
-                shown,
-                fontSize = 28.sp,
-                lineHeight = 34.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = (-0.4).sp,
-                color = Color.White.copy(alpha = alpha),
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .graphicsLayer {
@@ -1170,7 +1164,27 @@ private fun LyricsPane(player: MusicPlayerState, actions: AudioActions) {
                     }
                     .padding(vertical = 10.dp)
                     .then(if (blur > 0.dp) Modifier.blur(blur) else Modifier),
-            )
+            ) {
+                Text(
+                    shown,
+                    fontSize = 28.sp,
+                    lineHeight = 34.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = (-0.4).sp,
+                    color = Color.White.copy(alpha = alpha),
+                )
+                // A translation (a second line at the same time in the .lrc): smaller and grey, under its line.
+                line.translation?.let { translation ->
+                    Text(
+                        translation,
+                        fontSize = 18.sp,
+                        lineHeight = 23.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color.White.copy(alpha = alpha * 0.6f),
+                        modifier = Modifier.padding(top = 2.dp),
+                    )
+                }
+            }
         }
     }
 }
@@ -1248,6 +1262,19 @@ private fun QueuePane(player: MusicPlayerState, actions: AudioActions, upNext: L
                             color = Color.White.copy(alpha = 0.6f),
                         )
                     }
+                }
+                if (upNext.isNotEmpty()) {
+                    Text(
+                        "Clear",
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = NovaColors.AppleMusicRed,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable(onClickLabel = "Clear Up Next", role = Role.Button) { actions.clearUpNext() }
+                            .padding(horizontal = 8.dp, vertical = 6.dp),
+                    )
+                    Spacer(Modifier.width(4.dp))
                 }
                 SquareToggle(R.drawable.ic_shuffle, "Shuffle", on = player.shuffle, onClick = actions::toggleShuffle)
                 Spacer(Modifier.width(8.dp))

@@ -93,6 +93,8 @@ class MusicViewModel(app: Application) : AndroidViewModel(app), AudioActions {
 
     override fun moveUpNext(from: Int, to: Int) = player.moveUpNext(from, to)
 
+    override fun clearUpNext() = player.clearUpNext()
+
     override fun togglePlay() = player.togglePlay()
 
     override fun next() = player.next()

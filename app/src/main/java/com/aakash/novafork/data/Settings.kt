@@ -86,6 +86,11 @@ data class Settings(
      */
     val musicAutoplay: Boolean = true,
     /**
+     * Sound Check: songs play at the volume their ReplayGain (or iTunNORM) tag asks for, so
+     * quiet and loud albums sit at about the same level. Songs without the tag play unchanged.
+     */
+    val soundCheck: Boolean = false,
+    /**
      * The equaliser, for songs and videos alike: the name of a preset of libVLC's ("Flat",
      * "Rock" …), [EQUALIZER_CUSTOM] for [equalizerBands], or "" for off.
      */

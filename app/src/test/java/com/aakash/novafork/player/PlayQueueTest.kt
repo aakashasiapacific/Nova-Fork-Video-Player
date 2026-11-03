@@ -173,6 +173,21 @@ class PlayQueueTest {
     }
 
     @Test
+    fun `clearing up next keeps the playing item and what came before`() {
+        val queue = PlayQueue()
+        queue.set(ids, startIndex = 2, shuffle = false)
+        queue.clearUpcoming()
+        assertEquals(listOf(10L, 20L, 30L), queue.playOrder)
+        assertEquals(30L, queue.currentId)
+        assertEquals(2, queue.position)
+        assertTrue(queue.upNext(limit = 5).isEmpty())
+        assertNull(queue.nextPosition(wrap = false))
+        // Queued songs after a clear land after the playing one again.
+        queue.insert(listOf(60L), next = false)
+        assertEquals(listOf(10L, 20L, 30L, 60L), queue.playOrder)
+    }
+
+    @Test
     fun `up next can be reordered but not the playing item or what came before`() {
         val queue = PlayQueue()
         queue.set(ids, startIndex = 1, shuffle = false)

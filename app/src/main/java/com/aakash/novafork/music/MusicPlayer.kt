@@ -130,6 +130,10 @@ class MusicPlayer(
     private var lyricsJob: Job? = null
     private var skipJob: Job? = null
 
+    /** Sound Check's tag reader, and the volume (percent) the playing song's tag sets; 100 when off or untagged. */
+    private val soundCheck = SoundCheck(appContext)
+    private var songVolume = FULL_VOLUME
+
     /** The current song played to its end; play() opens it again. */
     private var ended = false
 
@@ -145,7 +149,7 @@ class MusicPlayer(
     private var preloadJob: Job? = null
 
     /** The song fading in over this one (a crossfade), on its own player until it takes over. */
-    private class Incoming(val position: Int, val song: SongEntity, val player: MediaPlayer, val descriptor: ParcelFileDescriptor?)
+    private class Incoming(val position: Int, val song: SongEntity, val player: MediaPlayer, val descriptor: ParcelFileDescriptor?, val volume: Int)
 
     private var incoming: Incoming? = null
 
@@ -174,7 +178,7 @@ class MusicPlayer(
             }
 
             override fun onDuck(ducked: Boolean) {
-                mediaPlayer?.setVolume(if (ducked) DUCKED_VOLUME else FULL_VOLUME)
+                mediaPlayer?.setVolume(if (ducked) DUCKED_VOLUME * songVolume / FULL_VOLUME else songVolume)
             }
 
             override fun onBecomingNoisy() = pause()
@@ -303,7 +307,7 @@ class MusicPlayer(
     fun setSleepTimer(minutes: Int) {
         sleepJob?.cancel()
         cancelCrossfade()
-        mediaPlayer?.volume = FULL_VOLUME
+        mediaPlayer?.volume = songVolume
         when {
             minutes == 0 -> _state.update { it.copy(sleep = null) }
             minutes < 0 -> _state.update { it.copy(sleep = SleepTimer.EndOfSong) }
@@ -324,12 +328,12 @@ class MusicPlayer(
         val player = mediaPlayer
         if (player != null && _state.value.isPlaying) {
             for (step in SLEEP_FADE_STEPS downTo 0) {
-                player.volume = FULL_VOLUME * step / SLEEP_FADE_STEPS
+                player.volume = songVolume * step / SLEEP_FADE_STEPS
                 delay(SLEEP_FADE_MS / SLEEP_FADE_STEPS)
             }
         }
         pause()
-        mediaPlayer?.volume = FULL_VOLUME
+        mediaPlayer?.volume = songVolume
         _state.update { it.copy(sleep = null) }
     }
 
@@ -380,6 +384,19 @@ class MusicPlayer(
         cancelCrossfade()
         dropPreloaded()
         queue.move(queue.position + from, queue.position + to)
+        _state.update { it.withQueue() }
+        saveResume()
+    }
+
+    /** Apple Music's Clear Up Next: the songs queued after the playing one go; it keeps playing. */
+    fun clearUpNext() {
+        if (queue.upNext(1).isEmpty()) return
+        cancelCrossfade()
+        dropPreloaded()
+        autoplayJob?.cancel()
+        autoplayJob = null
+        queue.clearUpcoming()
+        autoplayIds.clear()
         _state.update { it.withQueue() }
         saveResume()
     }
@@ -504,13 +521,14 @@ class MusicPlayer(
                 onFailed(song, "Can't open this song")
                 return@launch
             }
+            songVolume = volumeOf(song)
             val player = try {
                 (mediaPlayer ?: VlcEngine.newMediaPlayer(appContext).also {
                     it.setEventListener(eventListener)
                     mediaPlayer = it
                 }).also {
                     it.setMedia(opened.media)
-                    it.volume = FULL_VOLUME
+                    it.volume = songVolume
                     // The equaliser (Now Playing, the video player) on the new player.
                     AudioEffects.applyCurrent(appContext, it)
                 }
@@ -763,6 +781,8 @@ class MusicPlayer(
         } ?: return
         preloadJob = scope.launch {
             val song = findSong(nextId) ?: return@launch
+            // Its loudness tag is read now, while this song plays, so it starts on time.
+            volumeOf(song)
             val opened = open(song.uri) ?: return@launch
             preloaded?.second?.discard()
             preloaded = nextId to opened
@@ -791,6 +811,7 @@ class MusicPlayer(
      */
     private suspend fun crossfadeInto(position: Int, songId: Long, fadeMs: Long) {
         val song = findSong(songId) ?: return
+        val incomingVolume = volumeOf(song)
         val opened = open(song.uri) ?: return
         val player = try {
             VlcEngine.newMediaPlayer(appContext).also { it.setMedia(opened.media) }
@@ -804,14 +825,14 @@ class MusicPlayer(
         AudioEffects.applyCurrent(appContext, player)
         player.volume = 0
         player.play()
-        incoming = Incoming(position, song, player, opened.descriptor)
+        incoming = Incoming(position, song, player, opened.descriptor, incomingVolume)
         val outgoing = mediaPlayer
         val steps = (fadeMs / CROSSFADE_STEP_MS).toInt().coerceAtLeast(1)
         for (step in 1..steps) {
             delay(CROSSFADE_STEP_MS)
             val share = step.toFloat() / steps
-            player.volume = (FULL_VOLUME * share).roundToInt()
-            outgoing?.volume = (FULL_VOLUME * (1f - share)).roundToInt()
+            player.volume = (incomingVolume * share).roundToInt()
+            outgoing?.volume = (songVolume * (1f - share)).roundToInt()
         }
         handOver()
     }
@@ -830,7 +851,8 @@ class MusicPlayer(
         descriptor.closeQuietly()
         mediaPlayer = next.player
         descriptor = next.descriptor
-        next.player.volume = FULL_VOLUME
+        songVolume = next.volume
+        next.player.volume = songVolume
         next.player.setEventListener(eventListener)
         queue.moveTo(next.position)
         lyricsJob?.cancel()
@@ -871,8 +893,12 @@ class MusicPlayer(
             coming.descriptor.closeQuietly()
         }
         incoming = null
-        mediaPlayer?.volume = FULL_VOLUME
+        mediaPlayer?.volume = songVolume
     }
+
+    /** The volume (percent) [song]'s loudness tag asks for with Sound Check on; 100 otherwise. */
+    private suspend fun volumeOf(song: SongEntity): Int =
+        if (settings().soundCheck) soundCheck.volumeFor(song.uri) else FULL_VOLUME
 
     private suspend fun findSong(songId: Long): SongEntity? = try {
         music.song(songId)

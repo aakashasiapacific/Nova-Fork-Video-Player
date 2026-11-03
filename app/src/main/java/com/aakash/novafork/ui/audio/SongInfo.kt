@@ -1,5 +1,7 @@
 package com.aakash.novafork.ui.audio
 
+import android.media.MediaMetadataRetriever
+import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -21,6 +23,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.aakash.novafork.core.audio.AudioFiles
 import com.aakash.novafork.core.audio.AudioQuality
 import com.aakash.novafork.core.format.Formats
 import com.aakash.novafork.data.db.SongEntity
@@ -28,6 +31,9 @@ import com.aakash.novafork.data.music.Album
 import com.aakash.novafork.music.AudioInfo
 import com.aakash.novafork.music.AudioInfos
 import com.aakash.novafork.ui.common.IosSheet
+import java.util.concurrent.ConcurrentHashMap
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * The song's [AudioInfo], read on a background thread the first time and remembered; null until
@@ -43,6 +49,52 @@ internal fun rememberAudioInfo(song: SongEntity?): AudioInfo? {
         if (uri != null && value == null) value = AudioInfos.load(context, uri)
     }
     return info
+}
+
+/** Tags the library doesn't keep, read from the file for the Song Info sheet. */
+private data class FileCredits(val composer: String?, val albumArtist: String?, val genre: String?, val year: Int?, val disc: String?, val track: String?)
+
+private val creditsCache = ConcurrentHashMap<String, FileCredits>()
+
+/** The song's credits from its tags, read on a background thread the first time and remembered; null until then. */
+@Composable
+private fun rememberCredits(song: SongEntity): FileCredits? {
+    val context = LocalContext.current
+    val credits by produceState(creditsCache[song.uri], song.uri) {
+        value = creditsCache[song.uri] ?: withContext(Dispatchers.IO) { readCredits(context, song.uri) }?.also { creditsCache[song.uri] = it }
+    }
+    return credits
+}
+
+private fun readCredits(context: android.content.Context, uri: String): FileCredits? {
+    val retriever = MediaMetadataRetriever()
+    return try {
+        retriever.setDataSource(context, Uri.parse(uri))
+        fun tag(key: Int): String? = AudioFiles.cleanTag(retriever.extractMetadata(key))
+        FileCredits(
+            composer = tag(MediaMetadataRetriever.METADATA_KEY_COMPOSER),
+            albumArtist = tag(MediaMetadataRetriever.METADATA_KEY_ALBUMARTIST),
+            genre = tag(MediaMetadataRetriever.METADATA_KEY_GENRE),
+            year = AudioFiles.year(tag(MediaMetadataRetriever.METADATA_KEY_YEAR)) ?: AudioFiles.year(tag(MediaMetadataRetriever.METADATA_KEY_DATE)),
+            disc = tag(MediaMetadataRetriever.METADATA_KEY_DISC_NUMBER),
+            track = tag(MediaMetadataRetriever.METADATA_KEY_CD_TRACK_NUMBER),
+        )
+    } catch (e: RuntimeException) {
+        null
+    } finally {
+        try {
+            retriever.release()
+        } catch (e: Exception) {
+            // Nothing is left to clean up.
+        }
+    }
+}
+
+/** "Disc 1 · Track 3" (or either alone) from the library's numbers, else the file's own "1/2" and "3/12". */
+private fun discTrack(song: SongEntity, credits: FileCredits?): String? {
+    val disc = song.discNumber?.toString() ?: credits?.disc
+    val track = song.trackNumber?.toString() ?: credits?.track
+    return listOfNotNull(disc?.let { "Disc $it" }, track?.let { "Track $it" }).joinToString(" · ").ifEmpty { null }
 }
 
 /** "Lossless" / "Hi-Res Lossless" for [song], or null when it isn't lossless (or not known yet). */
@@ -82,7 +134,13 @@ internal fun SongInfoSheet(song: SongEntity, onDismiss: () -> Unit) {
     val format = AudioQuality.formatName(song.fileName, info?.codecMime)
     val quality = losslessLabel(song, info)
     val bitrate = info?.bitrateKbps ?: AudioQuality.averageBitrateKbps(song.sizeBytes, song.durationMs)
+    val credits = rememberCredits(song)
     val rows = listOfNotNull(
+        credits?.composer?.let { "Composer" to it },
+        (song.albumArtist ?: credits?.albumArtist)?.let { "Album Artist" to it },
+        discTrack(song, credits)?.let { "Disc / Track" to it },
+        (song.genre ?: credits?.genre)?.let { "Genre" to it },
+        (song.year ?: credits?.year)?.let { "Year" to it.toString() },
         "Format" to format,
         quality?.let { "Quality" to it },
         bitrate?.let { "Bitrate" to AudioQuality.bitrate(it) },

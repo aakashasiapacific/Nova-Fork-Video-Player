@@ -65,4 +65,12 @@ class AutoPlaylistsTest {
             AutoPlaylist.withSongs(library(song(1, plays = 1, played = 5))).keys.toList(),
         )
     }
+
+    @Test
+    fun favouritesFollowTheStarOrderAndComeFirst() {
+        val library = library(song(1, plays = 1, played = 5), song(2), song(3))
+        assertEquals(listOf(3L, 1L), AutoPlaylist.FAVOURITES.songs(library, listOf(3L, 99L, 1L)).map { it.id })
+        assertEquals(AutoPlaylist.FAVOURITES, AutoPlaylist.withSongs(library, listOf(2L)).keys.first())
+        assertTrue(AutoPlaylist.FAVOURITES !in AutoPlaylist.withSongs(library).keys)
+    }
 }

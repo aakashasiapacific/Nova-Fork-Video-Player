@@ -144,6 +144,18 @@ internal class PlayQueue(private val random: Random = Random.Default) {
         position = order.indexOf(newIndex[current]).coerceAtLeast(0)
     }
 
+    /** Drops everything queued after the playing item (and what was queued before it stays). */
+    fun clearUpcoming() {
+        if (order.isEmpty() || position >= order.lastIndex) return
+        val kept = order.take(position + 1)
+        val keptSet = kept.toSet()
+        val keep = ids.indices.filter { it in keptSet }
+        val newIndex = IntArray(ids.size) { -1 }
+        keep.forEachIndexed { new, old -> newIndex[old] = new }
+        ids = keep.map { ids[it] }
+        order = kept.map { newIndex[it] }
+    }
+
     /**
      * What an item belongs to for shuffling (a song's artist): a shuffle never plays two of the
      * same in a row while another can go between (owner: smart shuffle). Nothing by default.

@@ -96,4 +96,31 @@ class LrcParserTest {
         assertEquals(1, lyrics.activeIndex(20_000))
         assertEquals(2, lyrics.activeIndex(99_000))
     }
+
+    @Test
+    fun aSecondLineAtTheSameTimeIsTheTranslation() {
+        val lyrics = LrcParser.parse("[00:10.00]Hello\n[00:10.00]Hola\n[00:20.00]Bye\n[00:20.00]Adios\n[00:30.00]Alone")
+        assertEquals(
+            listOf(LyricLine(10_000, "Hello", translation = "Hola"), LyricLine(20_000, "Bye", translation = "Adios"), LyricLine(30_000, "Alone")),
+            lyrics.lines,
+        )
+        // The playing line follows the originals.
+        assertEquals(1, lyrics.activeIndex(25_000))
+    }
+
+    @Test
+    fun aTranslationTagOnTheNextLineOrTheSameLineTranslates() {
+        val lyrics = LrcParser.parse("[tr:en]\n[00:10.00]Hola\n[tr:Hello]\n[00:20.00]Adios[tr:Bye]\n[00:30.00]Sola")
+        assertEquals(
+            listOf(LyricLine(10_000, "Hola", translation = "Hello"), LyricLine(20_000, "Adios", translation = "Bye"), LyricLine(30_000, "Sola")),
+            lyrics.lines,
+        )
+    }
+
+    @Test
+    fun repeatedOrBlankLinesAtOneTimeAreNotTranslations() {
+        val lyrics = LrcParser.parse("[00:10.00]La\n[00:10.00]La\n[00:20.00]\n[00:20.00]Words")
+        assertEquals(listOf("La", "La", "", "Words"), lyrics.lines.map { it.text })
+        assertTrue(lyrics.lines.all { it.translation == null })
+    }
 }

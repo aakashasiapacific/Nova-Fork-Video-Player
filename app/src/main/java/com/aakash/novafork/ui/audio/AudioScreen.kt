@@ -109,6 +109,7 @@ import com.aakash.novafork.data.db.SongEntity
 import com.aakash.novafork.data.music.Album
 import com.aakash.novafork.data.music.Artist
 import com.aakash.novafork.data.music.AutoPlaylist
+import com.aakash.novafork.data.music.MusicFolders
 import com.aakash.novafork.data.music.MusicLibrary
 import com.aakash.novafork.data.music.MusicLibraryData
 import com.aakash.novafork.data.music.MusicScanState
@@ -193,6 +194,9 @@ private const val ALBUM = "album:"
 private const val ARTIST = "artist:"
 private const val GENRE = "genre:"
 private const val AUTO = "auto:"
+private const val TOP_SONGS_PAGE = "topsongs:"
+private const val FOLDERS = "folders"
+private const val FOLDER = "folder:"
 private const val STACK_SEPARATOR = "\u0001"
 
 /** How many songs the Recently Played page lists. */
@@ -266,6 +270,7 @@ fun AudioContent(
         onAdd = { addingSong = it },
         onInfo = { infoSong = it },
         favorites = favorites.toSet(),
+        favouriteOrder = favorites,
         isPlaying = player.isPlaying,
     )
     // On a page opened over Library a swipe right goes back, as on iOS (and is not taken for a
@@ -308,6 +313,8 @@ fun AudioContent(
                 val byId = library.songs.associateBy { it.id }
                 FavoritesPage(favorites.mapNotNull { byId[it] }, ctx)
             }
+            shown == FOLDERS -> FolderPage("", ctx)
+            shown.startsWith(FOLDER) -> FolderPage(shown.removePrefix(FOLDER), ctx)
             shown == RECENT -> RecentlyPlayedPage(recentSongs(library), ctx)
             shown == ARTISTS -> ArtistsPage(library.artists, ctx)
             shown == ALBUMS -> AlbumsPage("Albums", library.albums, ctx)
@@ -319,6 +326,8 @@ fun AudioContent(
                 ?.let { ArtistPage(it, ctx) } ?: Missing(ctx)
             shown.startsWith(AUTO) -> AutoPlaylist.entries.firstOrNull { it.name == shown.removePrefix(AUTO) }
                 ?.let { AutoPlaylistPage(it, ctx) } ?: Missing(ctx)
+            shown.startsWith(TOP_SONGS_PAGE) -> library.artists.firstOrNull { it.key == shown.removePrefix(TOP_SONGS_PAGE) }
+                ?.let { SongsPage("Top Songs", it.songs.filter { song -> song.playCount > 0 }, ctx) } ?: Missing(ctx)
             shown.startsWith(GENRE) -> library.genres.firstOrNull { it.name == shown.removePrefix(GENRE) }
                 ?.let { SongsPage(it.name, it.songs, ctx) } ?: Missing(ctx)
             else -> Missing(ctx)
@@ -353,6 +362,8 @@ private class PageContext(
     val onInfo: (SongEntity) -> Unit,
     /** Starred songs: a small star in their rows, Favorite or Unfavorite in their menus. */
     val favorites: Set<Long> = emptySet(),
+    /** The same ids, newest favourite first (the automatic Favourite Songs playlist). */
+    val favouriteOrder: List<Long> = emptyList(),
     /** The playing song's bars move only while it plays. */
     val isPlaying: Boolean = false,
 )
@@ -362,6 +373,8 @@ private fun pageTitle(page: String, library: MusicLibraryData): String = when {
     page == PLAYLISTS -> "Playlists"
     page == FAVORITES -> "Favorites"
     page == RECENT -> "Recently Played"
+    page == FOLDERS -> "Folders"
+    page.startsWith(FOLDER) -> page.removePrefix(FOLDER).substringAfterLast('/')
     page == ARTISTS -> "Artists"
     page == ALBUMS -> "Albums"
     page == SONGS -> "Songs"
@@ -369,6 +382,7 @@ private fun pageTitle(page: String, library: MusicLibraryData): String = when {
     page.startsWith(ALBUM) -> library.albums.firstOrNull { it.key == page.removePrefix(ALBUM) }?.title ?: "Back"
     page.startsWith(ARTIST) -> library.artists.firstOrNull { it.key == page.removePrefix(ARTIST) }?.name ?: "Back"
     page.startsWith(GENRE) -> page.removePrefix(GENRE)
+    page.startsWith(TOP_SONGS_PAGE) -> "Top Songs"
     page.startsWith(AUTO) -> AutoPlaylist.entries.firstOrNull { it.name == page.removePrefix(AUTO) }?.title ?: "Back"
     else -> "Back"
 }
@@ -454,7 +468,10 @@ private fun LibraryHome(
         row("favorites") { CategoryRow(R.drawable.ic_star, "Favorites") { ctx.onOpen(FAVORITES) } }
         // Under Favorites, a library of its own (owner), when something has been played.
         if (library.songs.any { it.lastPlayedAt != null }) {
-            row("recent") { CategoryRow(R.drawable.ic_history, "Recently Played", divider = false) { ctx.onOpen(RECENT) } }
+            row("recent") { CategoryRow(R.drawable.ic_history, "Recently Played", divider = library.songs.isNotEmpty()) { ctx.onOpen(RECENT) } }
+        }
+        if (library.songs.isNotEmpty()) {
+            row("folders") { CategoryRow(R.drawable.ic_folder, "Folders", divider = false) { ctx.onOpen(FOLDERS) } }
         }
         if (library.recentlyAdded.isNotEmpty()) {
             row("albumsTitle") { SectionTitle("Albums") }
@@ -471,7 +488,7 @@ private fun LibraryHome(
 @Composable
 private fun PlaylistsPage(playlists: List<MusicPlaylistRow>, ctx: PageContext) {
     // The automatic playlists that have songs now; they follow the library.
-    val automatic = remember(ctx.library) { AutoPlaylist.withSongs(ctx.library) }
+    val automatic = remember(ctx.library, ctx.favouriteOrder) { AutoPlaylist.withSongs(ctx.library, ctx.favouriteOrder) }
     AudioPage("Playlists") {
         header("Playlists", ctx)
         // Apple Music's first row: a blue "+" tile and New Playlist….
@@ -586,6 +603,36 @@ private fun FavoritesPage(songs: List<SongEntity>, ctx: PageContext) {
                 SongRow(song = song, ctx = ctx, onClick = { ctx.actions.play(songs, index, false) })
             }
         }
+    }
+}
+
+/** Folders: the folder at [path] ("" = the top level) with its subfolders as rows, Play and Shuffle, then its own songs. */
+@Composable
+private fun FolderPage(path: String, ctx: PageContext) {
+    val listing = remember(ctx.library, path) { MusicFolders.list(ctx.library.songs, path) }
+    val title = if (path.isEmpty()) "Folders" else path.substringAfterLast('/')
+    AudioPage(title) {
+        header(title, ctx)
+        if (listing.all.isEmpty()) row("empty") { Hint("No songs in this folder.") }
+        listing.folders.forEach { folder ->
+            row("fo:${folder.path}") {
+                ListRow(
+                    title = folder.name,
+                    subtitle = if (folder.songCount == 1) "1 song" else "${folder.songCount} songs",
+                    art = {
+                        Box(
+                            Modifier.size(56.dp).clip(RoundedCornerShape(8.dp)).background(Color(0xFF1C1C1E)),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            NovaIcon(R.drawable.ic_folder, contentDescription = null, tint = NovaColors.AppleMusicRed, modifier = Modifier.size(26.dp))
+                        }
+                    },
+                    onClick = { ctx.onOpen(FOLDER + folder.path) },
+                )
+            }
+        }
+        if (listing.all.isNotEmpty()) row("play") { PlayShuffle(listing.all, ctx.actions) }
+        songRows(listing.songs, ctx)
     }
 }
 
@@ -827,12 +874,32 @@ private fun ArtistHero(artist: Artist, ctx: PageContext) {
     }
 }
 
-/** An artist: their picture with Play, their albums in a row, then their top songs. */
+/** An artist: their picture with Play, their five most played songs, then their albums. */
 @Composable
 private fun ArtistPage(artist: Artist, ctx: PageContext) {
+    // Most played first (the artist's songs are already in that order); never-played ones don't count.
+    val topSongs = remember(artist) { artist.songs.filter { it.playCount > 0 } }
     AudioPage(artist.name) {
         row("back") { BackRow(ctx) { close -> QueueItems(artist.songs, ctx, close) } }
         row(ARTIST_HERO_KEY) { ArtistHero(artist, ctx) }
+        if (topSongs.isNotEmpty()) {
+            row("songsTitle") {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.weight(1f)) { SectionTitle("Top Songs") }
+                    if (topSongs.size > TOP_SONGS) {
+                        Text(
+                            "See All",
+                            color = NovaColors.AppleMusicRed,
+                            fontSize = 17.sp,
+                            modifier = Modifier
+                                .clickable(onClickLabel = "See all top songs", role = Role.Button) { ctx.onOpen(TOP_SONGS_PAGE + artist.key) }
+                                .padding(vertical = 8.dp),
+                        )
+                    }
+                }
+            }
+            songRows(topSongs.take(TOP_SONGS), ctx)
+        }
         if (artist.albums.isNotEmpty()) {
             row("albumsTitle") { SectionTitle("Albums") }
             row("albums") {
@@ -844,8 +911,6 @@ private fun ArtistPage(artist: Artist, ctx: PageContext) {
                 }
             }
         }
-        row("songsTitle") { SectionTitle("Top Songs") }
-        songRows(artist.songs.take(TOP_SONGS), ctx)
     }
 }
 
@@ -908,7 +973,7 @@ private fun PlaylistPage(playlist: OpenPlaylist, ctx: PageContext) {
  */
 @Composable
 private fun AutoPlaylistPage(kind: AutoPlaylist, ctx: PageContext) {
-    val songs = remember(ctx.library, kind) { kind.songs(ctx.library) }
+    val songs = remember(ctx.library, ctx.favouriteOrder, kind) { kind.songs(ctx.library, ctx.favouriteOrder) }
     AudioPage(kind.title) {
         row("back") { BackRow(ctx) { close -> QueueItems(songs, ctx, close) } }
         row("cover") {
@@ -940,6 +1005,7 @@ private fun AutoPlaylistPage(kind: AutoPlaylist, ctx: PageContext) {
 @Composable
 private fun AutoPlaylistCover(kind: AutoPlaylist, small: Boolean) {
     val colors = when (kind) {
+        AutoPlaylist.FAVOURITES -> listOf(Color(0xFFFF375F), Color(0xFF8E1230))
         AutoPlaylist.TOP_PLAYED -> listOf(NovaColors.AppleMusicRed, Color(0xFF7A1C3A))
         AutoPlaylist.RECENTLY_ADDED -> listOf(Color(0xFF5E5CE6), Color(0xFF2A2A72))
         AutoPlaylist.RECENTLY_PLAYED -> listOf(Color(0xFF30B0C7), Color(0xFF1B5E6E))
@@ -1379,7 +1445,7 @@ private fun FavoriteStar(favorite: Boolean) {
     if (favorite) {
         NovaIcon(
             R.drawable.ic_star,
-            contentDescription = "Favorite",
+            contentDescription = "Favourite",
             tint = Color.White.copy(alpha = 0.55f),
             modifier = Modifier.padding(start = 8.dp).size(13.dp),
         )
@@ -1415,7 +1481,7 @@ private fun SongMenu(
             },
         )
         NovaMenuItem(
-            text = { Text(if (favorite) "Undo Favorite" else "Favorite") },
+            text = { Text(if (favorite) "Remove from Favourites" else "Favourite") },
             leadingIcon = { NovaIcon(if (favorite) R.drawable.ic_star_slash else R.drawable.ic_star_outline, contentDescription = null) },
             onClick = {
                 onDismiss()
@@ -1684,4 +1750,4 @@ internal fun AddToPlaylistDialog(
 }
 
 private val Gutter = 20.dp
-private const val TOP_SONGS = 10
+private const val TOP_SONGS = 5
