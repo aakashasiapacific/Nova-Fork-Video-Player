@@ -38,6 +38,7 @@ import com.aakash.novafork.ui.common.NovaDropdownMenu
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.NovaMenuItem
 import com.aakash.novafork.ui.common.ScanBanner
+import com.aakash.novafork.ui.common.ShowMenuBox
 import com.aakash.novafork.ui.common.VideoMenuBox
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.AppUiState
@@ -280,13 +281,16 @@ private fun LibraryGridCard(
                 selected = item.key == selectedKey,
             )
         }
-        is LibraryItemUi.Show -> TabletLibraryItemCard(
-            item = item,
-            onClick = { onClick(item) },
-            onLongClick = { onLongClick(item) },
-            onLongClickLabel = longClickLabel(item),
-            selected = item.key == selectedKey,
-        )
+        // Shows get a menu (Details, Hide) in place of the one long-press action.
+        is LibraryItemUi.Show -> ShowMenuBox(showKey = item.card.key, actions = actions) { openMenu ->
+            TabletLibraryItemCard(
+                item = item,
+                onClick = { onClick(item) },
+                onLongClick = openMenu,
+                onLongClickLabel = "More options",
+                selected = item.key == selectedKey,
+            )
+        }
     }
 }
 

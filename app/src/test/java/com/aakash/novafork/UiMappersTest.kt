@@ -172,6 +172,69 @@ class UiMappersTest {
         assertTrue(UiMappers.search(small, "ke").results.isEmpty())
     }
 
+    private fun creditedMovie(id: Long, title: String, cast: String?, directors: String? = null): VideoWithMeta {
+        val meta = MetadataEntity(key = "movie:$id", tmdbId = id.toInt(), type = "movie", title = title, castNames = cast, directors = directors)
+        return VideoWithMeta(
+            video(id = id, sourceId = DEVICE, uri = "content://media/external/video/media/$id", kind = VideoKind.MOVIE, metadataKey = meta.key),
+            meta,
+        )
+    }
+
+    private fun creditedEpisode(id: Long, creators: String): VideoWithMeta {
+        val meta = MetadataEntity(key = "tv:900", tmdbId = 900, type = "tv", title = "Dark Show", directors = creators)
+        return VideoWithMeta(episode(id = id, season = 1, episode = id.toInt()).copy(metadataKey = meta.key), meta)
+    }
+
+    @Test
+    fun aPersonPageListsTheirMoviesAndShowsNewestFirst() {
+        val rows = listOf(
+            creditedMovie(1, "Older", cast = "Keanu Reeves, Carrie-Anne Moss"),
+            creditedMovie(2, "Newer", cast = "Someone Else", directors = "Keanu Reeves"),
+            creditedMovie(3, "Unrelated", cast = "Keanu Reevesley"),
+            creditedEpisode(10, creators = "KEANU reeves"),
+        )
+        val small = LibraryIndex.build(rows, listOf(device, nas), preferLocalArtwork = false)
+        val items = UiMappers.person(small, " keanu REEVES ")
+        // The show's episode arrived last, then the movies by when they were added.
+        assertEquals(listOf("s:name:show", "v:2", "v:1"), items.map { it.key })
+        // Whole names only: "Keanu" alone, or a name that merely starts the same, finds nothing.
+        assertTrue(UiMappers.person(small, "Keanu").isEmpty())
+        assertTrue(UiMappers.person(small, "").isEmpty())
+        assertEquals(listOf("v:3"), UiMappers.person(small, "Keanu Reevesley").map { it.key })
+    }
+
+    @Test
+    fun hiddenVideosLeaveEveryListButBrowse() {
+        val rows = listOf(
+            creditedMovie(1, "Hidden Film", cast = "A B"),
+            creditedMovie(2, "Shown Film", cast = "A B"),
+            creditedEpisode(10, creators = "C D"),
+            creditedEpisode(11, creators = "C D"),
+        )
+        val all = LibraryIndex.build(rows, listOf(device, nas), preferLocalArtwork = false)
+        val hidden = setOf(1L, 10L, 11L)
+        val small = LibraryIndex.build(rows, listOf(device, nas), preferLocalArtwork = false, hidden = hidden)
+        assertEquals(2, all.movies.size)
+        assertEquals(listOf(2L), small.movies.map { it.id })
+        // Hiding all of a show's episodes takes the show with them.
+        assertEquals(1, all.shows.size)
+        assertTrue(small.shows.isEmpty())
+        assertEquals(listOf(2L), small.videos.map { it.id })
+        assertTrue(UiMappers.search(small, "Hidden").results.isEmpty())
+        assertEquals(listOf("v:2"), UiMappers.person(small, "A B").map { it.key })
+        assertTrue(small.home.recentlyAdded.none { it.id in hidden })
+        // The files are still there: Browse lists them and their pages still open.
+        assertEquals(4, small.allVideos.size)
+        assertTrue(UiMappers.browseDir(small, DEVICE, "Movies", idle)!!.videos.any { it.id == 1L })
+        assertNotNull(UiMappers.videoDetails(small, 1L))
+        assertNotNull(UiMappers.videoDetails(small, 10L))
+        // Preferences lists them, a show's episodes as one row.
+        val listed = UiMappers.hiddenVideos(small, hidden)
+        assertEquals(listOf("Dark Show", "Hidden Film"), listed.map { it.title })
+        assertEquals(listOf(10L, 11L), listed.first().videoIds)
+        assertTrue(UiMappers.hiddenVideos(small, emptySet()).isEmpty())
+    }
+
     @Test
     fun allVideosIsAGaplessTimelineNewestFirst() {
         val utc = java.time.ZoneOffset.UTC

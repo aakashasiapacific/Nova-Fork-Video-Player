@@ -100,6 +100,7 @@ import com.aakash.novafork.ui.common.RatingPill
 import com.aakash.novafork.ui.common.ScanBanner
 import com.aakash.novafork.ui.common.SectionHeader
 import com.aakash.novafork.ui.common.SoftEdgeDepth
+import com.aakash.novafork.ui.common.ShowMenuBox
 import com.aakash.novafork.ui.common.VideoMenuBox
 import com.aakash.novafork.ui.common.bottomScrim
 import com.aakash.novafork.ui.common.deviceAccessNotice
@@ -428,7 +429,9 @@ private fun WatchlistRow(items: List<LibraryItemUi>, actions: AppActions) {
             CompositionLocalProvider(LocalCardParallax provides remember(rowState, index) { rowState.parallaxAt(index) }) {
                 when (item) {
                     is LibraryItemUi.Video -> PhoneWideVideoCard(card = item.card, onClick = { actions.openVideo(item.card.id) })
-                    is LibraryItemUi.Show -> PhoneWideShowCard(show = item.card, onClick = { actions.openShow(item.card.key) })
+                    is LibraryItemUi.Show -> ShowMenuBox(showKey = item.card.key, actions = actions) { openMenu ->
+                        PhoneWideShowCard(show = item.card, onClick = { actions.openShow(item.card.key) }, onLongClick = openMenu)
+                    }
                 }
             }
         }

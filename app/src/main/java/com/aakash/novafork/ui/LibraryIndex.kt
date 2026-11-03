@@ -76,17 +76,23 @@ class LibraryIndex(
     val preferLocalArtwork: Boolean,
     /** Movie id → its extras (trailers, featurettes...), in file-name order. They are also in [videos]. */
     val extrasByMovie: Map<Long, List<IndexedVideo>> = emptyMap(),
+    /**
+     * Every video, the ones the user hid from the library included ([videos] leaves those out).
+     * Browse and the details of a video opened there still use all of them: hiding never removes
+     * a file or makes it unplayable.
+     */
+    val allVideos: List<IndexedVideo> = videos,
 ) {
     /** Extras that found their movie: shown on its page only, never as items of their own. */
     val extraIds: Set<Long> = extrasByMovie.values.flatMapTo(HashSet<Long>()) { list -> list.map { it.id } }
 
-    val videosById: Map<Long, IndexedVideo> = videos.associateBy { it.id }
+    val videosById: Map<Long, IndexedVideo> = allVideos.associateBy { it.id }
     val showsByKey: Map<String, IndexedShow> = shows.associateBy { it.key }
     val sourcesById: Map<Long, SourceEntity> = sources.associateBy { it.id }
-    val videoCountBySource: Map<Long, Int> = videos.groupingBy { it.video.sourceId }.eachCount()
+    val videoCountBySource: Map<Long, Int> = allVideos.groupingBy { it.video.sourceId }.eachCount()
 
     /** By [com.aakash.novafork.data.db.VideoEntity.uri], for matching live network listings to the library. */
-    val videosByUri: Map<String, IndexedVideo> by lazy { videos.associateBy { it.video.uri } }
+    val videosByUri: Map<String, IndexedVideo> by lazy { allVideos.associateBy { it.video.uri } }
 
     /** Movies from device, folders and shares (matched movie streams stay with the streams). Newest first. */
     val movies: List<IndexedVideo> = videos.filter { it.kind == MediaKind.MOVIE && it.id !in extraIds }
@@ -99,7 +105,16 @@ class LibraryIndex(
     val home: HomeUi by lazy { UiMappers.home(this) }
 
     companion object {
-        fun build(rows: List<VideoWithMeta>, sources: List<SourceEntity>, preferLocalArtwork: Boolean): LibraryIndex {
+        /**
+         * [hidden] are ids of videos the user hid: they are left out of [videos], [shows] and
+         * everything derived from them, and kept in [allVideos] for Browse.
+         */
+        fun build(
+            rows: List<VideoWithMeta>,
+            sources: List<SourceEntity>,
+            preferLocalArtwork: Boolean,
+            hidden: Set<Long> = emptySet(),
+        ): LibraryIndex {
             val sourcesById = sources.associateBy { it.id }
             val smbRoots = sources
                 .filter { it.type == SourceType.SMB }
@@ -108,12 +123,13 @@ class LibraryIndex(
             val seasonPosters = { meta: MetadataEntity ->
                 seasonPosterCache.getOrPut(meta.key) { parseSeasonPosters(meta.seasonPostersJson) }
             }
-            val videos = rows
+            val allVideos = rows
                 .sortedWith(compareByDescending<VideoWithMeta> { it.video.dateAdded }.thenByDescending { it.video.id })
                 .map { row ->
                     val source = sourcesById[row.video.sourceId]
                     indexVideo(row, source, smbRoots[row.video.sourceId].orEmpty(), preferLocalArtwork, seasonPosters)
                 }
+            val videos = if (hidden.isEmpty()) allVideos else allVideos.filter { it.id !in hidden }
             val episodesByShow = LinkedHashMap<String, MutableList<IndexedVideo>>()
             for (video in videos) {
                 val key = video.showKey ?: continue
@@ -122,7 +138,7 @@ class LibraryIndex(
             val shows = episodesByShow
                 .map { (key, episodes) -> buildShow(key, episodes, preferLocalArtwork, seasonPosters) }
                 .sortedWith(compareBy(NaturalOrder) { it.sortKey })
-            return LibraryIndex(videos, shows, sources, preferLocalArtwork, extrasOf(videos))
+            return LibraryIndex(videos, shows, sources, preferLocalArtwork, extrasOf(videos), allVideos)
         }
     }
 }

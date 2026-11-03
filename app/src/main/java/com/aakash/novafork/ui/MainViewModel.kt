@@ -148,6 +148,12 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
     /** History's hidden videos (video id to when it had last been played); only the list is hidden, never a file. */
     private val historyPrefs = app.getSharedPreferences("history_hidden", android.content.Context.MODE_PRIVATE)
 
+    /** Hidden Videos: ids of videos kept out of the library's screens (never deleted; Browse still lists them). */
+    private val hiddenPrefs = app.getSharedPreferences("library_hidden", android.content.Context.MODE_PRIVATE)
+    private val hiddenVideoIds = MutableStateFlow(
+        hiddenPrefs.getStringSet(KEY_HIDDEN_VIDEOS, null).orEmpty().mapNotNull { it.toLongOrNull() }.toSet(),
+    )
+
     private val local = MutableStateFlow(
         LocalState(
             permission = currentPermission(),
@@ -163,8 +169,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
         library.observeSources(),
         settingsStore.settings.map { it.preferLocalArtwork }.distinctUntilChanged(),
         graph.database.metadataDao().observeArtworkChoices(),
-    ) { videos, sources, preferLocal, choices ->
-        LibraryIndex.build(withArtworkChoices(videos, choices), sources, preferLocal)
+        hiddenVideoIds,
+    ) { videos, sources, preferLocal, choices, hidden ->
+        LibraryIndex.build(withArtworkChoices(videos, choices), sources, preferLocal, hidden)
     }
 
     // Only touched from the state combine below, which never runs concurrently with itself.
@@ -174,9 +181,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
     /** Preferences' Storage and Watch Stats, sums over the whole library; worked out only on a settings page. */
     private val statsMemo = Memo<Pair<LibraryIndex, MusicLibraryData>, Pair<SpaceUsage, WatchStats>> { (index, music) ->
         val names = index.sources.associate { it.id to it.name }
-        val files = index.videos.map { StoredFile(it.video.sourceId, it.video.folder, it.video.sizeBytes) } +
+        val files = index.allVideos.map { StoredFile(it.video.sourceId, it.video.folder, it.video.sizeBytes) } +
             music.songs.map { StoredFile(it.sourceId, it.folder, it.sizeBytes) }
-        val records = index.videos.map {
+        val records = index.allVideos.map {
             PlayRecord(
                 isMovie = it.kind == MediaKind.MOVIE,
                 isEpisode = it.kind == MediaKind.EPISODE,
@@ -391,6 +398,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
             showDetails = showKey?.let { UiMappers.showDetails(index, it) },
             previewKey = previewKey,
             history = if (route == Route.History) UiMappers.history(index, user.historyHidden) else emptyList(),
+            person = (route as? Route.Person)?.let { UiMappers.person(index, it.name) }.orEmpty(),
+            hidden = if (route == Route.HiddenVideos) UiMappers.hiddenVideos(index, hiddenVideoIds.value) else emptyList(),
             playlist = openPlaylist?.let { UiMappers.playlistDetails(index, it.id, it.name, lists.openVideoIds) },
             search = searchMemo[Triple(index, user.query, music)].copy(recent = user.recentSearches),
             settings = SettingsUi(
@@ -522,6 +531,24 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
     override fun hideFromHistory(videoId: Long, playedAt: Long) {
         local.update { it.copy(historyHidden = it.historyHidden + (videoId to playedAt)) }
         historyPrefs.edit().putLong(videoId.toString(), playedAt).apply()
+    }
+
+    private fun setHidden(ids: Set<Long>) {
+        hiddenVideoIds.value = ids
+        hiddenPrefs.edit().putStringSet(KEY_HIDDEN_VIDEOS, ids.mapTo(HashSet()) { it.toString() }).apply()
+    }
+
+    override fun hideVideo(videoId: Long) {
+        setHidden(hiddenVideoIds.value + videoId)
+    }
+
+    override fun hideShow(showKey: String) {
+        val episodes = latestIndex?.showsByKey?.get(showKey)?.episodes ?: return
+        setHidden(hiddenVideoIds.value + episodes.map { it.id })
+    }
+
+    override fun unhideVideos(videoIds: List<Long>) {
+        setHidden(hiddenVideoIds.value - videoIds.toSet())
     }
 
     override fun rememberSearch(query: String) {
@@ -1721,6 +1748,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
         const val LYRICS_REINDEX_MS = 1_000L
 
         const val KEY_RECENT_SEARCHES = "recent"
+        const val KEY_HIDDEN_VIDEOS = "videos"
         val TRAILING_YEAR = Regex("""\s*\(?(19|20)\d{2}\)?$""")
 
         /** Live folder listings kept for going back without listing again. */

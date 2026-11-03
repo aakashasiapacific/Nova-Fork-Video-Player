@@ -75,7 +75,51 @@ fun VideoMenuBox(
                     actions.addToPlaylist(listOf(videoId), title)
                 },
             )
+            // Library only: the file stays, and Browse still lists it (Preferences › Hidden Videos brings it back).
+            NovaMenuItem(
+                text = { Text("Hide") },
+                leadingIcon = { NovaIcon(R.drawable.ic_visibility_off, contentDescription = null) },
+                onClick = {
+                    open = false
+                    actions.hideVideo(videoId)
+                },
+            )
             extraItems?.invoke { open = false }
+        }
+    }
+}
+
+/**
+ * Long-press menu of a show's card: Details and Hide (all its episodes leave the library's
+ * screens; nothing is deleted). [content] gets an `openMenu` callback to use as its long-click.
+ */
+@Composable
+fun ShowMenuBox(
+    showKey: String,
+    actions: AppActions,
+    modifier: Modifier = Modifier,
+    content: @Composable (openMenu: () -> Unit) -> Unit,
+) {
+    var open by remember { mutableStateOf(false) }
+    Box(modifier) {
+        ContextMenuLift(open = open) { copy -> content(if (copy) ({}) else ({ open = true })) }
+        NovaDropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            NovaMenuItem(
+                text = { Text("Details") },
+                leadingIcon = { NovaIcon(R.drawable.ic_info, contentDescription = null) },
+                onClick = {
+                    open = false
+                    actions.openShow(showKey)
+                },
+            )
+            NovaMenuItem(
+                text = { Text("Hide") },
+                leadingIcon = { NovaIcon(R.drawable.ic_visibility_off, contentDescription = null) },
+                onClick = {
+                    open = false
+                    actions.hideShow(showKey)
+                },
+            )
         }
     }
 }

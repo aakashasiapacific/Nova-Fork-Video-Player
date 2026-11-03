@@ -319,6 +319,17 @@ data class ShowDetailsUi(
     val moreLikeThis: List<LibraryItemUi> = emptyList(),
 )
 
+/** A row of Preferences' Hidden Videos: a video, or a show's hidden episodes together. */
+@Immutable
+data class HiddenItemUi(
+    val key: String,
+    val title: String,
+    val subtitle: String? = null,
+    val artwork: Artwork = Artwork(),
+    /** What "Unhide" brings back. */
+    val videoIds: List<Long> = emptyList(),
+)
+
 /** One video of the watch history: its card and when it was last played. */
 @Immutable
 data class HistoryEntryUi(val card: VideoCardUi, val playedAt: Long)
