@@ -293,8 +293,9 @@ private fun PlaySection(details: VideoDetailsUi, actions: AppActions, modifier: 
             Row(verticalAlignment = Alignment.CenterVertically) {
                 // Its digits roll as the clock moves the end time on.
                 RollingText(
+                    // The Resume button already says how long is left; this line adds when it ends.
                     text = if (duration != null && duration > 0) {
-                        metaLine(Formats.remaining(details.positionMs, duration), endsAt)
+                        endsAt ?: metaLine(Formats.remaining(details.positionMs, duration))
                     } else {
                         "${(progress.coerceIn(0f, 1f) * 100).roundToInt()}% watched"
                     },
