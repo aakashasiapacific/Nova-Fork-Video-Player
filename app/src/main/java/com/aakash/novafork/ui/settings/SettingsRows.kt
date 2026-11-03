@@ -186,18 +186,15 @@ internal fun RowIcon(@DrawableRes icon: Int, tile: Color = tileColor(icon)) {
 }
 
 /**
- * iPhone Settings' tile, exactly (owner: the glass version looked like a knock-off): a flat
- * square of solid [color] with iOS's corner, and the white glyph. No sheen, rim or shadow.
+ * ChatGPT Settings' row icon (owner: the coloured squares looked like a cheap copy of iOS): the
+ * plain white outline glyph on the card, no tile behind it. [color] is kept for the callers and
+ * not drawn.
  */
+@Suppress("UNUSED_PARAMETER")
 @Composable
 internal fun IconTile(@DrawableRes icon: Int, color: Color, size: Dp = TileSize) {
-    Box(
-        Modifier
-            .size(size)
-            .background(color, RoundedCornerShape(size * TileCornerRatio)),
-        contentAlignment = Alignment.Center,
-    ) {
-        NovaIcon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(size * 0.66f))
+    Box(Modifier.size(size), contentAlignment = Alignment.Center) {
+        NovaIcon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(size * 0.8f))
     }
 }
 
@@ -215,8 +212,6 @@ internal fun Modifier.glassSheen(): Modifier = drawWithContent {
     )
 }
 
-/** iOS's 7pt corner on a 30pt tile. */
-private const val TileCornerRatio = 0.23f
 
 /**
  * Tile colours by meaning, in iOS 26/27's palette: files and storage blue, network indigo,
