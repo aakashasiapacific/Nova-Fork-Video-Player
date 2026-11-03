@@ -212,7 +212,10 @@ private fun PlaySection(details: VideoDetailsUi, actions: AppActions, modifier: 
                     .height(52.dp)
                     // How far it was watched shows in the button itself, as on Apple TV.
                     .resumeFill(details.progress),
-                colors = ButtonDefaults.buttonColors(containerColor = NovaColors.IosBlue, contentColor = Color.White),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = rememberPlayColor(details.artwork, NovaColors.IosBlue),
+                    contentColor = Color.White,
+                ),
                 contentPadding = ButtonDefaults.ButtonWithIconContentPadding,
             ) {
                 NovaIcon(R.drawable.ic_play_arrow, contentDescription = null, modifier = Modifier.size(24.dp))

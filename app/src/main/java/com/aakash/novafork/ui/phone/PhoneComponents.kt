@@ -73,6 +73,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -84,6 +85,7 @@ import com.aakash.novafork.ui.common.EndOfListGap
 import com.aakash.novafork.ui.common.GlassCircle
 import com.aakash.novafork.ui.common.Hairline
 import com.aakash.novafork.ui.common.IosColors
+import com.aakash.novafork.ui.common.IosTextButton
 import com.aakash.novafork.ui.common.IosSpinner
 import com.aakash.novafork.ui.common.LandscapeArt
 import com.aakash.novafork.ui.common.LocalBottomBarSpace
@@ -390,9 +392,12 @@ private fun WideCardLayout(
             ProgressStrip(progress, Modifier.align(Alignment.BottomStart))
         }
         Spacer(Modifier.height(8.dp))
+        // Two lines of title and one of caption are always reserved, so every card in a row ends
+        // at the same height and the row neither jumps nor ragged-edges as titles change.
         Text(
             text = title,
             style = MaterialTheme.typography.titleSmall,
+            minLines = 2,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
@@ -402,14 +407,18 @@ private fun WideCardLayout(
                 text = subtitle.orEmpty(),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.fillMaxWidth().clipToBounds(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = with(LocalDensity.current) { MaterialTheme.typography.bodySmall.lineHeight.toDp() })
+                    .clipToBounds(),
             )
         } else {
             Text(
                 text = subtitle.orEmpty(),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 2,
+                minLines = 1,
+                maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
         }
@@ -908,6 +917,33 @@ internal fun CenteredScrollable(modifier: Modifier = Modifier, content: @Composa
             contentAlignment = Alignment.Center,
             content = content,
         )
+    }
+}
+
+/**
+ * An empty page's whole message: one quiet centred grey line and, only where something obvious can
+ * be done, one small text button under it. No icon, no title, no illustration.
+ */
+@Composable
+internal fun PhoneEmptyLine(
+    text: String,
+    modifier: Modifier = Modifier,
+    actionLabel: String? = null,
+    onAction: (() -> Unit)? = null,
+) {
+    Column(
+        modifier.padding(horizontal = 32.dp, vertical = 24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(
+            text,
+            style = MaterialTheme.typography.bodyMedium,
+            color = IosColors.SecondaryLabel,
+            textAlign = TextAlign.Center,
+        )
+        if (actionLabel != null && onAction != null) {
+            IosTextButton(onClick = onAction) { Text(actionLabel) }
+        }
     }
 }
 

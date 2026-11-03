@@ -18,7 +18,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
-import com.aakash.novafork.ui.common.EmptyState
 import com.aakash.novafork.ui.common.EndOfListGap
 import com.aakash.novafork.ui.common.IosIconButton
 import com.aakash.novafork.ui.common.LocalBottomBarSpace
@@ -51,11 +50,7 @@ fun PhonePlaylistScreen(
             LoadingBox()
         } else if (playlist.videos.isEmpty()) {
             CenteredScrollable {
-                EmptyState(
-                    icon = R.drawable.ic_playlist_add,
-                    title = "No videos yet",
-                    body = "Long-press a video in Browse, Library or a show and pick Add to playlist.",
-                )
+                PhoneEmptyLine("No videos yet. Long-press a video and pick Add to playlist.")
             }
         } else {
             PlaylistContent(playlist = playlist, actions = actions)

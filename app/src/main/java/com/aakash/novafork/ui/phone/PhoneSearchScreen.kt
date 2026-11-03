@@ -65,7 +65,6 @@ import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
 import com.aakash.novafork.ui.common.CollapsedTitleBar
-import com.aakash.novafork.ui.common.EmptyState
 import com.aakash.novafork.ui.common.Hairline
 import com.aakash.novafork.ui.common.IosColors
 import com.aakash.novafork.ui.common.IosIconButton
@@ -238,25 +237,13 @@ fun PhoneSearchScreen(
                         }
                     }
                     field.text.isBlank() -> CenteredScrollable(Modifier.padding(bottom = listSpace)) {
-                        EmptyState(
-                            icon = R.drawable.ic_search,
-                            title = "Search your library",
-                            body = "Find movies, shows, videos, songs, albums and artists.",
-                        )
+                        PhoneEmptyLine("Search movies, shows, videos and music")
                     }
                     search.isEmpty && query.isNotEmpty() -> CenteredScrollable(Modifier.padding(bottom = listSpace)) {
-                        EmptyState(
-                            icon = R.drawable.ic_search,
-                            title = "No Results",
-                            body = "Nothing in your library matches “$query”.",
-                        )
+                        PhoneEmptyLine("No results for “$query”")
                     }
                     shown.isEmpty() && !(showMusic && search.hasMusic) -> CenteredScrollable(Modifier.padding(bottom = listSpace)) {
-                        EmptyState(
-                            icon = R.drawable.ic_search,
-                            title = "No Results",
-                            body = "No ${filter.label.lowercase()} match “$query”.",
-                        )
+                        PhoneEmptyLine("No ${filter.label.lowercase()} match “$query”")
                     }
                     else -> {
                         // Apple Music's Top Hit: the best match first, larger, then the rest.

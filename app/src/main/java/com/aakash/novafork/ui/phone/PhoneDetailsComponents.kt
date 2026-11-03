@@ -58,6 +58,8 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toArgb
@@ -405,6 +407,25 @@ internal fun rememberDetailsTint(artwork: Artwork): Color {
         }
     }
     val shown by animateColorAsState(deep, tween(600), label = "detailsTint")
+    return shown
+}
+
+/**
+ * The big Play pill's colour: a deep take on the artwork's tint that white text stays readable on
+ * (a light tint is mixed a third of the way to black; one too dark to tell from the page, or not yet
+ * known, gives [fallback]). Eases over 300 ms when it arrives or the title changes.
+ */
+@Composable
+internal fun rememberPlayColor(artwork: Artwork, fallback: Color): Color {
+    val base = rememberArtTint(artwork.backdropUrl ?: artwork.stillUrl ?: artwork.posterUrl)
+    val target = if (base.alpha == 0f) {
+        fallback
+    } else {
+        val opaque = base.copy(alpha = 1f)
+        val deep = if (opaque.luminance() > 0.2f) lerp(opaque, Color.Black, 0.35f) else opaque
+        if (deep.luminance() < 0.02f) fallback else deep
+    }
+    val shown by animateColorAsState(target, tween(300), label = "playColor")
     return shown
 }
 

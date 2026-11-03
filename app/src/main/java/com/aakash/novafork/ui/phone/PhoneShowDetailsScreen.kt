@@ -48,6 +48,7 @@ import com.aakash.novafork.R
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
 import com.aakash.novafork.ui.common.EndOfListGap
 import com.aakash.novafork.ui.common.IosButton
+import com.aakash.novafork.ui.common.IosColors
 import com.aakash.novafork.ui.common.LocalBottomBarSpace
 import com.aakash.novafork.ui.common.NovaDropdownMenu
 import com.aakash.novafork.ui.common.NovaIcon
@@ -57,6 +58,7 @@ import com.aakash.novafork.ui.common.VideoMenuBox
 import com.aakash.novafork.ui.common.metaLine
 import com.aakash.novafork.ui.common.resumeFill
 import com.aakash.novafork.ui.model.AppActions
+import com.aakash.novafork.ui.model.EpisodeUi
 import com.aakash.novafork.ui.model.ShowDetailsUi
 import kotlin.math.abs
 
@@ -77,6 +79,7 @@ fun PhoneShowDetailsScreen(
     val haptics = LocalHapticFeedback.current
     // Lazy keys must be unique; a file listed twice in a season must not crash the list.
     val episodes = remember(season) { season?.episodes.orEmpty().distinctBy { it.videoId } }
+    val rows = remember(episodes) { episodeRowsWithGaps(episodes) }
     val episodeCount = remember(seasons) { seasons.sumOf { it.episodes.size } }
     // Identify works on a file; any episode of the show leads to the right show search.
     val identifyVideoId = nextUp?.videoId ?: seasons.firstNotNullOfOrNull { it.episodes.firstOrNull()?.videoId }
@@ -118,6 +121,10 @@ fun PhoneShowDetailsScreen(
                             .fillMaxWidth()
                             .height(52.dp)
                             .resumeFill(nextUp?.progress),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = rememberPlayColor(details.artwork, MaterialTheme.colorScheme.primary),
+                            contentColor = Color.White,
+                        ),
                         contentPadding = ButtonDefaults.ButtonWithIconContentPadding,
                     ) {
                         NovaIcon(R.drawable.ic_play_arrow, contentDescription = null, modifier = Modifier.size(24.dp))
@@ -220,7 +227,17 @@ fun PhoneShowDetailsScreen(
                         )
                     }
                 }
-                items(episodes, key = { "ep:${it.videoId}" }) { episode ->
+                items(rows, key = { it.key }) { row ->
+                    if (row is EpisodeListRow.Missing) {
+                        Text(
+                            text = row.label,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = IosColors.SecondaryLabel,
+                            modifier = Modifier.padding(horizontal = dims.gutter, vertical = 6.dp),
+                        )
+                        return@items
+                    }
+                    val episode = (row as EpisodeListRow.Row).episode
                     VideoMenuBox(
                         videoId = episode.videoId,
                         title = metaLine(details.title, episode.code, episode.title),
@@ -315,3 +332,38 @@ private fun Modifier.swipeSeasons(hasPrevious: Boolean, hasNext: Boolean, onSwip
 
 /** How far a swipe across the episodes must go to change season. */
 private val SeasonSwipeCommit = 64.dp
+
+/** A line of a season's list: an episode, or a quiet note that some numbers between two are missing. */
+private sealed interface EpisodeListRow {
+    val key: String
+
+    class Row(val episode: EpisodeUi) : EpisodeListRow {
+        override val key get() = "ep:${episode.videoId}"
+    }
+
+    class Missing(val first: Int, val last: Int) : EpisodeListRow {
+        override val key get() = "missing:$first"
+        val label get() = if (first == last) "Episode $first missing" else "Episodes $first–$last missing"
+    }
+}
+
+/**
+ * [episodes] with a [EpisodeListRow.Missing] between neighbours whose numbers skip (E3 then E5).
+ * Only gaps inside the numbers the season has: unnumbered episodes get none, and a double episode
+ * ("E3-E4", read from its code) counts as covering both numbers.
+ */
+private fun episodeRowsWithGaps(episodes: List<EpisodeUi>): List<EpisodeListRow> {
+    val out = ArrayList<EpisodeListRow>(episodes.size)
+    var previousEnd: Int? = null
+    for (episode in episodes) {
+        val start = episode.episode.takeIf { it > 0 }
+        if (start != null) {
+            val end = Regex("\\d+").findAll(episode.code).lastOrNull()?.value?.toIntOrNull()?.coerceAtLeast(start) ?: start
+            val before = previousEnd
+            if (before != null && start > before + 1) out += EpisodeListRow.Missing(before + 1, start - 1)
+            previousEnd = maxOf(before ?: end, end)
+        }
+        out += EpisodeListRow.Row(episode)
+    }
+    return out
+}
