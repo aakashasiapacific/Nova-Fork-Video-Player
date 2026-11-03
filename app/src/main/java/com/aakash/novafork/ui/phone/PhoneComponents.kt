@@ -869,6 +869,10 @@ internal fun PhoneTopBar(
     onBack: (() -> Unit)? = null,
     actions: @Composable RowScope.() -> Unit = {},
 ) {
+    // The title keeps clear of however many buttons the page puts on the right.
+    val density = LocalDensity.current
+    var actionsWidth by remember { mutableStateOf(0.dp) }
+    val side = maxOf(TOP_BAR_TITLE_INSET, actionsWidth + 8.dp)
     Box(
         modifier
             .fillMaxWidth()
@@ -888,7 +892,7 @@ internal fun PhoneTopBar(
                 textAlign = TextAlign.Center,
                 modifier = Modifier
                     .align(Alignment.Center)
-                    .padding(horizontal = 100.dp),
+                    .padding(horizontal = side),
             )
         } else {
             Text(
@@ -898,12 +902,20 @@ internal fun PhoneTopBar(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier
                     .align(Alignment.CenterStart)
-                    .padding(start = 4.dp, end = 100.dp),
+                    .padding(start = 4.dp, end = side),
             )
         }
-        Row(Modifier.align(Alignment.CenterEnd), verticalAlignment = Alignment.CenterVertically, content = actions)
+        Row(
+            Modifier
+                .align(Alignment.CenterEnd)
+                .onSizeChanged { actionsWidth = with(density) { it.width.toDp() } },
+            verticalAlignment = Alignment.CenterVertically,
+            content = actions,
+        )
     }
 }
+
+private val TOP_BAR_TITLE_INSET = 100.dp
 
 /**
  * Centres [content] in the available space but still scrolls when it does not fit (landscape),
