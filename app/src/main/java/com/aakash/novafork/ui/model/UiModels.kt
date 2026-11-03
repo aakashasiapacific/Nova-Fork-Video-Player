@@ -80,7 +80,18 @@ data class ShowCardUi(
     val seasonCount: Int = 0,
     val episodeCount: Int = 0,
     val unwatchedCount: Int = 0,
-)
+) {
+    /** "4 of 8 watched" once an episode was watched; null before that (the caption stays the episode count). */
+    val watchedCaption: String? get() = watchedCaptionOf(episodeCount - unwatchedCount, episodeCount)
+}
+
+/** "4 of 8 watched"; null when nothing is watched yet or there is nothing to watch. */
+fun watchedCaptionOf(watched: Int, total: Int): String? =
+    if (total > 0 && watched in 1..total) "$watched of $total watched" else null
+
+/** A person of a movie's or show's cast row; [photoUrl] is a TMDB w185 URL or null (no photo). */
+@Immutable
+data class CastUi(val name: String, val character: String? = null, val photoUrl: String? = null)
 
 @Immutable
 sealed interface LibraryItemUi {
@@ -272,6 +283,16 @@ data class VideoDetailsUi(
     val qualityBadges: List<String> = emptyList(),
     /** A movie's age rating ("PG-13") once TMDB has told; null until known. */
     val ageRating: String? = null,
+    /** https://www.youtube.com/watch?v=KEY of the official trailer once TMDB has told; null when none. */
+    val trailerUrl: String? = null,
+    /** The top-billed cast with photos, once TMDB has told; empty until then. */
+    val cast: List<CastUi> = emptyList(),
+    /** This video is a copy the app downloaded (it lives in Movies/Nova Fork), or one has been downloaded. */
+    val downloaded: Boolean = false,
+    /** What "Rename in Library" stores the title under (see LibraryIndex). */
+    val titleKey: String = "",
+    /** The title shown is one the user typed: "Use Original Title" is offered. */
+    val titleCustomised: Boolean = false,
 )
 
 @Immutable
@@ -298,7 +319,10 @@ data class SeasonUi(
     val title: String,
     val posterUrl: String? = null,
     val episodes: List<EpisodeUi> = emptyList(),
-)
+) {
+    /** "4 of 8 watched"; null before any episode is watched. */
+    val watchedCaption: String? get() = watchedCaptionOf(episodes.count { it.watched }, episodes.size)
+}
 
 @Immutable
 data class ShowDetailsUi(
@@ -327,6 +351,40 @@ data class ShowDetailsUi(
     val ageRating: String? = null,
     /** "New episode Fri, 7 Nov" when TMDB knows the next air date and it is not past; null otherwise. */
     val nextEpisodeLabel: String? = null,
+    /** https://www.youtube.com/watch?v=KEY of the official trailer once TMDB has told; null when none. */
+    val trailerUrl: String? = null,
+    /** The top-billed cast with photos, once TMDB has told; empty until then. */
+    val cast: List<CastUi> = emptyList(),
+    /** What "Rename in Library" stores the title under (see LibraryIndex). */
+    val titleKey: String = "",
+    /** The title shown is one the user typed: "Use Original Title" is offered. */
+    val titleCustomised: Boolean = false,
+)
+
+/** What the Library Health page lists: groups of things that need a look, each with its items. */
+@Immutable
+data class LibraryHealthUi(val groups: List<HealthGroupUi> = emptyList()) {
+    val problemCount: Int get() = groups.sumOf { it.items.size }
+}
+
+enum class HealthKind(val title: String, val footer: String) {
+    NO_ARTWORK("No Artwork", "Movies and shows with no poster or backdrop. Tap one to pick artwork."),
+    UNIDENTIFIED("Not Identified", "Movies with no details from TMDB. Tap one to identify it."),
+    UNPARSED_EPISODES("Unrecognised Episodes", "Episodes whose file name has no season or episode number. Tap one to open it."),
+}
+
+@Immutable
+data class HealthGroupUi(val kind: HealthKind, val items: List<HealthItemUi>)
+
+/** One thing on the Library Health page. Tapping it acts on [videoId] as its [HealthGroupUi.kind] says. */
+@Immutable
+data class HealthItemUi(
+    val key: String,
+    val title: String,
+    val subtitle: String? = null,
+    val artwork: Artwork = Artwork(),
+    /** The video (a show's first episode) to open, identify or change artwork for. */
+    val videoId: Long,
 )
 
 /** A row of Preferences' Hidden Videos: a video, or a show's hidden episodes together. */
@@ -515,6 +573,8 @@ data class SettingsUi(
     val space: SpaceUsage = SpaceUsage(),
     /** Preferences' Watch Stats group. Filled only while a settings page is open. */
     val watch: WatchStats = WatchStats(),
+    /** Preferences' Storage group: room the extra copies of duplicate videos take, in bytes (0 = no duplicates). */
+    val duplicateBytes: Long = 0,
     /** Preferences' library card: every video in the library. */
     val videoCount: Int = 0,
     /** Preferences' library card: every song in the music library. */

@@ -47,7 +47,12 @@ import com.aakash.novafork.ui.common.NovaDropdownMenu
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.NovaMenuItem
 import com.aakash.novafork.ui.common.RatingPill
+import com.aakash.novafork.ui.common.CastRow
+import com.aakash.novafork.ui.common.GreyCaption
 import com.aakash.novafork.ui.common.RenameFileDialog
+import com.aakash.novafork.ui.common.RenameInLibraryMenuItems
+import com.aakash.novafork.ui.common.RenameTitleDialog
+import com.aakash.novafork.ui.common.TrailerPill
 import com.aakash.novafork.ui.common.RenameFileMenuItem
 import com.aakash.novafork.ui.common.metaLine
 import com.aakash.novafork.ui.model.AppActions
@@ -171,6 +176,14 @@ private fun VideoBody(details: VideoDetailsUi, actions: AppActions) {
     val isStream = details.kind == MediaKind.STREAM
     val started = (details.progress ?: 0f) > 0f
     var renaming by remember { mutableStateOf(false) }
+    var renamingTitle by remember { mutableStateOf(false) }
+    if (renamingTitle) {
+        RenameTitleDialog(
+            title = details.title,
+            onRename = { actions.setTitleOverride(details.titleKey, it) },
+            onDismiss = { renamingTitle = false },
+        )
+    }
     if (renaming) {
         RenameFileDialog(
             fileName = details.fileName,
@@ -184,6 +197,7 @@ private fun VideoBody(details: VideoDetailsUi, actions: AppActions) {
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             TabletPlayButton(label = details.playLabel, onClick = { actions.play(details.id) })
+            details.trailerUrl?.let { TrailerPill(it, onOpen = actions::openWebPage) }
             // The rest waits in one round "…", as on the Apple TV app's iPad pages.
             var menuOpen by remember { mutableStateOf(false) }
             Box {
@@ -230,11 +244,19 @@ private fun VideoBody(details: VideoDetailsUi, actions: AppActions) {
                             actions.addToPlaylist(listOf(details.id), details.title)
                         },
                     )
+                    RenameInLibraryMenuItems(
+                        titleKey = details.titleKey,
+                        customised = details.titleCustomised,
+                        close = { menuOpen = false },
+                        onRename = { renamingTitle = true },
+                        onReset = { actions.setTitleOverride(details.titleKey, null) },
+                    )
                     RenameFileMenuItem(details, close = { menuOpen = false }, onRename = { renaming = true })
                 }
             }
         }
         WatchProgress(progress = details.progress, positionMs = details.positionMs, durationMs = details.durationMs)
+        if (details.downloaded) GreyCaption("Downloaded")
         val showKey = details.showKey
         if (details.kind == MediaKind.EPISODE && showKey != null && !details.showTitle.isNullOrBlank()) {
             IosTextButton(onClick = { actions.openShow(showKey) }) {
@@ -263,6 +285,7 @@ private fun VideoBody(details: VideoDetailsUi, actions: AppActions) {
                 )
             }
         }
+        CastRow(details.cast, onPerson = actions::openPerson, gutter = 0.dp)
         if (details.extras.isNotEmpty()) {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("Extras", style = MaterialTheme.typography.titleLarge)

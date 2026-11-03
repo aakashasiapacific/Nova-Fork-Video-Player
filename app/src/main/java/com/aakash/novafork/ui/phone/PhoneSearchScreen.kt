@@ -313,7 +313,7 @@ private fun TopHit(item: LibraryItemUi, actions: AppActions) {
         is LibraryItemUi.Show -> {
             artwork = item.card.artwork
             title = item.card.title
-            caption = countLabel(item.card.episodeCount, "episode")
+            caption = item.card.watchedCaption ?: countLabel(item.card.episodeCount, "episode")
             open = { actions.openShow(item.card.key) }
         }
     }

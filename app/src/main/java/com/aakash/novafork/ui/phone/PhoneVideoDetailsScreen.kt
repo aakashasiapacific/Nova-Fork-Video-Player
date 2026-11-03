@@ -43,7 +43,12 @@ import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
 import com.aakash.novafork.core.format.Formats
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
+import com.aakash.novafork.ui.common.CastRow
 import com.aakash.novafork.ui.common.EndOfListGap
+import com.aakash.novafork.ui.common.GreyCaption
+import com.aakash.novafork.ui.common.RenameInLibraryMenuItems
+import com.aakash.novafork.ui.common.RenameTitleDialog
+import com.aakash.novafork.ui.common.TrailerPill
 import com.aakash.novafork.ui.common.IosButton
 import com.aakash.novafork.ui.common.IosColors
 import com.aakash.novafork.ui.common.IosTextButton
@@ -71,6 +76,14 @@ fun PhoneVideoDetailsScreen(
 ) {
     val dims = LocalNovaDimens.current
     var renaming by remember { mutableStateOf(false) }
+    var renamingTitle by remember { mutableStateOf(false) }
+    if (renamingTitle) {
+        RenameTitleDialog(
+            title = details.title,
+            onRename = { actions.setTitleOverride(details.titleKey, it) },
+            onDismiss = { renamingTitle = false },
+        )
+    }
     if (renaming) {
         RenameFileDialog(
             fileName = details.fileName,
@@ -111,6 +124,19 @@ fun PhoneVideoDetailsScreen(
                     modifier = Modifier.tintBand(tint, from = 0.8f, to = if (hasOverview) 0.55f else 0f).padding(start = dims.gutter, end = dims.gutter, top = 20.dp),
                 )
             }
+            val trailer = details.trailerUrl
+            if (trailer != null || details.downloaded) {
+                item(key = "trailer") {
+                    Row(
+                        Modifier.padding(start = dims.gutter, end = dims.gutter, top = 12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        if (trailer != null) TrailerPill(trailer, onOpen = actions::openWebPage)
+                        if (details.downloaded) GreyCaption("Downloaded")
+                    }
+                }
+            }
             // "Downloading 42%" while it copies to the phone (Download is in the ⋮ menu).
             item(key = "download") {
                 DownloadStatus(details, Modifier.padding(start = dims.gutter, end = dims.gutter, top = 12.dp))
@@ -123,6 +149,11 @@ fun PhoneVideoDetailsScreen(
                         modifier = Modifier.padding(top = 12.dp),
                         onName = actions::openPerson,
                     )
+                }
+            }
+            if (details.cast.isNotEmpty()) {
+                item(key = "cast") {
+                    CastRow(details.cast, onPerson = actions::openPerson, gutter = dims.gutter, modifier = Modifier.padding(top = dims.sectionSpacing))
                 }
             }
             val showKey = details.showKey
@@ -214,6 +245,13 @@ fun PhoneVideoDetailsScreen(
                     },
                 )
                 DownloadMenuItem(details, close)
+                RenameInLibraryMenuItems(
+                    titleKey = details.titleKey,
+                    customised = details.titleCustomised,
+                    close = close,
+                    onRename = { renamingTitle = true },
+                    onReset = { actions.setTitleOverride(details.titleKey, null) },
+                )
                 RenameFileMenuItem(details, close, onRename = { renaming = true })
             },
         )

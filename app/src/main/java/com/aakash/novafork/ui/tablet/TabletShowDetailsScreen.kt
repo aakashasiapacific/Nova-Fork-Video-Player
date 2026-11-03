@@ -48,6 +48,13 @@ import com.aakash.novafork.ui.adaptive.LocalNovaDimens
 import com.aakash.novafork.data.DetailsHeaderStyle
 import com.aakash.novafork.ui.common.IosFilledTonalButton
 import com.aakash.novafork.ui.common.LocalDetailsHeaderStyle
+import com.aakash.novafork.ui.common.CastRow
+import com.aakash.novafork.ui.common.GlassCircle
+import com.aakash.novafork.ui.common.GreyCaption
+import com.aakash.novafork.ui.common.NovaMenuDivider
+import com.aakash.novafork.ui.common.RenameInLibraryMenuItems
+import com.aakash.novafork.ui.common.RenameTitleDialog
+import com.aakash.novafork.ui.common.TrailerPill
 import com.aakash.novafork.ui.common.MetaBadges
 import com.aakash.novafork.ui.common.NovaChip
 import com.aakash.novafork.ui.common.NovaDropdownMenu
@@ -214,6 +221,14 @@ internal fun TabletShowDetailsScreen(
     val nextUpId = details.nextUp?.videoId
     val playId = nextUpId ?: seasons.firstOrNull()?.episodes?.firstOrNull()?.videoId
 
+    var renamingTitle by remember { mutableStateOf(false) }
+    if (renamingTitle) {
+        RenameTitleDialog(
+            title = details.title,
+            onRename = { actions.setTitleOverride(details.titleKey, it) },
+            onDismiss = { renamingTitle = false },
+        )
+    }
     // Wide screens (tablets in landscape): info and seasons on the left, the season's episodes beside them.
     if (layout.isTablet && LocalConfiguration.current.screenWidthDp >= SideBySideMinWidthDp) {
         ShowSideBySide(
@@ -254,6 +269,40 @@ internal fun TabletShowDetailsScreen(
                     },
                 )
             }
+            val allEpisodes = seasons.flatMap { it.episodes }
+            if (details.trailerUrl != null || allEpisodes.isNotEmpty()) {
+                item(key = "showActions", span = { GridItemSpan(maxLineSpan) }, contentType = "showActions") {
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        details.trailerUrl?.let { TrailerPill(it, onOpen = actions::openWebPage) }
+                        var menuOpen by remember { mutableStateOf(false) }
+                        Box {
+                            TrailerlessMoreButton { menuOpen = true }
+                            NovaDropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                                val showWatched = allEpisodes.isNotEmpty() && allEpisodes.all { it.watched }
+                                NovaMenuItem(
+                                    text = { Text(if (showWatched) "Mark Show Unwatched" else "Mark Show Watched") },
+                                    onClick = {
+                                        menuOpen = false
+                                        allEpisodes.forEach { actions.setWatched(it.videoId, !showWatched) }
+                                    },
+                                )
+                                RenameInLibraryMenuItems(
+                                    titleKey = details.titleKey,
+                                    customised = details.titleCustomised,
+                                    close = { menuOpen = false },
+                                    onRename = { renamingTitle = true },
+                                    onReset = { actions.setTitleOverride(details.titleKey, null) },
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+            if (details.cast.isNotEmpty()) {
+                item(key = "cast", span = { GridItemSpan(maxLineSpan) }, contentType = "cast") {
+                    CastRow(details.cast, onPerson = actions::openPerson, gutter = 0.dp)
+                }
+            }
             if (season != null) {
                 item(key = "seasons", span = { GridItemSpan(maxLineSpan) }, contentType = "seasons") {
                     SeasonSelector(
@@ -261,6 +310,7 @@ internal fun TabletShowDetailsScreen(
                         selected = season.number,
                         onSelect = { selectedSeason = it },
                         modifier = Modifier.padding(top = 8.dp),
+                        onMarkSeason = { watched -> season.episodes.forEach { actions.setWatched(it.videoId, watched) } },
                     )
                 }
                 if (season.episodes.isNotEmpty()) {
@@ -425,14 +475,20 @@ private fun SeasonSelector(
     selected: Int,
     onSelect: (Int) -> Unit,
     modifier: Modifier = Modifier,
+    onMarkSeason: (watched: Boolean) -> Unit = {},
 ) {
+    val current = seasons.firstOrNull { it.number == selected } ?: seasons.first()
     if (seasons.size == 1) {
-        Text(seasons.first().title, style = MaterialTheme.typography.titleLarge, modifier = modifier)
+        Column(modifier) {
+            Text(current.title, style = MaterialTheme.typography.titleLarge)
+            current.watchedCaption?.let { GreyCaption(it) }
+        }
         return
     }
     // Apple TV's season picker: "Season 2 ⌄" opening a menu of the seasons.
     var open by remember { mutableStateOf(false) }
-    Box(modifier) {
+    Column(modifier) {
+    Box {
         Row(
             Modifier
                 .clip(RoundedCornerShape(8.dp))
@@ -459,6 +515,27 @@ private fun SeasonSelector(
                     },
                 )
             }
+            if (current.episodes.isNotEmpty()) {
+                NovaMenuDivider()
+                val allWatched = current.episodes.all { it.watched }
+                NovaMenuItem(
+                    text = { Text(if (allWatched) "Mark Season Unwatched" else "Mark Season Watched") },
+                    onClick = {
+                        open = false
+                        onMarkSeason(!allWatched)
+                    },
+                )
+            }
         }
+    }
+    current.watchedCaption?.let { GreyCaption(it) }
+    }
+}
+
+/** The round "…" of a tablet show page, opening its menu. */
+@Composable
+private fun TrailerlessMoreButton(onClick: () -> Unit) {
+    GlassCircle(onClick = onClick, description = "More options", size = 48.dp) {
+        NovaIcon(R.drawable.ic_more_vert, contentDescription = null, tint = androidx.compose.ui.graphics.Color.White)
     }
 }

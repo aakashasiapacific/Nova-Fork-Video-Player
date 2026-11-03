@@ -605,6 +605,11 @@ private fun PhonePage(state: AppUiState, actions: AppActions) {
             modifier = pageModifier,
             requireFingerprint = state.settings.settings.requireFingerprint,
         )
+        Route.LibraryHealth -> PhoneLibraryHealthScreen(
+            health = state.health,
+            actions = actions,
+            modifier = pageModifier,
+        )
         is Route.Playlist -> PhonePlaylistScreen(
             playlist = state.playlist?.takeIf { it.id == route.playlistId },
             actions = actions,

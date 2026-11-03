@@ -127,6 +127,7 @@ private fun libraryGroups(state: SettingsUi, actions: AppActions): List<Settings
                 actionRow("browse", R.drawable.ic_folder_open, "Browse sources and playlists") { actions.navigate(Route.Browse) },
                 actionRow("duplicates", R.drawable.ic_video_library, "Find duplicates") { actions.openLibrary(LibraryFilter.DUPLICATES) },
                 actionRow("hidden", R.drawable.ic_visibility_off, "Hidden Videos") { actions.navigate(Route.HiddenVideos) },
+                actionRow("health", R.drawable.ic_check_circle, "Library Health") { actions.navigate(Route.LibraryHealth) },
                 SettingsRow("all-files", "All files access", R.drawable.ic_folder_special) { shape ->
                     AllFilesAccessRow(
                         shape = shape,
@@ -176,7 +177,7 @@ private fun libraryGroups(state: SettingsUi, actions: AppActions): List<Settings
             footer = "Looks for new, changed and removed videos in every source. Nova also does this each time it opens.",
         ),
         downloadsGroup(actions),
-        storageGroup(state.space),
+        storageGroup(state.space, state.duplicateBytes, actions),
         watchStatsGroup(state.watch),
         backupGroup(actions),
     )

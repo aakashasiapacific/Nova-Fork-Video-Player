@@ -266,7 +266,7 @@ internal fun PhoneShowCard(
 ) {
     PosterCardLayout(
         title = show.title,
-        subtitle = countLabel(show.episodeCount, "episode"),
+        subtitle = show.watchedCaption ?: countLabel(show.episodeCount, "episode"),
         artwork = show.artwork,
         onClick = onClick,
         modifier = modifier,
@@ -339,7 +339,7 @@ internal fun PhoneWideShowCard(
 ) {
     WideCardLayout(
         title = show.title,
-        subtitle = countLabel(show.episodeCount, "episode"),
+        subtitle = show.watchedCaption ?: countLabel(show.episodeCount, "episode"),
         artwork = show.artwork,
         artTitle = show.title,
         onClick = onClick,
