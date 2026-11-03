@@ -28,6 +28,7 @@ import com.aakash.novafork.data.Settings
 import com.aakash.novafork.data.SmbCredentials
 import com.aakash.novafork.data.StoragePermissions
 import com.aakash.novafork.data.TmdbSearchResult
+import com.aakash.novafork.data.backup.AutoBackup
 import com.aakash.novafork.data.backup.BackupFormatException
 import com.aakash.novafork.data.backup.BackupManager
 import com.aakash.novafork.data.backup.BackupSummary
@@ -311,6 +312,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
     private val backups: BackupManager by lazy {
         BackupManager(getApplication<Application>(), graph.database, settingsStore, library, BuildConfig.VERSION_NAME)
     }
+    private val autoBackup: AutoBackup by lazy { AutoBackup(getApplication<Application>(), backups) }
     private val backup = MutableStateFlow(BackupUi())
     private val backupUi: StateFlow<BackupUi> = backup.asStateFlow()
 
@@ -322,6 +324,17 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
 
     init {
         launchSafely("Couldn't scan the library") { library.refreshAll() }
+        // Weekly automatic backup: on start, if the last one is a week old, write one quietly.
+        graph.appScope.launch {
+            try {
+                withContext(Dispatchers.IO) { publishAutoBackup() }
+                if (autoBackup.runIfDue() != null) withContext(Dispatchers.IO) { publishAutoBackup() }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.w(TAG, "Automatic backup check failed", e)
+            }
+        }
         viewModelScope.launch {
             // A result for the previous key or server says nothing about the new one.
             settingsStore.settings
@@ -1629,6 +1642,36 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
             backup.update { it.copy(waiting = report.waiting.total) }
             showMessage(restoreMessage(report))
             if (report.addedSourceIds.isNotEmpty()) scanRestoredSources(report.addedSourceIds)
+        }
+    }
+
+    private fun publishAutoBackup() {
+        val state = autoBackup.state()
+        backup.update { it.copy(autoWeekly = state.weekly, autoFolderName = state.folderName, lastAutoAt = state.lastAt) }
+    }
+
+    override fun setAutoBackup(weekly: Boolean) {
+        autoBackup.setWeekly(weekly)
+        publishAutoBackup()
+        if (weekly) runAutoBackupSoon()
+    }
+
+    /** MainActivity took the grant for [tree], the folder picked for automatic backups. */
+    fun setBackupFolder(tree: Uri) {
+        autoBackup.setFolder(tree)
+        publishAutoBackup()
+        runAutoBackupSoon()
+    }
+
+    private fun runAutoBackupSoon() {
+        graph.appScope.launch {
+            try {
+                if (autoBackup.runIfDue() != null) withContext(Dispatchers.IO) { publishAutoBackup() }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.w(TAG, "Automatic backup failed", e)
+            }
         }
     }
 

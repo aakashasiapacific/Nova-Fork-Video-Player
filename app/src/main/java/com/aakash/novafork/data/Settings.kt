@@ -102,6 +102,8 @@ data class Settings(
     val subtitleMargin: Int = 0,
     /** The small ticks on taps, swipes and switches; off silences every one. */
     val haptics: Boolean = true,
+    /** Opening Hidden Videos asks for a fingerprint or the screen lock first. */
+    val requireFingerprint: Boolean = false,
 )
 
 /** [Settings.equalizerPreset]'s value for the person's own band gains. */

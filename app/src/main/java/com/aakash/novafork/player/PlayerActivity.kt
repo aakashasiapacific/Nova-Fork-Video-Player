@@ -338,6 +338,13 @@ class PlayerActivity : ComponentActivity(), PlayerController.Host {
      * system handles them as usual.
      */
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
+        if (!isInPictureInPictureMode) {
+            if (shortcutsHelp.onKey(keyCode)) return true
+            if (event.unicodeChar == '?'.code || (keyCode == KeyEvent.KEYCODE_SLASH && event.isShiftPressed)) {
+                if (event.repeatCount == 0) shortcutsHelp.toggle()
+                return true
+            }
+        }
         if (isVolumeKey(keyCode) && !isInPictureInPictureMode && controller?.onVolumeKey(keyCode) == true) {
             volumeKeyHandled = true
             return true
@@ -346,11 +353,15 @@ class PlayerActivity : ComponentActivity(), PlayerController.Host {
         return super.onKeyDown(keyCode, event)
     }
 
+    private val shortcutsHelp by lazy {
+        com.aakash.novafork.ui.common.ShortcutsOverlay(this, "Keyboard shortcuts", com.aakash.novafork.ui.common.ShortcutsOverlay.Player)
+    }
+
     /**
      * A keyboard's shortcuts in the player (owner), as YouTube's and VLC's: Space or K plays and
      * pauses; ← → (or J L) go back and forward 10 s; ↑ ↓ change the volume and M mutes; N and P
      * play the next and previous; F changes fit or zoom; [ and ] slow down and speed up; 0 to 9
-     * jump to that tenth of the video; , and . step one frame back or on. A media keyboard's play, next and previous keys work too.
+     * jump to that tenth of the video; , and . step one frame back or on; ? lists them all. A media keyboard's play, next and previous keys work too.
      */
     private fun onPlayerShortcut(keyCode: Int, event: KeyEvent): Boolean {
         val player = controller ?: return false

@@ -39,6 +39,7 @@ import com.aakash.novafork.ui.audio.LocalMusicEnabled
 import com.aakash.novafork.ui.common.LocalHeroPreviewEnabled
 import com.aakash.novafork.ui.common.FileRenames
 import com.aakash.novafork.ui.common.LocalStatusBarIcons
+import com.aakash.novafork.ui.common.ShortcutsOverlay
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.DialogUi
 import com.aakash.novafork.ui.model.TopDestination
@@ -78,6 +79,20 @@ class MainActivity : ComponentActivity() {
         registerForActivityResult(ActivityResultContracts.CreateDocument(BackupManager.MIME_TYPE)) { uri ->
             if (uri != null) viewModel.writeBackup(uri)
         }
+
+    private val backupFolderPicker = registerForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+        if (uri != null) {
+            try {
+                contentResolver.takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+                )
+                viewModel.setBackupFolder(uri)
+            } catch (e: SecurityException) {
+                viewModel.showMessage("That folder can't be used for backups")
+            }
+        }
+    }
 
     private val backupOpener = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) viewModel.readBackup(uri)
@@ -155,6 +170,14 @@ class MainActivity : ComponentActivity() {
                     backupSaver.launch(BackupManager.fileName(LocalDate.now()))
                 } catch (e: ActivityNotFoundException) {
                     viewModel.showMessage("This device has no file picker to save the backup with")
+                }
+            }
+
+            override fun pickBackupFolder() {
+                try {
+                    backupFolderPicker.launch(null)
+                } catch (e: ActivityNotFoundException) {
+                    viewModel.showMessage("This device has no folder picker")
                 }
             }
 
@@ -502,11 +525,23 @@ class MainActivity : ComponentActivity() {
         val DARK_SCRIM = Color.argb(0x80, 0x1b, 0x1b, 0x1b)
     }
 
+    private val shortcutsHelp by lazy {
+        ShortcutsOverlay(this, "Keyboard shortcuts", ShortcutsOverlay.App)
+    }
+
+    private fun isQuestionMark(keyCode: Int, event: android.view.KeyEvent): Boolean =
+        event.unicodeChar == '?'.code || (keyCode == android.view.KeyEvent.KEYCODE_SLASH && event.isShiftPressed)
+
     /**
      * A keyboard in the library (owner): Ctrl+1 to 4 open Video, Audio, Preferences and Search, and
-     * / or Ctrl+F opens Search. Tab and the arrow keys move between items and Enter opens one.
+     * / or Ctrl+F opens Search, ? lists the shortcuts. Tab and the arrow keys move between items and Enter opens one.
      */
     override fun onKeyDown(keyCode: Int, event: android.view.KeyEvent): Boolean {
+        if (shortcutsHelp.onKey(keyCode)) return true
+        if (isQuestionMark(keyCode, event) && currentFocus !is android.widget.EditText) {
+            if (event.repeatCount == 0) shortcutsHelp.toggle()
+            return true
+        }
         val tabs = com.aakash.novafork.ui.model.TopDestination.entries
         val tab = when {
             event.isCtrlPressed && keyCode in android.view.KeyEvent.KEYCODE_1..android.view.KeyEvent.KEYCODE_4 ->

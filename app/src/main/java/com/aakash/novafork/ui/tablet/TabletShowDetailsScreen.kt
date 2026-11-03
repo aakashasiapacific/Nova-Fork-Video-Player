@@ -1,6 +1,12 @@
 package com.aakash.novafork.ui.tablet
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -53,6 +59,138 @@ import com.aakash.novafork.ui.model.SeasonUi
 import com.aakash.novafork.ui.model.ShowDetailsUi
 
 private val EpisodeCellMin = 280.dp
+private const val SideBySideMinWidthDp = 720
+private val InfoColumnWidth = 380.dp
+private val SideBySidePosterWidth = 180.dp
+
+/**
+ * The show page on a wide screen: a left column with the poster, info, Play and the season list
+ * (scrolls on its own), and the selected season's episodes on the right.
+ */
+@Composable
+private fun ShowSideBySide(
+    details: ShowDetailsUi,
+    season: SeasonUi?,
+    nextUpId: Long?,
+    playId: Long?,
+    onSelectSeason: (Int) -> Unit,
+    actions: AppActions,
+    modifier: Modifier = Modifier,
+) {
+    val dims = LocalNovaDimens.current
+    val seasons = details.seasons
+    Box(modifier.fillMaxSize()) {
+        TabletDetailsBackdrop(details.artwork)
+        Row(Modifier.fillMaxSize()) {
+            Column(
+                Modifier
+                    .width(InfoColumnWidth + dims.gutter)
+                    .fillMaxHeight()
+                    .verticalScroll(rememberScrollState())
+                    .padding(
+                        start = dims.gutter,
+                        top = statusBarTop() + 12.dp,
+                        bottom = navigationBarBottom() + dims.sectionSpacing,
+                    ),
+            ) {
+                TabletBackButton(onClick = actions::back)
+                Spacer(Modifier.height(20.dp))
+                TabletDetailsPoster(details.artwork, details.title, SideBySidePosterWidth)
+                Spacer(Modifier.height(20.dp))
+                ShowHeadline(details)
+                if (playId != null) {
+                    Spacer(Modifier.height(20.dp))
+                    ShowPlay(details) { actions.play(playId) }
+                }
+                Spacer(Modifier.height(20.dp))
+                ShowText(details)
+                if (seasons.size > 1) {
+                    Spacer(Modifier.height(28.dp))
+                    Text("Seasons", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.height(8.dp))
+                    seasons.forEach { item ->
+                        SeasonListRow(item, selected = item.number == season?.number, onClick = { onSelectSeason(item.number) })
+                    }
+                }
+            }
+            LazyVerticalGrid(
+                columns = GridCells.Adaptive(EpisodeCellMin),
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight(),
+                contentPadding = PaddingValues(
+                    start = 24.dp,
+                    end = dims.gutter,
+                    top = statusBarTop() + 12.dp,
+                    bottom = navigationBarBottom() + dims.sectionSpacing,
+                ),
+                horizontalArrangement = Arrangement.spacedBy(20.dp),
+                verticalArrangement = Arrangement.spacedBy(24.dp),
+            ) {
+                if (season != null) {
+                    item(key = "seasonTitle", span = { GridItemSpan(maxLineSpan) }, contentType = "seasons") {
+                        Text(season.title, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(top = 8.dp))
+                    }
+                    if (season.episodes.isNotEmpty()) {
+                        item(key = "playSeason", span = { GridItemSpan(maxLineSpan) }, contentType = "playSeason") {
+                            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                IosFilledTonalButton(onClick = { actions.playSeason(details.key, season.number) }) {
+                                    ButtonLabel(R.drawable.ic_play_arrow, if (seasons.size > 1) "Play ${season.title}" else "Play All")
+                                }
+                                IosFilledTonalButton(onClick = { actions.playSeason(details.key, season.number, shuffle = true) }) {
+                                    ButtonLabel(R.drawable.ic_shuffle, "Shuffle")
+                                }
+                            }
+                        }
+                    }
+                    items(season.episodes, key = { "${it.season}:${it.episode}:${it.videoId}" }, contentType = { "episode" }) { episode ->
+                        VideoMenuBox(
+                            videoId = episode.videoId,
+                            title = metaLine(details.title, episode.code, episode.title),
+                            actions = actions,
+                        ) { openMenu ->
+                            TabletEpisodeCard(
+                                episode = episode,
+                                onClick = { actions.play(episode.videoId) },
+                                onLongClick = openMenu,
+                                isNextUp = episode.videoId == nextUpId,
+                            )
+                        }
+                    }
+                } else {
+                    item(key = "noEpisodes", span = { GridItemSpan(maxLineSpan) }, contentType = "empty") {
+                        Text(
+                            text = "No episodes found for this show.",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SeasonListRow(season: SeasonUi, selected: Boolean, onClick: () -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(vertical = 2.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(if (selected) Color.White.copy(alpha = 0.14f) else Color.Transparent)
+            .clickable(onClickLabel = "Show ${season.title}", onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(season.title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(
+            text = season.episodes.size.toString(),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
 
 /**
  * TV show page: full-screen artwork behind a heavy scrim, a header with poster, info and Play
@@ -73,6 +211,20 @@ internal fun TabletShowDetailsScreen(
     val season = seasons.firstOrNull { it.number == selectedSeason } ?: seasons.firstOrNull()
     val nextUpId = details.nextUp?.videoId
     val playId = nextUpId ?: seasons.firstOrNull()?.episodes?.firstOrNull()?.videoId
+
+    // Wide screens (tablets in landscape): info and seasons on the left, the season's episodes beside them.
+    if (layout.isTablet && LocalConfiguration.current.screenWidthDp >= SideBySideMinWidthDp) {
+        ShowSideBySide(
+            details = details,
+            season = season,
+            nextUpId = nextUpId,
+            playId = playId,
+            onSelectSeason = { selectedSeason = it },
+            actions = actions,
+            modifier = modifier,
+        )
+        return
+    }
 
     Box(modifier.fillMaxSize()) {
         TabletDetailsBackdrop(details.artwork)

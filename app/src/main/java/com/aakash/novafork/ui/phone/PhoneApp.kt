@@ -603,6 +603,7 @@ private fun PhonePage(state: AppUiState, actions: AppActions) {
             items = state.hidden,
             actions = actions,
             modifier = pageModifier,
+            requireFingerprint = state.settings.settings.requireFingerprint,
         )
         is Route.Playlist -> PhonePlaylistScreen(
             playlist = state.playlist?.takeIf { it.id == route.playlistId },

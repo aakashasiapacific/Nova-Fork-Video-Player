@@ -199,6 +199,7 @@ private fun TabletPage(state: AppUiState, actions: AppActions, layout: DeviceLay
             items = state.hidden,
             actions = actions,
             modifier = pageModifier,
+            requireFingerprint = state.settings.settings.requireFingerprint,
         )
         Route.Browse, is Route.BrowseDir, is Route.Playlist -> TabletBrowseScreen(
             state = state,
