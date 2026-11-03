@@ -77,6 +77,7 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
             putFloat(KEY_GLASS_TINT, s.glassTint)
             putInt(KEY_CROSSFADE_SECONDS, s.crossfadeSeconds)
             putBoolean(KEY_MUSIC_AUTOPLAY, s.musicAutoplay)
+            putBoolean(KEY_SOUND_CHECK, s.soundCheck)
             putString(KEY_EQUALIZER_PRESET, s.equalizerPreset)
             putString(KEY_EQUALIZER_BANDS, s.equalizerBands)
             putBoolean(KEY_NIGHT_MODE, s.nightMode)
@@ -123,6 +124,7 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
         const val KEY_GLASS_TINT = "glass_tint_v2"
         const val KEY_CROSSFADE_SECONDS = "crossfade_seconds"
         const val KEY_MUSIC_AUTOPLAY = "music_autoplay"
+        const val KEY_SOUND_CHECK = "sound_check"
         const val KEY_EQUALIZER_PRESET = "equalizer_preset"
         const val KEY_EQUALIZER_BANDS = "equalizer_bands"
         const val KEY_NIGHT_MODE = "night_mode"
@@ -164,6 +166,7 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
             KEY_GLASS_TINT to SettingType.FLOAT,
             KEY_CROSSFADE_SECONDS to SettingType.INT,
             KEY_MUSIC_AUTOPLAY to SettingType.BOOLEAN,
+            KEY_SOUND_CHECK to SettingType.BOOLEAN,
             KEY_EQUALIZER_PRESET to SettingType.STRING,
             KEY_EQUALIZER_BANDS to SettingType.STRING,
             KEY_NIGHT_MODE to SettingType.BOOLEAN,
@@ -223,6 +226,7 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
                 glassTint = prefs.float(KEY_GLASS_TINT, defaults.glassTint).coerceIn(0f, 1f),
                 crossfadeSeconds = prefs.int(KEY_CROSSFADE_SECONDS, defaults.crossfadeSeconds).coerceIn(0, 8),
                 musicAutoplay = prefs.boolean(KEY_MUSIC_AUTOPLAY, defaults.musicAutoplay),
+                soundCheck = prefs.boolean(KEY_SOUND_CHECK, defaults.soundCheck),
                 equalizerPreset = prefs.string(KEY_EQUALIZER_PRESET) ?: defaults.equalizerPreset,
                 equalizerBands = prefs.string(KEY_EQUALIZER_BANDS) ?: defaults.equalizerBands,
                 nightMode = prefs.boolean(KEY_NIGHT_MODE, defaults.nightMode),

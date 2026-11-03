@@ -4,7 +4,13 @@ package com.aakash.novafork.core.audio
  * One line of lyrics. [timeMs] is null for lyrics without timing (a plain text file or tag).
  * [words]: when each word starts being sung, for enhanced LRC; empty otherwise.
  */
-data class LyricLine(val timeMs: Long?, val text: String, val words: List<LyricWord> = emptyList())
+data class LyricLine(
+    val timeMs: Long?,
+    val text: String,
+    val words: List<LyricWord> = emptyList(),
+    /** The line translated, when the .lrc has one for it (a second line at the same time, or a "[tr:...]" tag). */
+    val translation: String? = null,
+)
 
 /** One sung word of an enhanced-LRC line: from [timeMs], the characters [start] until [end] of its text. */
 data class LyricWord(val timeMs: Long, val start: Int, val end: Int)
@@ -40,14 +46,18 @@ data class Lyrics(val lines: List<LyricLine>, val synced: Boolean) {
  * ("[00:12.00][01:30.00]chorus"), "[mm:ss]" and "[mm:ss:xx]" spellings, an "[offset:±ms]" tag
  * (positive = the lyrics come sooner) and enhanced-LRC word times ("<00:12.34>word"), which are
  * taken out of the text and kept as the line's [LyricLine.words]. Other tags ([ar:], [ti:], [al:], [by:], [length:] …) are skipped. A file without any
- * time tag is read as plain lyrics, one line per line. Parsed by hand rather than with regexes:
+ * time tag is read as plain lyrics, one line per line. A translation travels with its line: a
+ * second line at the very same time, a "[tr:...]" (or "[translation:...]") tag on the next line or
+ * at the end of the line, becomes the first line's [LyricLine.translation]. Parsed by hand rather than with regexes:
  * Android's regex engine rejects patterns the JVM accepts, and these brackets are everywhere.
  */
 object LrcParser {
     fun parse(text: String): Lyrics {
         val rawLines = text.removePrefix("﻿").lines()
         var offsetMs = 0L
-        val timed = ArrayList<Triple<Long, String, List<LyricWord>>>()
+        val timed = ArrayList<Timed>()
+        // Where the last time-tagged line's entries begin, which a "[tr:...]" line after it translates.
+        var lastGroupStart = 0
         val plain = ArrayList<String>()
         for (raw in rawLines) {
             val line = raw.trim()
@@ -71,18 +81,34 @@ object LrcParser {
                     val name = inside.substring(0, colon).trim().lowercase()
                     if (name == "offset") {
                         inside.substring(colon + 1).trim().removePrefix("+").toLongOrNull()?.let { offsetMs = it }
+                    } else if (name in TRANSLATION_TAGS && stamps.isEmpty()) {
+                        val value = inside.substring(colon + 1).trim()
+                        if (value.isNotEmpty()) {
+                            for (i in lastGroupStart until timed.size) timed[i] = timed[i].copy(translation = value)
+                        }
                     }
                     isTagLine = true
                 }
                 rest = rest.substring(close + 1)
             }
             if (stamps.isNotEmpty()) {
-                val lyric = stripWordTimes(rest).trim()
-                val words = wordTimes(rest, lyric)
+                var body = rest
+                var inlineTranslation: String? = null
+                if (body.endsWith("]")) {
+                    val open = TRANSLATION_TAGS.maxOf { body.lastIndexOf("[$it:") }
+                    if (open >= 0) {
+                        inlineTranslation = body.substring(body.indexOf(':', open) + 1, body.length - 1).trim().ifEmpty { null }
+                        body = body.substring(0, open)
+                    }
+                }
+                val lyric = stripWordTimes(body).trim()
+                val words = wordTimes(body, lyric)
+                lastGroupStart = timed.size
                 // A line sung again later ([00:12][01:30]) keeps its words' timing from each start.
                 for (stamp in stamps) {
                     val shift = stamp - stamps[0]
-                    timed += Triple(stamp, lyric, if (shift == 0L) words else words.map { it.copy(timeMs = it.timeMs + shift) })
+                    val shifted = if (shift == 0L) words else words.map { it.copy(timeMs = it.timeMs + shift) }
+                    timed += Timed(stamp, lyric, shifted, inlineTranslation)
                 }
             } else if (!isTagLine) {
                 plain += stripWordTimes(line).trim()
@@ -90,18 +116,43 @@ object LrcParser {
         }
         if (timed.isNotEmpty()) {
             val lines = timed
-                .map { (time, lyric, words) ->
+                .map { entry ->
                     LyricLine(
-                        (time - offsetMs).coerceAtLeast(0L),
-                        lyric,
-                        words.map { it.copy(timeMs = (it.timeMs - offsetMs).coerceAtLeast(0L)) },
+                        (entry.timeMs - offsetMs).coerceAtLeast(0L),
+                        entry.text,
+                        entry.words.map { it.copy(timeMs = (it.timeMs - offsetMs).coerceAtLeast(0L)) },
+                        entry.translation,
                     )
                 }
                 .sortedBy { it.timeMs }
-            return Lyrics(lines, synced = true)
+            return Lyrics(withTranslations(lines), synced = true)
         }
         val lines = plain.dropWhile { it.isEmpty() }.dropLastWhile { it.isEmpty() }.map { LyricLine(null, it) }
         return Lyrics(lines, synced = false)
+    }
+
+    private data class Timed(val timeMs: Long, val text: String, val words: List<LyricWord>, val translation: String?)
+
+    private val TRANSLATION_TAGS = listOf("tr", "translation")
+
+    /**
+     * The common two-language .lrc: a line followed by another at exactly the same time is the
+     * first one's translation. Blank or identical lines, and a line with a translation already,
+     * are left as they are.
+     */
+    private fun withTranslations(lines: List<LyricLine>): List<LyricLine> {
+        val out = ArrayList<LyricLine>(lines.size)
+        for (line in lines) {
+            val previous = out.lastOrNull()
+            if (previous != null && previous.timeMs == line.timeMs && previous.translation == null && line.translation == null &&
+                previous.text.isNotEmpty() && line.text.isNotEmpty() && previous.text != line.text && line.words.isEmpty()
+            ) {
+                out[out.lastIndex] = previous.copy(translation = line.text)
+            } else {
+                out += line
+            }
+        }
+        return out
     }
 
     /** "mm:ss", "mm:ss.f…" or "mm:ss:xx" (hundredths), also with hours ("h:mm:ss.xx"); null otherwise. */

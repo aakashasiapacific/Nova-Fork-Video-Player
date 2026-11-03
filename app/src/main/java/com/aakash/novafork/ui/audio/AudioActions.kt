@@ -36,6 +36,9 @@ interface AudioActions {
     /** Up Next dragged into a new order: the song [from] places ahead goes to [to] places ahead. */
     fun moveUpNext(from: Int, to: Int) = Unit
 
+    /** Now Playing's "Clear": the songs queued after the playing one are removed. */
+    fun clearUpNext() = Unit
+
     /** Playlists' "New Playlist…": an empty playlist named [name]. */
     fun createPlaylist(name: String) = Unit
 
