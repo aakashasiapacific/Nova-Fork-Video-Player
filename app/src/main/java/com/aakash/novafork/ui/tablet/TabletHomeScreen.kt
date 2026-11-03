@@ -1,5 +1,7 @@
 package com.aakash.novafork.ui.tablet
 
+import com.aakash.novafork.ui.common.HomeSkeleton
+import com.aakash.novafork.ui.common.LocalLibraryLoading
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -101,7 +103,9 @@ internal fun TabletHomeScreen(
         onRefresh = actions::refreshQuietly,
         modifier = modifier.fillMaxSize(),
     ) {
-        if (home.isEmpty) {
+        if (home.isEmpty && (LocalLibraryLoading.current || scan.running)) {
+            HomeSkeleton()
+        } else if (home.isEmpty) {
             HomeOnboarding(scan = scan, permission = permission, layout = layout, actions = actions)
         } else {
             HomeFeed(home = home, scan = scan, permission = permission, layout = layout, actions = actions)

@@ -1,5 +1,7 @@
 package com.aakash.novafork.ui.phone
 
+import com.aakash.novafork.ui.common.PosterSkeletonGrid
+import com.aakash.novafork.ui.common.LocalLibraryLoading
 import androidx.annotation.DrawableRes
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
@@ -107,7 +109,9 @@ fun PhoneLibraryScreen(
                 .weight(1f),
         ) {
             CompositionLocalProvider(LocalVideoSelection provides selection) {
-                if (library.items.isEmpty()) {
+                if (library.items.isEmpty() && (LocalLibraryLoading.current || scan.running)) {
+                    PosterSkeletonGrid()
+                } else if (library.items.isEmpty()) {
                     LibraryEmpty(filter = library.filter, actions = actions)
                 } else if (library.timelineMonths.isNotEmpty()) {
                     // All videos, newest first, under month headings (each card says the day it arrived).

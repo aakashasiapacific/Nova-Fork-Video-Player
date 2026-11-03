@@ -82,6 +82,7 @@ import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.PosterArt
 import com.aakash.novafork.ui.common.ProgressStrip
 import com.aakash.novafork.ui.common.WatchedBadge
+import com.aakash.novafork.ui.theme.Spacing
 import com.aakash.novafork.ui.common.bottomScrim
 import com.aakash.novafork.ui.common.iosOverscroll
 import com.aakash.novafork.ui.common.metaLine
@@ -327,7 +328,7 @@ internal fun TabletPosterCard(
             }
             ProgressStrip(progress, Modifier.align(Alignment.BottomCenter))
         }
-        Spacer(Modifier.height(10.dp))
+        Spacer(Modifier.height(Spacing.sm))
         Text(
             text = title,
             style = MaterialTheme.typography.titleSmall,

@@ -1,5 +1,7 @@
 package com.aakash.novafork.ui.phone
 
+import com.aakash.novafork.ui.common.HomeSkeleton
+import com.aakash.novafork.ui.common.LocalLibraryLoading
 import androidx.annotation.DrawableRes
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
@@ -155,7 +157,10 @@ fun PhoneHomeScreen(
     Box(
         modifier = modifier.fillMaxSize(),
     ) {
-        if (home.isEmpty) {
+        if (home.isEmpty && (LocalLibraryLoading.current || scan.running)) {
+            // Before the first scan finishes: soft placeholders, never a blank page or the onboarding.
+            HomeSkeleton()
+        } else if (home.isEmpty) {
             HomeOnboarding(scan = scan, permission = permission, actions = actions)
         } else {
             HomeFeed(home = home, scan = scan, permission = permission, actions = actions)

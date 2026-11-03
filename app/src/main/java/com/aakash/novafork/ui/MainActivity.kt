@@ -1,5 +1,6 @@
 package com.aakash.novafork.ui
 
+import com.aakash.novafork.ui.common.LocalLibraryLoading
 import android.app.ActivityOptions
 import android.app.RecoverableSecurityException
 import android.content.ActivityNotFoundException
@@ -204,6 +205,7 @@ class MainActivity : ComponentActivity() {
                 LocalStatusBarIcons provides { darkIcons -> setDarkStatusBarIcons(darkIcons) },
                 LocalHeroPreviewEnabled provides true,
                 LocalMusicEnabled provides true,
+                LocalLibraryLoading provides !state.libraryLoaded,
             ) {
                 NovaRoot(state = state, actions = actions)
             }

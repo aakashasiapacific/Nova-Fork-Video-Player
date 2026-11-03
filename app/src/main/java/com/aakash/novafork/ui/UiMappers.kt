@@ -364,7 +364,7 @@ object UiMappers {
 
     /**
      * Every video (episodes one by one), newest first by when it reached the device, as one
-     * gapless grid: each card's second line says when it arrived ("Today · 2h 37m").
+     * gapless grid under month headings; each card's second line is its episode label, year or length.
      */
     private fun timeline(index: LibraryIndex, now: Long, zone: ZoneId): List<TimelineMonth> {
         val today = Instant.ofEpochMilli(now).atZone(zone).toLocalDate()
@@ -374,10 +374,10 @@ object UiMappers {
             .map { video ->
                 val card = video.card
                 val day = Instant.ofEpochMilli(video.video.dateAdded).atZone(zone).toLocalDate()
-                val arrived = arrivedLabel(day, today)
-                // Episodes keep their "S1 · E4"; the rest show their length.
-                val detail = if (card.kind == MediaKind.EPISODE) card.subtitle else timelineDuration(card.durationMs)
-                YearMonth.from(day) to card.copy(subtitle = joinMeta(arrived, detail))
+                // The month headings already say when; episodes keep "S1 · E4", movies "2021 · 2h 35m",
+                // the rest show their length.
+                val detail = if (card.kind == MediaKind.EPISODE || card.kind == MediaKind.MOVIE) card.subtitle else timelineDuration(card.durationMs)
+                YearMonth.from(day) to card.copy(subtitle = detail)
             }
             .groupBy({ it.first }, { it.second })
             .map { (month, cards) -> TimelineMonth(monthTitle(month, today), cards) }

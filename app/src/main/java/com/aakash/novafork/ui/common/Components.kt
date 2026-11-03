@@ -33,6 +33,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
@@ -101,17 +102,18 @@ fun ProgressStrip(progress: Float?, modifier: Modifier = Modifier, height: Dp = 
     }
 }
 
-/** Small round check shown on watched items. */
+/** A quiet check on watched items: white on a faint 20% white disc with a soft shadow, no dark circle. */
 @Composable
 fun WatchedBadge(modifier: Modifier = Modifier) {
     Box(
         modifier
-            .size(22.dp)
+            .size(20.dp)
+            .shadow(3.dp, CircleShape, clip = false, ambientColor = Color.Black.copy(alpha = 0.35f), spotColor = Color.Black.copy(alpha = 0.35f))
             .clip(CircleShape)
-            .background(Color.Black.copy(alpha = 0.6f)),
+            .background(Color.White.copy(alpha = 0.2f)),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(painterResource(R.drawable.ic_check), contentDescription = "Watched", tint = NovaColors.Mint, modifier = Modifier.size(15.dp))
+        Icon(painterResource(R.drawable.ic_check), contentDescription = "Watched", tint = Color.White, modifier = Modifier.size(13.dp))
     }
 }
 

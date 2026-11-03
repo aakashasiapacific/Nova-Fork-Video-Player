@@ -1,5 +1,6 @@
 package com.aakash.novafork.ui.tablet
 
+import com.aakash.novafork.ui.common.breakableName
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -311,7 +312,7 @@ private fun VideoFileCard(details: VideoDetailsUi, modifier: Modifier = Modifier
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         Text(
-                            text = fact.value,
+                            text = fact.value.breakableName(),
                             style = MaterialTheme.typography.bodyMedium,
                             maxLines = 4,
                             overflow = TextOverflow.Ellipsis,

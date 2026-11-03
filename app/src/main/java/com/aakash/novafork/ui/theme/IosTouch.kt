@@ -15,6 +15,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.ContentDrawScope
 import androidx.compose.ui.node.DelegatableNode
 import androidx.compose.ui.node.DrawModifierNode
+import com.aakash.novafork.ui.common.Motion
 import kotlinx.coroutines.launch
 
 /**
@@ -66,5 +67,42 @@ private class HighlightNode(private val source: InteractionSource) : Modifier.No
 
     private companion object {
         const val HIGHLIGHT_ALPHA = 0.12f
+    }
+}
+
+/**
+ * The press state of list rows (Settings keeps [IosHighlight]): a soft white wash of 7%, in at
+ * once on touch and out over about 200ms, both on the app's springs.
+ */
+object SoftRowIndication : IndicationNodeFactory {
+    override fun create(interactionSource: InteractionSource): DelegatableNode = SoftRowNode(interactionSource)
+
+    override fun equals(other: Any?): Boolean = other === this
+
+    override fun hashCode(): Int = System.identityHashCode(this)
+}
+
+private class SoftRowNode(private val source: InteractionSource) : Modifier.Node(), DrawModifierNode {
+    private val wash = Animatable(0f)
+
+    override fun onAttach() {
+        coroutineScope.launch {
+            var pressed = 0
+            source.interactions.collect { interaction ->
+                when (interaction) {
+                    is PressInteraction.Press -> pressed++
+                    is PressInteraction.Release, is PressInteraction.Cancel -> pressed = (pressed - 1).coerceAtLeast(0)
+                }
+                launch {
+                    if (pressed > 0) wash.animateTo(1f, Motion.press()) else wash.animateTo(0f, Motion.page())
+                }
+            }
+        }
+    }
+
+    override fun ContentDrawScope.draw() {
+        drawContent()
+        val value = wash.value
+        if (value > 0f) drawRect(Color.White.copy(alpha = 0.07f * value))
     }
 }

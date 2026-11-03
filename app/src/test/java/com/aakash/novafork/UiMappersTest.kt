@@ -243,9 +243,9 @@ class UiMappersTest {
         assertEquals(index.videos.size, library.timeline.size)
         val added = library.timeline.map { card -> index.videos.first { it.id == card.id }.video.dateAdded }
         assertEquals(added.sortedDescending(), added)
-        // Each card says when it arrived: Dune came a day before "now".
+        // No arrival date on the cards (the month headings say it).
         val dune = requireNotNull(library.timeline.first { it.id == DUNE }.subtitle)
-        assertTrue(dune, dune.startsWith("Yesterday · 2h "))
+        assertTrue(dune, !dune.startsWith("Yesterday"))
         // Other sorts and filters are the plain grid.
         assertTrue(UiMappers.library(index, LibraryFilter.ALL, LibrarySort.TITLE).timeline.isEmpty())
         assertTrue(UiMappers.library(index, LibraryFilter.MOVIES, LibrarySort.RECENT).timeline.isEmpty())

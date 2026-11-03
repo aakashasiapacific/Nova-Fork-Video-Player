@@ -1,5 +1,6 @@
 package com.aakash.novafork.ui.phone
 
+import com.aakash.novafork.ui.common.breakableName
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -352,6 +353,7 @@ private fun Fact(label: String, value: String, modifier: Modifier = Modifier, co
     }
     Column(modifier.then(copy), verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Text(label, style = MaterialTheme.typography.titleSmall)
-        Text(value, style = MaterialTheme.typography.bodyMedium, color = IosColors.SecondaryLabel)
+        // Wrap at dots, dashes and underscores, never mid-word; the copied text stays the real name.
+        Text(value.breakableName(), style = MaterialTheme.typography.bodyMedium, color = IosColors.SecondaryLabel)
     }
 }

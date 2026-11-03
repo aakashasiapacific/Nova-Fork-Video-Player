@@ -1,5 +1,7 @@
 package com.aakash.novafork.ui.tablet
 
+import com.aakash.novafork.ui.common.PosterSkeletonGrid
+import com.aakash.novafork.ui.common.LocalLibraryLoading
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -85,6 +87,11 @@ internal fun TabletLibraryScreen(
                 .padding(start = dims.gutter, end = dims.gutter - 8.dp, top = 20.dp, bottom = 12.dp),
         )
         when {
+            items.isEmpty() && (LocalLibraryLoading.current || state.scan.running) -> PosterSkeletonGrid(
+                Modifier
+                    .weight(1f)
+                    .fillMaxWidth(),
+            )
             items.isEmpty() -> LibraryEmpty(
                 filter = library.filter,
                 actions = actions,

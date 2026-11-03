@@ -116,6 +116,8 @@ import com.aakash.novafork.ui.model.ShowCardUi
 import com.aakash.novafork.ui.model.TimelineMonth
 import com.aakash.novafork.ui.model.VideoCardUi
 import com.aakash.novafork.ui.theme.NovaColors
+import com.aakash.novafork.ui.theme.SoftRowIndication
+import com.aakash.novafork.ui.theme.Spacing
 import kotlinx.coroutines.delay
 
 private val ThumbShape = RoundedCornerShape(8.dp)
@@ -210,7 +212,7 @@ private fun PosterCardLayout(
             ProgressStrip(progress, Modifier.align(Alignment.BottomStart))
         }
         if (!bare) {
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(Spacing.sm))
             Text(
                 text = searchHighlighted(title),
                 style = MaterialTheme.typography.titleSmall,
@@ -225,7 +227,7 @@ private fun PosterCardLayout(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            Spacer(Modifier.height(4.dp))
+            Spacer(Modifier.height(Spacing.xs))
         }
     }
 }
@@ -238,10 +240,12 @@ internal fun PhonePosterCard(
     modifier: Modifier = Modifier,
     onLongClick: (() -> Unit)? = null,
     bare: Boolean = false,
+    /** Library grids: the card's own short caption ("S1 · E4", "2021 · 2h 35m"), without the episode's title. */
+    terse: Boolean = false,
 ) {
     PosterCardLayout(
         title = card.displayTitle(),
-        subtitle = card.displaySubtitle(),
+        subtitle = if (terse) card.subtitle else card.displaySubtitle(),
         artwork = card.artwork,
         onClick = onClick,
         modifier = modifier,
@@ -489,8 +493,13 @@ internal fun PhoneVideoRow(
     Row(
         modifier
             .fillMaxWidth()
-            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
-            .padding(horizontal = dims.gutter, vertical = 8.dp),
+            .combinedClickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = SoftRowIndication,
+                onClick = onClick,
+                onLongClick = onLongClick,
+            )
+            .padding(horizontal = dims.gutter, vertical = Spacing.sm),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
@@ -565,8 +574,9 @@ private fun GreyActionPill(@DrawableRes icon: Int, label: String, onClick: () ->
 }
 
 /**
- * Episode in a season list: still with progress, code and title, duration, then a short
- * overview. The one to watch next ([upNext]) says so in blue above its title.
+ * Episode in a season list, as Apple TV draws it: the 16:9 still on the left (about 40% of the
+ * row) with its progress along the bottom edge; on the right "3. Title" in 15sp semibold, a
+ * two-line grey summary, then "45m" or "28m left". The one to watch next ([upNext]) says so in blue.
  */
 @Composable
 internal fun PhoneEpisodeRow(
@@ -577,72 +587,79 @@ internal fun PhoneEpisodeRow(
     upNext: Boolean = false,
 ) {
     val dims = LocalNovaDimens.current
-    Column(
+    Row(
         modifier
             .fillMaxWidth()
-            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
-            .padding(horizontal = dims.gutter, vertical = 10.dp)
+            .combinedClickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = SoftRowIndication,
+                onClick = onClick,
+                onLongClick = onLongClick,
+            )
+            .padding(horizontal = dims.gutter, vertical = Spacing.md)
             // Finished episodes step back a little, so the ones still to watch stand out.
             .graphicsLayer { alpha = if (episode.watched && !upNext) WatchedEpisodeAlpha else 1f },
+        verticalAlignment = Alignment.Top,
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                Modifier
-                    .width(132.dp)
-                    .aspectRatio(16f / 9f)
-                    .clip(ThumbShape)
-                    .background(MaterialTheme.colorScheme.surfaceContainerHigh),
-            ) {
-                LandscapeArt(artwork = episode.artwork, title = episode.title, modifier = Modifier.fillMaxSize())
-                if (episode.watched) WatchedBadge(Modifier.align(Alignment.TopEnd).padding(4.dp))
-                ProgressStrip(episode.progress, Modifier.align(Alignment.BottomStart))
-            }
-            Spacer(Modifier.width(14.dp))
-            Column(Modifier.weight(1f)) {
-                // Apple TV's small grey caps above an episode's title: "EPISODE 3".
-                val label = if (episode.episode > 0) "EPISODE ${episode.episode}" else episode.code.uppercase()
-                if (label.isNotBlank() || upNext) {
-                    Text(
-                        text = buildAnnotatedString {
-                            if (upNext) {
-                                withStyle(SpanStyle(color = NovaColors.IosBlue)) { append("UP NEXT") }
-                                if (label.isNotBlank()) append(" · ")
-                            }
-                            append(label)
-                        },
-                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold, letterSpacing = 0.3.sp),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                Text(
-                    text = episode.title,
-                    style = MaterialTheme.typography.titleSmall,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                val meta = metaLine(durationLabel(episode.durationMs), episode.airDate)
-                if (meta.isNotEmpty()) {
-                    Text(
-                        text = meta,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 2,
-                    )
-                }
-            }
+        Box(
+            Modifier
+                .weight(0.4f)
+                .aspectRatio(16f / 9f)
+                .clip(ThumbShape)
+                .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+        ) {
+            LandscapeArt(artwork = episode.artwork, title = episode.title, modifier = Modifier.fillMaxSize())
+            if (episode.watched) WatchedBadge(Modifier.align(Alignment.TopEnd).padding(Spacing.xs + 2.dp))
+            ProgressStrip(episode.progress, Modifier.align(Alignment.BottomStart))
         }
-        val overview = episode.overview
-        if (!overview.isNullOrBlank()) {
+        Spacer(Modifier.width(Spacing.md))
+        Column(Modifier.weight(0.6f)) {
+            val heading = if (episode.episode > 0) "${episode.episode}. ${episode.title}" else episode.title.ifBlank { episode.code }
             Text(
-                text = overview,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                text = heading,
+                style = MaterialTheme.typography.titleSmall,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(top = 8.dp),
             )
+            val overview = episode.overview
+            if (!overview.isNullOrBlank()) {
+                Text(
+                    text = overview,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = Spacing.xs),
+                )
+            }
+            val length = episodeLengthLabel(episode)
+            if (upNext || length != null) {
+                Text(
+                    text = buildAnnotatedString {
+                        if (upNext) {
+                            withStyle(SpanStyle(color = NovaColors.IosBlue, fontWeight = FontWeight.SemiBold)) { append("Up Next") }
+                            if (length != null) append(" · ")
+                        }
+                        if (length != null) append(length)
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    modifier = Modifier.padding(top = Spacing.xs),
+                )
+            }
         }
     }
+}
+
+/** "45m" for an episode not started, "28m left" once part-way; null when the length is unknown. */
+private fun episodeLengthLabel(episode: EpisodeUi): String? {
+    val duration = episode.durationMs?.takeIf { it > 0 } ?: return null
+    val progress = episode.progress
+    if (progress != null && progress > 0f && progress < 1f) {
+        return Formats.remaining((duration * progress).toLong(), duration)
+    }
+    return durationLabel(duration)
 }
 
 /** Poster grid for library items (Library and Search). */
@@ -663,9 +680,9 @@ internal fun PhoneLibraryGrid(
         columns = GridCells.Adaptive(pinchedCell ?: dims.gridMinCell),
         modifier = modifier.fillMaxSize().pinchColumns(state).iosScrollIndicator(state),
         state = state,
-        contentPadding = PaddingValues(start = dims.gutter, end = dims.gutter, top = 8.dp, bottom = EndOfListGap + LocalBottomBarSpace.current),
+        contentPadding = PaddingValues(start = dims.gutter, end = dims.gutter, top = Spacing.sm, bottom = EndOfListGap + LocalBottomBarSpace.current),
         horizontalArrangement = Arrangement.spacedBy(dims.rowSpacing),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
         header()
         itemsIndexed(items, key = { _, item -> item.key }) { index, item ->
@@ -711,7 +728,7 @@ internal fun PhoneTimelineGrid(
             state = state,
             contentPadding = PaddingValues(start = dims.gutter, end = dims.gutter, top = 0.dp, bottom = EndOfListGap + LocalBottomBarSpace.current),
             horizontalArrangement = Arrangement.spacedBy(dims.rowSpacing),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(Spacing.md),
         ) {
             months.forEach { month ->
                 item(key = "month:" + month.title, span = { GridItemSpan(maxLineSpan) }) {
@@ -725,7 +742,7 @@ internal fun PhoneTimelineGrid(
                 itemsIndexed(month.cards, key = { _, card -> "v:" + card.id }) { index, card ->
                     val appear = Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null).staggeredAppear("v:" + card.id, index, seen)
                     VideoMenuBox(videoId = card.id, title = card.displayTitle(), actions = actions, showDetails = false, modifier = appear) { openMenu ->
-                        SelectablePosterCard(card, actions, openMenu)
+                        SelectablePosterCard(card, actions, openMenu, terse = true)
                     }
                 }
             }
@@ -1018,15 +1035,15 @@ internal val LocalVideoSelection = staticCompositionLocalOf<VideoSelection?> { n
 
 /** A poster that opens its video, or, while selecting, ticks it. */
 @Composable
-private fun SelectablePosterCard(card: VideoCardUi, actions: AppActions, openMenu: () -> Unit) {
+private fun SelectablePosterCard(card: VideoCardUi, actions: AppActions, openMenu: () -> Unit, terse: Boolean = false) {
     val selection = LocalVideoSelection.current
     if (selection == null) {
-        PhonePosterCard(card, onClick = { actions.openVideo(card.id) }, onLongClick = openMenu)
+        PhonePosterCard(card, onClick = { actions.openVideo(card.id) }, onLongClick = openMenu, terse = terse)
         return
     }
     val checked = card.id in selection.selected
     Box {
-        PhonePosterCard(card, onClick = { selection.toggle(card.id) }, onLongClick = { selection.toggle(card.id) })
+        PhonePosterCard(card, onClick = { selection.toggle(card.id) }, onLongClick = { selection.toggle(card.id) }, terse = terse)
         IosCheckCircle(
             checked = checked,
             modifier = Modifier
