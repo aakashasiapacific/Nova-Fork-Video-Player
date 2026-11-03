@@ -594,7 +594,12 @@ private fun SongsPage(title: String, songs: List<SongEntity>, ctx: PageContext) 
 @Composable
 private fun AlbumPage(album: Album, ctx: PageContext) {
     AudioPage(album.title) {
-        row("back") { BackRow(ctx) { close -> QueueItems(album.songs, ctx, close) } }
+        row("back") {
+            BackRow(ctx) { close ->
+                QueueItems(album.songs, ctx, close)
+                PlaySimilarItem(album, ctx, close)
+            }
+        }
         row(ALBUM_COVER_KEY) {
             // A soft glow of the cover's own colours spreads behind it (owner), as the Home hero's.
             val glow = rememberCoverTint(album.artUri)
@@ -968,6 +973,51 @@ private fun QueueItems(songs: List<SongEntity>, ctx: PageContext, close: () -> U
     )
 }
 
+/** "Play Similar": a station of the library's own songs close to [album], shuffled. */
+@Composable
+private fun PlaySimilarItem(album: Album, ctx: PageContext, close: () -> Unit) {
+    val similar = remember(album, ctx.library) { similarSongs(album, ctx.library) }
+    NovaMenuItem(
+        text = { Text("Play Similar") },
+        leadingIcon = { NovaIcon(R.drawable.ic_shuffle, contentDescription = null) },
+        enabled = similar.isNotEmpty(),
+        onClick = {
+            close()
+            ctx.actions.play(similar, 0, false)
+        },
+    )
+}
+
+/**
+ * Songs like [album]'s from the library itself (owner): other albums by the same artist, then the
+ * same genre, then songs from within five years of it, each scored and shuffled a little; never
+ * the album's own songs, at most [SIMILAR_SONGS].
+ */
+private fun similarSongs(album: Album, library: MusicLibraryData): List<SongEntity> {
+    val own = album.songs.map { it.id }.toSet()
+    val artists = album.songs.map { it.artistKey }.toSet()
+    val genres = album.songs.mapNotNull { it.genre?.lowercase()?.takeIf { g -> g.isNotBlank() } }.toSet()
+    val year = album.songs.mapNotNull { it.year }.firstOrNull()
+    return library.songs
+        .asSequence()
+        .filter { it.id !in own }
+        .map { song ->
+            var score = 0
+            if (song.artistKey in artists) score += 3
+            if (song.genre?.lowercase() in genres) score += 2
+            if (year != null && song.year != null && kotlin.math.abs(song.year - year) <= 5) score += 1
+            song to score
+        }
+        .filter { it.second > 0 }
+        .shuffled()
+        .sortedByDescending { it.second }
+        .take(SIMILAR_SONGS)
+        .map { it.first }
+        .toList()
+}
+
+private const val SIMILAR_SONGS = 50
+
 /** A Library link (Playlists, Favorites): its glyph in Apple Music's red, the name, and a chevron. */
 @Composable
 private fun CategoryRow(@DrawableRes icon: Int, label: String, divider: Boolean = true, onClick: () -> Unit) {
@@ -1015,6 +1065,7 @@ private fun AlbumTile(album: Album, ctx: PageContext, modifier: Modifier = Modif
                 },
             )
             QueueItems(album.songs, ctx, close)
+            PlaySimilarItem(album, ctx, close)
             NovaMenuItem(
                 text = { Text("Go to Artist") },
                 leadingIcon = { NovaIcon(R.drawable.ic_artist, contentDescription = null) },
