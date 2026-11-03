@@ -84,6 +84,12 @@ data class Settings(
     val equalizerBands: String = "",
     /** Night mode for videos: quiet dialogue louder and loud scenes softer (a compressor). */
     val nightMode: Boolean = false,
+    /** Subtitle text size, percent of libVLC's own (50 to 200). */
+    val subtitleSize: Int = 100,
+    /** A dark box behind subtitle lines, for reading over bright pictures. */
+    val subtitleBackground: Boolean = false,
+    /** How far above the bottom of the picture subtitles sit, in px of the video (0 = libVLC's own). */
+    val subtitleMargin: Int = 0,
 )
 
 /** [Settings.equalizerPreset]'s value for the person's own band gains. */

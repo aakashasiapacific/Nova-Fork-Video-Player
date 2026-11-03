@@ -142,8 +142,14 @@ class PlayerController(
     private class CarriedChoices(val audioTrack: Int?, val subtitleTrack: Int?, val subtitleDelayMs: Long)
 
     private val appContext: Context = context.applicationContext
-    private val libVLC = VlcEngine.libVLC(appContext)
-    private val mediaPlayer: MediaPlayer = VlcEngine.newMediaPlayer(appContext)
+    // Videos draw subtitles in the person's style (size, box, height): an instance made with it.
+    private val libVLC = graph.settings.settings.value.let { settings ->
+        VlcEngine.videoLibVLC(
+            appContext,
+            VlcEngine.SubtitleStyle(settings.subtitleSize, settings.subtitleBackground, settings.subtitleMargin),
+        )
+    }
+    private val mediaPlayer: MediaPlayer = MediaPlayer(libVLC)
     private val audioManager: AudioManager = checkNotNull(appContext.getSystemService(AudioManager::class.java))
     private val mainHandler = Handler(Looper.getMainLooper())
     private val subtitleFinder = SubtitleFinder(appContext, graph.smb) { server, share ->

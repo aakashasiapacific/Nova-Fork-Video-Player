@@ -78,6 +78,9 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
             putString(KEY_EQUALIZER_PRESET, s.equalizerPreset)
             putString(KEY_EQUALIZER_BANDS, s.equalizerBands)
             putBoolean(KEY_NIGHT_MODE, s.nightMode)
+            putInt(KEY_SUBTITLE_SIZE, s.subtitleSize)
+            putBoolean(KEY_SUBTITLE_BACKGROUND, s.subtitleBackground)
+            putInt(KEY_SUBTITLE_MARGIN, s.subtitleMargin)
         }
     }
 
@@ -118,6 +121,9 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
         const val KEY_EQUALIZER_PRESET = "equalizer_preset"
         const val KEY_EQUALIZER_BANDS = "equalizer_bands"
         const val KEY_NIGHT_MODE = "night_mode"
+        const val KEY_SUBTITLE_SIZE = "subtitle_size"
+        const val KEY_SUBTITLE_BACKGROUND = "subtitle_background"
+        const val KEY_SUBTITLE_MARGIN = "subtitle_margin"
 
         /**
          * The type [write] stores each key with. A restored backup's entry of another type is
@@ -153,6 +159,9 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
             KEY_EQUALIZER_PRESET to SettingType.STRING,
             KEY_EQUALIZER_BANDS to SettingType.STRING,
             KEY_NIGHT_MODE to SettingType.BOOLEAN,
+            KEY_SUBTITLE_SIZE to SettingType.INT,
+            KEY_SUBTITLE_BACKGROUND to SettingType.BOOLEAN,
+            KEY_SUBTITLE_MARGIN to SettingType.INT,
         )
 
         /**
@@ -206,6 +215,9 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
                 equalizerPreset = prefs.string(KEY_EQUALIZER_PRESET) ?: defaults.equalizerPreset,
                 equalizerBands = prefs.string(KEY_EQUALIZER_BANDS) ?: defaults.equalizerBands,
                 nightMode = prefs.boolean(KEY_NIGHT_MODE, defaults.nightMode),
+                subtitleSize = prefs.int(KEY_SUBTITLE_SIZE, defaults.subtitleSize).coerceIn(50, 200),
+                subtitleBackground = prefs.boolean(KEY_SUBTITLE_BACKGROUND, defaults.subtitleBackground),
+                subtitleMargin = prefs.int(KEY_SUBTITLE_MARGIN, defaults.subtitleMargin).coerceIn(0, 300),
             )
         }
 

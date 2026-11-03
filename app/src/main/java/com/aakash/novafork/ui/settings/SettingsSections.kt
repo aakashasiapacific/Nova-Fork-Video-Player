@@ -409,6 +409,19 @@ private fun ClearMetadataRow(shape: Shape, onConfirm: () -> Unit) {
 
 // Player
 
+private val SubtitleSizes = listOf(
+    Option(75, "Small"),
+    Option(100, "Default"),
+    Option(130, "Large"),
+    Option(160, "Extra large"),
+)
+
+private val SubtitlePositions = listOf(
+    Option(0, "Default"),
+    Option(60, "Raised"),
+    Option(120, "Higher"),
+)
+
 private val SubtitleEncodings = listOf(
     Option("", "Automatic"),
     Option("UTF-8", "UTF-8 (Unicode)"),
@@ -512,6 +525,23 @@ private fun playerGroups(settings: Settings, actions: AppActions): List<Settings
         ),
         footer = "Auto-load picks up .srt and other subtitle files next to a video. Change the encoding if " +
             "subtitles show garbled letters. The languages are chosen first when a video has several tracks.",
+    ),
+    SettingsGroup(
+        key = "subtitle-style",
+        title = "Subtitle style",
+        rows = listOf(
+            choiceRow("subtitle-size", R.drawable.ic_subtitles, "Size", SubtitleSizes, settings.subtitleSize) { size ->
+                actions.updateSettings { it.copy(subtitleSize = size) }
+            },
+            switchRow("subtitle-box", R.drawable.ic_subtitles, "Background box", settings.subtitleBackground) { on ->
+                actions.updateSettings { it.copy(subtitleBackground = on) }
+            },
+            choiceRow("subtitle-position", R.drawable.ic_subtitles, "Position", SubtitlePositions, settings.subtitleMargin) { margin ->
+                actions.updateSettings { it.copy(subtitleMargin = margin) }
+            },
+        ),
+        footer = "The box keeps lines readable over bright scenes. Raised moves subtitles up, clear of the " +
+            "player's controls. Takes effect from the next video you open.",
     ),
     SettingsGroup(
         key = "music",
