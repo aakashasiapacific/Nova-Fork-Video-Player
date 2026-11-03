@@ -638,7 +638,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
         local.update { it.copy(dialog = dialog) }
     }
 
-    fun showMessage(text: String) {
+    override fun showMessage(text: String) {
         local.update { it.copy(message = text) }
     }
 

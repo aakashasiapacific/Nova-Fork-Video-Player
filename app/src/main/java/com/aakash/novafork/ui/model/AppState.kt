@@ -388,6 +388,9 @@ interface AppActions {
 
     fun consumeMessage()
 
+    /** A short notice at the top of the screen. */
+    fun showMessage(text: String) {}
+
     /** Shares the crash report text (Android share sheet). */
     fun shareCrashReport()
     /** Forgets the crash report. */

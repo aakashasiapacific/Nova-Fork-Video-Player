@@ -139,6 +139,7 @@ private fun libraryGroups(state: SettingsUi, actions: AppActions): List<Settings
             rows = listOf(actionRow("rescan", R.drawable.ic_refresh, "Rescan library", onClick = actions::refresh)),
             footer = "Looks for new, changed and removed videos in every source. Nova also does this quietly each time it opens.",
         ),
+        downloadsGroup(actions),
         backupGroup(actions),
     )
 }
