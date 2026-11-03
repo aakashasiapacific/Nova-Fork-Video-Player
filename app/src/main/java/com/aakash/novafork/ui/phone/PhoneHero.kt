@@ -85,6 +85,7 @@ import androidx.compose.ui.unit.dp
 import coil.imageLoader
 import coil.request.ImageRequest
 import com.aakash.novafork.R
+import com.aakash.novafork.ui.adaptive.LocalDeviceLayout
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
 import com.aakash.novafork.ui.audio.coverColors
 import com.aakash.novafork.ui.common.ArtImage
@@ -361,7 +362,8 @@ private fun PhoneHeroPage(hero: HeroUi, preview: Boolean, muted: Boolean, action
             Box(
                 Modifier
                     .align(Alignment.BottomEnd)
-                    .padding(end = 32.dp, bottom = HeroContentBottom),
+                    // On a tablet, clear of the tab bar standing on the right.
+                    .padding(end = if (LocalDeviceLayout.current.isTablet) 112.dp else 32.dp, bottom = HeroContentBottom),
             ) {
                 HeroActions(hero = hero, play = play, actions = actions)
             }

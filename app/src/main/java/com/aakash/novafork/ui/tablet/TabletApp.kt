@@ -107,16 +107,20 @@ fun TabletApp(state: AppUiState, actions: AppActions, layout: DeviceLayout, modi
                             // bar; the others start below it.
                             val underBar = pageState.route is Route.VideoDetails || pageState.route is Route.ShowDetails ||
                                 (pageState.route == Route.Home && pageState.home.hero.isNotEmpty())
-                            Box(if (underBar) Modifier.fillMaxSize() else Modifier.fillMaxSize().padding(top = TabletTopBarSpace)) {
+                            // The tab bar stands on the right (iPhone Duo): pages leave room there,
+                            // except art at the top, which runs under it.
+                            Box(if (underBar) Modifier.fillMaxSize() else Modifier.fillMaxSize().padding(end = TabletSideBarSpace)) {
                                 TabletPage(state = pageState, actions = actions, layout = layout)
                             }
                         }
                     }
                 }
-                TabletTopBar(
+                TabletSideBar(
                     selected = state.route.top,
                     onSelect = actions::selectTab,
-                    modifier = Modifier.align(Alignment.TopCenter),
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .windowInsetsPadding(WindowInsets.systemBars.only(WindowInsetsSides.End)),
                 )
                 if (music != null) {
                     val (viewModel, player) = music
