@@ -66,6 +66,38 @@ internal enum class SettingsSection(val title: String, val summary: String, @Dra
     ABOUT("About", "Version, library diagnostics and credits", R.drawable.ic_info, IosPalette.Gray),
 }
 
+/** The grey line under a section's name on the top page: its current state, short and true. */
+internal fun sectionSummary(section: SettingsSection, state: SettingsUi): String {
+    val settings = state.settings
+    return when (section) {
+        SettingsSection.LIBRARY -> {
+            val folders = state.sources.count { it.type == SourceType.FOLDER }
+            val shares = state.sources.count { it.type.isNetworkShare || it.type.isMediaServer }
+            listOfNotNull(
+                if (folders > 0) (if (folders == 1) "1 folder" else "$folders folders") else null,
+                if (shares > 0) (if (shares == 1) "1 network share" else "$shares network shares") else null,
+            ).joinToString(" · ").ifEmpty { if (settings.scanDeviceStorage) "Device storage" else "No sources" }
+        }
+        SettingsSection.ARTWORK -> {
+            val language = TmdbLanguages.firstOrNull { it.value == settings.tmdbLanguage }?.label ?: settings.tmdbLanguage
+            val key = when (state.keyStatus) {
+                KeyStatus.VALID -> "Key working"
+                KeyStatus.INVALID -> "Key not accepted"
+                KeyStatus.UNREACHABLE -> "Can't reach TMDB"
+                KeyStatus.MISSING -> "No key"
+                KeyStatus.UNKNOWN, KeyStatus.CHECKING -> null
+            }
+            listOfNotNull(language, key).joinToString(" · ")
+        }
+        SettingsSection.PLAYER ->
+            "Hardware decoding ${settings.hardwareDecoding.label} · Seek ${settings.seekStepSeconds} s"
+        SettingsSection.APPEARANCE ->
+            "Layout ${settings.layoutMode.label} · Haptics ${if (settings.haptics) "on" else "off"}"
+        SettingsSection.ABOUT ->
+            if (state.versionName.isBlank()) "Diagnostics and credits" else "Version ${state.versionName}"
+    }
+}
+
 /** The groups of one section. The first group has no title: the section's title stands for it. */
 internal fun settingsGroups(section: SettingsSection, state: SettingsUi, actions: AppActions): List<SettingsGroup> =
     when (section) {
@@ -103,8 +135,7 @@ private fun libraryGroups(state: SettingsUi, actions: AppActions): List<Settings
                 },
             ),
             // iOS Settings explains a row under its group, not inside the row.
-            footer = "Scanning finds the videos in internal storage and on SD cards. All files access lets " +
-                "subtitles and posters next to device videos load: Android hides those files from apps without it.",
+            footer = "All files access lets subtitles and posters next to device videos load; Android hides them without it.",
         ),
         SettingsGroup(
             key = "folders",
@@ -140,7 +171,7 @@ private fun libraryGroups(state: SettingsUi, actions: AppActions): List<Settings
             key = "rescan",
             title = null,
             rows = listOf(actionRow("rescan", R.drawable.ic_refresh, "Rescan library", onClick = actions::refresh)),
-            footer = "Looks for new, changed and removed videos in every source. Nova also does this quietly each time it opens.",
+            footer = "Looks for new, changed and removed videos in every source. Nova also does this each time it opens.",
         ),
         downloadsGroup(actions),
         storageGroup(state.space),
@@ -245,7 +276,7 @@ private fun artworkGroups(state: SettingsUi, actions: AppActions): List<Settings
             rows = listOf(
                 SettingsRow("tmdb-key", "TMDB API key", R.drawable.ic_key) { shape -> TmdbKeyRow(shape, state, actions) },
             ),
-            footer = "Free key: themoviedb.org → Settings → API. Paste the API key or the Read Access Token." +
+            footer = "Free key: themoviedb.org → Settings → API." +
                 if (state.hasBuiltInKey) " A built-in key is used when this is empty." else "",
         ),
         SettingsGroup(
@@ -265,9 +296,8 @@ private fun artworkGroups(state: SettingsUi, actions: AppActions): List<Settings
                     actions.updateSettings { it.copy(preferLocalArtwork = on) }
                 },
             ),
-            footer = "Titles, overviews and posters come in this language; changing it downloads them again. " +
-                "If posters don't load on your network, try the api.tmdb.org server or Secure DNS. " +
-                "Local artwork is poster.jpg and fanart.jpg next to your videos.",
+            footer = "Changing the language downloads titles and posters again. If posters don't load, try the " +
+                "api.tmdb.org server or Secure DNS. Local artwork is poster.jpg and fanart.jpg.",
         ),
         SettingsGroup(
             key = "clear",
@@ -277,7 +307,7 @@ private fun artworkGroups(state: SettingsUi, actions: AppActions): List<Settings
                     ClearMetadataRow(shape, onConfirm = actions::clearMetadata)
                 },
             ),
-            footer = "Forgets downloaded posters, details and matches, then fetches them again. Your videos and watch history stay.",
+            footer = "Downloads posters and details again. Your videos and watch history stay.",
         ),
     )
 }
@@ -498,8 +528,8 @@ private fun playerGroups(settings: Settings, actions: AppActions): List<Settings
                 actions.updateSettings { it.copy(autoPlayNext = on) }
             },
         ),
-        footer = "Software only decoding can help when a video shows green frames or stutters. " +
-            "Double-tap the sides of the video to jump back or forward by the seek step.",
+        footer = "Software only can help when a video shows green frames or stutters. " +
+            "Double-tap the video's sides to seek by this step.",
     ),
     SettingsGroup(
         key = "background",
@@ -509,8 +539,7 @@ private fun playerGroups(settings: Settings, actions: AppActions): List<Settings
                 actions.updateSettings { it.copy(backgroundAudio = on) }
             },
         ),
-        footer = "Keeps a video's sound playing after you leave the player, with controls in a notification. " +
-            "Off: leaving the player pauses the video.",
+        footer = "Keeps a video's sound playing after you leave the player. Off: leaving pauses it.",
     ),
     SettingsGroup(
         key = "tracks",
@@ -532,10 +561,8 @@ private fun playerGroups(settings: Settings, actions: AppActions): List<Settings
                 actions.updateSettings { it.copy(preferredAudioLanguage = language) }
             },
         ),
-        footer = "Auto-load picks up .srt and other subtitle files next to a video. Change the encoding if " +
-            "subtitles show garbled letters. The languages are chosen first when a video has several tracks. " +
-            "Fetch missing subtitles adds one from OpenSubtitles to the subtitle menu, quietly, when a video has " +
-            "none in your language (needs the OpenSubtitles key in Subtitle downloads).",
+        footer = "Change the encoding if subtitles show garbled letters. Fetch missing subtitles adds one from " +
+            "OpenSubtitles when a video has none in your language (needs the key below).",
     ),
     SettingsGroup(
         key = "subtitle-style",
@@ -551,8 +578,7 @@ private fun playerGroups(settings: Settings, actions: AppActions): List<Settings
                 actions.updateSettings { it.copy(subtitleMargin = margin) }
             },
         ),
-        footer = "The box keeps lines readable over bright scenes. Raised moves subtitles up, clear of the " +
-            "player's controls. Takes effect from the next video you open.",
+        footer = "Applies from the next video you open.",
     ),
     SettingsGroup(
         key = "music",
@@ -565,8 +591,7 @@ private fun playerGroups(settings: Settings, actions: AppActions): List<Settings
                 actions.updateSettings { it.copy(musicAutoplay = on) }
             },
         ),
-        footer = "Each song fades into the next over this many seconds. Off: songs follow with no gap. " +
-            "Autoplay keeps the music going with similar songs from your library when the queue ends.",
+        footer = "Autoplay keeps the music going with similar songs when the queue ends.",
     ),
 ) + subtitleDownloadGroups(settings, actions)
 
@@ -589,7 +614,7 @@ private fun appearanceGroups(settings: Settings, actions: AppActions): List<Sett
                 tile = IosPalette.Blue,
             ) { mode -> actions.updateSettings { it.copy(layoutMode = mode) } },
         ),
-        footer = "Automatic uses the tablet layout when the screen's smallest side is at least 600dp.",
+        footer = "Automatic uses the tablet layout from 600dp wide.",
     ),
     SettingsGroup(
         key = "glass",
@@ -599,7 +624,7 @@ private fun appearanceGroups(settings: Settings, actions: AppActions): List<Sett
                 GlassRow(shape, tint = settings.glassTint) { tint -> actions.updateSettings { it.copy(glassTint = tint) } }
             },
         ),
-        footer = "How see-through the glass buttons and bars are, as on iOS 27. Tinted reads best over bright pictures.",
+        footer = "How see-through buttons and bars are. Tinted reads best over bright pictures.",
     ),
     SettingsGroup(
         key = "haptics",
@@ -609,7 +634,7 @@ private fun appearanceGroups(settings: Settings, actions: AppActions): List<Sett
                 actions.updateSettings { it.copy(haptics = on) }
             },
         ),
-        footer = "The light ticks when you tap tabs, flip switches, swipe and scrub.",
+        footer = "Light ticks when you tap, swipe and scrub.",
     ),
 )
 
@@ -623,7 +648,7 @@ private fun aboutGroups(state: SettingsUi, actions: AppActions): List<SettingsGr
             infoRow("version", R.drawable.ic_info, "Version", state.versionName.ifBlank { "Unknown" }),
             actionRow("diagnostics", R.drawable.ic_tune, "Library diagnostics", onClick = actions::openLibraryDiagnostics),
         ),
-        footer = "Diagnostics show what Nova sees: storage access, the videos Android lists and each source, to copy or share.",
+        footer = "Shows what Nova sees in each source, to copy or share.",
     ),
     SettingsGroup(
         key = "credits",
@@ -632,7 +657,7 @@ private fun aboutGroups(state: SettingsUi, actions: AppActions): List<SettingsGr
             infoRow("libvlc", R.drawable.ic_play_arrow, "Playback by libVLC", "LGPL"),
             infoRow("tmdb", R.drawable.ic_movie, "Metadata from TMDB", null, tile = IosPalette.Teal),
         ),
-        footer = "libVLC is the engine behind VLC, licensed under the LGPL. " +
-            "This product uses the TMDB API but is not endorsed or certified by TMDB.",
+        footer = "libVLC is licensed under the LGPL. This product uses the TMDB API but is not endorsed or " +
+            "certified by TMDB.",
     ),
 )

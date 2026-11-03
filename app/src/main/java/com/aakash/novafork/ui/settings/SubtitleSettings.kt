@@ -77,9 +77,9 @@ internal fun subtitleDownloadGroups(settings: Settings, actions: AppActions): Li
             ) { on -> actions.updateSettings { it.copy(autoDownloadSubtitles = on) } },
         ),
         // Exactly what the player will use: text that names no language falls back to the automatic ones.
-        footer = "Codes or names, most wanted first, e.g. \"en, fr\" or \"Hindi, English\". Searching in " +
-            "${languagesLabel(settings.subtitleLanguages, settings)}. Automatic downloads fetch one subtitle " +
-            "sure to fit when a video has none in your first language. In the player: Subtitles → Download subtitles.",
+        footer = "Codes or names, most wanted first, e.g. \"en, fr\". Searching in " +
+            "${languagesLabel(settings.subtitleLanguages, settings)}. Automatic downloads fill in a video with " +
+            "none in your first language.",
     ),
 )
 

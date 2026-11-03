@@ -49,9 +49,7 @@ internal fun backupGroup(actions: AppActions): SettingsGroup = SettingsGroup(
         SettingsRow("backup-save", "Back Up", R.drawable.ic_storage, IosPalette.Green) { shape -> BackupRow(shape, actions) },
         SettingsRow("backup-restore", "Restore", R.drawable.ic_restart_alt) { shape -> RestoreRow(shape, actions) },
     ),
-    footer = "Back Up saves settings, sources, watch history, manual matches and playlists to a file you can " +
-        "keep or move to another device. Restoring adds to what is here; videos not found yet get their " +
-        "history once their source is scanned.",
+    footer = "Saves settings, sources, history, matches and playlists to a file. Restoring adds to what is here.",
 )
 
 /** "Back Up", with the day of the last backup in grey (or a spinner while one is made). */

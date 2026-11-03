@@ -25,8 +25,7 @@ internal fun storageGroup(space: SpaceUsage): SettingsGroup = SettingsGroup(
     key = "storage",
     title = "Storage",
     rows = listOf(SettingsRow("storage", "Storage", R.drawable.ic_storage) { shape -> StorageList(shape, space) }),
-    footer = "Where the videos and music in your library take room, from the file sizes Nova has stored. " +
-        "Files whose size isn't known, such as streams, aren't counted.",
+    footer = "Room taken by your videos and music. Files of unknown size, such as streams, aren't counted.",
 )
 
 @Composable
@@ -100,8 +99,7 @@ internal fun watchStatsGroup(watch: WatchStats): SettingsGroup = SettingsGroup(
             }
         }
     },
-    footer = "Time is counted from each video's last viewing, so a video watched twice in a month counts once " +
-        "for that month. The shows are those with most episodes watched.",
+    footer = "Time is counted from each video's last viewing, so a video watched twice in a month counts once.",
 )
 
 @Composable

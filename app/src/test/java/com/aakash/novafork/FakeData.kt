@@ -664,6 +664,8 @@ object FakeScreens {
             sources = UiMappers.sources(index, idle),
             allFilesAccess = false,
             canRequestAllFilesAccess = true,
+            videoCount = index.allVideos.size,
+            songCount = 842,
         )
 
     /** Everything loaded, as on a warm start; [route] picks the page. */

@@ -513,6 +513,12 @@ data class SettingsUi(
     val space: SpaceUsage = SpaceUsage(),
     /** Preferences' Watch Stats group. Filled only while a settings page is open. */
     val watch: WatchStats = WatchStats(),
+    /** Preferences' library card: every video in the library. */
+    val videoCount: Int = 0,
+    /** Preferences' library card: every song in the music library. */
+    val songCount: Int = 0,
+    /** When a source last finished scanning (epoch ms); null when none has. */
+    val lastScanAt: Long? = null,
 )
 
 @Immutable

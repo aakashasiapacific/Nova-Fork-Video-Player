@@ -41,6 +41,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.aakash.novafork.R
 import com.aakash.novafork.ui.common.Hairline
 import com.aakash.novafork.ui.common.IosColors
@@ -79,11 +80,14 @@ internal data class Option<T>(val value: T, val label: String)
 
 /** iOS 26/27's grouped cards round more than the old 10pt. */
 internal val CardCorner = 26.dp
-private val TileSize = 30.dp
-/** Every row is this tall, as iOS 27 Settings' rows are. */
-private val RowHeight = 52.dp
+private val TileSize = 28.dp
+/** A one-line row is this tall; a row with a grey line under its title is [TwoLineRowHeight]. */
+private val RowHeight = 50.dp
+internal val TwoLineRowHeight = 60.dp
 private val RowPaddingStart = 16.dp
 internal val IconTextGap = 14.dp
+/** Room between two groups, header and footer included. */
+internal val GroupSpacing = 24.dp
 /** Separators start under the row's text, as in iOS's inset-grouped lists. */
 internal val SeparatorInset = RowPaddingStart + TileSize + IconTextGap
 
@@ -105,14 +109,14 @@ internal fun SettingsGroupBlock(group: SettingsGroup, title: String?, modifier: 
     }
 }
 
-/** A group's name over its card: sentence case and semibold, as iOS 26 headers are, not caps. */
+/** A group's name over its card: small grey sentence case, 8dp above the card. */
 @Composable
 internal fun GroupHeader(title: String) {
     Text(
         text = title,
-        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+        style = MaterialTheme.typography.bodySmall.copy(fontSize = 13.sp, lineHeight = 18.sp, fontWeight = FontWeight.Normal),
         color = IosColors.SecondaryLabel,
-        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 18.dp, bottom = 8.dp),
+        modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
     )
 }
 
@@ -121,7 +125,7 @@ internal fun GroupHeader(title: String) {
 internal fun GroupFooter(text: String) {
     Text(
         text = text,
-        style = MaterialTheme.typography.bodySmall,
+        style = MaterialTheme.typography.bodySmall.copy(fontSize = 13.sp, lineHeight = 18.sp),
         color = IosColors.SecondaryLabel,
         modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp),
     )
@@ -141,10 +145,10 @@ internal fun SettingsCard(modifier: Modifier = Modifier, content: @Composable Co
 
 /** The hairline between two rows, from under the text to the card's edge. */
 @Composable
-internal fun RowSeparator() {
+internal fun RowSeparator(start: Dp = SeparatorInset) {
     Box(
         Modifier
-            .padding(start = SeparatorInset)
+            .padding(start = start)
             .fillMaxWidth()
             .height(Hairline)
             .background(IosColors.Separator),
@@ -162,6 +166,7 @@ internal fun RowSurface(
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
     interaction: Modifier = Modifier,
+    minHeight: Dp = RowHeight,
     content: @Composable RowScope.() -> Unit,
 ) {
     Surface(shape = shape, color = Color.Transparent, modifier = modifier.fillMaxWidth()) {
@@ -169,7 +174,7 @@ internal fun RowSurface(
             Modifier
                 .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
                 .then(interaction)
-                .heightIn(min = RowHeight)
+                .heightIn(min = minHeight)
                 // Little room above and below: a 48dp button still fits the one-line height.
                 .padding(start = RowPaddingStart, end = 16.dp, top = 2.dp, bottom = 2.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -179,10 +184,83 @@ internal fun RowSurface(
     }
 }
 
-/** iOS Settings' icon: a white glyph on a small rounded tile in the row's colour. */
+/**
+ * A Preferences row's icon: the outline glyph ([prefIcon]) in white at 90%, no tile. [tile] is kept
+ * for the callers and not drawn.
+ */
+@Suppress("UNUSED_PARAMETER")
 @Composable
-internal fun RowIcon(@DrawableRes icon: Int, tile: Color = tileColor(icon)) {
-    IconTile(icon, tile)
+internal fun RowIcon(@DrawableRes icon: Int, tile: Color = Color.Unspecified) {
+    PrefIcon(icon)
+}
+
+/** The outline glyph, 24dp in a [TileSize] box so every row's text lines up. */
+@Composable
+internal fun PrefIcon(@DrawableRes icon: Int) {
+    Box(Modifier.size(TileSize), contentAlignment = Alignment.Center) {
+        NovaIcon(prefIcon(icon), contentDescription = null, tint = Color.White.copy(alpha = 0.9f), modifier = Modifier.size(24.dp))
+    }
+}
+
+/**
+ * Preferences' own outline version of a glyph, all one 1.5 stroke on a 24 grid, so no row shows a
+ * filled icon beside an outlined one. Other screens keep the glyphs they have.
+ */
+@DrawableRes
+internal fun prefIcon(@DrawableRes icon: Int): Int = when (icon) {
+    R.drawable.ic_aspect_ratio -> R.drawable.ic_pref_aspect_ratio
+    R.drawable.ic_audiotrack -> R.drawable.ic_pref_audiotrack
+    R.drawable.ic_brightness_6 -> R.drawable.ic_pref_brightness_6
+    R.drawable.ic_check_circle -> R.drawable.ic_pref_check_circle
+    R.drawable.ic_cloud -> R.drawable.ic_pref_cloud
+    R.drawable.ic_computer -> R.drawable.ic_pref_computer
+    R.drawable.ic_create_new_folder -> R.drawable.ic_pref_create_new_folder
+    R.drawable.ic_dark_mode -> R.drawable.ic_pref_dark_mode
+    R.drawable.ic_delete -> R.drawable.ic_pref_delete
+    R.drawable.ic_dns -> R.drawable.ic_pref_dns
+    R.drawable.ic_edit -> R.drawable.ic_pref_edit
+    R.drawable.ic_error -> R.drawable.ic_pref_error
+    R.drawable.ic_folder -> R.drawable.ic_pref_folder
+    R.drawable.ic_folder_open -> R.drawable.ic_pref_folder_open
+    R.drawable.ic_folder_special -> R.drawable.ic_pref_folder_special
+    R.drawable.ic_grid_view -> R.drawable.ic_pref_grid_view
+    R.drawable.ic_hd -> R.drawable.ic_pref_hd
+    R.drawable.ic_hide_image -> R.drawable.ic_pref_hide_image
+    R.drawable.ic_history -> R.drawable.ic_pref_history
+    R.drawable.ic_image -> R.drawable.ic_pref_image
+    R.drawable.ic_info -> R.drawable.ic_pref_info
+    R.drawable.ic_key -> R.drawable.ic_pref_key
+    R.drawable.ic_lan -> R.drawable.ic_pref_lan
+    R.drawable.ic_language -> R.drawable.ic_pref_language
+    R.drawable.ic_link -> R.drawable.ic_pref_link
+    R.drawable.ic_live_tv -> R.drawable.ic_pref_live_tv
+    R.drawable.ic_lock -> R.drawable.ic_pref_lock
+    R.drawable.ic_movie -> R.drawable.ic_pref_movie
+    R.drawable.ic_music_notes -> R.drawable.ic_pref_music_notes
+    R.drawable.ic_phone_android -> R.drawable.ic_pref_phone_android
+    R.drawable.ic_play_arrow -> R.drawable.ic_pref_play_arrow
+    R.drawable.ic_public -> R.drawable.ic_pref_public
+    R.drawable.ic_refresh -> R.drawable.ic_pref_refresh
+    R.drawable.ic_repeat -> R.drawable.ic_pref_repeat
+    R.drawable.ic_replay -> R.drawable.ic_pref_replay
+    R.drawable.ic_restart_alt -> R.drawable.ic_pref_restart_alt
+    R.drawable.ic_screen_rotation -> R.drawable.ic_pref_screen_rotation
+    R.drawable.ic_sd_storage -> R.drawable.ic_pref_sd_storage
+    R.drawable.ic_skip_next -> R.drawable.ic_pref_skip_next
+    R.drawable.ic_smart_display -> R.drawable.ic_pref_smart_display
+    R.drawable.ic_speed -> R.drawable.ic_pref_speed
+    R.drawable.ic_storage -> R.drawable.ic_pref_storage
+    R.drawable.ic_subtitles -> R.drawable.ic_pref_subtitles
+    R.drawable.ic_theaters -> R.drawable.ic_pref_theaters
+    R.drawable.ic_timer -> R.drawable.ic_pref_timer
+    R.drawable.ic_tune -> R.drawable.ic_pref_tune
+    R.drawable.ic_tv -> R.drawable.ic_pref_tv
+    R.drawable.ic_video_library -> R.drawable.ic_pref_video_library
+    R.drawable.ic_visibility -> R.drawable.ic_pref_visibility
+    R.drawable.ic_visibility_off -> R.drawable.ic_pref_visibility_off
+    R.drawable.ic_volume_up -> R.drawable.ic_pref_volume_up
+    R.drawable.ic_wifi -> R.drawable.ic_pref_wifi
+    else -> icon
 }
 
 /**

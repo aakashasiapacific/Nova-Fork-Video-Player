@@ -35,8 +35,7 @@ internal fun downloadsGroup(actions: AppActions): SettingsGroup = SettingsGroup(
     key = "downloads",
     title = "Downloads",
     rows = listOf(SettingsRow("downloads", "Downloads", R.drawable.ic_storage) { shape -> DownloadsList(shape, actions) }),
-    footer = "Videos downloaded from network shares, kept in Movies/Nova Fork. Swipe one left to remove the " +
-        "downloaded copy; the original on the share stays.",
+    footer = "Copies from network shares, kept in Movies/Nova Fork. Swipe left to remove one; the original stays.",
 )
 
 @Composable

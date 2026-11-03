@@ -55,10 +55,12 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.aakash.novafork.R
 import com.aakash.novafork.ui.adaptive.DeviceLayout
 import com.aakash.novafork.ui.common.CollapsedTitleBar
 import com.aakash.novafork.ui.common.IosColors
+import com.aakash.novafork.ui.common.IosTextButton
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.OnTabReselect
 import com.aakash.novafork.ui.common.largeTitle
@@ -72,7 +74,6 @@ import com.aakash.novafork.ui.phone.PhoneTopBar
 private val PhoneMargin = 16.dp
 private val TabletListWidth = 300.dp
 private val TabletContentMaxWidth = 720.dp
-private val GroupGap = 12.dp
 
 /**
  * Settings for both UI families: one scrolling list of groups on a phone, a section list with the
@@ -94,9 +95,9 @@ fun SettingsScreen(
 }
 
 /**
- * iOS 27 Settings (owner: the old page looked ugly): the large title, a search field that finds
- * any setting, the app's own card (as the Apple Account card), then the sections, icon and name
- * only, each opening its own page ([SettingsSectionScreen]).
+ * The top page: the large title, a search field that finds any setting, a card summing up the
+ * library (with Scan Now), then the sections, each with a grey line on its current state and
+ * opening its own page ([SettingsSectionScreen]); the version sits in a small footer.
  */
 @Composable
 private fun PhoneSettings(state: SettingsUi, actions: AppActions, modifier: Modifier, contentPadding: PaddingValues) {
@@ -127,10 +128,11 @@ private fun PhoneSettings(state: SettingsUi, actions: AppActions, modifier: Modi
                 SettingsSearchField(query = query, onQueryChange = { query = it }, modifier = Modifier.padding(top = 10.dp))
             }
             if (query.isBlank()) {
-                item(key = "app") {
-                    AppCard(
-                        versionName = state.versionName,
-                        onClick = { open(SettingsSection.ABOUT) },
+                item(key = "library") {
+                    LibraryCard(
+                        state = state,
+                        onOpenSources = { open(SettingsSection.LIBRARY) },
+                        onScan = actions::refresh,
                         modifier = Modifier.padding(top = 20.dp),
                     )
                 }
@@ -138,10 +140,22 @@ private fun PhoneSettings(state: SettingsUi, actions: AppActions, modifier: Modi
                     item(key = "sections:$index") {
                         SectionCard(
                             sections = sections,
+                            state = state,
                             onOpen = open,
                             modifier = Modifier.padding(top = SectionCardGap),
                         )
                     }
+                }
+                item(key = "version") {
+                    Text(
+                        text = if (state.versionName.isBlank()) "Nova Fork" else "Nova Fork ${state.versionName}",
+                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 13.sp, lineHeight = 18.sp),
+                        color = IosColors.SecondaryLabel,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = GroupSpacing, bottom = 8.dp),
+                    )
                 }
             } else {
                 item(key = "results") {
@@ -158,20 +172,35 @@ private val PhoneSectionCards = listOf(
     listOf(SettingsSection.LIBRARY, SettingsSection.ARTWORK, SettingsSection.PLAYER),
     listOf(SettingsSection.APPEARANCE, SettingsSection.ABOUT),
 )
-private val SectionCardGap = 28.dp
+private val SectionCardGap = GroupSpacing
 
-/** One card of section rows: icon tile, name and chevron, hairlines inset under the names. */
+/** One card of section rows: icon, name over a grey line on its state, chevron; hairlines under the text. */
 @Composable
-private fun SectionCard(sections: List<SettingsSection>, onOpen: (SettingsSection) -> Unit, modifier: Modifier = Modifier) {
+private fun SectionCard(
+    sections: List<SettingsSection>,
+    state: SettingsUi,
+    onOpen: (SettingsSection) -> Unit,
+    modifier: Modifier = Modifier,
+) {
     SettingsCard(modifier) {
         sections.forEachIndexed { index, section ->
             if (index > 0) RowSeparator()
             RowSurface(
                 shape = RoundedCornerShape(0.dp),
                 onClick = { onOpen(section) },
+                minHeight = TwoLineRowHeight,
             ) {
-                RowIcon(section.icon, section.tile)
-                RowTitle(section.title, Modifier.weight(1f))
+                RowIcon(section.icon)
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                    RowTitle(section.title)
+                    Text(
+                        text = sectionSummary(section, state),
+                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 13.sp, lineHeight = 17.sp),
+                        color = IosColors.SecondaryLabel,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
                 RowChevron()
             }
         }
@@ -179,37 +208,76 @@ private fun SectionCard(sections: List<SettingsSection>, onOpen: (SettingsSectio
 }
 
 /**
- * The Apple Account card's place, for the app itself: its icon, name and version; it opens
- * About.
+ * The library at a glance: videos, songs and sources side by side (a tap opens Sources), then when
+ * it was last updated and Scan Now.
  */
 @Composable
-private fun AppCard(versionName: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+private fun LibraryCard(state: SettingsUi, onOpenSources: () -> Unit, onScan: () -> Unit, modifier: Modifier = Modifier) {
+    val scanning = state.sources.any { it.isScanning }
     SettingsCard(modifier) {
         Row(
             Modifier
                 .fillMaxWidth()
-                .clickable(onClickLabel = "Open About", onClick = onClick)
-                .padding(horizontal = 16.dp, vertical = 14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
+                .clickable(onClickLabel = "Open Sources", onClick = onOpenSources)
+                .padding(horizontal = 16.dp, vertical = 16.dp),
         ) {
-            AppIcon(AppIconSize)
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text("Nova Fork", style = MaterialTheme.typography.titleLarge, maxLines = 1)
-                Text(
-                    text = if (versionName.isBlank()) "Videos and music" else "Version $versionName",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = IosColors.SecondaryLabel,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            RowChevron()
+            LibraryStat("Videos", state.videoCount, Modifier.weight(1f))
+            LibraryStat("Songs", state.songCount, Modifier.weight(1f))
+            LibraryStat("Sources", state.sources.size, Modifier.weight(1f))
+        }
+        RowSeparator(start = 16.dp)
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .heightIn(min = 48.dp)
+                .padding(start = 16.dp, end = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = when {
+                    scanning -> "Scanning…"
+                    state.lastScanAt != null -> "Updated ${relativeAge(state.lastScanAt, System.currentTimeMillis())}"
+                    else -> "Pull down anywhere to refresh"
+                },
+                style = MaterialTheme.typography.bodySmall.copy(fontSize = 13.sp, lineHeight = 18.sp),
+                color = IosColors.SecondaryLabel,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            IosTextButton(onClick = onScan, enabled = !scanning) { Text("Scan Now") }
         }
     }
 }
 
-private val AppIconSize = 58.dp
+@Composable
+private fun LibraryStat(label: String, count: Int, modifier: Modifier = Modifier) {
+    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            text = count.toString(),
+            style = MaterialTheme.typography.headlineMedium,
+            maxLines = 1,
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodySmall.copy(fontSize = 13.sp, lineHeight = 18.sp),
+            color = IosColors.SecondaryLabel,
+            maxLines = 1,
+        )
+    }
+}
+
+/** "just now", "5 min ago", "3 h ago", "2 days ago": how long before [now] [then] was. */
+internal fun relativeAge(then: Long, now: Long): String {
+    val minutes = ((now - then) / 60_000L).coerceAtLeast(0L)
+    return when {
+        minutes < 1L -> "just now"
+        minutes < 60L -> "$minutes min ago"
+        minutes < 24L * 60L -> "${minutes / 60L} h ago"
+        minutes < 48L * 60L -> "yesterday"
+        else -> "${minutes / (24L * 60L)} days ago"
+    }
+}
 
 /** The launcher icon as the home screen shows it: the white mark on its blue gradient square */
 @Composable
@@ -399,16 +467,13 @@ fun SettingsSectionScreen(
                     SettingsGroupBlock(
                         group = group,
                         title = group.title,
-                        modifier = Modifier.padding(top = if (index == 0) 8.dp else SectionGroupGap),
+                        modifier = Modifier.padding(top = if (index == 0) 8.dp else GroupSpacing),
                     )
                 }
             }
         }
     }
 }
-
-/** Room between a section page's groups (iOS leaves about this much). */
-private val SectionGroupGap = 24.dp
 
 @Composable
 private fun TabletSettings(state: SettingsUi, actions: AppActions, modifier: Modifier, contentPadding: PaddingValues) {
@@ -469,7 +534,7 @@ private fun TabletSettings(state: SettingsUi, actions: AppActions, modifier: Mod
                         SettingsGroupBlock(
                             group = group,
                             title = group.title,
-                            modifier = Modifier.padding(top = if (index == 0 || group.title != null) 0.dp else GroupGap),
+                            modifier = Modifier.padding(top = if (index == 0) 0.dp else GroupSpacing),
                         )
                     }
                 }
@@ -495,7 +560,7 @@ private fun SectionListItem(section: SettingsSection, selected: Boolean, onClick
                 .padding(horizontal = 12.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            IconTile(section.icon, section.tile)
+            PrefIcon(section.icon)
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text(section.title, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
