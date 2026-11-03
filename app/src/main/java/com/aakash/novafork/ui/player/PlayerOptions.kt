@@ -19,9 +19,14 @@ import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -39,6 +44,7 @@ import com.aakash.novafork.ui.common.IosTextButton
 import com.aakash.novafork.ui.common.NovaChip
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.model.TrackUi
+import kotlin.math.roundToInt
 
 // Option rows shared by the phone track sheet and the tablet side panel.
 
@@ -168,6 +174,36 @@ internal fun SubtitleDelayRow(
             Spacer(Modifier.width(8.dp))
             IosTextButton(onClick = { onChange(0L) }, enabled = delayMs != 0L) { Text("Reset") }
         }
+    }
+}
+
+/**
+ * "Subtitle size" slider, 50 to 200 percent in steps of 10. The text changes as the slider is
+ * let go (the video is reopened at the same place for it); the value is the app's setting.
+ */
+@Composable
+internal fun SubtitleSizeRow(sizePercent: Int, onChange: (Int) -> Unit, modifier: Modifier = Modifier) {
+    var dragging by remember { mutableStateOf<Float?>(null) }
+    val shown = dragging?.let { (it / 10f).roundToInt() * 10 } ?: sizePercent
+    Column(modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(text = "Subtitle size", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+            Text(
+                text = "$shown%",
+                style = MaterialTheme.typography.titleMedium.merge(TextStyle(fontFeatureSettings = "tnum")),
+            )
+        }
+        Slider(
+            value = dragging ?: sizePercent.toFloat(),
+            onValueChange = { dragging = it },
+            onValueChangeFinished = {
+                dragging?.let { onChange((it / 10f).roundToInt() * 10) }
+                dragging = null
+            },
+            valueRange = 50f..200f,
+            steps = 14,
+            modifier = Modifier.semantics { contentDescription = "Subtitle size" },
+        )
     }
 }
 

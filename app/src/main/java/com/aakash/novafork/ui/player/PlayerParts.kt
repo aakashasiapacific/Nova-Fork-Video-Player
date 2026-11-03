@@ -66,6 +66,7 @@ internal enum class PlayerSheet(val title: String) {
     QUEUE("Queue"),
     CAST("Cast to a device"),
     CHAPTERS("Chapters"),
+    BOOKMARKS("Bookmarks"),
 }
 
 /** Physical third of the screen a tap hit (not mirrored for RTL: right always seeks forward). */

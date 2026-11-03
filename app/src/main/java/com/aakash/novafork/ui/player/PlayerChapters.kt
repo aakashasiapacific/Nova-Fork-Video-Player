@@ -200,6 +200,24 @@ internal fun chapterSkip(chapters: List<ChapterUi>, index: Int, durationMs: Long
     }
 }
 
+private val RecapName = Regex("""\b(intro|opening|op|recap|previously)\b""", RegexOption.IGNORE_CASE)
+
+/**
+ * The parts of the video told apart on the seek bar (display only, nothing skips): chapters named
+ * like an intro, opening or recap, and credits or an ending among the last ones. As 0..1 fractions.
+ */
+internal fun markedRanges(chapters: List<ChapterUi>, durationMs: Long): List<ClosedFloatingPointRange<Float>> {
+    if (chapters.size < 2 || durationMs <= 0L) return emptyList()
+    return chapters.indices.mapNotNull { index ->
+        val name = chapters[index].name
+        val credits = chapterSkip(chapters, index, durationMs) == ChapterSkip.CREDITS
+        if (!credits && !RecapName.containsMatchIn(name)) return@mapNotNull null
+        val start = (chapters[index].startMs.toFloat() / durationMs).coerceIn(0f, 1f)
+        val end = (chapterEndMs(chapters, index, durationMs).toFloat() / durationMs).coerceIn(0f, 1f)
+        if (end > start) start..end else null
+    }
+}
+
 /** Credits only count as such in the last part of the video. */
 private const val CREDITS_FROM = 0.7
 

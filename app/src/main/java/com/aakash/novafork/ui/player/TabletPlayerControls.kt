@@ -125,6 +125,13 @@ private fun TabletTopBar(
                 iconSize = 26.dp,
             )
         }
+        PlayerIconButton(
+            icon = R.drawable.ic_bookmark,
+            contentDescription = "Bookmarks",
+            onClick = { onOpenSheet(PlayerSheet.BOOKMARKS) },
+            buttonSize = 56.dp,
+            iconSize = 26.dp,
+        )
         if (state.chapters.size > 1) {
             PlayerIconButton(
                 icon = R.drawable.ic_player_chapters,

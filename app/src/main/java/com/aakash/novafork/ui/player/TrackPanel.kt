@@ -221,6 +221,7 @@ private fun TrackPanelList(
                         },
                     )
                     SubtitleDelayRow(delayMs = state.subtitleDelayMs, onChange = actions::setSubtitleDelay)
+                    SubtitleSizeRow(sizePercent = state.subtitleSize, onChange = actions::setSubtitleSize)
                 }
                 PlayerPanel.SPEED -> Column {
                     OptionHeader("Speed")

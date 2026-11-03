@@ -130,5 +130,5 @@ private val VideoSleepChoices = listOf(
     30 to "30 Minutes",
     45 to "45 Minutes",
     60 to "1 Hour",
-    SLEEP_END_OF_VIDEO to "End of Video",
+    SLEEP_END_OF_VIDEO to "End of This Episode",
 )

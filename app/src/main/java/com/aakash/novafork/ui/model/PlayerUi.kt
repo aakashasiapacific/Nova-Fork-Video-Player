@@ -99,6 +99,10 @@ data class ChapterUi(
     val durationMs: Long,
 )
 
+/** A bookmark the person saved inside the playing video. */
+@Immutable
+data class BookmarkUi(val positionMs: Long, val label: String)
+
 /** The "Download subtitles" list over the player; see [PlayerActions.searchSubtitles]. */
 @Immutable
 data class SubtitleSearchUi(
@@ -134,6 +138,8 @@ data class PlayerUiState(
     /** 0.25 – 4.0 */
     val rate: Float = 1f,
     val subtitleDelayMs: Long = 0,
+    /** The subtitle text size, percent of libVLC's own (Settings.subtitleSize). */
+    val subtitleSize: Int = 100,
     /** The sound's delay for the output playing (a Bluetooth device's own), ms; later when positive. */
     val audioDelayMs: Long = 0,
     /** Lock: hides everything but an unlock button and ignores gestures. */
@@ -190,6 +196,8 @@ data class PlayerUiState(
     val equalizerOn: Boolean = false,
     /** The sleep timer while it runs; null = off. */
     val sleepTimer: SleepTimerUi? = null,
+    /** The playing video's bookmarks, earliest first. */
+    val bookmarks: List<BookmarkUi> = emptyList(),
     /** 0 to 1: how far the picture has dimmed as the sleep timer ran out; back to 0 on play. */
     val sleepDim: Float = 0f,
 )
@@ -295,6 +303,17 @@ interface PlayerActions {
      * [SLEEP_END_OF_VIDEO] pauses at the end of this video instead of going on; 0 turns it off.
      */
     fun setSleepTimer(minutes: Int) {}
+
+    // Bookmarks and subtitle size. Default bodies keep other implementations compiling.
+
+    /** Saves the current position as a bookmark of this video ([PlayerUiState.bookmarks]). */
+    fun addBookmark() {}
+
+    /** Deletes the bookmark at [positionMs]. */
+    fun removeBookmark(positionMs: Long) {}
+
+    /** The subtitle text size, percent (50 to 200), changed live and kept as the app's setting. */
+    fun setSubtitleSize(percent: Int) {}
 }
 
 open class NoOpPlayerActions : PlayerActions {

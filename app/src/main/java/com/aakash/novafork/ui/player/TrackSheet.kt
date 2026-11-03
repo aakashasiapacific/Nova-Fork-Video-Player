@@ -104,6 +104,7 @@ internal fun TrackSheet(
                         },
                     )
                     SubtitleDelayRow(delayMs = state.subtitleDelayMs, onChange = actions::setSubtitleDelay)
+                    SubtitleSizeRow(sizePercent = state.subtitleSize, onChange = actions::setSubtitleSize)
                 }
                 else -> {
                     OptionHeader("Playback speed")
