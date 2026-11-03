@@ -5,12 +5,10 @@ import androidx.annotation.DrawableRes
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -76,6 +74,7 @@ import com.aakash.novafork.core.format.Formats
 import com.aakash.novafork.ui.common.IosButton
 import com.aakash.novafork.ui.common.IosTextButton
 import com.aakash.novafork.ui.common.LandscapeArt
+import com.aakash.novafork.ui.common.Motion
 import com.aakash.novafork.ui.model.GestureFeedback
 import com.aakash.novafork.ui.model.UpNextUi
 import com.aakash.novafork.ui.theme.NovaColors
@@ -98,8 +97,8 @@ internal fun FeedbackOverlay(
     AnimatedVisibility(
         visible = feedback != null,
         modifier = modifier,
-        enter = fadeIn(tween(120)),
-        exit = fadeOut(tween(250)),
+        enter = fadeIn(Motion.content()),
+        exit = fadeOut(Motion.press()),
     ) {
         if (shown != null) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -214,15 +213,15 @@ internal fun VolumeHud(level: Float?, modifier: Modifier = Modifier) {
     val shown = (rememberLatestNonNull(level) ?: 0f).coerceIn(0f, 1f)
     val fill by animateFloatAsState(
         targetValue = shown,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow),
+        animationSpec = Motion.content(),
         label = "volumeHud",
     )
     val landscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     Box(modifier, contentAlignment = if (landscape) Alignment.TopCenter else BiasAlignment(horizontalBias = 1f, verticalBias = -0.35f)) {
         AnimatedVisibility(
             visible = level != null,
-            enter = fadeIn(tween(140)) + scaleIn(tween(180), initialScale = 0.85f),
-            exit = fadeOut(tween(320)) + scaleOut(tween(320), targetScale = 0.85f),
+            enter = fadeIn(Motion.content()) + scaleIn(Motion.content(), initialScale = 0.9f),
+            exit = fadeOut(Motion.content()) + scaleOut(Motion.content(), targetScale = 0.9f),
         ) {
             val icon = if (shown <= 0f) R.drawable.ic_volume_off else R.drawable.ic_volume_up
             if (landscape) {
@@ -291,7 +290,7 @@ private fun SeekBubbleSide(bubble: SeekBubble?, forward: Boolean, modifier: Modi
     LaunchedEffect(bubble?.totalMs) {
         if (bubble != null) {
             pulse.snapTo(1.15f)
-            pulse.animateTo(1f, tween(200))
+            pulse.animateTo(1f, Motion.press())
         }
     }
     AnimatedVisibility(
@@ -299,8 +298,8 @@ private fun SeekBubbleSide(bubble: SeekBubble?, forward: Boolean, modifier: Modi
         modifier = modifier
             .fillMaxHeight()
             .fillMaxWidth(0.32f),
-        enter = fadeIn(tween(100)),
-        exit = fadeOut(tween(350)),
+        enter = fadeIn(Motion.press()),
+        exit = fadeOut(Motion.content()),
     ) {
         // Rounded on the side that faces the middle, like a ripple spreading from the edge.
         val shape = if (forward) {
@@ -553,8 +552,8 @@ internal fun UnlockButton(visible: Boolean, onClick: () -> Unit, modifier: Modif
     AnimatedVisibility(
         visible = visible,
         modifier = modifier,
-        enter = fadeIn(tween(150)),
-        exit = fadeOut(tween(300)),
+        enter = fadeIn(Motion.content()),
+        exit = fadeOut(Motion.press()),
     ) {
         Surface(
             onClick = onClick,

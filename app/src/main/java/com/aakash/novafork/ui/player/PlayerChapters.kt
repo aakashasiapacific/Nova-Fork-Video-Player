@@ -1,7 +1,6 @@
 package com.aakash.novafork.ui.player
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
@@ -234,8 +233,8 @@ internal fun ChapterSkipButton(
     AnimatedVisibility(
         visible = skip != null && (fresh || controlsVisible),
         modifier = modifier,
-        enter = fadeIn(tween(200)) + scaleIn(tween(200), initialScale = 0.92f),
-        exit = fadeOut(tween(200)),
+        enter = fadeIn(Motion.content()) + scaleIn(Motion.content(), initialScale = 0.9f),
+        exit = fadeOut(Motion.press()),
     ) {
         val label = shown?.label.orEmpty()
         Box(

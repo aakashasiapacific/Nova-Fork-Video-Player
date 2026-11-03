@@ -54,6 +54,7 @@ import androidx.compose.ui.unit.dp
 import com.aakash.novafork.data.Settings
 import com.aakash.novafork.ui.adaptive.DeviceLayout
 import com.aakash.novafork.ui.common.EqualizerSheet
+import com.aakash.novafork.ui.common.Motion
 import com.aakash.novafork.ui.model.PlayerActions
 import com.aakash.novafork.ui.model.PlayerUiState
 import kotlin.coroutines.resume
@@ -281,13 +282,13 @@ private fun PlayerChrome(
                     scope.launch {
                         if (dismiss.value > height * DISMISS_FRACTION || velocity > DISMISS_VELOCITY) {
                             // Off the bottom, then the player closes (fading out, see PlayerActivity).
-                            dismiss.animateTo(height, tween(180), initialVelocity = velocity)
+                            dismiss.animateTo(height, Motion.page(), initialVelocity = velocity)
                             backDispatcher?.onBackPressed()
                             // Still here (casting, or locked): the video comes back.
                             delay(400)
                             dismiss.snapTo(0f)
                         } else {
-                            dismiss.animateTo(0f, spring(dampingRatio = 0.8f, stiffness = 500f), initialVelocity = velocity)
+                            dismiss.animateTo(0f, Motion.page(), initialVelocity = velocity)
                         }
                     }
                 },
@@ -318,8 +319,8 @@ private fun PlayerChrome(
             AnimatedVisibility(
                 visible = controlsVisible,
                 modifier = Modifier.fillMaxSize(),
-                enter = fadeIn(tween(180)),
-                exit = fadeOut(tween(260)),
+                enter = fadeIn(Motion.content()),
+                exit = fadeOut(Motion.press()),
             ) {
                 if (layout.isTablet) {
                     TabletPlayerControls(
@@ -335,7 +336,7 @@ private fun PlayerChrome(
                 } else {
                     // The bars slide in from the top and bottom edges as they fade in, and back out.
                     val shown by transition.animateFloat(
-                        transitionSpec = { tween(if (targetState == EnterExitState.Visible) 220 else 260) },
+                        transitionSpec = { if (targetState == EnterExitState.Visible) Motion.content() else Motion.page() },
                         label = "controlsSlide",
                     ) { if (it == EnterExitState.Visible) 1f else 0f }
                     PhonePlayerControls(
@@ -354,7 +355,7 @@ private fun PlayerChrome(
                 visible = pausedInfo,
                 modifier = Modifier.fillMaxSize(),
                 enter = fadeIn(tween(PAUSED_INFO_FADE_IN_MS)),
-                exit = fadeOut(tween(200)),
+                exit = fadeOut(Motion.press()),
             ) {
                 PausedInfo(state = state, frame = pausedFrame)
             }

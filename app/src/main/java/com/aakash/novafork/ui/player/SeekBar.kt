@@ -4,7 +4,6 @@ import android.os.SystemClock
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -51,6 +50,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.aakash.novafork.core.format.Formats
+import com.aakash.novafork.ui.common.Motion
 import com.aakash.novafork.ui.common.RollingText
 import com.aakash.novafork.ui.model.GestureFeedback
 import com.aakash.novafork.ui.model.PlayerActions
@@ -176,7 +176,7 @@ internal fun PlayerSeekBar(
 
     // Samsung: while the bar is dragged, the time it points at shows large above it.
     val bigTime = remember { Animatable(0f) }
-    LaunchedEffect(dragging != null) { bigTime.animateTo(if (dragging != null) 1f else 0f, tween(BIG_TIME_FADE_MS)) }
+    LaunchedEffect(dragging != null) { bigTime.animateTo(if (dragging != null) 1f else 0f, Motion.content()) }
     val bigTimeLabel: @Composable BoxScope.() -> Unit = {
         if (bigTime.value > 0f) {
             Text(
@@ -246,7 +246,6 @@ private fun TimeLabel(text: String, style: TextStyle, rolling: Boolean, alignmen
 
 /** How far above the seek bar's top the large scrubbing time sits. */
 private val BigTimeRise = 40.dp
-private const val BIG_TIME_FADE_MS = 150
 
 @Composable
 private fun SeekSlider(
@@ -267,7 +266,7 @@ private fun SeekSlider(
     // while dragged the knob goes and the bar swells into a thick rounded bar, filled white.
     val trackHeight by animateDpAsState(
         targetValue = if (active) ActiveTrack else if (large) 4.dp else 3.dp,
-        animationSpec = spring(dampingRatio = 0.8f, stiffness = 600f),
+        animationSpec = Motion.press(),
         label = "seekTrack",
     )
     val knob by animateDpAsState(
