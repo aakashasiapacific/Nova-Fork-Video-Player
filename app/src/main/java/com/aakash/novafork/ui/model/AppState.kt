@@ -48,6 +48,9 @@ sealed interface Route {
 
     /** Preferences › Hidden Videos: what was hidden from the library, each with "Unhide". */
     data object HiddenVideos : Route
+
+    /** Preferences › Library Health: videos without artwork or details, episodes the names gave no number. */
+    data object LibraryHealth : Route
 }
 
 /** The tab a route belongs to (for highlighting the nav bar / rail). */
@@ -57,7 +60,7 @@ val Route.top: TopDestination
         is Route.Person,
         -> TopDestination.VIDEO
         // Sources are under Settings.
-        Route.Browse, is Route.BrowseDir, Route.Settings, is Route.SettingsPage, Route.HiddenVideos -> TopDestination.SETTINGS
+        Route.Browse, is Route.BrowseDir, Route.Settings, is Route.SettingsPage, Route.HiddenVideos, Route.LibraryHealth -> TopDestination.SETTINGS
         Route.Audio -> TopDestination.AUDIO
         Route.Search -> TopDestination.SEARCH
     }
@@ -290,6 +293,8 @@ data class AppUiState(
     val person: List<LibraryItemUi> = emptyList(),
     /** Hidden Videos (route HiddenVideos): what was hidden from the library. */
     val hidden: List<HiddenItemUi> = emptyList(),
+    /** Library Health (route LibraryHealth). */
+    val health: LibraryHealthUi = LibraryHealthUi(),
     val search: SearchUi = SearchUi(),
     val settings: SettingsUi = SettingsUi(),
     val scan: ScanUi = ScanUi(),
@@ -408,6 +413,13 @@ interface AppActions {
     fun identifySearch(query: String, tv: Boolean)
     fun identifyPick(videoId: Long, result: IdentifyResultUi)
     fun setWatched(videoId: Long, watched: Boolean)
+
+    /**
+     * "Rename in Library": shows [title] for the movie, show or video stored under [key]
+     * ([VideoDetailsUi.titleKey]) from now on; null or blank goes back to the original title.
+     * Only the name in the app changes; no file is renamed.
+     */
+    fun setTitleOverride(key: String, title: String?) {}
 
     fun updateSettings(transform: (Settings) -> Settings)
     fun checkTmdbKey()

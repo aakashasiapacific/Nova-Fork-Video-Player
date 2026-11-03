@@ -94,6 +94,28 @@ class TmdbClient(
     suspend fun tvNextEpisode(id: Int): TmdbEpisode? =
         get("tv/$id", listOf("language" to language()), TmdbTvNextEpisode.serializer()).nextEpisodeToAir
 
+    /**
+     * The YouTube key of a movie's or show's trailer ([type] "movie" or "tv"), preferring the device
+     * [languages] then English; null when TMDB lists none.
+     */
+    suspend fun trailerKey(type: String, id: Int, languages: List<String>): String? {
+        val videoLanguages = (languages.map { it.substringBefore('-').lowercase() } + listOf(logoLanguage(), "en", "null"))
+            .distinct()
+            .joinToString(",")
+        val videos = get(
+            "$type/$id/videos",
+            listOf("language" to language(), "include_video_language" to videoLanguages),
+            TmdbVideos.serializer(),
+        )
+        return videos.trailerKey(languages)
+    }
+
+    /** The top-billed cast of a movie ("movie") or show ("tv"), with photo paths, at most 15. */
+    suspend fun castOf(type: String, id: Int): List<CastMember> {
+        val path = if (type == "tv") "tv/$id/aggregate_credits" else "movie/$id/credits"
+        return get(path, listOf("language" to language()), TmdbCastCredits.serializer()).topCast()
+    }
+
     private fun logoLanguage(): String = language().substringBefore('-').lowercase()
 
     /** Every poster and backdrop TMDB has for a title, for "Change artwork" (any language). */

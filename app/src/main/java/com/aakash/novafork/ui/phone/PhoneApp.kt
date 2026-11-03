@@ -604,6 +604,11 @@ private fun PhonePage(state: AppUiState, actions: AppActions) {
             actions = actions,
             modifier = pageModifier,
         )
+        Route.LibraryHealth -> PhoneLibraryHealthScreen(
+            health = state.health,
+            actions = actions,
+            modifier = pageModifier,
+        )
         is Route.Playlist -> PhonePlaylistScreen(
             playlist = state.playlist?.takeIf { it.id == route.playlistId },
             actions = actions,

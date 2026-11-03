@@ -14,7 +14,9 @@ import com.aakash.novafork.core.jellyfin.ServerSecrets
 import com.aakash.novafork.core.library.LibraryKeys
 import com.aakash.novafork.core.plex.PlexResource
 import com.aakash.novafork.core.smb.SmbUris
+import com.aakash.novafork.core.tmdb.CastMember
 import com.aakash.novafork.core.tmdb.NextEpisodeLabel
+import com.aakash.novafork.core.tmdb.TmdbClient
 import com.aakash.novafork.core.tmdb.TmdbDisabledException
 import com.aakash.novafork.core.tmdb.TmdbException
 import com.aakash.novafork.data.IdentifyType
@@ -48,11 +50,13 @@ import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.AppUiState
 import com.aakash.novafork.ui.model.BackupUi
 import com.aakash.novafork.ui.model.BrowseDirUi
+import com.aakash.novafork.ui.model.CastUi
 import com.aakash.novafork.ui.model.DialogUi
 import com.aakash.novafork.ui.model.IdentifyResultUi
 import com.aakash.novafork.ui.model.KeyStatus
 import com.aakash.novafork.ui.model.LibraryCounts
 import com.aakash.novafork.ui.model.LibraryFilter
+import com.aakash.novafork.ui.model.LibraryHealthUi
 import com.aakash.novafork.ui.model.LibraryItemUi
 import com.aakash.novafork.ui.model.LibrarySort
 import com.aakash.novafork.ui.model.LibraryUi
@@ -175,9 +179,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
         library.observeSources(),
         settingsStore.settings.map { it.preferLocalArtwork }.distinctUntilChanged(),
         graph.database.metadataDao().observeArtworkChoices(),
-        hiddenVideoIds,
-    ) { videos, sources, preferLocal, choices, hidden ->
-        LibraryIndex.build(withArtworkChoices(videos, choices), sources, preferLocal, hidden)
+        combine(hiddenVideoIds, graph.titleOverrides.titles) { hidden, titles -> hidden to titles },
+    ) { videos, sources, preferLocal, choices, (hidden, titles) ->
+        LibraryIndex.build(withArtworkChoices(videos, choices), sources, preferLocal, hidden, titles)
     }
 
     // Only touched from the state combine below, which never runs concurrently with itself.
@@ -204,6 +208,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
         }
         spaceByFolder(files, names) to watchStats(records)
     }
+    /** Preferences' "Duplicates use …" note; worked out only on a settings page. */
+    private val duplicateBytesMemo = Memo<LibraryIndex, Long> { index -> UiMappers.duplicateBytes(index) }
     private val searchMemo = Memo<Triple<LibraryIndex, String, MusicLibraryData>, SearchUi> { (index, query, music) ->
         UiMappers.search(index, query, music)
     }
@@ -407,6 +413,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
             previewKey = previewKey,
             history = if (route == Route.History) UiMappers.history(index, user.historyHidden) else emptyList(),
             person = (route as? Route.Person)?.let { UiMappers.person(index, it.name) }.orEmpty(),
+            health = if (route == Route.LibraryHealth) UiMappers.libraryHealth(index) else LibraryHealthUi(),
             hidden = if (route == Route.HiddenVideos) UiMappers.hiddenVideos(index, hiddenVideoIds.value) else emptyList(),
             playlist = openPlaylist?.let { UiMappers.playlistDetails(index, it.id, it.name, lists.openVideoIds) },
             search = searchMemo[Triple(index, user.query, music)].copy(recent = user.recentSearches),
@@ -420,6 +427,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
                 canRequestAllFilesAccess = StoragePermissions.canRequestAllFilesAccess,
                 space = stats?.first ?: SpaceUsage(),
                 watch = stats?.second ?: WatchStats(),
+                duplicateBytes = if (stats != null) duplicateBytesMemo[index] else 0L,
                 videoCount = index.allVideos.size,
                 songCount = music.songs.size,
                 lastScanAt = index.sources.mapNotNull { it.lastScanAt }.maxOrNull(),
@@ -436,9 +444,19 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
     private fun withAgeRating(index: LibraryIndex, videoId: Long, details: VideoDetailsUi?): VideoDetailsUi? {
         val key = index.videosById[videoId]?.takeIf { it.kind == MediaKind.MOVIE }?.meta?.key
         if (details == null || key == null) return details
-        graph.titleExtras.request(key)
-        return details.copy(ageRating = graph.titleExtras.certification(key))
+        val extras = graph.titleExtras
+        extras.request(key)
+        return details.copy(
+            ageRating = extras.certification(key),
+            trailerUrl = trailerUrlOf(extras.trailerKey(key)),
+            cast = castOf(extras.cast(key)),
+        )
     }
+
+    private fun trailerUrlOf(youtubeKey: String?): String? = youtubeKey?.let { "https://www.youtube.com/watch?v=$it" }
+
+    private fun castOf(cast: List<CastMember>): List<CastUi> =
+        cast.map { CastUi(it.name, it.character, TmdbClient.imageUrl(it.profilePath, "w185")) }
 
     /** A show's page with its cached age rating and next episode date; asks TMDB for what isn't cached. */
     private fun withShowExtras(index: LibraryIndex, showKey: String, details: ShowDetailsUi?): ShowDetailsUi? {
@@ -449,6 +467,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
         val locale = Locale.getDefault()
         return details.copy(
             ageRating = extras.certification(key),
+            trailerUrl = trailerUrlOf(extras.trailerKey(key)),
+            cast = castOf(extras.cast(key)),
             nextEpisodeLabel = NextEpisodeLabel.of(extras.nextAirDate(key), LocalDate.now(), locale) { skeleton ->
                 DateFormat.getBestDateTimePattern(locale, skeleton)
             },
@@ -702,6 +722,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
 
     override fun playMusic(songIds: List<Long>, startIndex: Int) {
         if (songIds.isNotEmpty()) graph.musicPlayer.playSongs(songIds, startIndex)
+    }
+
+    override fun setTitleOverride(key: String, title: String?) {
+        if (key.isBlank()) return
+        if (title.isNullOrBlank()) graph.titleOverrides.reset(key) else graph.titleOverrides.set(key, title)
     }
 
     override fun setWatched(videoId: Long, watched: Boolean) {

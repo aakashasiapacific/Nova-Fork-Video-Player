@@ -46,7 +46,13 @@ import com.aakash.novafork.R
 import com.aakash.novafork.ui.AppShortcuts
 import androidx.compose.ui.platform.LocalContext
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
+import com.aakash.novafork.ui.common.CastRow
 import com.aakash.novafork.ui.common.EndOfListGap
+import com.aakash.novafork.ui.common.GreyCaption
+import com.aakash.novafork.ui.common.NovaMenuDivider
+import com.aakash.novafork.ui.common.RenameInLibraryMenuItems
+import com.aakash.novafork.ui.common.RenameTitleDialog
+import com.aakash.novafork.ui.common.TrailerPill
 import com.aakash.novafork.ui.common.IosButton
 import com.aakash.novafork.ui.common.IosColors
 import com.aakash.novafork.ui.common.LocalBottomBarSpace
@@ -85,6 +91,14 @@ fun PhoneShowDetailsScreen(
     // Identify works on a file; any episode of the show leads to the right show search.
     val identifyVideoId = nextUp?.videoId ?: seasons.firstNotNullOfOrNull { it.episodes.firstOrNull()?.videoId }
 
+    var renamingTitle by remember { mutableStateOf(false) }
+    if (renamingTitle) {
+        RenameTitleDialog(
+            title = details.title,
+            onRename = { actions.setTitleOverride(details.titleKey, it) },
+            onDismiss = { renamingTitle = false },
+        )
+    }
     BoxWithConstraints(modifier.fillMaxSize()) {
         val backdropHeight = detailsBackdropHeight(maxHeight)
         val listState = rememberLazyListState()
@@ -151,6 +165,14 @@ fun PhoneShowDetailsScreen(
                     }
                 }
             }
+            val trailer = details.trailerUrl
+            if (trailer != null) {
+                item(key = "trailer") {
+                    Row(Modifier.padding(start = dims.gutter, end = dims.gutter, top = 12.dp)) {
+                        TrailerPill(trailer, onOpen = actions::openWebPage)
+                    }
+                }
+            }
             item(key = "overview") {
                 Column(Modifier.tintBand(tint, from = 0.55f, to = 0f).padding(start = dims.gutter, end = dims.gutter, top = 16.dp)) {
                     OverviewBlock(tagline = details.tagline, overview = details.overview)
@@ -159,6 +181,11 @@ fun PhoneShowDetailsScreen(
                         modifier = Modifier.padding(top = 12.dp),
                         onName = actions::openPerson,
                     )
+                }
+            }
+            if (details.cast.isNotEmpty()) {
+                item(key = "cast") {
+                    CastRow(details.cast, onPerson = actions::openPerson, gutter = dims.gutter, modifier = Modifier.padding(top = dims.sectionSpacing))
                 }
             }
             item(key = "seasons") {
@@ -200,6 +227,17 @@ fun PhoneShowDetailsScreen(
                                         },
                                     )
                                 }
+                                if (season != null && season.episodes.isNotEmpty()) {
+                                    NovaMenuDivider()
+                                    val allWatched = season.episodes.all { it.watched }
+                                    NovaMenuItem(
+                                        text = { Text(if (allWatched) "Mark Season Unwatched" else "Mark Season Watched") },
+                                        onClick = {
+                                            seasonMenu = false
+                                            season.episodes.forEach { actions.setWatched(it.videoId, !allWatched) }
+                                        },
+                                    )
+                                }
                             }
                         }
                     } else {
@@ -208,6 +246,7 @@ fun PhoneShowDetailsScreen(
                             modifier = Modifier.padding(horizontal = dims.gutter),
                         )
                     }
+                    season?.watchedCaption?.let { GreyCaption(it, Modifier.padding(horizontal = dims.gutter)) }
                     Spacer(Modifier.height(8.dp))
                 }
             }
@@ -284,6 +323,28 @@ fun PhoneShowDetailsScreen(
                             close()
                             AppShortcuts.pinShow(context, details.key, details.title)
                         },
+                    )
+                    val allEpisodes = seasons.flatMap { it.episodes }
+                    val showWatched = allEpisodes.isNotEmpty() && allEpisodes.all { it.watched }
+                    NovaMenuItem(
+                        text = { Text(if (showWatched) "Mark Show Unwatched" else "Mark Show Watched") },
+                        leadingIcon = {
+                            NovaIcon(
+                                if (showWatched) R.drawable.ic_visibility_off else R.drawable.ic_check_circle,
+                                contentDescription = null,
+                            )
+                        },
+                        onClick = {
+                            close()
+                            allEpisodes.forEach { actions.setWatched(it.videoId, !showWatched) }
+                        },
+                    )
+                    RenameInLibraryMenuItems(
+                        titleKey = details.titleKey,
+                        customised = details.titleCustomised,
+                        close = close,
+                        onRename = { renamingTitle = true },
+                        onReset = { actions.setTitleOverride(details.titleKey, null) },
                     )
                     NovaMenuItem(
                         text = { Text("Identify Show…") },

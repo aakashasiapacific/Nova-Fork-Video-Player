@@ -21,12 +21,16 @@ import com.aakash.novafork.ui.model.Crumb
 import com.aakash.novafork.ui.model.EpisodeUi
 import com.aakash.novafork.ui.model.FolderUi
 import com.aakash.novafork.ui.model.HeroTarget
+import com.aakash.novafork.ui.model.HealthGroupUi
+import com.aakash.novafork.ui.model.HealthItemUi
+import com.aakash.novafork.ui.model.HealthKind
 import com.aakash.novafork.ui.model.HeroUi
 import com.aakash.novafork.ui.model.HiddenItemUi
 import com.aakash.novafork.ui.model.HistoryDayUi
 import com.aakash.novafork.ui.model.HistoryEntryUi
 import com.aakash.novafork.ui.model.HomeUi
 import com.aakash.novafork.ui.model.LibraryFilter
+import com.aakash.novafork.ui.model.LibraryHealthUi
 import com.aakash.novafork.ui.model.LibraryItemUi
 import com.aakash.novafork.ui.model.LibrarySort
 import com.aakash.novafork.ui.model.LibraryUi
@@ -236,14 +240,7 @@ object UiMappers {
      * unmatched file with the same title and length. Each copy shows where it lives and its size.
      */
     fun duplicates(index: LibraryIndex): List<LibraryItemUi> =
-        index.videos
-            // A trailer named after its film is a bonus, not a second copy.
-            .filter { it.id !in index.extraIds }
-            .groupBy(::duplicateKey)
-            .filterKeys { it != null }
-            .values
-            .filter { it.size > 1 }
-            .sortedBy { it.first().sortKey.lowercase() }
+        duplicateGroups(index)
             .flatMap { copies ->
                 copies.map { copy ->
                     val where = listOfNotNull(
@@ -306,6 +303,28 @@ object UiMappers {
         }
         return items.sortedWith(compareBy(NaturalOrder) { sortKeyOf(it.title) })
     }
+
+    /** Each set of copies of one film or episode (two or more), by title. */
+    private fun duplicateGroups(index: LibraryIndex): List<List<IndexedVideo>> =
+        index.videos
+            // A trailer named after its film is a bonus, not a second copy.
+            .filter { it.id !in index.extraIds }
+            .groupBy(::duplicateKey)
+            .filterKeys { it != null }
+            .values
+            .filter { it.size > 1 }
+            .sortedBy { it.first().sortKey.lowercase() }
+
+    /**
+     * The room the extra copies of duplicates take, in bytes: every set of copies minus its
+     * largest one (the copy you would keep). Copies of unknown size count as nothing. 0 when
+     * there are no duplicates.
+     */
+    fun duplicateBytes(index: LibraryIndex): Long =
+        duplicateGroups(index).sumOf { copies ->
+            val sizes = copies.map { it.video.sizeBytes ?: 0L }
+            sizes.sum() - (sizes.maxOrNull() ?: 0L)
+        }
 
     private fun duplicateKey(video: IndexedVideo): String? {
         val row = video.video
@@ -506,6 +525,10 @@ object UiMappers {
             sizeLabel = video.sizeBytes?.takeIf { it > 0 }?.let(Formats::size),
             resolutionLabel = resolutionLabel(video.width, video.height),
             qualityBadges = QualityBadges.of(video.width, video.height),
+            downloaded = item.id in index.downloadedIds,
+            // An episode keeps its show's title; renaming is done on the show's page.
+            titleKey = if (isEpisode) "" else item.titleKey,
+            titleCustomised = !isEpisode && item.titleCustomised,
             sourceLabel = item.source?.let(::sourceLabel).orEmpty(),
             isMatched = meta != null,
             starring = meta?.castNames.nonBlank(),
@@ -614,7 +637,42 @@ object UiMappers {
             isMatched = show.meta != null,
             lastWatched = show.episodes.mapNotNull { it.video.lastPlayedAt }.maxOrNull()?.let { watchedLabel(it) },
             moreLikeThis = moreLikeThis(index, show.meta, show.title),
+            titleKey = show.titleKey,
+            titleCustomised = show.titleCustomised,
         )
+    }
+
+    // Library health
+
+    /**
+     * What Preferences › Library Health lists, a group only when it has something: movies and
+     * shows with no poster or backdrop at all, movies with no TMDB details, and episodes whose
+     * file name gave no episode number. Streams, home videos and hidden videos are not checked.
+     */
+    fun libraryHealth(index: LibraryIndex): LibraryHealthUi {
+        val groups = ArrayList<HealthGroupUi>()
+        fun noArt(artwork: Artwork) = artwork.posterUrl == null && artwork.backdropUrl == null && artwork.tallUrl == null
+        fun movieItem(movie: IndexedVideo) = HealthItemUi("v:${movie.id}", movie.title, movie.card.subtitle, movie.card.artwork, movie.id)
+        val missingArt = ArrayList<HealthItemUi>()
+        index.movies.filter { noArt(it.card.artwork) }.mapTo(missingArt, ::movieItem)
+        index.shows.filter { noArt(it.card.artwork) }.mapTo(missingArt) { show ->
+            HealthItemUi("s:${show.key}", show.title, countLabel(show.card.episodeCount, "episode"), show.card.artwork, show.episodes.first().id)
+        }
+        if (missingArt.isNotEmpty()) {
+            groups += HealthGroupUi(HealthKind.NO_ARTWORK, missingArt.sortedWith(compareBy(NaturalOrder) { sortKeyOf(it.title) }))
+        }
+        val unidentified = index.movies.filter { it.meta == null }.map(::movieItem)
+        if (unidentified.isNotEmpty()) {
+            groups += HealthGroupUi(HealthKind.UNIDENTIFIED, unidentified.sortedWith(compareBy(NaturalOrder) { sortKeyOf(it.title) }))
+        }
+        val unparsed = index.videos
+            .filter { it.kind == MediaKind.EPISODE && it.video.episode == null && it.id !in index.extraIds }
+            .map { episode ->
+                HealthItemUi("v:${episode.id}", episode.video.fileName, episode.showTitle, episode.card.artwork, episode.id)
+            }
+            .sortedWith(compareBy(NaturalOrder) { it.title })
+        if (unparsed.isNotEmpty()) groups += HealthGroupUi(HealthKind.UNPARSED_EPISODES, unparsed)
+        return LibraryHealthUi(groups)
     }
 
     /**

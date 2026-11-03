@@ -11,7 +11,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import com.aakash.novafork.R
 import com.aakash.novafork.ui.common.IosColors
+import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.FolderSpace
+import com.aakash.novafork.ui.model.LibraryFilter
 import com.aakash.novafork.ui.model.SpaceUsage
 import com.aakash.novafork.ui.model.WatchStats
 import com.aakash.novafork.ui.model.watchTimeLabel
@@ -21,11 +23,27 @@ import com.aakash.novafork.ui.model.watchTimeLabel
  * with its size and file count, and the total at the top. Worked out from the sizes the library
  * already stores. View only: nothing here deletes or moves a file.
  */
-internal fun storageGroup(space: SpaceUsage): SettingsGroup = SettingsGroup(
+internal fun storageGroup(space: SpaceUsage, duplicateBytes: Long, actions: AppActions): SettingsGroup = SettingsGroup(
     key = "storage",
     title = "Storage",
-    rows = listOf(SettingsRow("storage", "Storage", R.drawable.ic_storage) { shape -> StorageList(shape, space) }),
-    footer = "Room taken by your videos and music. Files of unknown size, such as streams, aren't counted.",
+    rows = buildList {
+        add(SettingsRow("storage", "Storage", R.drawable.ic_storage) { shape -> StorageList(shape, space) })
+        // The extra copies of films and episodes stored twice; the page it opens only lists them, nothing is deleted.
+        if (duplicateBytes > 0L) {
+            add(
+                SettingsRow("storage-duplicates", "Duplicates", R.drawable.ic_video_library) { shape ->
+                    val context = LocalContext.current
+                    ActionRow(
+                        shape = shape,
+                        icon = R.drawable.ic_video_library,
+                        title = "Duplicates use ${Formatter.formatShortFileSize(context, duplicateBytes)}",
+                        onClick = { actions.openLibrary(LibraryFilter.DUPLICATES) },
+                    )
+                },
+            )
+        }
+    },
+    footer = "Room taken by your videos and music. Files of unknown size, such as streams, aren't counted. Duplicates counts the extra copies; nothing is deleted.",
 )
 
 @Composable

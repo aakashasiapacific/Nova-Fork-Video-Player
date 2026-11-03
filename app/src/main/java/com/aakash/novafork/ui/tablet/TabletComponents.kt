@@ -150,7 +150,7 @@ internal fun countLabel(count: Int, singular: String, plural: String = singular 
 
 internal fun ShowCardUi.subtitleLine(): String = metaLine(
     year?.toString(),
-    if (seasonCount > 0) countLabel(seasonCount, "season") else countLabel(episodeCount, "episode"),
+    watchedCaption ?: if (seasonCount > 0) countLabel(seasonCount, "season") else countLabel(episodeCount, "episode"),
 )
 
 /**
