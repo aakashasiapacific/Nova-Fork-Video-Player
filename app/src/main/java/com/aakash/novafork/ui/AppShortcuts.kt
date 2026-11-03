@@ -23,6 +23,28 @@ import com.aakash.novafork.ui.theme.NovaColors
  */
 internal object AppShortcuts {
     const val ACTION_SEARCH = "com.aakash.novafork.action.SEARCH"
+    /** A show pinned to the home screen: opens its page ([EXTRA_SHOW_KEY]). */
+    const val ACTION_OPEN_SHOW = "com.aakash.novafork.action.OPEN_SHOW"
+    const val EXTRA_SHOW_KEY = "show_key"
+
+    /**
+     * Asks the launcher to pin [showKey]'s page to the home screen (owner), with the app's own
+     * icon and the show's name; the launcher shows its own confirmation. False when it can't.
+     */
+    fun pinShow(context: Context, showKey: String, title: String): Boolean {
+        if (!androidx.core.content.pm.ShortcutManagerCompat.isRequestPinShortcutSupported(context)) return false
+        val shortcut = ShortcutInfoCompat.Builder(context, "show:$showKey")
+            .setShortLabel(title.take(24))
+            .setLongLabel(title)
+            .setIcon(IconCompat.createWithResource(context, com.aakash.novafork.R.mipmap.ic_launcher))
+            .setIntent(
+                Intent(context, MainActivity::class.java)
+                    .setAction(ACTION_OPEN_SHOW)
+                    .putExtra(EXTRA_SHOW_KEY, showKey),
+            )
+            .build()
+        return androidx.core.content.pm.ShortcutManagerCompat.requestPinShortcut(context, shortcut, null)
+    }
     private const val ACTION_CONTINUE = "com.aakash.novafork.action.CONTINUE"
     private const val TAG = "AppShortcuts"
 

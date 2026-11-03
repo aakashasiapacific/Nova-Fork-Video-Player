@@ -232,9 +232,12 @@ class MainActivity : ComponentActivity() {
         openShortcut(intent)
     }
 
-    /** The app icon's Search shortcut opens the Search tab. */
+    /** The app icon's Search shortcut opens the Search tab; a pinned show opens its page. */
     private fun openShortcut(intent: Intent?) {
         if (intent?.action == AppShortcuts.ACTION_SEARCH) actions.selectTab(TopDestination.SEARCH)
+        if (intent?.action == AppShortcuts.ACTION_OPEN_SHOW) {
+            intent.getStringExtra(AppShortcuts.EXTRA_SHOW_KEY)?.let { actions.openShow(it) }
+        }
     }
 
     /** Where the last touch went down, for the player to grow out of. */

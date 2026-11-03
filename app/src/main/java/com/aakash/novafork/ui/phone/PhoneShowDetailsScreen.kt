@@ -45,6 +45,8 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
+import com.aakash.novafork.ui.AppShortcuts
+import androidx.compose.ui.platform.LocalContext
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
 import com.aakash.novafork.ui.common.EndOfListGap
 import com.aakash.novafork.ui.common.IosButton
@@ -272,6 +274,15 @@ fun PhoneShowDetailsScreen(
             collapsed = titleCollapse,
             menu = if (identifyVideoId != null) {
                 { close ->
+                    val context = LocalContext.current
+                    NovaMenuItem(
+                        text = { Text("Add to Home Screen") },
+                        leadingIcon = { NovaIcon(R.drawable.ic_add, contentDescription = null) },
+                        onClick = {
+                            close()
+                            AppShortcuts.pinShow(context, details.key, details.title)
+                        },
+                    )
                     NovaMenuItem(
                         text = { Text("Identify Show…") },
                         leadingIcon = { NovaIcon(R.drawable.ic_search, contentDescription = null) },
