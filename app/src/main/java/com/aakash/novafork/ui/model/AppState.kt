@@ -547,6 +547,9 @@ interface AppActions {
      */
     fun exportBackup(includeSecrets: Boolean) {}
 
+    /** Saves the watch history as a CSV file the person picks (History's "Export"). */
+    fun exportHistory() {}
+
     /** Picks a backup file (system picker) and reads it; [BackupUi.confirm] then asks before restoring. */
     fun importBackup() {}
 

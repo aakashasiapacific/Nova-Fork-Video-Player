@@ -9,6 +9,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import com.aakash.novafork.ui.common.IosTextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -38,7 +39,15 @@ internal fun PhoneHistoryScreen(
 ) {
     val dims = LocalNovaDimens.current
     Column(modifier.fillMaxSize()) {
-        PhoneTopBar(title = "History", onBack = actions::back)
+        PhoneTopBar(
+            title = "History",
+            onBack = actions::back,
+            actions = {
+                if (entries.isNotEmpty()) {
+                    IosTextButton(onClick = actions::exportHistory) { Text("Export") }
+                }
+            },
+        )
         if (entries.isEmpty()) {
             CenteredScrollable {
                 PhoneEmptyLine("No history yet")

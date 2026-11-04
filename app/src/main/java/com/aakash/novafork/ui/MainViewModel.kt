@@ -1662,6 +1662,40 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
         }
     }
 
+    /**
+     * The watch history as CSV at [uri]: every video ever played, last played first, with its
+     * show, season, episode, play count, watched state and file name. Nothing is changed.
+     */
+    fun writeHistoryCsv(uri: Uri) {
+        val index = latestIndex ?: return
+        val resolver = getApplication<Application>().contentResolver
+        launchSafely("Couldn't save the history") {
+            val rows = index.allVideos
+                .filter { it.video.lastPlayedAt != null || it.video.playCount > 0 }
+                .sortedByDescending { it.video.lastPlayedAt ?: 0L }
+            val text = buildString {
+                appendLine("Title,Show,Season,Episode,Last played,Play count,Watched,File")
+                for (item in rows) {
+                    val video = item.video
+                    val played = video.lastPlayedAt?.let { java.time.Instant.ofEpochMilli(it).toString() }.orEmpty()
+                    appendLine(
+                        listOf(
+                            item.title, item.showTitle.orEmpty(), video.season?.toString().orEmpty(), video.episode?.toString().orEmpty(),
+                            played, video.playCount.toString(), if (video.watched) "yes" else "no", video.fileName,
+                        ).joinToString(",") { csvField(it) },
+                    )
+                }
+            }
+            withContext(Dispatchers.IO) {
+                openForWriting(resolver, uri).use { it.write(text.toByteArray(Charsets.UTF_8)) }
+            }
+            showMessage(if (rows.size == 1) "1 video exported" else "${rows.size} videos exported")
+        }
+    }
+
+    private fun csvField(value: String): String =
+        if (value.any { it == ',' || it == '"' || it == '\n' || it == '\r' }) "\"" + value.replace("\"", "\"\"") + "\"" else value
+
     /** Reads and checks the backup file at [uri]; [BackupUi.confirm] then asks before restoring it. */
     fun readBackup(uri: Uri) {
         val resolver = getApplication<Application>().contentResolver
