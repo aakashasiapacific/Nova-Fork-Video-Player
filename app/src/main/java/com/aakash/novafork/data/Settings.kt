@@ -122,6 +122,8 @@ data class Settings(
      * played go on from the library itself. Off: the music stops at the end of the queue.
      */
     val musicAutoplay: Boolean = true,
+    /** Autoplay after a whole album: the next album (the artist's, else the most alike) instead of mixed songs. */
+    val autoplayAlbums: Boolean = false,
     /**
      * Sound Check: songs play at the volume their ReplayGain (or iTunNORM) tag asks for, so
      * quiet and loud albums sit at about the same level. Songs without the tag play unchanged.

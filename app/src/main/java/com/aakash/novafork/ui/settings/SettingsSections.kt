@@ -619,11 +619,14 @@ private fun playerGroups(settings: Settings, actions: AppActions): List<Settings
             switchRow("music-autoplay", R.drawable.ic_repeat, "Autoplay", settings.musicAutoplay, tile = IosPalette.Pink) { on ->
                 actions.updateSettings { it.copy(musicAutoplay = on) }
             },
+            switchRow("autoplay-albums", R.drawable.ic_album, "Album After Album", settings.autoplayAlbums) { on ->
+                actions.updateSettings { it.copy(autoplayAlbums = on) }
+            },
             switchRow("sound-check", R.drawable.ic_volume_up, "Sound Check", settings.soundCheck) { on ->
                 actions.updateSettings { it.copy(soundCheck = on) }
             },
         ),
-        footer = "Autoplay keeps the music going with similar songs when the queue ends. Sound Check evens out song volumes from their ReplayGain tags.",
+        footer = "Autoplay keeps the music going with similar songs when the queue ends; with Album After Album, a whole album ends into another album. Sound Check evens out song volumes from their ReplayGain tags.",
     ),
 ) + subtitleDownloadGroups(settings, actions)
 

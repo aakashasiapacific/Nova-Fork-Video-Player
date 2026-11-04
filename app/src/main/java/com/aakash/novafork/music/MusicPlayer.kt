@@ -692,6 +692,29 @@ class MusicPlayer(
     private fun autoplayOn() = settings().musicAutoplay && _state.value.repeat == RepeatMode.OFF
 
     /**
+     * Album After Album: when the queue was one whole album, another album to follow it, in track
+     * order: the same artist's next by year (else any of theirs not queued), else the album of the
+     * song most like it. Null when the setting is off or the queue wasn't a single album.
+     */
+    private fun nextAlbum(queued: List<Long>, library: List<SongEntity>): List<SongEntity>? {
+        if (!settings().autoplayAlbums || queued.isEmpty()) return null
+        val byId = library.associateBy { it.id }
+        val songs = queued.mapNotNull { byId[it] }
+        val albumKey = songs.map { it.albumKey }.distinct().singleOrNull() ?: return null
+        val albums = MusicLibrary.albums(library).associateBy { it.key }
+        val current = albums[albumKey] ?: return null
+        // A whole album, give or take a song skipped from the queue.
+        if (songs.size < current.songs.size - 1) return null
+        val taken = queued.toSet()
+        val sameArtist = albums.values
+            .filter { it.artistKey == current.artistKey && it.key != albumKey && it.songs.none { song -> song.id in taken } }
+            .sortedWith(compareBy<com.aakash.novafork.data.music.Album> { it.year ?: Int.MAX_VALUE }.thenBy { it.title })
+        val next = sameArtist.firstOrNull { (it.year ?: 0) >= (current.year ?: 0) } ?: sameArtist.firstOrNull()
+            ?: SimilarSongs.pick(current.songs, library, exclude = taken, limit = 1).firstOrNull()?.let { albums[it.albumKey] }
+        return next?.songs?.filter { it.id !in taken }?.takeIf { it.isNotEmpty() }
+    }
+
+    /**
      * Autoplay: appends up to [AUTOPLAY_SONGS] songs of the library like the last ones queued (see
      * [SimilarSongs]), none already in this queue. False when the library has none to add.
      */
@@ -707,7 +730,8 @@ class MusicPlayer(
         val queued = queue.playOrder
         val byId = library.associateBy { it.id }
         val seeds = queued.takeLast(AUTOPLAY_SEEDS).mapNotNull { byId[it] }
-        val picked = SimilarSongs.pick(seeds, library, exclude = queued.toSet(), limit = AUTOPLAY_SONGS)
+        val picked = nextAlbum(queued, library)
+            ?: SimilarSongs.pick(seeds, library, exclude = queued.toSet(), limit = AUTOPLAY_SONGS)
         if (picked.isEmpty()) return false
         for (song in picked) {
             artistOf[song.id] = song.artistKey
