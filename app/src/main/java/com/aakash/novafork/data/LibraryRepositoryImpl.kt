@@ -496,6 +496,9 @@ class LibraryRepositoryImpl(
             localBackdrop = file.localBackdrop,
             localThumb = file.localThumb,
             remoteId = file.remoteId,
+            // Continue from another device: the server's progress for a video new here.
+            positionMs = file.serverPositionMs ?: 0L,
+            watched = file.serverWatched,
         ).withParse(parsed)
         val server = file.serverMetadata?.takeIf { it.isUsable() }
         return if (server != null) video.withServerMetadata(sourceId, server, now) else video
@@ -516,7 +519,15 @@ class LibraryRepositoryImpl(
             localThumb = file.localThumb,
             remoteId = file.remoteId ?: old.remoteId,
             present = true,
-        )
+        ).let { video ->
+            // Continue from another device: progress made elsewhere on the server reaches a video
+            // not started here. What was watched on this device is never overwritten.
+            if (old.positionMs == 0L && !old.watched && (file.serverPositionMs != null || file.serverWatched)) {
+                video.copy(positionMs = file.serverPositionMs ?: 0L, watched = file.serverWatched)
+            } else {
+                video
+            }
+        }
         val server = file.serverMetadata?.takeIf { it.isUsable() }
         return when {
             // The user's Identify outranks both the server and the file name.

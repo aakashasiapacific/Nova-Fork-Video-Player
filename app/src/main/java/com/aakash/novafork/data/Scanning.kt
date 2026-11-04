@@ -47,6 +47,10 @@ data class ScannedVideo(
      * Identify replaces it. Null: the file name is parsed and matched against TMDB as usual.
      */
     val serverMetadata: ServerMetadata? = null,
+    /** Where the media server says it was left (another device's progress); null when it wasn't started. */
+    val serverPositionMs: Long? = null,
+    /** The media server counts it as watched. */
+    val serverWatched: Boolean = false,
 )
 
 enum class ServerItemType { MOVIE, EPISODE }
