@@ -289,6 +289,8 @@ data class VideoDetailsUi(
     val cast: List<CastUi> = emptyList(),
     /** This video is a copy the app downloaded (it lives in Movies/Nova Fork), or one has been downloaded. */
     val downloaded: Boolean = false,
+    /** "Watched 3 times · last on 2 Nov"; null before it was ever played. */
+    val historyLine: String? = null,
     /** What "Rename in Library" stores the title under (see LibraryIndex). */
     val titleKey: String = "",
     /** The title shown is one the user typed: "Use Original Title" is offered. */

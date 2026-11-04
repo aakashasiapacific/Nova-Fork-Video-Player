@@ -507,6 +507,26 @@ object UiMappers {
 
     // Details
 
+    /**
+     * "Watched 3 times · last on 2 Nov" (the year too when it isn't this year); "Played once · …"
+     * for one play; null before any.
+     */
+    internal fun historyLine(playCount: Int, lastPlayedAt: Long?, now: Long = System.currentTimeMillis(), zone: ZoneId = ZoneId.systemDefault()): String? {
+        if (playCount <= 0 && lastPlayedAt == null) return null
+        val times = when (playCount) {
+            0, 1 -> "Played once"
+            2 -> "Played twice"
+            else -> "Played $playCount times"
+        }
+        val last = lastPlayedAt?.let {
+            val date = java.time.Instant.ofEpochMilli(it).atZone(zone).toLocalDate()
+            val sameYear = date.year == java.time.Instant.ofEpochMilli(now).atZone(zone).year
+            val pattern = if (sameYear) "d MMM" else "d MMM yyyy"
+            "last on " + date.format(java.time.format.DateTimeFormatter.ofPattern(pattern, java.util.Locale.getDefault()))
+        }
+        return listOfNotNull(times, last).joinToString(" · ")
+    }
+
     fun videoDetails(index: LibraryIndex, videoId: Long): VideoDetailsUi? {
         val item = index.videosById[videoId] ?: return null
         val video = item.video
@@ -521,6 +541,7 @@ object UiMappers {
             runtimeLabel(video, meta.takeIf { isMovie })
         }
         return VideoDetailsUi(
+            historyLine = historyLine(video.playCount, video.lastPlayedAt),
             id = video.id,
             kind = item.kind,
             title = item.title,

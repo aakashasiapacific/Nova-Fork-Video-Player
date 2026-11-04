@@ -143,4 +143,15 @@ class LibraryHealthTest {
         assertEquals("4 of 8 watched", ShowCardUi(key = "k", title = "T", episodeCount = 8, unwatchedCount = 4).watchedCaption)
         assertNull(ShowCardUi(key = "k", title = "T", episodeCount = 8, unwatchedCount = 8).watchedCaption)
     }
+
+    @Test
+    fun historyLineCountsPlaysAndNamesTheLastDay() {
+        val zone = java.time.ZoneId.of("UTC")
+        val now = java.time.LocalDate.of(2026, 11, 4).atStartOfDay(zone).toInstant().toEpochMilli()
+        val nov2 = java.time.LocalDate.of(2026, 11, 2).atStartOfDay(zone).toInstant().toEpochMilli()
+        val lastYear = java.time.LocalDate.of(2025, 3, 9).atStartOfDay(zone).toInstant().toEpochMilli()
+        org.junit.Assert.assertNull(UiMappers.historyLine(0, null, now, zone))
+        org.junit.Assert.assertEquals("Played 3 times · last on 2 Nov", UiMappers.historyLine(3, nov2, now, zone))
+        org.junit.Assert.assertEquals("Played once · last on 9 Mar 2025", UiMappers.historyLine(1, lastYear, now, zone))
+    }
 }
