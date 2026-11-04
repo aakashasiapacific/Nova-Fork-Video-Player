@@ -561,6 +561,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
         launchSafely("Couldn't scan the library") { library.refreshAll() }
     }
 
+    override fun scanSource(sourceId: Long) {
+        launchSafely("Couldn't scan that source") { library.scanSource(sourceId) }
+    }
+
     override fun refreshQuietly() {
         viewModelScope.launch {
             try {

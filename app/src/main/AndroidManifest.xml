@@ -139,6 +139,18 @@
             android:exported="false"
             android:foregroundServiceType="dataSync" />
 
+        <!-- Quick Settings tile: resumes the first Continue Watching video. -->
+        <service
+            android:name=".ui.ResumeTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_play_arrow"
+            android:label="Resume"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
         <!-- Home-screen widgets: Continue Watching and Now Playing. The app redraws them when
              their content changes; the system update only restores them. -->
         <receiver

@@ -335,6 +335,9 @@ interface AppActions {
 
     /** The library refresh with nothing shown for it (pulling a page down, coming back to the app). */
     fun refreshQuietly() = refresh()
+
+    /** Looks through one source again (its row's "Scan Now"). */
+    fun scanSource(sourceId: Long) {}
     fun requestPermission()
     /** Opens the system "All files access" screen (Android 11+). */
     fun requestAllFilesAccess()

@@ -50,6 +50,7 @@ internal object AppShortcuts {
 
     /** Sets the shortcuts; [resume] is the first Continue Watching card, or null for none. */
     fun update(context: Context, resume: VideoCardUi?) {
+        ResumeTileService.remember(context, resume)
         val shortcuts = buildList {
             if (resume != null) {
                 val title = if (resume.kind == MediaKind.EPISODE && !resume.showTitle.isNullOrBlank()) resume.showTitle else resume.title

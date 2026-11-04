@@ -152,6 +152,7 @@ private fun libraryGroups(state: SettingsUi, actions: AppActions): List<Settings
                         source = folder,
                         onEdit = null,
                         onRemove = { actions.showDialog(DialogUi.ConfirmRemoveSource(folder)) },
+                        onScan = { actions.scanSource(folder.id) },
                     )
                 }
             } + actionRow("add-folder", R.drawable.ic_create_new_folder, "Add Folder", onClick = actions::addFolder),
@@ -167,6 +168,7 @@ private fun libraryGroups(state: SettingsUi, actions: AppActions): List<Settings
                         source = share,
                         onEdit = { actions.editSource(share) },
                         onRemove = { actions.showDialog(DialogUi.ConfirmRemoveSource(share)) },
+                        onScan = { actions.scanSource(share.id) },
                     )
                 }
             } + actionRow("add-share", R.drawable.ic_lan, "Add Network Source", onClick = actions::addNetworkSource),
@@ -204,7 +206,7 @@ private fun AllFilesAccessRow(shape: Shape, granted: Boolean, canRequest: Boolea
 
 /** A source in one line: its name, then how many videos (or that it scans, or what went wrong). */
 @Composable
-private fun SourceRow(shape: Shape, source: SourceUi, onEdit: (() -> Unit)?, onRemove: () -> Unit) {
+private fun SourceRow(shape: Shape, source: SourceUi, onEdit: (() -> Unit)?, onRemove: () -> Unit, onScan: (() -> Unit)? = null) {
     RowSurface(shape = shape, onClick = onEdit) {
         RowIcon(sourceTypeIcon(source.type))
         RowTitle(source.name, Modifier.weight(1f))
@@ -225,6 +227,16 @@ private fun SourceRow(shape: Shape, source: SourceUi, onEdit: (() -> Unit)?, onR
                 NovaIcon(R.drawable.ic_more_vert, contentDescription = "Options for ${source.name}")
             }
             NovaDropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                if (onScan != null && !source.isScanning) {
+                    NovaMenuItem(
+                        text = { Text("Scan Now") },
+                        leadingIcon = { NovaIcon(R.drawable.ic_refresh, contentDescription = null) },
+                        onClick = {
+                            menuOpen = false
+                            onScan()
+                        },
+                    )
+                }
                 if (onEdit != null) {
                     NovaMenuItem(
                         text = { Text("Edit") },
