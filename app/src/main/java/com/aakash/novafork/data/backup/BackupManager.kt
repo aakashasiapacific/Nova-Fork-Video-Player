@@ -8,6 +8,7 @@ import androidx.room.withTransaction
 import com.aakash.novafork.core.library.LibraryKeys
 import com.aakash.novafork.data.LibraryRepository
 import com.aakash.novafork.data.PrefsSettingsStore
+import com.aakash.novafork.data.TitleOverrides
 import com.aakash.novafork.data.Settings
 import com.aakash.novafork.data.SettingsStore
 import com.aakash.novafork.data.db.MatchState
@@ -48,6 +49,8 @@ class BackupManager(
     private val appVersion: String,
     reloadSettings: (() -> Settings)? = null,
     private val clock: () -> Long = System::currentTimeMillis,
+    /** "Rename in Library" titles, backed up and restored by their TMDB key. */
+    private val titleOverrides: TitleOverrides? = null,
 ) {
     private val appContext: Context = context.applicationContext
     private val reload: () -> Settings = reloadSettings ?: { PrefsSettingsStore(appContext).settings.value }
@@ -142,6 +145,7 @@ class BackupManager(
                 },
                 watchlist = watchlist.mapNotNull { (key, addedAt) -> saved(key, addedAt) },
                 videoFavorites = starred.mapNotNull { (key, addedAt) -> saved(key, addedAt) },
+                titleOverrides = titleOverrides?.titles?.value.orEmpty().filterKeys { it.isPortableTitleKey() },
                 songFavorites = songStars.mapNotNull { star ->
                     starredSongs[star.songId]?.let { song ->
                         BackupSongFavorite(SongMatcher.refOf(song, sourcesById[song.sourceId]), star.addedAt)
@@ -217,6 +221,9 @@ class BackupManager(
      * [RestoreReport.addedSourceIds].
      */
     suspend fun restore(backup: NovaBackup): RestoreReport {
+        titleOverrides?.let { overrides ->
+            backup.titleOverrides.filterKeys { it.isPortableTitleKey() }.forEach { (key, title) -> overrides.set(key, title) }
+        }
         val settingsWritten = withContext(Dispatchers.IO) { SettingsBackup.restore(settingsPrefs, backup.settings) }
         if (settingsWritten > 0) {
             val restored = withContext(Dispatchers.IO) { reload() }
@@ -448,3 +455,6 @@ private const val VIDEO_PREFIX = "v:"
 
 /** The video id in a watchlist or favorites key ("v:<id>"); null for a show. */
 private fun videoIdOf(key: String): Long? = key.takeIf { it.startsWith(VIDEO_PREFIX) }?.removePrefix(VIDEO_PREFIX)?.toLongOrNull()
+
+/** Title keys that mean the same title on every device: TMDB's ("movie:603", "tv:1396"). */
+private fun String.isPortableTitleKey(): Boolean = startsWith("movie:") || startsWith("tv:")

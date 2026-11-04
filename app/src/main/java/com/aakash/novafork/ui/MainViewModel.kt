@@ -316,7 +316,14 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
     private val plexSignIn: PlexSignIn by lazy { MediaServerSources.plexSignIn(graph) }
 
     private val backups: BackupManager by lazy {
-        BackupManager(getApplication<Application>(), graph.database, settingsStore, library, BuildConfig.VERSION_NAME)
+        BackupManager(
+            getApplication<Application>(),
+            graph.database,
+            settingsStore,
+            library,
+            BuildConfig.VERSION_NAME,
+            titleOverrides = graph.titleOverrides,
+        )
     }
     private val autoBackup: AutoBackup by lazy { AutoBackup(getApplication<Application>(), backups) }
     private val backup = MutableStateFlow(BackupUi())

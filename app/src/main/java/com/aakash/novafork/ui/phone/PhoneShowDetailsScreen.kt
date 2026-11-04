@@ -311,8 +311,7 @@ fun PhoneShowDetailsScreen(
             modifier = Modifier.align(Alignment.TopStart),
             title = details.title,
             collapsed = titleCollapse,
-            menu = if (identifyVideoId != null) {
-                { close ->
+            menu = { close ->
                     val context = LocalContext.current
                     NovaMenuItem(
                         text = { Text("Add to Home Screen") },
@@ -344,7 +343,7 @@ fun PhoneShowDetailsScreen(
                         onRename = { renamingTitle = true },
                         onReset = { actions.setTitleOverride(details.titleKey, null) },
                     )
-                    NovaMenuItem(
+                    if (identifyVideoId != null) NovaMenuItem(
                         text = { Text("Identify Show…") },
                         leadingIcon = { NovaIcon(R.drawable.ic_search, contentDescription = null) },
                         onClick = {
@@ -352,7 +351,7 @@ fun PhoneShowDetailsScreen(
                             actions.identify(identifyVideoId)
                         },
                     )
-                    NovaMenuItem(
+                    if (identifyVideoId != null) NovaMenuItem(
                         text = { Text("Change Artwork…") },
                         leadingIcon = { NovaIcon(R.drawable.ic_image, contentDescription = null) },
                         onClick = {
@@ -360,9 +359,6 @@ fun PhoneShowDetailsScreen(
                             actions.changeArtwork(identifyVideoId)
                         },
                     )
-                }
-            } else {
-                null
             },
         )
     }

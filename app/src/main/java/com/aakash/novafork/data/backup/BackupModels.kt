@@ -41,6 +41,11 @@ data class NovaBackup(
     val videoFavorites: List<BackupSavedItem> = emptyList(),
     /** Songs starred in Now Playing. */
     val songFavorites: List<BackupSongFavorite> = emptyList(),
+    /**
+     * "Rename in Library" titles by TMDB key ("movie:603", "tv:1396"), which are the same on
+     * every device. Older apps ignore this field.
+     */
+    val titleOverrides: Map<String, String> = emptyMap(),
 ) {
     fun summary(): BackupSummary = BackupSummary(
         createdAt = createdAt,
