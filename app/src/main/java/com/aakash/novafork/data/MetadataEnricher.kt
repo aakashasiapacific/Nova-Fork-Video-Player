@@ -133,6 +133,14 @@ internal class MetadataEnricher(
         try {
             coroutineScope {
                 val permits = Semaphore(CONCURRENCY)
+                // Newest first, ahead of the touch-ups: what Home and Recently Added show gets its
+                // poster and title before the older shelves (the semaphore hands out turns in order).
+                for ((query, group) in groups.entries.sortedByDescending { entry -> entry.value.maxOf { it.dateAdded } }) {
+                    launch {
+                        permits.withPermit { isolated("Matching $query") { pass.match(query, group) } }
+                        advance(group.size)
+                    }
+                }
                 for (key in orphanKeys) {
                     launch {
                         permits.withPermit { isolated("Restoring $key") { pass.restore(key) } }
@@ -143,12 +151,6 @@ internal class MetadataEnricher(
                     launch {
                         permits.withPermit { isolated("Refreshing $key") { pass.refreshDetails(key) } }
                         advance(1)
-                    }
-                }
-                for ((query, group) in groups) {
-                    launch {
-                        permits.withPermit { isolated("Matching $query") { pass.match(query, group) } }
-                        advance(group.size)
                     }
                 }
             }
