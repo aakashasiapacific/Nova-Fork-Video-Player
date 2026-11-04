@@ -457,6 +457,14 @@ private val SubtitleSizes = listOf(
     Option(160, "Extra large"),
 )
 
+private val SubtitleColors = listOf(
+    Option(0xFFFFFF, "White"),
+    Option(0xFFE14D, "Yellow"),
+    Option(0x6FE3F5, "Cyan"),
+    Option(0x8CE68C, "Green"),
+    Option(0xC8C8C8, "Grey"),
+)
+
 private val SubtitlePositions = listOf(
     Option(0, "Default"),
     Option(60, "Raised"),
@@ -588,6 +596,12 @@ private fun playerGroups(settings: Settings, actions: AppActions): List<Settings
             },
             switchRow("subtitle-box", R.drawable.ic_subtitles, "Background box", settings.subtitleBackground) { on ->
                 actions.updateSettings { it.copy(subtitleBackground = on) }
+            },
+            choiceRow("subtitle-color", R.drawable.ic_subtitles, "Colour", SubtitleColors, settings.subtitleColor) { color ->
+                actions.updateSettings { it.copy(subtitleColor = color) }
+            },
+            switchRow("subtitle-bold", R.drawable.ic_subtitles, "Bold", settings.subtitleBold) { on ->
+                actions.updateSettings { it.copy(subtitleBold = on) }
             },
             choiceRow("subtitle-position", R.drawable.ic_subtitles, "Position", SubtitlePositions, settings.subtitleMargin) { margin ->
                 actions.updateSettings { it.copy(subtitleMargin = margin) }

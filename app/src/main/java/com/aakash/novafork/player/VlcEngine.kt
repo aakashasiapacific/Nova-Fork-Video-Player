@@ -41,7 +41,14 @@ object VlcEngine {
     fun newMediaPlayer(context: Context): MediaPlayer = MediaPlayer(libVLC(context))
 
     /** The subtitle look ([com.aakash.novafork.data.Settings]' size, box and height) libVLC draws with. */
-    data class SubtitleStyle(val size: Int = 100, val background: Boolean = false, val margin: Int = 0) {
+    data class SubtitleStyle(
+        val size: Int = 100,
+        val background: Boolean = false,
+        val margin: Int = 0,
+        /** 0xRRGGBB. */
+        val color: Int = 0xFFFFFF,
+        val bold: Boolean = false,
+    ) {
         val options: List<String>
             get() = buildList {
                 if (size != 100) add("--sub-text-scale=$size")
@@ -50,6 +57,8 @@ object VlcEngine {
                     add("--freetype-background-color=0")
                 }
                 if (margin > 0) add("--sub-margin=$margin")
+                if (color != 0xFFFFFF) add("--freetype-color=${color and 0xFFFFFF}")
+                if (bold) add("--freetype-bold")
             }
     }
 

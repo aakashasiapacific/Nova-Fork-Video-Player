@@ -83,6 +83,8 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
             putBoolean(KEY_NIGHT_MODE, s.nightMode)
             putInt(KEY_SUBTITLE_SIZE, s.subtitleSize)
             putBoolean(KEY_SUBTITLE_BACKGROUND, s.subtitleBackground)
+            putInt(KEY_SUBTITLE_COLOR, s.subtitleColor)
+            putBoolean(KEY_SUBTITLE_BOLD, s.subtitleBold)
             putInt(KEY_SUBTITLE_MARGIN, s.subtitleMargin)
             putBoolean(KEY_HAPTICS, s.haptics)
             putBoolean(KEY_PIP_ON_LEAVE, s.pipOnLeave)
@@ -136,6 +138,8 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
         const val KEY_NIGHT_MODE = "night_mode"
         const val KEY_SUBTITLE_SIZE = "subtitle_size"
         const val KEY_SUBTITLE_BACKGROUND = "subtitle_background"
+        const val KEY_SUBTITLE_COLOR = "subtitle_color"
+        const val KEY_SUBTITLE_BOLD = "subtitle_bold"
         const val KEY_SUBTITLE_MARGIN = "subtitle_margin"
         const val KEY_HAPTICS = "haptics"
         const val KEY_PIP_ON_LEAVE = "pip_on_leave"
@@ -184,6 +188,8 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
             KEY_NIGHT_MODE to SettingType.BOOLEAN,
             KEY_SUBTITLE_SIZE to SettingType.INT,
             KEY_SUBTITLE_BACKGROUND to SettingType.BOOLEAN,
+            KEY_SUBTITLE_COLOR to SettingType.INT,
+            KEY_SUBTITLE_BOLD to SettingType.BOOLEAN,
             KEY_SUBTITLE_MARGIN to SettingType.INT,
             KEY_HAPTICS to SettingType.BOOLEAN,
             KEY_PIP_ON_LEAVE to SettingType.BOOLEAN,
@@ -250,6 +256,8 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
                 nightMode = prefs.boolean(KEY_NIGHT_MODE, defaults.nightMode),
                 subtitleSize = prefs.int(KEY_SUBTITLE_SIZE, defaults.subtitleSize).coerceIn(50, 200),
                 subtitleBackground = prefs.boolean(KEY_SUBTITLE_BACKGROUND, defaults.subtitleBackground),
+                subtitleColor = prefs.int(KEY_SUBTITLE_COLOR, defaults.subtitleColor),
+                subtitleBold = prefs.boolean(KEY_SUBTITLE_BOLD, defaults.subtitleBold),
                 subtitleMargin = prefs.int(KEY_SUBTITLE_MARGIN, defaults.subtitleMargin).coerceIn(0, 300),
                 haptics = prefs.boolean(KEY_HAPTICS, defaults.haptics),
                 pipOnLeave = prefs.boolean(KEY_PIP_ON_LEAVE, defaults.pipOnLeave),

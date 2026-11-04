@@ -142,6 +142,10 @@ data class Settings(
     val subtitleBackground: Boolean = false,
     /** How far above the bottom of the picture subtitles sit, in px of the video (0 = libVLC's own). */
     val subtitleMargin: Int = 0,
+    /** Subtitle text colour as 0xRRGGBB (white by default). */
+    val subtitleColor: Int = 0xFFFFFF,
+    /** Subtitle text in bold. */
+    val subtitleBold: Boolean = false,
     /** Leaving the app while a video plays shrinks it into a picture-in-picture window. */
     val pipOnLeave: Boolean = false,
     /** The small ticks on taps, swipes and switches; off silences every one. */

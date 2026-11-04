@@ -148,7 +148,13 @@ class PlayerController(
     private val libVLC = graph.settings.settings.value.let { settings ->
         VlcEngine.videoLibVLC(
             appContext,
-            VlcEngine.SubtitleStyle(settings.subtitleSize, settings.subtitleBackground, settings.subtitleMargin),
+            VlcEngine.SubtitleStyle(
+                settings.subtitleSize,
+                settings.subtitleBackground,
+                settings.subtitleMargin,
+                color = settings.subtitleColor,
+                bold = settings.subtitleBold,
+            ),
         )
     }
     private val mediaPlayer: MediaPlayer = MediaPlayer(libVLC)
