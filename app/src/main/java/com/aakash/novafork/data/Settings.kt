@@ -16,6 +16,22 @@ enum class HwDecoding(val label: String) { AUTO("Automatic"), DISABLED("Software
 enum class ThemeMode(val label: String) { DARK("Dark"), LIGHT("Light"), SYSTEM("Follow system") }
 
 /** Preferences › Appearance › Home hero: what the Home hero's picture is made of. */
+/** How the library pages lay out their titles (Preferences › Appearance › Library). */
+enum class LibraryLayout(val label: String) {
+    GRID("Grid"),
+
+    /** One title per row: a small poster, the title and its caption. */
+    LIST("List"),
+}
+
+/** Posters per row in the library grids; [AUTOMATIC] fits them to the screen (pinch still works). */
+enum class PosterColumns(val label: String, val count: Int) {
+    AUTOMATIC("Automatic", 0),
+    TWO("2", 2),
+    THREE("3", 3),
+    FOUR("4", 4),
+}
+
 enum class HeroStyle(val label: String) {
     /** Apple TV: the full-bleed backdrop, title and meta over its foot; no poster card. */
     BACKDROP("Backdrop"),
@@ -134,6 +150,10 @@ data class Settings(
     val requireFingerprint: Boolean = false,
     /** The Home hero's look; see [HeroStyle]. */
     val heroStyle: HeroStyle = HeroStyle.BACKDROP,
+    /** Library pages as a poster grid or a list. */
+    val libraryLayout: LibraryLayout = LibraryLayout.GRID,
+    /** Posters per row in the library grids. */
+    val posterColumns: PosterColumns = PosterColumns.AUTOMATIC,
     /** The top of a title's page; see [DetailsHeaderStyle]. */
     val detailsHeaderStyle: DetailsHeaderStyle = DetailsHeaderStyle.BACKDROP,
 )

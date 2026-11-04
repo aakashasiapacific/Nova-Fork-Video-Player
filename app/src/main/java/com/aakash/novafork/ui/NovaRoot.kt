@@ -29,6 +29,8 @@ import com.aakash.novafork.ui.common.IosToastHost
 import com.aakash.novafork.ui.common.LocalDetailsHeaderStyle
 import com.aakash.novafork.ui.common.LocalGlassTint
 import com.aakash.novafork.ui.common.LocalHeroStyle
+import com.aakash.novafork.ui.common.LocalLibraryLayout
+import com.aakash.novafork.ui.common.LocalPosterColumns
 import com.aakash.novafork.ui.common.LocalHud
 import com.aakash.novafork.ui.common.LocalSheetDepth
 import com.aakash.novafork.ui.common.NovaAlertDialog
@@ -58,6 +60,8 @@ fun NovaRoot(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
             LocalGlassTint provides settings.glassTint,
             LocalHeroStyle provides settings.heroStyle,
             LocalDetailsHeaderStyle provides settings.detailsHeaderStyle,
+            LocalLibraryLayout provides settings.libraryLayout,
+            LocalPosterColumns provides settings.posterColumns,
             LocalSheetDepth provides remember { SheetDepth() },
         ) {
             HapticsSetting(settings.haptics) {

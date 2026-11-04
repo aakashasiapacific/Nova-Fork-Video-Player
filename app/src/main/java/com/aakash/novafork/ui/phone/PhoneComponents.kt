@@ -82,6 +82,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aakash.novafork.R
+import com.aakash.novafork.ui.common.LocalPosterColumns
+import com.aakash.novafork.ui.common.LocalLibraryLayout
+import com.aakash.novafork.data.LibraryLayout
 import com.aakash.novafork.core.format.Formats
 import com.aakash.novafork.data.db.SourceType
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
@@ -662,6 +665,68 @@ private fun episodeLengthLabel(episode: EpisodeUi): String? {
     return durationLabel(duration)
 }
 
+/**
+ * The library grids' columns: one per row in the List layout; else the owner's posters per row,
+ * unless a pinch has just resized the grid; else fitted to the width.
+ */
+@Composable
+private fun libraryColumns(minCell: Dp): GridCells {
+    val pinched = pinchedCell
+    val fixed = LocalPosterColumns.current.count
+    return when {
+        LocalLibraryLayout.current == LibraryLayout.LIST -> GridCells.Fixed(1)
+        pinched != null -> GridCells.Adaptive(pinched)
+        fixed > 0 -> GridCells.Fixed(fixed)
+        else -> GridCells.Adaptive(minCell)
+    }
+}
+
+/** A library title as a list row (Library layout: List): a small poster, the title and its caption. */
+@Composable
+private fun PhoneLibraryListRow(
+    title: String,
+    subtitle: String?,
+    artwork: Artwork,
+    onClick: () -> Unit,
+    onLongClick: (() -> Unit)?,
+    progress: Float? = null,
+    watched: Boolean = false,
+) {
+    val shape = RoundedCornerShape(6.dp)
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            Modifier
+                .width(56.dp)
+                .aspectRatio(2f / 3f)
+                .clip(shape)
+                .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+        ) {
+            PosterArt(artwork = artwork, title = title, modifier = Modifier.fillMaxSize(), showTitleOnPlaceholder = false)
+            ProgressStrip(progress, Modifier.align(Alignment.BottomStart))
+        }
+        Spacer(Modifier.width(Spacing.md))
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (!subtitle.isNullOrBlank()) {
+                Text(
+                    subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+        if (watched) WatchedBadge(Modifier.padding(start = Spacing.sm))
+    }
+}
+
 /** Poster grid for library items (Library and Search). */
 @Composable
 internal fun PhoneLibraryGrid(
@@ -676,8 +741,9 @@ internal fun PhoneLibraryGrid(
 ) {
     val dims = LocalNovaDimens.current
     val seen = remember { mutableSetOf<Any>() }
+    val asList = LocalLibraryLayout.current == LibraryLayout.LIST
     LazyVerticalGrid(
-        columns = GridCells.Adaptive(pinchedCell ?: dims.gridMinCell),
+        columns = libraryColumns(dims.gridMinCell),
         modifier = modifier.fillMaxSize().pinchColumns(state).iosScrollIndicator(state),
         state = state,
         contentPadding = PaddingValues(start = dims.gutter, end = dims.gutter, top = Spacing.sm, bottom = EndOfListGap + LocalBottomBarSpace.current),
@@ -695,10 +761,32 @@ internal fun PhoneLibraryGrid(
                     showDetails = false,
                     modifier = appear,
                 ) { openMenu ->
-                    SelectablePosterCard(item.card, actions, openMenu)
+                    if (asList) {
+                        PhoneLibraryListRow(
+                            title = item.card.displayTitle(),
+                            subtitle = item.card.displaySubtitle(),
+                            artwork = item.card.artwork,
+                            onClick = { actions.openVideo(item.card.id) },
+                            onLongClick = openMenu,
+                            progress = item.card.progress,
+                            watched = item.card.watched,
+                        )
+                    } else {
+                        SelectablePosterCard(item.card, actions, openMenu)
+                    }
                 }
                 is LibraryItemUi.Show -> ShowMenuBox(showKey = item.card.key, actions = actions, modifier = appear) { openMenu ->
-                    PhoneShowCard(item.card, onClick = { actions.openShow(item.card.key) }, onLongClick = openMenu)
+                    if (asList) {
+                        PhoneLibraryListRow(
+                            title = item.card.title,
+                            subtitle = item.card.watchedCaption ?: countLabel(item.card.episodeCount, "episode"),
+                            artwork = item.card.artwork,
+                            onClick = { actions.openShow(item.card.key) },
+                            onLongClick = openMenu,
+                        )
+                    } else {
+                        PhoneShowCard(item.card, onClick = { actions.openShow(item.card.key) }, onLongClick = openMenu)
+                    }
                 }
             }
         }
@@ -722,8 +810,9 @@ internal fun PhoneTimelineGrid(
         months.map { month -> index.also { index += 1 + month.cards.size } }
     }
     Box(modifier.fillMaxSize()) {
+        val asList = LocalLibraryLayout.current == LibraryLayout.LIST
         LazyVerticalGrid(
-            columns = GridCells.Adaptive(pinchedCell ?: dims.gridMinCell),
+            columns = libraryColumns(dims.gridMinCell),
             modifier = Modifier.fillMaxSize().pinchColumns(state).iosScrollIndicator(state),
             state = state,
             contentPadding = PaddingValues(start = dims.gutter, end = dims.gutter, top = 0.dp, bottom = EndOfListGap + LocalBottomBarSpace.current),
@@ -742,7 +831,19 @@ internal fun PhoneTimelineGrid(
                 itemsIndexed(month.cards, key = { _, card -> "v:" + card.id }) { index, card ->
                     val appear = Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null).staggeredAppear("v:" + card.id, index, seen)
                     VideoMenuBox(videoId = card.id, title = card.displayTitle(), actions = actions, showDetails = false, modifier = appear) { openMenu ->
-                        SelectablePosterCard(card, actions, openMenu, terse = true)
+                        if (asList) {
+                            PhoneLibraryListRow(
+                                title = card.displayTitle(),
+                                subtitle = card.displaySubtitle(),
+                                artwork = card.artwork,
+                                onClick = { actions.openVideo(card.id) },
+                                onLongClick = openMenu,
+                                progress = card.progress,
+                                watched = card.watched,
+                            )
+                        } else {
+                            SelectablePosterCard(card, actions, openMenu, terse = true)
+                        }
                     }
                 }
             }

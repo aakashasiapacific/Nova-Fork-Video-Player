@@ -88,6 +88,8 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
             putBoolean(KEY_PIP_ON_LEAVE, s.pipOnLeave)
             putBoolean(KEY_REQUIRE_FINGERPRINT, s.requireFingerprint)
             putString(KEY_HERO_STYLE, s.heroStyle.name)
+            putString(KEY_LIBRARY_LAYOUT, s.libraryLayout.name)
+            putString(KEY_POSTER_COLUMNS, s.posterColumns.name)
             putString(KEY_DETAILS_HEADER_STYLE, s.detailsHeaderStyle.name)
         }
     }
@@ -139,6 +141,8 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
         const val KEY_PIP_ON_LEAVE = "pip_on_leave"
         const val KEY_REQUIRE_FINGERPRINT = "require_fingerprint"
         const val KEY_HERO_STYLE = "hero_style"
+        const val KEY_LIBRARY_LAYOUT = "library_layout"
+        const val KEY_POSTER_COLUMNS = "poster_columns"
         const val KEY_DETAILS_HEADER_STYLE = "details_header_style"
 
         /**
@@ -185,6 +189,8 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
             KEY_PIP_ON_LEAVE to SettingType.BOOLEAN,
             KEY_REQUIRE_FINGERPRINT to SettingType.BOOLEAN,
             KEY_HERO_STYLE to SettingType.STRING,
+            KEY_LIBRARY_LAYOUT to SettingType.STRING,
+            KEY_POSTER_COLUMNS to SettingType.STRING,
             KEY_DETAILS_HEADER_STYLE to SettingType.STRING,
         )
 
@@ -249,6 +255,8 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
                 pipOnLeave = prefs.boolean(KEY_PIP_ON_LEAVE, defaults.pipOnLeave),
                 requireFingerprint = prefs.boolean(KEY_REQUIRE_FINGERPRINT, defaults.requireFingerprint),
                 heroStyle = enumOrDefault(prefs.string(KEY_HERO_STYLE), defaults.heroStyle),
+                libraryLayout = enumOrDefault(prefs.string(KEY_LIBRARY_LAYOUT), defaults.libraryLayout),
+                posterColumns = enumOrDefault(prefs.string(KEY_POSTER_COLUMNS), defaults.posterColumns),
                 detailsHeaderStyle = enumOrDefault(prefs.string(KEY_DETAILS_HEADER_STYLE), defaults.detailsHeaderStyle),
             )
         }

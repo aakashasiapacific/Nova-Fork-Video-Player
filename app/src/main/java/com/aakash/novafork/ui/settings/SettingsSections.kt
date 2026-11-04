@@ -35,6 +35,8 @@ import com.aakash.novafork.R
 import com.aakash.novafork.data.AspectMode
 import com.aakash.novafork.data.DetailsHeaderStyle
 import com.aakash.novafork.data.HeroStyle
+import com.aakash.novafork.data.LibraryLayout
+import com.aakash.novafork.data.PosterColumns
 import com.aakash.novafork.data.HwDecoding
 import com.aakash.novafork.data.LayoutMode
 import com.aakash.novafork.data.Settings
@@ -652,6 +654,27 @@ private fun appearanceGroups(settings: Settings, actions: AppActions): List<Sett
             ) { style -> actions.updateSettings { it.copy(detailsHeaderStyle = style) } },
         ),
         footer = "Backdrop is Apple TV's look: the picture fills the top and the title sits over it.",
+    ),
+    SettingsGroup(
+        key = "libraryLook",
+        title = "Library",
+        rows = listOf(
+            choiceRow(
+                "libraryLayout",
+                R.drawable.ic_video_library,
+                "Layout",
+                LibraryLayout.entries.map { Option(it, it.label) },
+                settings.libraryLayout,
+            ) { layout -> actions.updateSettings { it.copy(libraryLayout = layout) } },
+            choiceRow(
+                "posterColumns",
+                R.drawable.ic_video_library,
+                "Posters per row",
+                PosterColumns.entries.map { Option(it, it.label) },
+                settings.posterColumns,
+            ) { columns -> actions.updateSettings { it.copy(posterColumns = columns) } },
+        ),
+        footer = "Automatic fits posters to the screen; pinching a grid still resizes it.",
     ),
     SettingsGroup(
         key = "glass",
