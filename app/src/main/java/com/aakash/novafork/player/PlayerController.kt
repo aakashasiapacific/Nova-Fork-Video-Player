@@ -757,8 +757,8 @@ class PlayerController(
             val delayMs = subtitleDelays.get(current.videoKey)
             if (delayMs != _state.value.subtitleDelayMs) _state.update { it.copy(subtitleDelayMs = delayMs) }
         }
-        // And the fit or zoom picked for it before (owner).
-        videoAspects.get(current.videoKey)?.let { mode ->
+        // And the fit or zoom picked for it before (owner), else the one last picked for its show.
+        (videoAspects.get(current.videoKey) ?: showPreferences.aspect(entry?.video?.showKey))?.let { mode ->
             if (mode != _state.value.aspect) {
                 mediaPlayer.setVideoScale(mode.toScaleType())
                 _state.update { it.copy(aspect = mode) }
@@ -1411,6 +1411,7 @@ class PlayerController(
         mediaPlayer.setVideoScale(mode.toScaleType())
         _state.update { it.copy(aspect = mode) }
         nowPlaying?.let { videoAspects.set(it.videoKey, mode) }
+        currentShowKey?.let { showPreferences.setAspect(it, mode) }
         showLabel(mode.label)
     }
 

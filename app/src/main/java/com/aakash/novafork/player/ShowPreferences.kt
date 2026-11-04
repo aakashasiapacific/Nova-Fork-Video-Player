@@ -21,6 +21,17 @@ internal class ShowPreferences(context: Context) {
         }
     }
 
+    /** The fit or zoom last picked for one of [showKey]'s episodes; null when none was. */
+    fun aspect(showKey: String?): com.aakash.novafork.data.AspectMode? {
+        if (showKey == null) return null
+        val name = prefs.getString(ASPECT + showKey, null) ?: return null
+        return com.aakash.novafork.data.AspectMode.entries.firstOrNull { it.name == name }
+    }
+
+    fun setAspect(showKey: String, mode: com.aakash.novafork.data.AspectMode) {
+        prefs.edit().putString(ASPECT + showKey, mode.name).apply()
+    }
+
     fun setRate(showKey: String, rate: Float) {
         prefs.edit().apply { if (rate == 1f) remove(RATE + showKey) else putFloat(RATE + showKey, rate) }.apply()
     }
@@ -80,6 +91,7 @@ internal class ShowPreferences(context: Context) {
         .firstOrNull { word -> word.isNotBlank() && TrackLanguages.aliases(word).size > 1 }
 
     private companion object {
+        const val ASPECT = "aspect:"
         const val PREFS_NAME = "show_preferences"
         const val RATE = "rate:"
         const val AUDIO = "audio:"
