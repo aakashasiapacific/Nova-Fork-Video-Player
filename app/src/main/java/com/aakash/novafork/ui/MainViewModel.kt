@@ -428,7 +428,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
             },
             browse = browse,
             browseDir = (route as? Route.BrowseDir)?.let { browseDirFor(index, it, user.listings, scan) },
-            videoDetails = videoId?.let { withAgeRating(index, it, UiMappers.videoDetails(index, it)) },
+            videoDetails = videoId?.let { withStreamBadges(index, it, withAgeRating(index, it, UiMappers.videoDetails(index, it))) },
             showDetails = showKey?.let { withShowExtras(index, it, UiMappers.showDetails(index, it)) },
             previewKey = previewKey,
             history = if (route == Route.History) UiMappers.history(index, user.historyHidden) else emptyList(),
@@ -461,6 +461,19 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
     }
 
     /** A movie's page with its cached age rating; asks TMDB for it when it isn't cached. */
+    /** The "5.1" / "7.1" badge, once the video has been played and its tracks are known. */
+    private fun withStreamBadges(index: LibraryIndex, videoId: Long, details: VideoDetailsUi?): VideoDetailsUi? {
+        val channels = graph.streamTraits.channels(videoId) ?: return details
+        val video = index.videosById[videoId]?.video ?: return details
+        return details?.copy(
+            qualityBadges = com.aakash.novafork.core.format.QualityBadges.of(
+                video.width,
+                video.height,
+                com.aakash.novafork.core.format.StreamTraits(channels = channels),
+            ),
+        )
+    }
+
     private fun withAgeRating(index: LibraryIndex, videoId: Long, details: VideoDetailsUi?): VideoDetailsUi? {
         val key = index.videosById[videoId]?.takeIf { it.kind == MediaKind.MOVIE }?.meta?.key
         if (details == null || key == null) return details

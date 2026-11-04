@@ -2187,9 +2187,26 @@ class PlayerController(
     }
 
     private fun refreshTracks() {
+        recordStreamTraits()
         val audioTracks = trackList(mediaPlayer.audioTracks, mediaPlayer.audioTrack)
         val subtitleTracks = trackList(mediaPlayer.spuTracks, mediaPlayer.spuTrack)
         _state.update { it.copy(audioTracks = audioTracks, subtitleTracks = subtitleTracks) }
+    }
+
+    /** Remembers the most audio channels of any track, for the details page's "5.1" badge. */
+    private fun recordStreamTraits() {
+        val videoId = nowPlaying?.entry?.video?.id ?: return
+        val media = mediaPlayer.media ?: return
+        try {
+            val channels = (0 until media.trackCount)
+                .mapNotNull { media.getTrack(it) as? IMedia.AudioTrack }
+                .maxOfOrNull { it.channels } ?: return
+            graph.streamTraits.recordChannels(videoId, channels)
+        } catch (e: Exception) {
+            Log.w(TAG, "Couldn't read the stream's tracks", e)
+        } finally {
+            media.release()
+        }
     }
 
     private fun trackList(tracks: Array<out MediaPlayer.TrackDescription>?, selectedId: Int): List<TrackUi> {

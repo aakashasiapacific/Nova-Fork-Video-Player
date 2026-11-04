@@ -17,6 +17,7 @@ import com.aakash.novafork.data.SmbBrowser
 import com.aakash.novafork.data.SourceModule
 import com.aakash.novafork.data.SourceScanner
 import com.aakash.novafork.data.TitleExtras
+import com.aakash.novafork.data.StreamTraitsStore
 import com.aakash.novafork.data.TitleOverrides
 import com.aakash.novafork.data.backup.PendingRestore
 import com.aakash.novafork.data.db.NovaDatabase
@@ -69,6 +70,9 @@ class AppGraph(val app: Application) {
 
     /** Age ratings and next episode dates from TMDB, cached for the details pages. */
     val titleExtras: TitleExtras by lazy { TitleExtras(app, tmdb, appScope) }
+
+    /** Audio channels each video turned out to have when played (the "5.1" badge). */
+    val streamTraits: StreamTraitsStore by lazy { StreamTraitsStore(app) }
 
     /** Titles the user typed with "Rename in Library"; only the app's display name changes. */
     val titleOverrides: TitleOverrides by lazy { TitleOverrides(app) }
