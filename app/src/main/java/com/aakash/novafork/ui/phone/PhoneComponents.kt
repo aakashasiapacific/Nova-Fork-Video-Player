@@ -107,6 +107,7 @@ import com.aakash.novafork.ui.common.iosScrollIndicator
 import com.aakash.novafork.ui.common.metaLine
 import com.aakash.novafork.ui.common.pressDim
 import com.aakash.novafork.ui.common.pressScale
+import com.aakash.novafork.ui.common.pressTilt
 import com.aakash.novafork.ui.common.searchHighlighted
 import com.aakash.novafork.ui.common.sourceTypeIcon
 import com.aakash.novafork.ui.common.staggeredAppear
@@ -130,6 +131,13 @@ private val ThumbShape = RoundedCornerShape(8.dp)
 // ---------------------------------------------------------------------------------------------
 
 /** Episodes read better under their show's name ("The Bear" / "S2 · E3 · Fishes"). */
+/** "★ 8.2 · 2024 · 2h 47m" for a poster's long-press menu; null when nothing is known. */
+internal fun VideoCardUi.infoLine(): String? = listOfNotNull(
+    rating?.let { "★ " + String.format(java.util.Locale.US, "%.1f", it) },
+    year?.toString(),
+    durationMs?.takeIf { it > 0 }?.let { Formats.runtime((it / 60_000L).toInt()) },
+).joinToString(" · ").ifEmpty { null }
+
 internal fun VideoCardUi.displayTitle(): String {
     val show = showTitle
     return if (kind == MediaKind.EPISODE && !show.isNullOrBlank()) show else title
@@ -198,6 +206,7 @@ private fun PosterCardLayout(
     Column(
         modifier
             .pressScale(press, pressed = CardPressScale)
+            .pressTilt()
             .clip(shape)
             .combinedClickable(interactionSource = press, indication = null, onClick = onClick, onLongClick = onLongClick)
             .then(if (bare) Modifier.semantics(mergeDescendants = true) { contentDescription = title } else Modifier),
@@ -374,6 +383,7 @@ private fun WideCardLayout(
         modifier
             .width(width)
             .pressScale(press, pressed = CardPressScale)
+            .pressTilt()
             .clip(shape)
             .combinedClickable(interactionSource = press, indication = null, onClick = onClick, onLongClick = onLongClick),
     ) {
@@ -759,6 +769,7 @@ internal fun PhoneLibraryGrid(
                     title = item.card.displayTitle(),
                     actions = actions,
                     showDetails = false,
+                    info = item.card.infoLine(),
                     modifier = appear,
                 ) { openMenu ->
                     if (asList) {
@@ -830,7 +841,7 @@ internal fun PhoneTimelineGrid(
                 }
                 itemsIndexed(month.cards, key = { _, card -> "v:" + card.id }) { index, card ->
                     val appear = Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null).staggeredAppear("v:" + card.id, index, seen)
-                    VideoMenuBox(videoId = card.id, title = card.displayTitle(), actions = actions, showDetails = false, modifier = appear) { openMenu ->
+                    VideoMenuBox(videoId = card.id, title = card.displayTitle(), actions = actions, showDetails = false, info = card.infoLine(), modifier = appear) { openMenu ->
                         if (asList) {
                             PhoneLibraryListRow(
                                 title = card.displayTitle(),

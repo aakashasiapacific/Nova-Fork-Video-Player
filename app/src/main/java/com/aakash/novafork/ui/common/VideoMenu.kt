@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -57,6 +58,8 @@ fun VideoMenuBox(
     actions: AppActions,
     modifier: Modifier = Modifier,
     showDetails: Boolean = true,
+    /** A quiet line at the top of the menu: "★ 8.2 · 2024 · 2h 47m" (press and hold a poster). */
+    info: String? = null,
     extraItems: (@Composable (close: () -> Unit) -> Unit)? = null,
     content: @Composable (openMenu: () -> Unit) -> Unit,
 ) {
@@ -64,6 +67,15 @@ fun VideoMenuBox(
     Box(modifier) {
         ContextMenuLift(open = open) { copy -> content(if (copy) ({}) else ({ open = true })) }
         NovaDropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            if (!info.isNullOrBlank()) {
+                Text(
+                    info,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                )
+            }
             // Details is the quick row's (i), so the list starts at Add to Playlist.
             VideoQuickActions(videoId = videoId, actions = actions, showDetails = showDetails, close = { open = false })
             NovaMenuItem(
