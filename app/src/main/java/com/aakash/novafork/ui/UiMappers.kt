@@ -171,6 +171,9 @@ object UiMappers {
     }
 
     /** In-progress items first, then the newest movies and shows; items with a backdrop win. */
+    /** How many not-started titles lead the hero before what is under way. */
+    private const val HERO_NEW_FIRST = 3
+
     private fun hero(index: LibraryIndex, inProgress: List<IndexedVideo>): List<HeroUi> {
         val candidates = LinkedHashMap<HeroTarget, HeroUi>()
         fun add(hero: HeroUi) {
@@ -189,7 +192,7 @@ object UiMappers {
                 Triple(show.latestAdded, untouched, heroForShow(show))
             }
         val recent = (recentMovies + recentShows).sortedByDescending { it.first }
-        recent.filter { it.second }.forEach { add(it.third) }
+        recent.filter { it.second }.take(HERO_NEW_FIRST).forEach { add(it.third) }
         inProgress.forEach { video -> add(heroForInProgress(index, video)) }
         recent.forEach { add(it.third) }
         // sortedByDescending is stable, so the order above survives within each group.
