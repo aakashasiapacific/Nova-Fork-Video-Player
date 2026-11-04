@@ -901,7 +901,7 @@ private fun ArtistPage(artist: Artist, ctx: PageContext) {
             songRows(topSongs.take(TOP_SONGS), ctx)
         }
         if (artist.albums.isNotEmpty()) {
-            row("albumsTitle") { SectionTitle("Recently Added") }
+            row("albumsTitle") { SectionTitle("Albums") }
             row("albums") {
                 val rowState = rememberLazyListState()
                 LazyRow(state = rowState, flingBehavior = rememberRowSnap(rowState), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
