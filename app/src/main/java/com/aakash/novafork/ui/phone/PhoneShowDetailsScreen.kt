@@ -17,6 +17,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.border
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.Arrangement
+import com.aakash.novafork.ui.model.SeasonUi
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -245,6 +250,11 @@ fun PhoneShowDetailsScreen(
                         )
                     }
                     season?.let { GreyCaption(it.summaryCaption, Modifier.padding(horizontal = dims.gutter)) }
+                    if (seasons.size > 1) {
+                        // Apple TV's season posters: tap one to show its episodes.
+                        Spacer(Modifier.height(12.dp))
+                        SeasonPosterRow(seasons, selected = season?.number, gutter = dims.gutter) { selectedSeason = it }
+                    }
                     Spacer(Modifier.height(8.dp))
                 }
             }
@@ -434,4 +444,49 @@ private fun episodeRowsWithGaps(episodes: List<EpisodeUi>): List<EpisodeListRow>
         out += EpisodeListRow.Row(episode)
     }
     return out
+}
+
+/** The seasons as a row of their posters, the chosen one outlined; the show's poster stands in for one without. */
+@Composable
+private fun SeasonPosterRow(seasons: List<SeasonUi>, selected: Int?, gutter: androidx.compose.ui.unit.Dp, onSelect: (Int) -> Unit) {
+    androidx.compose.foundation.lazy.LazyRow(
+        contentPadding = PaddingValues(horizontal = gutter),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        items(seasons, key = { it.number }) { item ->
+            val chosen = item.number == selected
+            val shape = RoundedCornerShape(8.dp)
+            Column(
+                Modifier
+                    .width(92.dp)
+                    .clip(shape)
+                    .clickable(onClickLabel = "Show ${item.title}") { onSelect(item.number) },
+            ) {
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(2f / 3f)
+                        .clip(shape)
+                        .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                        .then(
+                            if (chosen) Modifier.border(2.dp, Color.White, shape) else Modifier,
+                        ),
+                ) {
+                    com.aakash.novafork.ui.common.PosterArt(
+                        artwork = com.aakash.novafork.ui.model.Artwork(posterUrl = item.posterUrl),
+                        title = item.title,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    item.title,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (chosen) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+    }
 }
