@@ -322,6 +322,16 @@ data class SeasonUi(
 ) {
     /** "4 of 8 watched"; null before any episode is watched. */
     val watchedCaption: String? get() = watchedCaptionOf(episodes.count { it.watched }, episodes.size)
+
+    /** "8 episodes · 6h 12m" (the length only when every episode's is known), then how many are watched. */
+    val summaryCaption: String
+        get() {
+            val count = if (episodes.size == 1) "1 episode" else "${episodes.size} episodes"
+            val total = episodes.takeIf { list -> list.isNotEmpty() && list.all { (it.durationMs ?: 0L) > 0L } }
+                ?.sumOf { it.durationMs ?: 0L }
+                ?.let { com.aakash.novafork.core.format.Formats.runtime((it / 60_000L).toInt()) }
+            return listOfNotNull(count, total, watchedCaption).joinToString(" · ")
+        }
 }
 
 @Immutable

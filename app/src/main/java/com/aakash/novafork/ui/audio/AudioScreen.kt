@@ -474,7 +474,7 @@ private fun LibraryHome(
             row("folders") { CategoryRow(R.drawable.ic_folder, "Folders", divider = false) { ctx.onOpen(FOLDERS) } }
         }
         if (library.recentlyAdded.isNotEmpty()) {
-            row("albumsTitle") { SectionTitle("Albums") }
+            row("albumsTitle") { SectionTitle("Recently Added") }
             // Newest first.
             items(library.recentlyAdded, key = { "album:" + it.key }) { album ->
                 AlbumTile(album, ctx) { ctx.onOpen(ALBUM + album.key) }
@@ -901,7 +901,7 @@ private fun ArtistPage(artist: Artist, ctx: PageContext) {
             songRows(topSongs.take(TOP_SONGS), ctx)
         }
         if (artist.albums.isNotEmpty()) {
-            row("albumsTitle") { SectionTitle("Albums") }
+            row("albumsTitle") { SectionTitle("Recently Added") }
             row("albums") {
                 val rowState = rememberLazyListState()
                 LazyRow(state = rowState, flingBehavior = rememberRowSnap(rowState), horizontalArrangement = Arrangement.spacedBy(14.dp)) {

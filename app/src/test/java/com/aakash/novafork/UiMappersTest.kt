@@ -155,10 +155,11 @@ class UiMappersTest {
     }
 
     @Test
-    fun heroStartsWithWhatIsInProgressThenTheNewest() {
+    fun heroStartsWithSomethingNewThenWhatIsInProgress() {
         val hero = index.home.hero
+        val targets = hero.map { it.target }
         assertEquals(
-            listOf(
+            setOf(
                 HeroTarget.Video(DUNE),
                 HeroTarget.Show(SEVERANCE_KEY),
                 HeroTarget.Show(PANCHAYAT_KEY),
@@ -166,16 +167,20 @@ class UiMappersTest {
                 HeroTarget.Show(SHOGUN_KEY),
                 HeroTarget.Video(OPPENHEIMER),
             ),
-            hero.map { it.target },
+            targets.toSet(),
         )
-        val dune = hero[0]
+        // Not started yet comes first (owner); Dune and Severance are under way.
+        val firstStarted = targets.indexOfFirst { it == HeroTarget.Video(DUNE) || it == HeroTarget.Show(SEVERANCE_KEY) }
+        assertTrue(hero.take(firstStarted).none { it.playLabel.startsWith("Resume") })
+        assertTrue(hero.drop(firstStarted).take(2).all { it.playLabel.startsWith("Resume") })
+        val dune = hero.first { it.target == HeroTarget.Video(DUNE) }
         assertEquals("Resume · 1h 41m left", dune.playLabel)
         assertEquals("2024 · 2h 47m · Science Fiction, Adventure", dune.metaLine)
-        val severance = hero[1]
+        val severance = hero.first { it.target == HeroTarget.Show(SEVERANCE_KEY) }
         assertEquals("Resume · 20m left", severance.playLabel)
         assertEquals(SEVERANCE_S2E3, severance.playVideoId)
         assertEquals("S2 · E3 · Who Is Alive?", severance.metaLine)
-        assertEquals("Play S1 · E1", hero[4].playLabel)
+        assertEquals("Play S1 · E1", hero.first { it.target == HeroTarget.Show(SHOGUN_KEY) }.playLabel)
     }
 
     @Test

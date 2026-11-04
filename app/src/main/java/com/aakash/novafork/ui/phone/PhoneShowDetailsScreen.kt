@@ -244,7 +244,7 @@ fun PhoneShowDetailsScreen(
                             modifier = Modifier.padding(horizontal = dims.gutter),
                         )
                     }
-                    season?.watchedCaption?.let { GreyCaption(it, Modifier.padding(horizontal = dims.gutter)) }
+                    season?.let { GreyCaption(it.summaryCaption, Modifier.padding(horizontal = dims.gutter)) }
                     Spacer(Modifier.height(8.dp))
                 }
             }

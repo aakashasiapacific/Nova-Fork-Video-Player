@@ -37,6 +37,9 @@ sealed interface Route {
     /** Everything left partway, from Home's "Continue Watching ›". */
     data object ContinueWatching : Route
 
+    /** The next episode of each show being watched, from Home's "Up Next ›". */
+    data object UpNext : Route
+
     /** Every video played, newest first, from Home's Library list. */
     data object History : Route
 
@@ -56,7 +59,7 @@ sealed interface Route {
 /** The tab a route belongs to (for highlighting the nav bar / rail). */
 val Route.top: TopDestination
     get() = when (this) {
-        Route.Home, Route.Library, Route.ContinueWatching, Route.History, is Route.VideoDetails, is Route.ShowDetails, is Route.Playlist,
+        Route.Home, Route.Library, Route.ContinueWatching, Route.UpNext, Route.History, is Route.VideoDetails, is Route.ShowDetails, is Route.Playlist,
         is Route.Person,
         -> TopDestination.VIDEO
         // Sources are under Settings.

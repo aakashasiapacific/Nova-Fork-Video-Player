@@ -481,7 +481,7 @@ private fun SeasonSelector(
     if (seasons.size == 1) {
         Column(modifier) {
             Text(current.title, style = MaterialTheme.typography.titleLarge)
-            current.watchedCaption?.let { GreyCaption(it) }
+            GreyCaption(current.summaryCaption)
         }
         return
     }
@@ -528,7 +528,7 @@ private fun SeasonSelector(
             }
         }
     }
-    current.watchedCaption?.let { GreyCaption(it) }
+    GreyCaption(current.summaryCaption)
     }
 }
 

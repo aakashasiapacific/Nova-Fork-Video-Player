@@ -185,6 +185,14 @@ private fun TabletPage(state: AppUiState, actions: AppActions, layout: DeviceLay
             actions = actions,
             modifier = pageModifier,
         )
+        Route.UpNext -> PhoneContinueWatchingScreen(
+            cards = state.home.upNext,
+            actions = actions,
+            modifier = pageModifier,
+            title = "Up Next",
+            emptyText = "Nothing up next",
+            swipeToRemove = false,
+        )
         Route.History -> PhoneHistoryScreen(
             entries = state.history,
             actions = actions,

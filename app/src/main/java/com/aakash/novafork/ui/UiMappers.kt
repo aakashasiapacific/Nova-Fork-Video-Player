@@ -176,18 +176,22 @@ object UiMappers {
         fun add(hero: HeroUi) {
             if (hero.target !in candidates) candidates[hero.target] = hero
         }
-        inProgress.forEach { video -> add(heroForInProgress(index, video)) }
-
+        // Owner: something new to start first; what is already under way follows (it also has its
+        // own Continue Watching row), then the rest of what arrived lately.
         val recentMovies = index.movies
             .take(HERO_RECENT_CANDIDATES)
-            .map { it.video.dateAdded to heroForVideo(it) }
+            .map { Triple(it.video.dateAdded, it.video.positionMs <= 0L && !it.video.watched, heroForVideo(it)) }
         val recentShows = index.shows
             .sortedByDescending { it.latestAdded }
             .take(HERO_RECENT_CANDIDATES)
-            .map { it.latestAdded to heroForShow(it) }
-        (recentMovies + recentShows)
-            .sortedByDescending { it.first }
-            .forEach { add(it.second) }
+            .map { show ->
+                val untouched = show.episodes.none { it.video.watched || it.video.positionMs > 0L }
+                Triple(show.latestAdded, untouched, heroForShow(show))
+            }
+        val recent = (recentMovies + recentShows).sortedByDescending { it.first }
+        recent.filter { it.second }.forEach { add(it.third) }
+        inProgress.forEach { video -> add(heroForInProgress(index, video)) }
+        recent.forEach { add(it.third) }
         // sortedByDescending is stable, so the order above survives within each group.
         val main = candidates.values
             .sortedByDescending { it.artwork.tallUrl != null || it.artwork.backdropUrl != null }

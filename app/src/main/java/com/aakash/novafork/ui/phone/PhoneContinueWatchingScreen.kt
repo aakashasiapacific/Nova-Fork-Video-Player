@@ -15,6 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
+import com.aakash.novafork.ui.common.SwipeToDelete
 import com.aakash.novafork.ui.common.EndOfListGap
 import com.aakash.novafork.ui.common.LocalBottomBarSpace
 import com.aakash.novafork.ui.common.iosScrollIndicator
@@ -31,13 +32,17 @@ internal fun PhoneContinueWatchingScreen(
     cards: List<VideoCardUi>,
     actions: AppActions,
     modifier: Modifier = Modifier,
+    title: String = "Continue Watching",
+    emptyText: String = "Nothing in progress",
+    /** Swiping a card left takes it off Continue Watching (it forgets the place; the file stays). */
+    swipeToRemove: Boolean = true,
 ) {
     val dims = LocalNovaDimens.current
     Column(modifier.fillMaxSize()) {
-        PhoneTopBar(title = "Continue Watching", onBack = actions::back)
+        PhoneTopBar(title = title, onBack = actions::back)
         if (cards.isEmpty()) {
             CenteredScrollable {
-                PhoneEmptyLine("Nothing in progress")
+                PhoneEmptyLine(emptyText)
             }
         } else {
             val state = rememberLazyGridState()
@@ -50,8 +55,15 @@ internal fun PhoneContinueWatchingScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 items(cards, key = { it.id }) { card ->
-                    BoxWithConstraints(Modifier.fillMaxWidth()) {
-                        ContinueWatchingCard(card = card, actions = actions, width = maxWidth)
+                    val cardBox: @Composable () -> Unit = {
+                        BoxWithConstraints(Modifier.fillMaxWidth()) {
+                            ContinueWatchingCard(card = card, actions = actions, width = maxWidth)
+                        }
+                    }
+                    if (swipeToRemove) {
+                        SwipeToDelete(onDelete = { actions.setWatched(card.id, false) }, label = "Remove") { cardBox() }
+                    } else {
+                        cardBox()
                     }
                 }
             }

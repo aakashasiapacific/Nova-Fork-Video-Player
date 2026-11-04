@@ -284,7 +284,7 @@ private fun HomeFeed(home: HomeUi, scan: ScanUi, permission: PermissionUi, actio
             }
             if (home.upNext.isNotEmpty()) {
                 item(key = "upNext", contentType = "landscapeRow") {
-                    HomeSection(title = "Up Next", topPadding = if (home.continueWatching.isEmpty()) 0.dp else null) {
+                    HomeSection(title = "Up Next", topPadding = if (home.continueWatching.isEmpty()) 0.dp else null, onOpen = { actions.navigate(Route.UpNext) }) {
                         UpNextRow(home.upNext, actions)
                     }
                 }
