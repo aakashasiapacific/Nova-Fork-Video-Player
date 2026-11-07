@@ -3,6 +3,8 @@ package com.aakash.novafork.data
 import android.content.Context
 import android.os.SystemClock
 import coil.ImageLoader
+import com.aakash.novafork.ui.common.SystemThumbnail
+import com.aakash.novafork.ui.common.SystemThumbnailFetcher
 import coil.decode.VideoFrameDecoder
 import coil.disk.DiskCache
 import coil.memory.MemoryCache
@@ -52,6 +54,8 @@ object Network {
                 add(VideoFrameDecoder.Factory())
                 add(SmbFetcher.Factory(smb))
                 add(SongArtFetcher.Factory())
+                add(SystemThumbnailFetcher.Factory())
+                add(coil.key.Keyer<SystemThumbnail> { data, _ -> "systhumb:${data.uri}" })
             }
             .memoryCache { MemoryCache.Builder(appContext).maxSizePercent(0.20).build() }
             .diskCache {

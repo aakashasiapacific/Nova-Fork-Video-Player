@@ -18,6 +18,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -69,6 +72,10 @@ fun ArtImage(
     val current = candidates.getOrNull(index)
     // A soft sweep of light while the picture loads, instead of a flat grey box.
     var loading by remember(current) { mutableStateOf(current != null) }
+    // A video's own system thumbnail first (what Samsung Gallery shows); a grabbed frame if there is none.
+    var systemFailed by remember(current) { mutableStateOf(false) }
+    val useSystem = current != null && current == frameSource && frameAtMs == null && !systemFailed &&
+        SystemThumbnail.supports(current)
     var widthPx by remember { mutableIntStateOf(0) }
     Box(if (rightSizePosters) modifier.onSizeChanged { widthPx = it.width } else modifier) {
         // While a picture is on its way: a plain dark tile (Apple TV), not the titled stand-in,
@@ -84,13 +91,13 @@ fun ArtImage(
             else -> remember(current, rightSizedPoster(current, widthPx)) { cachedOrSized(context, current, widthPx) }
         }
         if (sized != null) {
-            val model = remember(sized) {
+            val model = remember(sized, useSystem) {
                 ImageRequest.Builder(context)
-                    .data(sized)
+                    .data(if (useSystem) SystemThumbnail(sized) else sized)
                     // Fades in only when it came over the network: from the cache it is simply there.
                     .transitionFactory(NetworkCrossfade)
                     .apply {
-                        if (current == frameSource) {
+                        if (current == frameSource && !useSystem) {
                             if (frameAtMs != null) videoFrameMillis(frameAtMs) else videoFramePercent(0.1)
                         }
                     }
@@ -104,8 +111,12 @@ fun ArtImage(
                 alignment = alignment,
                 onSuccess = { loading = false },
                 onError = {
-                    loading = false
-                    index += 1
+                    if (useSystem) {
+                        systemFailed = true
+                    } else {
+                        loading = false
+                        index += 1
+                    }
                 },
             )
         }
@@ -121,6 +132,28 @@ fun PosterArt(
     showTitleOnPlaceholder: Boolean = true,
 ) {
     val candidates = remember(artwork) { listOfNotNull(artwork.posterUrl, artwork.frameSource) }
+    if (artwork.frameOnly && artwork.frameSource != null) {
+        // No poster exists (a download, a camera clip): the whole landscape frame sits in the middle of
+        // the tile over a soft blur of itself, so no text or face is cut off by a tall crop.
+        Box(modifier.clipToBounds()) {
+            ArtImage(
+                candidates = candidates,
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize().blur(FrameBlur).alpha(FrameBlurAlpha),
+                frameSource = artwork.frameSource,
+            ) {}
+            ArtImage(
+                candidates = candidates,
+                contentDescription = title,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Fit,
+                frameSource = artwork.frameSource,
+            ) {
+                ArtPlaceholder(seed = artwork.seed.ifEmpty { title }, title = if (showTitleOnPlaceholder) title else null)
+            }
+        }
+        return
+    }
     ArtImage(
         candidates = candidates,
         contentDescription = title,
@@ -131,6 +164,9 @@ fun PosterArt(
         ArtPlaceholder(seed = artwork.seed.ifEmpty { title }, title = if (showTitleOnPlaceholder) title else null)
     }
 }
+
+private val FrameBlur = 28.dp
+private const val FrameBlurAlpha = 0.55f
 
 /** TMDB poster widths, smallest first (all are real TMDB poster sizes). */
 private val POSTER_WIDTHS = intArrayOf(185, 342, 500)
