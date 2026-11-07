@@ -39,6 +39,9 @@ interface AudioActions {
     /** Now Playing's "Clear": the songs queued after the playing one are removed. */
     fun clearUpNext() = Unit
 
+    /** Now Playing's "Save": the playing song and those queued after it become a new playlist. */
+    fun saveQueueAsPlaylist() = Unit
+
     /** Playlists' "New Playlist…": an empty playlist named [name]. */
     fun createPlaylist(name: String) = Unit
 

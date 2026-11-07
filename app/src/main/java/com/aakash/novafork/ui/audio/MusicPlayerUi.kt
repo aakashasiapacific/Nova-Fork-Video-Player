@@ -1265,6 +1265,16 @@ private fun QueuePane(player: MusicPlayerState, actions: AudioActions, upNext: L
                 }
                 if (upNext.isNotEmpty()) {
                     Text(
+                        "Save",
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = NovaColors.AppleMusicRed,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable(onClickLabel = "Save the queue as a playlist", role = Role.Button) { actions.saveQueueAsPlaylist() }
+                            .padding(horizontal = 8.dp, vertical = 6.dp),
+                    )
+                    Text(
                         "Clear",
                         fontSize = 15.sp,
                         fontWeight = FontWeight.SemiBold,

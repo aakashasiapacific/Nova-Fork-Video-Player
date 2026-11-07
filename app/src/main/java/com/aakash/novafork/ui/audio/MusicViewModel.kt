@@ -95,6 +95,19 @@ class MusicViewModel(app: Application) : AndroidViewModel(app), AudioActions {
 
     override fun clearUpNext() = player.clearUpNext()
 
+    override fun saveQueueAsPlaylist() {
+        val state = player.state.value
+        val ids = listOfNotNull(state.nowPlaying?.songId) + state.upNext
+        if (ids.isEmpty()) return
+        launchSafely {
+            val day = java.time.LocalDate.now()
+            val name = "Queue ${day.dayOfMonth} ${day.month.getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.getDefault())}"
+            val id = music.createPlaylist(name)
+            music.addToPlaylist(id, ids)
+            refreshOpenPlaylist()
+        }
+    }
+
     override fun togglePlay() = player.togglePlay()
 
     override fun next() = player.next()
