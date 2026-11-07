@@ -101,6 +101,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
@@ -112,6 +113,7 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.transformLatest
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -250,7 +252,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
     /** The music library, for search (one search over videos and music). */
     @OptIn(ExperimentalCoroutinesApi::class)
     private val musicLibrary: Flow<MusicLibraryData> = graph.music.observeLibrary()
-        .onStart { emit(MusicLibraryData()) }
+        // Home first: the music library is read a moment after start (the Audio tab has its own).
+        .onStart {
+            emit(MusicLibraryData())
+            delay(MUSIC_LOAD_DELAY_MS)
+        }
         .transformLatest { music ->
             // Lyrics are read after start-up settles, then kept, so search can find a sung line.
             emit(music.copy(lyrics = lastLyrics))
@@ -294,8 +300,19 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
         assemble(index, scan, settings, user, extra.lists, extra.music, extra.watchlist, extra.favorites)
     }
         .flowOn(Dispatchers.Default)
-        // Seeded with the real settings so the first frame already has the right theme and layout.
-        .stateIn(viewModelScope, SharingStarted.Eagerly, AppUiState(settings = SettingsUi(settings = settingsStore.settings.value)))
+        // Seeded with the real settings so the first frame already has the right theme and layout,
+        // and with the last Home page, so the app opens on something at once (see HomeSnapshot).
+        .stateIn(viewModelScope, SharingStarted.Eagerly, initialState())
+
+    private fun initialState(): AppUiState {
+        val settings = SettingsUi(settings = settingsStore.settings.value)
+        val cached = HomeSnapshot.read(getApplication<Application>().filesDir)
+        return if (cached != null) {
+            AppUiState(libraryLoaded = true, home = cached, settings = settings)
+        } else {
+            AppUiState(settings = settings)
+        }
+    }
 
     private val queueStarts = Channel<QueueStart>(Channel.BUFFERED)
 
@@ -346,6 +363,13 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
                 throw e
             } catch (e: Exception) {
                 Log.w(TAG, "Automatic backup check failed", e)
+            }
+        }
+        viewModelScope.launch {
+            // Keep the latest Home on disk for the next start (a few seconds after it settles).
+            state.map { it.home }.distinctUntilChanged().collectLatest { home ->
+                delay(HOME_SNAPSHOT_DELAY_MS)
+                withContext(Dispatchers.IO) { HomeSnapshot.write(getApplication<Application>().filesDir, home) }
             }
         }
         viewModelScope.launch {
@@ -1905,6 +1929,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
     private companion object {
         /** Lyrics search: the first read waits for start-up, later ones for a burst of changes. */
         const val LYRICS_FIRST_INDEX_MS = 4_000L
+        const val HOME_SNAPSHOT_DELAY_MS = 3_000L
+        const val MUSIC_LOAD_DELAY_MS = 2_000L
         const val LYRICS_REINDEX_MS = 1_000L
 
         const val KEY_RECENT_SEARCHES = "recent"

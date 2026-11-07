@@ -35,7 +35,9 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import com.aakash.novafork.data.StoragePermissions
 import com.aakash.novafork.data.backup.BackupManager
+import com.aakash.novafork.NovaApp
 import com.aakash.novafork.player.PlayerIntents
+import com.aakash.novafork.player.VlcEngine
 import com.aakash.novafork.ui.audio.LocalMusicEnabled
 import com.aakash.novafork.ui.common.LocalHeroPreviewEnabled
 import com.aakash.novafork.ui.common.FileRenames
@@ -49,6 +51,7 @@ import java.io.File
 import java.io.IOException
 import java.time.LocalDate
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChangedBy
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -209,6 +212,32 @@ class MainActivity : ComponentActivity() {
      * Cold start: the first frame waits (at most [COLD_START_HOLD_MS]) for the library, so Home
      * opens already filled instead of flashing empty rows under the launch screen's fade.
      */
+    /**
+     * Home is on screen by now: load libVLC quietly in the background so the first video starts
+     * at once (its native libraries are the slow part). Made with the person's subtitle style, as
+     * the player asks for it, so the player reuses this instance.
+     */
+    private fun warmVideoEngine() {
+        lifecycleScope.launch(Dispatchers.Default) {
+            delay(WARM_ENGINE_DELAY_MS)
+            try {
+                val settings = NovaApp.graph(this@MainActivity).settings.settings.value
+                VlcEngine.videoLibVLC(
+                    applicationContext,
+                    VlcEngine.SubtitleStyle(
+                        settings.subtitleSize,
+                        settings.subtitleBackground,
+                        settings.subtitleMargin,
+                        color = settings.subtitleColor,
+                        bold = settings.subtitleBold,
+                    ),
+                )
+            } catch (e: Throwable) {
+                // The player makes it itself when a video is opened.
+            }
+        }
+    }
+
     private fun holdLaunchScreenUntilLoaded() {
         val content = findViewById<android.view.View>(android.R.id.content)
         val giveUpAt = android.os.SystemClock.uptimeMillis() + COLD_START_HOLD_MS
@@ -261,6 +290,7 @@ class MainActivity : ComponentActivity() {
             }
         }
         holdLaunchScreenUntilLoaded()
+        warmVideoEngine()
         if (savedInstanceState == null) openShortcut(intent)
         lifecycleScope.launch {
             // Queues resolve in the background (folder, season, playlist); play each one once.
@@ -535,6 +565,7 @@ class MainActivity : ComponentActivity() {
         /** How long the launch screen takes to fade into Home. */
         const val SPLASH_FADE_MS = 260L
         const val COLD_START_HOLD_MS = 800L
+        const val WARM_ENGINE_DELAY_MS = 2_500L
 
         /** The navigation bar scrim enableEdgeToEdge uses on Android 8.0, which has no dark nav icons. */
         val DARK_SCRIM = Color.argb(0x80, 0x1b, 0x1b, 0x1b)
