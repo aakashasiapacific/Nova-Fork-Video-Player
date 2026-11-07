@@ -46,3 +46,22 @@ class SearchPhraseTest {
         assertNotNull(SearchPhrase.parse("comedies"))
     }
 }
+
+class WakeOnLanTest {
+    @Test
+    fun aMacMakesA102ByteMagicPacket() {
+        val mac = requireNotNull(com.aakash.novafork.data.WakeOnLan.parseMac("aa:bb:cc:dd:ee:0f"))
+        assertEquals(6, mac.size)
+        val packet = com.aakash.novafork.data.WakeOnLan.packet(mac)
+        assertEquals(102, packet.size)
+        assertEquals(0xFF.toByte(), packet[0])
+        assertEquals(0x0F.toByte(), packet[101])
+    }
+
+    @Test
+    fun otherTextIsNotAMac() {
+        assertNull(com.aakash.novafork.data.WakeOnLan.parseMac("hello"))
+        assertNull(com.aakash.novafork.data.WakeOnLan.parseMac("AA:BB:CC:DD:EE"))
+        assertNull(com.aakash.novafork.data.WakeOnLan.parseMac("GG:BB:CC:DD:EE:FF"))
+    }
+}

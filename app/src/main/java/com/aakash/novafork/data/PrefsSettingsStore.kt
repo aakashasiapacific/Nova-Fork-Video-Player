@@ -87,6 +87,7 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
             putInt(KEY_SUBTITLE_COLOR, s.subtitleColor)
             putBoolean(KEY_SUBTITLE_BOLD, s.subtitleBold)
             putBoolean(KEY_CAPTIONS_WHEN_MUTED, s.captionsWhenMuted)
+            putString(KEY_WAKE_ON_LAN_MAC, s.wakeOnLanMac)
             putInt(KEY_NETWORK_BUFFER_MS, s.networkBufferMs)
             putInt(KEY_SUBTITLE_MARGIN, s.subtitleMargin)
             putBoolean(KEY_HAPTICS, s.haptics)
@@ -145,6 +146,7 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
         const val KEY_SUBTITLE_COLOR = "subtitle_color"
         const val KEY_SUBTITLE_BOLD = "subtitle_bold"
         const val KEY_CAPTIONS_WHEN_MUTED = "captions_when_muted"
+        const val KEY_WAKE_ON_LAN_MAC = "wake_on_lan_mac"
         const val KEY_NETWORK_BUFFER_MS = "network_buffer_ms"
         const val KEY_SUBTITLE_MARGIN = "subtitle_margin"
         const val KEY_HAPTICS = "haptics"
@@ -198,6 +200,7 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
             KEY_SUBTITLE_COLOR to SettingType.INT,
             KEY_SUBTITLE_BOLD to SettingType.BOOLEAN,
             KEY_CAPTIONS_WHEN_MUTED to SettingType.BOOLEAN,
+            KEY_WAKE_ON_LAN_MAC to SettingType.STRING,
             KEY_NETWORK_BUFFER_MS to SettingType.INT,
             KEY_SUBTITLE_MARGIN to SettingType.INT,
             KEY_HAPTICS to SettingType.BOOLEAN,
@@ -269,6 +272,7 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
                 subtitleColor = prefs.int(KEY_SUBTITLE_COLOR, defaults.subtitleColor),
                 subtitleBold = prefs.boolean(KEY_SUBTITLE_BOLD, defaults.subtitleBold),
                 captionsWhenMuted = prefs.boolean(KEY_CAPTIONS_WHEN_MUTED, defaults.captionsWhenMuted),
+                wakeOnLanMac = prefs.string(KEY_WAKE_ON_LAN_MAC) ?: defaults.wakeOnLanMac,
                 networkBufferMs = prefs.int(KEY_NETWORK_BUFFER_MS, defaults.networkBufferMs).coerceIn(500, 30_000),
                 subtitleMargin = prefs.int(KEY_SUBTITLE_MARGIN, defaults.subtitleMargin).coerceIn(0, 300),
                 haptics = prefs.boolean(KEY_HAPTICS, defaults.haptics),

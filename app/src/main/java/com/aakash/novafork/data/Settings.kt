@@ -150,6 +150,8 @@ data class Settings(
     val subtitleBold: Boolean = false,
     /** Subtitles turn on by themselves when the phone's media volume is off as a video opens. */
     val captionsWhenMuted: Boolean = false,
+    /** The MAC address of a NAS to wake (Wake-on-LAN) before the library visits it; empty = never. */
+    val wakeOnLanMac: String = "",
     /** How much of a network video libVLC buffers ahead, in ms (more rides out a slow connection). */
     val networkBufferMs: Int = 1500,
     /** Leaving the app while a video plays shrinks it into a picture-in-picture window. */

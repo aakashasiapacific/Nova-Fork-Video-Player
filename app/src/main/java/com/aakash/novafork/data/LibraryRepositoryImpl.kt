@@ -201,7 +201,22 @@ class LibraryRepositoryImpl(
 
     /** The first call after [markLaunch] (or after this repository was created) is the launch's refresh. */
     override suspend fun refreshAll() {
+        wakeNas()
         refreshAll(force = !takeLaunch())
+    }
+
+    @Volatile private var lastWakeAt = 0L
+
+    /** Wake-on-LAN, when a MAC is set: wakes the NAS and gives it a few seconds, at most once in ten minutes. */
+    private suspend fun wakeNas() {
+        val mac = settings.settings.value.wakeOnLanMac
+        if (mac.isBlank()) return
+        val sent = withContext(Dispatchers.IO) { WakeOnLan.wake(mac) }
+        val now = System.currentTimeMillis()
+        if (sent && now - lastWakeAt > WAKE_REPEAT_MS) {
+            lastWakeAt = now
+            kotlinx.coroutines.delay(WAKE_WAIT_MS)
+        }
     }
 
     /**
@@ -1548,3 +1563,7 @@ private fun TmdbTvSummary.toSearchResult() = TmdbSearchResult(
     overview = overview.nonBlank(),
     posterUrl = TmdbClient.posterUrl(posterPath, "w342"),
 )
+
+/** Wake-on-LAN is repeated at most this often, and the NAS gets this long to wake. */
+private const val WAKE_REPEAT_MS = 10 * 60_000L
+private const val WAKE_WAIT_MS = 5_000L

@@ -32,6 +32,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.aakash.novafork.BuildConfig
 import com.aakash.novafork.R
+import com.aakash.novafork.data.WakeOnLan
 import com.aakash.novafork.data.Settings
 import com.aakash.novafork.player.SubtitleDownloadRules
 import com.aakash.novafork.ui.common.IosIconButton
@@ -257,5 +258,54 @@ private fun StatusPill(label: String, color: Color) {
             color = color,
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
         )
+    }
+}
+
+/** Preferences › Sources › Wake NAS: the MAC address Wake-on-LAN sends to before the library visits a server. */
+internal fun wakeNasGroup(settings: Settings, actions: AppActions): SettingsGroup = SettingsGroup(
+    key = "wake-nas",
+    title = "Wake a sleeping NAS",
+    rows = listOf(
+        SettingsRow("wake-nas-mac", "NAS MAC address", R.drawable.ic_wifi) { shape -> WakeMacRow(shape, settings.wakeOnLanMac, actions) },
+    ),
+    footer = "Before the library visits your servers, Nova sends a Wake-on-LAN packet to this address and waits a few seconds. " +
+        "Find it in the NAS's network settings (like AA:BB:CC:DD:EE:FF). Leave empty to never wake it.",
+)
+
+@Composable
+private fun WakeMacRow(shape: Shape, saved: String, actions: AppActions) {
+    var edited by remember { mutableStateOf<String?>(null) }
+    val focusManager = LocalFocusManager.current
+    val text = edited ?: saved
+    RowSurface(shape = shape) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .padding(vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            FormRowTitle(R.drawable.ic_wifi, "NAS MAC address") {
+                if (text.isNotBlank()) {
+                    if (WakeOnLan.parseMac(text) != null) StatusPill("Ready", NovaColors.Mint) else StatusPill("Not a MAC", IosPalette.Gray)
+                }
+            }
+            NovaTextField(
+                value = text,
+                onValueChange = { value ->
+                    edited = value
+                    actions.updateSettings { it.copy(wakeOnLanMac = value.trim()) }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                placeholder = { Text("AA:BB:CC:DD:EE:FF") },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(
+                    capitalization = KeyboardCapitalization.Characters,
+                    autoCorrectEnabled = false,
+                    keyboardType = KeyboardType.Text,
+                    imeAction = ImeAction.Done,
+                ),
+                keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
+            )
+        }
     }
 }

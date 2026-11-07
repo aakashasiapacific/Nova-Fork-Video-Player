@@ -182,6 +182,7 @@ private fun libraryGroups(state: SettingsUi, actions: AppActions): List<Settings
         ),
         downloadsGroup(actions),
         storageGroup(state.space, state.duplicateBytes, actions),
+        wakeNasGroup(state.settings, actions),
         dataUsageGroup(),
         watchStatsGroup(state.watch),
         backupGroup(actions),
