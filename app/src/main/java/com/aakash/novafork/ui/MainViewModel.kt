@@ -487,9 +487,15 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
     /** A movie's page with its cached age rating; asks TMDB for it when it isn't cached. */
     /** The "5.1" / "7.1" badge, once the video has been played and its tracks are known. */
     private fun withStreamBadges(index: LibraryIndex, videoId: Long, details: VideoDetailsUi?): VideoDetailsUi? {
-        val channels = graph.streamTraits.channels(videoId) ?: return details
-        val video = index.videosById[videoId]?.video ?: return details
-        return details?.copy(
+        val traits = graph.streamTraits
+        val languageLine = listOfNotNull(
+            traits.audioLanguages(videoId)?.let { "Audio: $it" },
+            traits.subtitleLanguages(videoId)?.let { "Subtitles: $it" },
+        ).joinToString(" · ").ifEmpty { null }
+        val withLanguages = details?.copy(languageLine = languageLine)
+        val channels = traits.channels(videoId) ?: return withLanguages
+        val video = index.videosById[videoId]?.video ?: return withLanguages
+        return withLanguages?.copy(
             qualityBadges = com.aakash.novafork.core.format.QualityBadges.of(
                 video.width,
                 video.height,

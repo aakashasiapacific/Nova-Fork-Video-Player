@@ -2209,12 +2209,28 @@ class PlayerController(
                 .mapNotNull { media.getTrack(it) as? IMedia.AudioTrack }
                 .maxOfOrNull { it.channels } ?: return
             graph.streamTraits.recordChannels(videoId, channels)
+            graph.streamTraits.recordLanguages(
+                videoId,
+                languageList(mediaPlayer.audioTracks),
+                languageList(mediaPlayer.spuTracks),
+            )
         } catch (e: Exception) {
             Log.w(TAG, "Couldn't read the stream's tracks", e)
         } finally {
             media.release()
         }
     }
+
+    /** "English, French": the language each real track names, once each (track names look like "Track 1 - [English]"). */
+    private fun languageList(tracks: Array<out MediaPlayer.TrackDescription>?): String =
+        realTracks(tracks)
+            .mapNotNull { track ->
+                val name = track.name ?: return@mapNotNull null
+                val inBrackets = name.substringAfter('[', "").substringBefore(']', "")
+                inBrackets.ifBlank { if (" - " in name) name.substringAfterLast(" - ") else name }.trim().takeIf { it.isNotEmpty() && !it.startsWith("Track") }
+            }
+            .distinct()
+            .joinToString(", ")
 
     private fun trackList(tracks: Array<out MediaPlayer.TrackDescription>?, selectedId: Int): List<TrackUi> {
         val real = realTracks(tracks)

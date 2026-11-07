@@ -124,6 +124,11 @@ fun PhoneVideoDetailsScreen(
                     modifier = Modifier.tintBand(tint, from = 0.8f, to = if (hasOverview) 0.55f else 0f).padding(start = dims.gutter, end = dims.gutter, top = 20.dp),
                 )
             }
+            details.languageLine?.let { line ->
+                item(key = "languages") {
+                    GreyCaption(line, Modifier.padding(start = dims.gutter, end = dims.gutter, top = 10.dp))
+                }
+            }
             details.historyLine?.let { line ->
                 item(key = "history") {
                     GreyCaption(line, Modifier.padding(start = dims.gutter, end = dims.gutter, top = 10.dp))

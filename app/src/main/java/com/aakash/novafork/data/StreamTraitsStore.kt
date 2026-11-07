@@ -19,6 +19,19 @@ class StreamTraitsStore(context: Context) {
         prefs.edit { putInt(videoId.toString(), channels) }
     }
 
+    /** The audio and subtitle languages seen for [videoId] ("English, French"), or null before it was played. */
+    fun audioLanguages(videoId: Long): String? = prefs.getString("a:$videoId", null)?.takeIf { it.isNotBlank() }
+
+    fun subtitleLanguages(videoId: Long): String? = prefs.getString("s:$videoId", null)?.takeIf { it.isNotBlank() }
+
+    fun recordLanguages(videoId: Long, audio: String, subtitles: String) {
+        if (prefs.getString("a:$videoId", null) == audio && prefs.getString("s:$videoId", null) == subtitles) return
+        prefs.edit {
+            putString("a:$videoId", audio)
+            putString("s:$videoId", subtitles)
+        }
+    }
+
     private companion object {
         const val PREFS = "stream_traits"
     }

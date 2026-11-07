@@ -291,6 +291,8 @@ data class VideoDetailsUi(
     val downloaded: Boolean = false,
     /** "Watched 3 times · last on 2 Nov"; null before it was ever played. */
     val historyLine: String? = null,
+    /** "Audio: English, French · Subtitles: English", from the tracks seen when it was played; null before that. */
+    val languageLine: String? = null,
     /** What "Rename in Library" stores the title under (see LibraryIndex). */
     val titleKey: String = "",
     /** The title shown is one the user typed: "Use Original Title" is offered. */
