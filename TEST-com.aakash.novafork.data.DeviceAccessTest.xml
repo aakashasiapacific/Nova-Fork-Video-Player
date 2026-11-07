@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.aakash.novafork.data.DeviceAccessTest" tests="10" skipped="0" failures="0" errors="0" timestamp="2026-11-07T14:11:44.134Z" hostname="runnervm7aw5e" time="1.615">
+  <properties/>
+  <testcase name="allFilesAccessCountsAsAccessToEveryVideo" classname="com.aakash.novafork.data.DeviceAccessTest" time="0.049"/>
+  <testcase name="aScanThatNeverFinishesIsGivenUpAndTheLibraryMovesOn" classname="com.aakash.novafork.data.DeviceAccessTest" time="0.452"/>
+  <testcase name="limitedAccessScansTheVideosThatWerePicked" classname="com.aakash.novafork.data.DeviceAccessTest" time="0.028"/>
+  <testcase name="aScannersOwnTimeOutFailsOnlyItsSource" classname="com.aakash.novafork.data.DeviceAccessTest" time="0.038"/>
+  <testcase name="allFilesAccessAloneScansDeviceStorage" classname="com.aakash.novafork.data.DeviceAccessTest" time="0.029"/>
+  <testcase name="pullToRefreshDuringARefreshScansDeviceStorageAgain" classname="com.aakash.novafork.data.DeviceAccessTest" time="0.033"/>
+  <testcase name="accessGrantedWhileTheAppRunsScansDeviceStorageInTheBackground" classname="com.aakash.novafork.data.DeviceAccessTest" time="0.881"/>
+  <testcase name="libraryStatsCountEachSourceAndWhatTheLastScanDid" classname="com.aakash.novafork.data.DeviceAccessTest" time="0.035"/>
+  <testcase name="allFilesAccessGrantedWhileTheAppRunsScansDeviceStorage" classname="com.aakash.novafork.data.DeviceAccessTest" time="0.055"/>
+  <testcase name="limitedAccessAndTheVideoPermission" classname="com.aakash.novafork.data.DeviceAccessTest" time="0.015"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

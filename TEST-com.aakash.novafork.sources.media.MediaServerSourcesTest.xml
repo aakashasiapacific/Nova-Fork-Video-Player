@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.aakash.novafork.sources.media.MediaServerSourcesTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-11-07T14:12:03.681Z" hostname="runnervm7aw5e" time="0.206">
+  <properties/>
+  <testcase name="aJellyfinScanListsMoviesAndEpisodesWithTheServersMetadata" classname="com.aakash.novafork.sources.media.MediaServerSourcesTest" time="0.062"/>
+  <testcase name="jellyfinBrowsingAndPlaying" classname="com.aakash.novafork.sources.media.MediaServerSourcesTest" time="0.024"/>
+  <testcase name="aRefusedTokenSignsInAgain" classname="com.aakash.novafork.sources.media.MediaServerSourcesTest" time="0.02"/>
+  <testcase name="aPlexScanListsMoviesEpisodesAndHomeVideos" classname="com.aakash.novafork.sources.media.MediaServerSourcesTest" time="0.046"/>
+  <testcase name="aPlexServerFromPlexTvBecomesASource" classname="com.aakash.novafork.sources.media.MediaServerSourcesTest" time="0.021"/>
+  <testcase name="plexBrowsingAndPlaying" classname="com.aakash.novafork.sources.media.MediaServerSourcesTest" time="0.019"/>
+  <testcase name="logsNeverCarryTokens" classname="com.aakash.novafork.sources.media.MediaServerSourcesTest" time="0.014"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

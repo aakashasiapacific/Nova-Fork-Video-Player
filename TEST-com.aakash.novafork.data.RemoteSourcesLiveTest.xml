@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.aakash.novafork.data.RemoteSourcesLiveTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-11-07T14:12:01.048Z" hostname="runnervm7aw5e" time="0.306">
+  <properties/>
+  <testcase name="progressIsReportedToTheVideosServer" classname="com.aakash.novafork.data.RemoteSourcesLiveTest" time="0.084"/>
+  <testcase name="aFailingReportDoesNotStopTheNextOnes" classname="com.aakash.novafork.data.RemoteSourcesLiveTest" time="0.083"/>
+  <testcase name="videosOfSourcesWithoutAReporterAreNotReported" classname="com.aakash.novafork.data.RemoteSourcesLiveTest" time="0.06"/>
+  <testcase name="theMetadataPassLeavesServerVideosToTheirServer" classname="com.aakash.novafork.data.RemoteSourcesLiveTest" time="0.079"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

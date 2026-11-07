@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.aakash.novafork.data.NovaDatabaseTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-11-07T14:12:00.442Z" hostname="runnervm7aw5e" time="0.078">
+  <properties/>
+  <testcase name="reopeningKeepsTheLibrary" classname="com.aakash.novafork.data.NovaDatabaseTest" time="0.027"/>
+  <testcase name="databaseOfANewerAppVersionStartsOverInsteadOfFailing" classname="com.aakash.novafork.data.NovaDatabaseTest" time="0.032"/>
+  <testcase name="migrationsLeadFromTheFirstVersionToTheCurrentOne" classname="com.aakash.novafork.data.NovaDatabaseTest" time="0.019"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

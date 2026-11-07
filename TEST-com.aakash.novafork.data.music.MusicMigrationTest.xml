@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.aakash.novafork.data.music.MusicMigrationTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-11-07T14:12:02.225Z" hostname="runnervm7aw5e" time="0.038">
+  <properties/>
+  <testcase name="versionThreeUpgradesAndTakesMusic" classname="com.aakash.novafork.data.music.MusicMigrationTest" time="0.038"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

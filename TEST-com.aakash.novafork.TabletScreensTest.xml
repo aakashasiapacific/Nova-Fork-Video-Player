@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.aakash.novafork.TabletScreensTest" tests="12" skipped="0" failures="0" errors="0" timestamp="2026-11-07T14:11:37.058Z" hostname="runnervm7aw5e" time="3.816">
+  <properties/>
+  <testcase name="addSourceDialog" classname="com.aakash.novafork.TabletScreensTest" time="0.29"/>
+  <testcase name="browseDir" classname="com.aakash.novafork.TabletScreensTest" time="0.306"/>
+  <testcase name="portraitHome" classname="com.aakash.novafork.TabletScreensTest" time="0.436"/>
+  <testcase name="movieDetails" classname="com.aakash.novafork.TabletScreensTest" time="0.34"/>
+  <testcase name="home" classname="com.aakash.novafork.TabletScreensTest" time="0.424"/>
+  <testcase name="jellyfinDialog" classname="com.aakash.novafork.TabletScreensTest" time="0.227"/>
+  <testcase name="portraitLibrary" classname="com.aakash.novafork.TabletScreensTest" time="0.311"/>
+  <testcase name="browseRemote" classname="com.aakash.novafork.TabletScreensTest" time="0.26"/>
+  <testcase name="libraryTwoPane" classname="com.aakash.novafork.TabletScreensTest" time="0.316"/>
+  <testcase name="settings" classname="com.aakash.novafork.TabletScreensTest" time="0.199"/>
+  <testcase name="playlist" classname="com.aakash.novafork.TabletScreensTest" time="0.277"/>
+  <testcase name="showDetails" classname="com.aakash.novafork.TabletScreensTest" time="0.429"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

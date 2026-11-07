@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.aakash.novafork.SearchPhraseTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-11-07T14:11:37.052Z" hostname="runnervm7aw5e" time="0.002">
+  <properties/>
+  <testcase name="decadesAndLeftoverWords" classname="com.aakash.novafork.SearchPhraseTest" time="0.001"/>
+  <testcase name="ordinarySearchesStayOrdinary" classname="com.aakash.novafork.SearchPhraseTest" time="0.0"/>
+  <testcase name="comediesUnderTwoHours" classname="com.aakash.novafork.SearchPhraseTest" time="0.0"/>
+  <testcase name="stateSizeAndPeriod" classname="com.aakash.novafork.SearchPhraseTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
