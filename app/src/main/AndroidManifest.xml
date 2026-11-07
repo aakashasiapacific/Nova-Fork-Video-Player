@@ -3,6 +3,8 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Hidden Videos can ask for a fingerprint or the screen lock (platform BiometricPrompt). -->
+    <uses-permission android:name="android.permission.USE_BIOMETRIC" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!-- Chromecast discovery (libVLC, mDNS): many devices drop multicast answers without a lock -->
     <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
@@ -10,10 +12,18 @@
          (media notifications show without POST_NOTIFICATIONS; other ones would need it). -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <!-- Downloading a network video to Movies/Nova Fork (DownloadService). -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- The sleep timer's Live Update (Android 16). -->
+    <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS" />
     <!-- Android 13+: videos, plus images so poster.jpg / fanart.jpg next to a video can be shown -->
     <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <!-- Saving a captured video frame to Pictures needs this before Android 10 only. -->
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
+    <!-- Android 13+: music for the Audio tab -->
+    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
     <!-- Android 14+: "Allow limited access" -->
     <uses-permission android:name="android.permission.READ_MEDIA_VISUAL_USER_SELECTED" />
     <!-- Android 12 and older -->
@@ -35,6 +45,12 @@
     <!-- requestLegacyExternalStorage: Android 10 only (ignored from 11 on). With the storage
          permission, plain file access to the folders of device videos (subtitles, artwork) works
          there the way "All files access" makes it work on Android 11+. -->
+    <queries>
+        <intent>
+            <action android:name="android.speech.action.RECOGNIZE_SPEECH" />
+        </intent>
+    </queries>
+
     <application
         android:name=".NovaApp"
         android:allowBackup="true"
@@ -116,5 +132,62 @@
             android:name=".player.PlaybackService"
             android:exported="false"
             android:foregroundServiceType="mediaPlayback" />
+
+        <!-- Music playback: in the foreground with a media notification while songs play. -->
+        <service
+            android:name=".music.MusicService"
+            android:exported="false"
+            android:foregroundServiceType="mediaPlayback" />
+
+        <!-- Copies network videos into Movies/Nova Fork, with a progress notification. -->
+        <service
+            android:name=".download.DownloadService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+
+        <!-- Quick Settings tile: resumes the first Continue Watching video. -->
+        <service
+            android:name=".ui.ResumeTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_play_arrow"
+            android:label="Resume"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
+        <!-- Home-screen widgets: Continue Watching and Now Playing. The app redraws them when
+             their content changes; the system update only restores them. -->
+        <receiver
+            android:name=".widget.ContinueWatchingWidget"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_continue_watching_info" />
+        </receiver>
+        <receiver
+            android:name=".widget.UpNextWidget"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_up_next_info" />
+        </receiver>
+        <receiver
+            android:name=".widget.NowPlayingWidget"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_now_playing_info" />
+        </receiver>
     </application>
 </manifest>

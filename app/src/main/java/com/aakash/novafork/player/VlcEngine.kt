@@ -40,6 +40,52 @@ object VlcEngine {
 
     fun newMediaPlayer(context: Context): MediaPlayer = MediaPlayer(libVLC(context))
 
+    /** The subtitle look ([com.aakash.novafork.data.Settings]' size, box and height) libVLC draws with. */
+    data class SubtitleStyle(
+        val size: Int = 100,
+        val background: Boolean = false,
+        val margin: Int = 0,
+        /** 0xRRGGBB. */
+        val color: Int = 0xFFFFFF,
+        val bold: Boolean = false,
+    ) {
+        val options: List<String>
+            get() = buildList {
+                if (size != 100) add("--sub-text-scale=$size")
+                if (background) {
+                    add("--freetype-background-opacity=160")
+                    add("--freetype-background-color=0")
+                }
+                if (margin > 0) add("--sub-margin=$margin")
+                if (color != 0xFFFFFF) add("--freetype-color=${color and 0xFFFFFF}")
+                if (bold) add("--freetype-bold")
+            }
+    }
+
+    @Volatile
+    private var videoInstance: Pair<SubtitleStyle, LibVLC>? = null
+
+    /**
+     * The video player's libVLC: subtitle styling is an instance option in libVLC 3, so videos get
+     * an instance of their own, made again when the style changes (music keeps [libVLC]). An
+     * instance a background video still uses is left to it rather than released.
+     */
+    fun videoLibVLC(context: Context, style: SubtitleStyle): LibVLC {
+        if (style.options.isEmpty()) return libVLC(context)
+        synchronized(this) {
+            videoInstance?.let { (made, instance) -> if (made == style) return instance }
+            val instance = try {
+                LibVLC(context.applicationContext, ArrayList(coreOptions + moduleOptions + style.options))
+            } catch (e: IllegalStateException) {
+                Log.w(TAG, "libVLC rejected the subtitle style; using the shared instance", e)
+                return libVLC(context)
+            }
+            instance.setUserAgent("Nova Fork", "NovaFork/${BuildConfig.VERSION_NAME}")
+            videoInstance = style to instance
+            return instance
+        }
+    }
+
     private fun create(context: Context): LibVLC {
         // LibVLC appends its default audio/chroma options to the list, so it must be mutable.
         val libVLC = try {

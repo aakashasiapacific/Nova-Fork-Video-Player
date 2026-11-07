@@ -1,34 +1,60 @@
 package com.aakash.novafork.ui
 
+import com.aakash.novafork.ui.common.LocalLibraryLoading
+import android.app.ActivityOptions
+import android.app.RecoverableSecurityException
 import android.content.ActivityNotFoundException
+import android.content.ContentResolver
+import android.content.ContentValues
+import android.content.ContentUris
 import android.content.Intent
+import android.content.IntentSender
 import android.graphics.Color
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.DocumentsContract
+import android.provider.MediaStore
 import android.provider.Settings as AndroidSettings
 import android.util.Log
+import android.view.MotionEvent
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
-import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.core.view.WindowCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import com.aakash.novafork.data.StoragePermissions
-import com.aakash.novafork.data.ThemeMode
 import com.aakash.novafork.data.backup.BackupManager
+import com.aakash.novafork.NovaApp
 import com.aakash.novafork.player.PlayerIntents
+import com.aakash.novafork.player.VlcEngine
+import com.aakash.novafork.ui.audio.LocalMusicEnabled
+import com.aakash.novafork.ui.common.LocalHeroPreviewEnabled
+import com.aakash.novafork.ui.common.FileRenames
+import com.aakash.novafork.ui.common.LocalStatusBarIcons
+import com.aakash.novafork.ui.common.ShortcutsOverlay
 import com.aakash.novafork.ui.model.AppActions
+import com.aakash.novafork.ui.model.DialogUi
+import com.aakash.novafork.ui.model.TopDestination
+import com.aakash.novafork.widget.ContinueWatchingWidget
+import com.aakash.novafork.widget.UpNextWidget
+import java.io.File
+import java.io.IOException
 import java.time.LocalDate
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.distinctUntilChangedBy
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -59,14 +85,46 @@ class MainActivity : ComponentActivity() {
             if (uri != null) viewModel.writeBackup(uri)
         }
 
+    private val historySaver =
+        registerForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri ->
+            if (uri != null) viewModel.writeHistoryCsv(uri)
+        }
+
+    private val backupFolderPicker = registerForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+        if (uri != null) {
+            try {
+                contentResolver.takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+                )
+                viewModel.setBackupFolder(uri)
+            } catch (e: SecurityException) {
+                viewModel.showMessage("That folder can't be used for backups")
+            }
+        }
+    }
+
     private val backupOpener = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) viewModel.readBackup(uri)
+    }
+
+    /** The device video waiting for the user's yes to change its file (see [startDeviceRename]). */
+    private var pendingRename: DeviceRename? = null
+
+    private val renameAccess = registerForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
+        val rename = pendingRename ?: return@registerForActivityResult
+        pendingRename = null
+        if (result.resultCode == RESULT_OK) {
+            applyDeviceRename(rename, mayAsk = false)
+        } else {
+            viewModel.showMessage(FileRenames.FAILED)
+        }
     }
 
     private val actions: AppActions by lazy {
         object : AppActions by viewModel {
             override fun play(videoId: Long, startOver: Boolean) {
-                startActivity(PlayerIntents.forVideo(this@MainActivity, videoId, startOver))
+                startActivity(PlayerIntents.forVideo(this@MainActivity, videoId, startOver), growFromTouch())
             }
 
             override fun playUrl(url: String) {
@@ -76,11 +134,11 @@ class MainActivity : ComponentActivity() {
                     return
                 }
                 viewModel.dismissDialog()
-                startActivity(PlayerIntents.forUri(this@MainActivity, link))
+                startActivity(PlayerIntents.forUri(this@MainActivity, link), growFromTouch())
             }
 
             override fun playRemote(uri: String, title: String) {
-                startActivity(PlayerIntents.forUri(this@MainActivity, uri, title.ifBlank { null }))
+                startActivity(PlayerIntents.forUri(this@MainActivity, uri, title.ifBlank { null }), growFromTouch())
             }
 
             override fun openWebPage(url: String) {
@@ -125,6 +183,22 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
+            override fun exportHistory() {
+                try {
+                    historySaver.launch("NovaFork-history-${LocalDate.now()}.csv")
+                } catch (e: ActivityNotFoundException) {
+                    viewModel.showMessage("This device has no file picker to save with")
+                }
+            }
+
+            override fun pickBackupFolder() {
+                try {
+                    backupFolderPicker.launch(null)
+                } catch (e: ActivityNotFoundException) {
+                    viewModel.showMessage("This device has no folder picker")
+                }
+            }
+
             override fun importBackup() {
                 try {
                     backupOpener.launch(BackupManager.OPEN_MIME_TYPES)
@@ -135,28 +209,113 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    /**
+     * Cold start: the first frame waits (at most [COLD_START_HOLD_MS]) for the library, so Home
+     * opens already filled instead of flashing empty rows under the launch screen's fade.
+     */
+    /**
+     * Home is on screen by now: load libVLC quietly in the background so the first video starts
+     * at once (its native libraries are the slow part). Made with the person's subtitle style, as
+     * the player asks for it, so the player reuses this instance.
+     */
+    private fun warmVideoEngine() {
+        lifecycleScope.launch(Dispatchers.Default) {
+            delay(WARM_ENGINE_DELAY_MS)
+            try {
+                val settings = NovaApp.graph(this@MainActivity).settings.settings.value
+                VlcEngine.videoLibVLC(
+                    applicationContext,
+                    VlcEngine.SubtitleStyle(
+                        settings.subtitleSize,
+                        settings.subtitleBackground,
+                        settings.subtitleMargin,
+                        color = settings.subtitleColor,
+                        bold = settings.subtitleBold,
+                    ),
+                )
+            } catch (e: Throwable) {
+                // The player makes it itself when a video is opened.
+            }
+        }
+    }
+
+    private fun holdLaunchScreenUntilLoaded() {
+        val content = findViewById<android.view.View>(android.R.id.content)
+        val giveUpAt = android.os.SystemClock.uptimeMillis() + COLD_START_HOLD_MS
+        content.viewTreeObserver.addOnPreDrawListener(
+            object : android.view.ViewTreeObserver.OnPreDrawListener {
+                override fun onPreDraw(): Boolean {
+                    val ready = viewModel.state.value.libraryLoaded || android.os.SystemClock.uptimeMillis() >= giveUpAt
+                    if (ready) content.viewTreeObserver.removeOnPreDrawListener(this)
+                    return ready
+                }
+            },
+        )
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        // Android 12+: the black launch screen fades into Home instead of cutting (iOS).
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            splashScreen.setOnExitAnimationListener { view ->
+                view.animate().alpha(0f).setDuration(SPLASH_FADE_MS).withEndAction { view.remove() }.start()
+            }
+        }
         setContent {
             val state by viewModel.state.collectAsStateWithLifecycle()
-            val dark = when (state.settings.settings.themeMode) {
-                ThemeMode.DARK -> true
-                ThemeMode.LIGHT -> false
-                ThemeMode.SYSTEM -> isSystemInDarkTheme()
+            // One dark theme: light (white) system bar icons on clear bars, except where a page
+            // asks for dark ones over a bright picture (the Home hero, see LocalStatusBarIcons).
+            LaunchedEffect(Unit) { applySystemBarStyle(dark = true) }
+            CompositionLocalProvider(
+                LocalStatusBarIcons provides { darkIcons -> setDarkStatusBarIcons(darkIcons) },
+                LocalHeroPreviewEnabled provides true,
+                LocalMusicEnabled provides true,
+                LocalLibraryLoading provides !state.libraryLoaded,
+            ) {
+                NovaRoot(state = state, actions = actions)
             }
-            // System bar icons follow the app's theme, which need not match the system's.
-            LaunchedEffect(dark) { applySystemBarStyle(dark) }
-            NovaRoot(state = state, actions = actions)
         }
+        lifecycleScope.launch {
+            // The app icon's "Continue" shortcut and the home-screen widget follow the first Continue Watching video.
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.state
+                    .map { it.home.continueWatching.firstOrNull() }
+                    .distinctUntilChangedBy { card -> card?.let { Triple(it.id, it.title, it.progress) } }
+                    .collect { card ->
+                        withContext(Dispatchers.Default) {
+                            AppShortcuts.update(this@MainActivity, card)
+                            ContinueWatchingWidget.update(this@MainActivity, card)
+                        }
+                    }
+            }
+        }
+        lifecycleScope.launch {
+            // The Up Next widget follows the first Up Next card.
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.state
+                    .map { it.home.upNext.firstOrNull() }
+                    .distinctUntilChangedBy { card -> card?.let { it.id to it.title } }
+                    .collect { card -> withContext(Dispatchers.Default) { UpNextWidget.update(this@MainActivity, card) } }
+            }
+        }
+        holdLaunchScreenUntilLoaded()
+        warmVideoEngine()
+        if (savedInstanceState == null) openShortcut(intent)
         lifecycleScope.launch {
             // Queues resolve in the background (folder, season, playlist); play each one once.
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.queueRequests.collect { queue ->
                     startActivity(
                         PlayerIntents.forQueue(this@MainActivity, queue.videoIds.toLongArray(), queue.startIndex, queue.shuffle),
+                        growFromTouch(),
                     )
                 }
+            }
+        }
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.deviceRenameRequests.collect { startDeviceRename(it) }
             }
         }
         val askedOnce = uiPrefs.getBoolean(KEY_ASKED_STORAGE, false)
@@ -165,10 +324,61 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        openShortcut(intent)
+    }
+
+    /** The app icon's Search shortcut opens the Search tab; a pinned show opens its page. */
+    private fun openShortcut(intent: Intent?) {
+        if (intent?.action == AppShortcuts.ACTION_SEARCH) actions.selectTab(TopDestination.SEARCH)
+        if (intent?.action == AppShortcuts.ACTION_OPEN_SHOW) {
+            intent.getStringExtra(AppShortcuts.EXTRA_SHOW_KEY)?.let { actions.openShow(it) }
+        }
+    }
+
+    /** Where the last touch went down, for the player to grow out of. */
+    private var lastTouchX = 0f
+    private var lastTouchY = 0f
+
+    override fun dispatchTouchEvent(event: MotionEvent): Boolean {
+        if (event.actionMasked == MotionEvent.ACTION_DOWN) {
+            lastTouchX = event.rawX
+            lastTouchY = event.rawY
+        }
+        return super.dispatchTouchEvent(event)
+    }
+
+    /** The player grows out of the Play button that was tapped instead of sliding in (iOS). */
+    private fun growFromTouch(): Bundle {
+        val size = (120 * resources.displayMetrics.density).toInt()
+        return ActivityOptions.makeScaleUpAnimation(
+            window.decorView,
+            (lastTouchX - size / 2).toInt(),
+            (lastTouchY - size / 4).toInt(),
+            size,
+            size / 2,
+        ).toBundle()
+    }
+
+    /** The first start is the launch, which refreshes on its own (MainViewModel). */
+    private var started = false
+
+    override fun onStart() {
+        super.onStart()
+        // Every return to the app looks for new videos again, silently, as at launch.
+        if (started) viewModel.onAppReturned()
+        started = true
+    }
+
     override fun onResume() {
         super.onResume()
         // Access can change in system settings while the app is in the background.
         viewModel.onPermissionsChanged()
+    }
+
+    private fun setDarkStatusBarIcons(dark: Boolean) {
+        WindowCompat.getInsetsController(window, window.decorView).isAppearanceLightStatusBars = dark
     }
 
     private fun applySystemBarStyle(dark: Boolean) {
@@ -231,13 +441,100 @@ class MainActivity : ComponentActivity() {
             false
         }
 
+    // Renaming a device video's file
+
+    /**
+     * Android 11+ asks once through the system's write request (a dialog the user answers);
+     * before that the rename is tried at once and, on Android 10, a [RecoverableSecurityException]
+     * carries the same kind of question. The library row follows only after MediaStore agreed.
+     */
+    private fun startDeviceRename(rename: DeviceRename) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+            applyDeviceRename(rename, mayAsk = true)
+            return
+        }
+        try {
+            askToRename(rename, MediaStore.createWriteRequest(contentResolver, listOf(Uri.parse(rename.uri))).intentSender)
+        } catch (e: Exception) {
+            Log.w(TAG, "No write request for ${rename.uri}", e)
+            viewModel.showMessage(FileRenames.FAILED)
+        }
+    }
+
+    private fun askToRename(rename: DeviceRename, sender: IntentSender) {
+        pendingRename = rename
+        try {
+            renameAccess.launch(IntentSenderRequest.Builder(sender).build())
+        } catch (e: ActivityNotFoundException) {
+            pendingRename = null
+            viewModel.showMessage(FileRenames.FAILED)
+        }
+    }
+
+    /** Renames in MediaStore; with [mayAsk], Android 10's "allow this app to change" question may come first. */
+    private fun applyDeviceRename(rename: DeviceRename, mayAsk: Boolean) {
+        lifecycleScope.launch {
+            val newName = try {
+                withContext(Dispatchers.IO) { renameInMediaStore(Uri.parse(rename.uri), rename.newFileName) }
+            } catch (e: SecurityException) {
+                val sender = if (mayAsk && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && e is RecoverableSecurityException) {
+                    e.userAction.actionIntent.intentSender
+                } else {
+                    null
+                }
+                if (sender != null) {
+                    askToRename(rename, sender)
+                    return@launch
+                }
+                Log.w(TAG, "Not allowed to rename ${rename.uri}", e)
+                null
+            } catch (e: Exception) {
+                Log.w(TAG, "Couldn't rename ${rename.uri}", e)
+                null
+            }
+            if (newName != null) viewModel.finishDeviceRename(rename.videoId, newName) else viewModel.showMessage(FileRenames.FAILED)
+        }
+    }
+
+    /**
+     * Gives the video [uri] the file name [newName] and returns the name it ended up with (the
+     * system may add " (1)" if one exists). Before Android 10 the file itself is renamed first
+     * (WRITE_EXTERNAL_STORAGE), as MediaStore only edits its row there. Never replaces a file.
+     */
+    @Suppress("DEPRECATION")
+    private fun renameInMediaStore(uri: Uri, newName: String): String {
+        val values = ContentValues()
+        values.put(MediaStore.MediaColumns.DISPLAY_NAME, newName)
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+            val path = contentResolver.query(uri, arrayOf(MediaStore.MediaColumns.DATA), null, null, null)
+                ?.use { cursor -> if (cursor.moveToFirst()) cursor.getString(0) else null }
+                ?: throw IOException("No file behind $uri")
+            val file = File(path)
+            val target = File(file.parentFile, newName)
+            if (target.exists() || !file.renameTo(target)) throw IOException("Couldn't rename $path")
+            values.put(MediaStore.MediaColumns.DATA, target.absolutePath)
+        }
+        if (contentResolver.update(uri, values, null, null) < 1) throw IOException("MediaStore kept the old name of $uri")
+        return contentResolver.query(uri, arrayOf(MediaStore.MediaColumns.DISPLAY_NAME), null, null, null)
+            ?.use { cursor -> if (cursor.moveToFirst()) cursor.getString(0) else null }
+            ?.takeIf { it.isNotBlank() }
+            ?: newName
+    }
+
     // Folder picker
 
     private fun onFolderPicked(treeUri: Uri) {
         lifecycleScope.launch {
             val name = withContext(Dispatchers.IO) {
                 try {
-                    contentResolver.takePersistableUriPermission(treeUri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    try {
+                        contentResolver.takePersistableUriPermission(
+                            treeUri,
+                            Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+                        )
+                    } catch (e: SecurityException) {
+                        contentResolver.takePersistableUriPermission(treeUri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }
                 } catch (e: SecurityException) {
                     Log.w(TAG, "No persistable permission for $treeUri", e)
                     return@withContext null
@@ -275,7 +572,46 @@ class MainActivity : ComponentActivity() {
         const val UI_PREFS = "ui"
         const val KEY_ASKED_STORAGE = "asked_storage_permission"
 
+        /** How long the launch screen takes to fade into Home. */
+        const val SPLASH_FADE_MS = 260L
+        const val COLD_START_HOLD_MS = 800L
+        const val WARM_ENGINE_DELAY_MS = 2_500L
+
         /** The navigation bar scrim enableEdgeToEdge uses on Android 8.0, which has no dark nav icons. */
         val DARK_SCRIM = Color.argb(0x80, 0x1b, 0x1b, 0x1b)
     }
+
+    private val shortcutsHelp by lazy {
+        ShortcutsOverlay(this, "Keyboard shortcuts", ShortcutsOverlay.App)
+    }
+
+    private fun isQuestionMark(keyCode: Int, event: android.view.KeyEvent): Boolean =
+        event.unicodeChar == '?'.code || (keyCode == android.view.KeyEvent.KEYCODE_SLASH && event.isShiftPressed)
+
+    /**
+     * A keyboard in the library (owner): Ctrl+1 to 4 open Video, Audio, Preferences and Search, and
+     * / or Ctrl+F opens Search, ? lists the shortcuts. Tab and the arrow keys move between items and Enter opens one.
+     */
+    override fun onKeyDown(keyCode: Int, event: android.view.KeyEvent): Boolean {
+        if (shortcutsHelp.onKey(keyCode)) return true
+        if (isQuestionMark(keyCode, event) && currentFocus !is android.widget.EditText) {
+            if (event.repeatCount == 0) shortcutsHelp.toggle()
+            return true
+        }
+        val tabs = com.aakash.novafork.ui.model.TopDestination.entries
+        val tab = when {
+            event.isCtrlPressed && keyCode in android.view.KeyEvent.KEYCODE_1..android.view.KeyEvent.KEYCODE_4 ->
+                tabs.getOrNull(keyCode - android.view.KeyEvent.KEYCODE_1)
+            event.isCtrlPressed && keyCode == android.view.KeyEvent.KEYCODE_F -> com.aakash.novafork.ui.model.TopDestination.SEARCH
+            keyCode == android.view.KeyEvent.KEYCODE_SLASH && currentFocus !is android.widget.EditText ->
+                com.aakash.novafork.ui.model.TopDestination.SEARCH
+            else -> null
+        }
+        if (tab != null) {
+            viewModel.selectTab(tab)
+            return true
+        }
+        return super.onKeyDown(keyCode, event)
+    }
+
 }

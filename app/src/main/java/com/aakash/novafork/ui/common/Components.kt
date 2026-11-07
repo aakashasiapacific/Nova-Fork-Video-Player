@@ -1,32 +1,39 @@
 package com.aakash.novafork.ui.common
 
 import androidx.annotation.DrawableRes
+import androidx.compose.animation.core.AnimationState
+import androidx.compose.animation.core.DecayAnimationSpec
+import androidx.compose.animation.core.animateDecay
+import androidx.compose.animation.core.calculateTargetValue
+import androidx.compose.animation.rememberSplineBasedDecay
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.FlingBehavior
+import androidx.compose.foundation.gestures.ScrollScope
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
@@ -34,11 +41,14 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
+import com.aakash.novafork.ui.common.IosProgressBar
 import com.aakash.novafork.ui.model.ScanUi
 import com.aakash.novafork.ui.theme.NovaColors
 import java.util.Locale
+import kotlin.math.abs
+import kotlin.math.roundToInt
 
-/** Icon from res/drawable (Material Icons Round, see docs/ARCHITECTURE.md for the list). */
+/** Icon from res/drawable (Framework7 Icons, MIT: see docs/ARCHITECTURE.md for the list). */
 @Composable
 fun NovaIcon(
     @DrawableRes res: Int,
@@ -70,15 +80,18 @@ fun RatingPill(rating: Float?, modifier: Modifier = Modifier, onImage: Boolean =
     }
 }
 
-/** Thin progress strip for the bottom edge of a card. Draws nothing for null/0. */
+/** Progress on a card: a thin bar along the picture's bottom edge. Draws nothing for null/0. */
 @Composable
 fun ProgressStrip(progress: Float?, modifier: Modifier = Modifier, height: Dp = 3.dp) {
     if (progress == null || progress <= 0f) return
+    // Owner: along the very bottom edge of the picture, edge to edge (Apple TV, Netflix), not a
+    // floating capsule inside it. The card's rounded corners clip its ends. A dark track keeps the
+    // unwatched part readable over bright art.
     Box(
         modifier
             .fillMaxWidth()
             .height(height)
-            .background(Color.White.copy(alpha = 0.25f)),
+            .background(Color.Black.copy(alpha = 0.45f)),
     ) {
         Box(
             Modifier
@@ -89,17 +102,42 @@ fun ProgressStrip(progress: Float?, modifier: Modifier = Modifier, height: Dp = 
     }
 }
 
-/** Small round check shown on watched items. */
+/** A quiet check on watched items: white on a faint 20% white disc with a soft shadow, no dark circle. */
 @Composable
 fun WatchedBadge(modifier: Modifier = Modifier) {
     Box(
         modifier
-            .size(22.dp)
+            .size(20.dp)
+            .shadow(3.dp, CircleShape, clip = false, ambientColor = Color.Black.copy(alpha = 0.35f), spotColor = Color.Black.copy(alpha = 0.35f))
             .clip(CircleShape)
-            .background(Color.Black.copy(alpha = 0.6f)),
+            .background(Color.White.copy(alpha = 0.2f)),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(painterResource(R.drawable.ic_check), contentDescription = "Watched", tint = NovaColors.Mint, modifier = Modifier.size(15.dp))
+        Icon(painterResource(R.drawable.ic_check), contentDescription = "Watched", tint = Color.White, modifier = Modifier.size(13.dp))
+    }
+}
+
+/** A small outlined grey tag after a details page's year and length: "4K", "HD", "PG-13". */
+@Composable
+fun MetaBadge(text: String, modifier: Modifier = Modifier) {
+    val grey = MaterialTheme.colorScheme.onSurfaceVariant
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelSmall,
+        color = grey,
+        maxLines = 1,
+        modifier = modifier
+            .border(1.dp, grey.copy(alpha = 0.7f), RoundedCornerShape(4.dp))
+            .padding(horizontal = 5.dp, vertical = 1.dp),
+    )
+}
+
+/** [badges] side by side as [MetaBadge]s; draws nothing when empty. */
+@Composable
+fun MetaBadges(badges: List<String>, modifier: Modifier = Modifier) {
+    if (badges.isEmpty()) return
+    Row(modifier, horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+        badges.forEach { MetaBadge(it) }
     }
 }
 
@@ -121,11 +159,11 @@ fun SectionHeader(
             text = title,
             style = MaterialTheme.typography.titleLarge,
             modifier = Modifier.weight(1f),
-            maxLines = 1,
+            maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
         if (actionLabel != null && onAction != null) {
-            TextButton(onClick = onAction) { Text(actionLabel) }
+            IosTextButton(onClick = onAction) { Text(actionLabel) }
         }
     }
 }
@@ -147,13 +185,10 @@ fun EmptyState(
             .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Surface(shape = CircleShape, color = MaterialTheme.colorScheme.surfaceContainerHigh, modifier = Modifier.size(72.dp)) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(painterResource(icon), contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(34.dp))
-            }
-        }
-        Spacer(Modifier.height(16.dp))
-        Text(title, style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center)
+        // iOS's "content unavailable" look: a large grey symbol on its own, a bold title, grey text.
+        Icon(painterResource(icon), contentDescription = null, tint = IosColors.SecondaryLabel, modifier = Modifier.size(56.dp))
+        Spacer(Modifier.height(14.dp))
+        Text(title, style = MaterialTheme.typography.headlineSmall, textAlign = TextAlign.Center)
         Spacer(Modifier.height(8.dp))
         Text(
             body,
@@ -163,10 +198,10 @@ fun EmptyState(
         )
         if (actionLabel != null && onAction != null) {
             Spacer(Modifier.height(20.dp))
-            Button(onClick = onAction) { Text(actionLabel) }
+            IosButton(onClick = onAction) { Text(actionLabel) }
         }
         if (secondaryLabel != null && onSecondary != null) {
-            TextButton(onClick = onSecondary) { Text(secondaryLabel) }
+            IosTextButton(onClick = onSecondary) { Text(secondaryLabel) }
         }
     }
 }
@@ -178,9 +213,9 @@ fun ScanBanner(scan: ScanUi, modifier: Modifier = Modifier) {
     Column(modifier.fillMaxWidth()) {
         val p = scan.progress
         if (p == null) {
-            LinearProgressIndicator(modifier = Modifier.fillMaxWidth().height(2.dp))
+            IosProgressBar(modifier = Modifier.fillMaxWidth().height(2.dp))
         } else {
-            LinearProgressIndicator(progress = { p }, modifier = Modifier.fillMaxWidth().height(2.dp))
+            IosProgressBar(progress = { p }, modifier = Modifier.fillMaxWidth().height(2.dp))
         }
         if (!scan.label.isNullOrBlank()) {
             Text(
@@ -188,9 +223,61 @@ fun ScanBanner(scan: ScanUi, modifier: Modifier = Modifier) {
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
-                maxLines = 1,
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
         }
+    }
+}
+
+/**
+ * A poster row's fling (owner: stopping card by card felt like friction): the row glides as far as
+ * the flick sends it, as any list does, and comes to rest with a card lined up at the row's start
+ * (after its padding) in that same one motion, never a glide and then a second snap.
+ */
+@Composable
+fun rememberRowSnap(state: LazyListState): FlingBehavior {
+    val decay = rememberSplineBasedDecay<Float>()
+    return remember(state, decay) { RowGlide(state, decay) }
+}
+
+private class RowGlide(private val state: LazyListState, private val decay: DecayAnimationSpec<Float>) : FlingBehavior {
+    override suspend fun ScrollScope.performFling(initialVelocity: Float): Float {
+        val info = state.layoutInfo
+        val cards = info.visibleItemsInfo
+        if (cards.isEmpty() || info.totalItemsCount == 0) return initialVelocity
+        // Where the flick would glide to, and the card edge nearest that.
+        val glide = decay.calculateTargetValue(0f, initialVelocity)
+        val stride = cards.sumOf { it.size }.toFloat() / cards.size + info.mainAxisItemSpacing
+        val first = cards.first()
+        val index = (first.index + ((glide - first.offset) / stride).roundToInt()).coerceIn(0, info.totalItemsCount - 1)
+        val target = cards.firstOrNull { it.index == index }?.offset?.toFloat()
+            ?: (first.offset + (index - first.index) * stride)
+        if (abs(target) < 1f) return 0f
+        // The flick's own glide, at the speed that ends it exactly there.
+        val velocity = velocityFor(target)
+        var moved = 0f
+        var blocked = false
+        AnimationState(0f, velocity).animateDecay(decay) {
+            val used = scrollBy(value - moved)
+            blocked = abs(value - moved - used) > 0.5f
+            moved += used
+            if (blocked) cancelAnimation()
+        }
+        if (!blocked) scrollBy(target - moved)
+        return 0f
+    }
+
+    /** The fling speed whose glide covers [distance] (the glide grows with the speed). */
+    private fun velocityFor(distance: Float): Float {
+        val goal = abs(distance)
+        var high = 1_000f
+        while (abs(decay.calculateTargetValue(0f, high)) < goal && high < 1e6f) high *= 2f
+        var low = 0f
+        repeat(24) {
+            val mid = (low + high) / 2f
+            if (abs(decay.calculateTargetValue(0f, mid)) < goal) low = mid else high = mid
+        }
+        return if (distance < 0f) -high else high
     }
 }

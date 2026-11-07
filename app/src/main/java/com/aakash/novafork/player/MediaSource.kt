@@ -67,7 +67,6 @@ internal fun ParcelFileDescriptor?.closeQuietly() {
 
 internal object MediaSource {
     private const val TAG = "MediaSource"
-    private const val NETWORK_CACHING_MS = 1500
 
     /** Videos (by URI) whose hardware decoding failed in this process; they play in software now. */
     private val softwareOnly: MutableSet<String> = ConcurrentHashMap.newKeySet<String>()
@@ -108,12 +107,12 @@ internal object MediaSource {
                 smbCredentials?.username?.takeIf { it.isNotBlank() }?.let { addOption(":smb-user=$it") }
                 smbCredentials?.password?.takeIf { it.isNotBlank() }?.let { addOption(":smb-pwd=$it") }
                 smbCredentials?.domain?.takeIf { it.isNotBlank() }?.let { addOption(":smb-domain=$it") }
-                addOption(":network-caching=$NETWORK_CACHING_MS")
+                addOption(":network-caching=${settings.networkBufferMs}")
             }
             UriKind.NETWORK -> {
                 val network = networkPlayback(context, uri)
                 Media(libVLC, Uri.parse(network.uri)).apply {
-                    addOption(":network-caching=$NETWORK_CACHING_MS")
+                    addOption(":network-caching=${settings.networkBufferMs}")
                     for (option in network.options) addOption(option)
                 }
             }
@@ -159,6 +158,9 @@ internal object MediaSource {
         }
         val encoding = settings.subtitleEncoding.trim()
         if (encoding.isNotEmpty()) media.addOption(":subsdec-encoding=$encoding")
+        // The subtitle size is an instance option too (see VlcEngine.videoLibVLC); stated here as
+        // well, a change of it applies when the video is opened again, without a new instance.
+        media.addOption(":sub-text-scale=${settings.subtitleSize.coerceIn(50, 200)}")
     }
 
     private fun localPath(uri: String): String =

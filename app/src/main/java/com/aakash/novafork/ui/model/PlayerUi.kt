@@ -1,7 +1,9 @@
 package com.aakash.novafork.ui.model
 
 import androidx.compose.runtime.Immutable
+import androidx.compose.ui.graphics.ImageBitmap
 import com.aakash.novafork.data.AspectMode
+import com.aakash.novafork.data.Settings
 
 /** One audio or subtitle track as libVLC reports it. id -1 = "Disable". */
 @Immutable
@@ -12,10 +14,6 @@ data class TrackUi(val id: Int, val name: String, val selected: Boolean)
 sealed interface GestureFeedback {
     /** Horizontal drag / double tap: where playback will land and how far that is. */
     data class Seek(val targetMs: Long, val deltaMs: Long, val durationMs: Long) : GestureFeedback
-    /** Right-side vertical drag. 0–1. */
-    data class Volume(val level: Float) : GestureFeedback
-    /** Left-side vertical drag. 0–1. */
-    data class Brightness(val level: Float) : GestureFeedback
     /** Short label after a button press: "Fit screen", "1.5×", "Subtitles off". */
     data class Label(val text: String) : GestureFeedback
 }
@@ -41,6 +39,18 @@ enum class RepeatMode {
     /** Play the same item again. */
     ONE,
 }
+
+/** [PlayerActions.setSleepTimer]'s choice to stop at the end of the video playing. */
+const val SLEEP_END_OF_VIDEO = -1
+
+/** The video sleep timer while it runs (see [PlayerActions.setSleepTimer]). */
+@Immutable
+data class SleepTimerUi(
+    /** What was chosen: minutes, or [SLEEP_END_OF_VIDEO]. */
+    val choice: Int,
+    /** Whole minutes to go, rounded up; null when it waits for the end of the video. */
+    val minutesLeft: Int?,
+)
 
 /** One library video of the play queue, in play order (shuffled order while shuffle is on). */
 @Immutable
@@ -80,6 +90,19 @@ data class SubtitleResultUi(
     val downloaded: Boolean = false,
 )
 
+/** One chapter of the playing file, as its container names it ("Chapter 3" when it has no name). */
+@Immutable
+data class ChapterUi(
+    val name: String,
+    val startMs: Long,
+    /** 0 when the file doesn't say; the next chapter's start (or the end) then ends it. */
+    val durationMs: Long,
+)
+
+/** A bookmark the person saved inside the playing video. */
+@Immutable
+data class BookmarkUi(val positionMs: Long, val label: String)
+
 /** The "Download subtitles" list over the player; see [PlayerActions.searchSubtitles]. */
 @Immutable
 data class SubtitleSearchUi(
@@ -100,6 +123,10 @@ data class PlayerUiState(
     val title: String = "",
     /** "S1 · E3 · Pilot", "1080p · nas.local" … */
     val subtitle: String? = null,
+    /** The title's synopsis (TMDB), shown over the picture after a while paused. */
+    val overview: String? = null,
+    /** Played to the end with nothing to follow: it stays on the last frame with Replay (Samsung). */
+    val finished: Boolean = false,
     val isPlaying: Boolean = false,
     val isBuffering: Boolean = false,
     val positionMs: Long = 0,
@@ -111,6 +138,10 @@ data class PlayerUiState(
     /** 0.25 – 4.0 */
     val rate: Float = 1f,
     val subtitleDelayMs: Long = 0,
+    /** The subtitle text size, percent of libVLC's own (Settings.subtitleSize). */
+    val subtitleSize: Int = 100,
+    /** The sound's delay for the output playing (a Bluetooth device's own), ms; later when positive. */
+    val audioDelayMs: Long = 0,
     /** Lock: hides everything but an unlock button and ignores gestures. */
     val locked: Boolean = false,
     val inPictureInPicture: Boolean = false,
@@ -118,6 +149,13 @@ data class PlayerUiState(
     /** False where the system ignores orientation requests (Android 16+ on screens ≥ 600dp). */
     val canRotate: Boolean = true,
     val feedback: GestureFeedback? = null,
+    /** While the seek bar is dragged: the video's frame at that point (files on the phone only). */
+    val scrubFrame: ImageBitmap? = null,
+    /**
+     * The media volume 0–1 while the player's own (iOS-style) volume indicator shows, after a
+     * volume key; null while it is hidden. The system's volume panel stays away in the player.
+     */
+    val volumeHud: Float? = null,
     /** Shown for a few seconds after auto-resume: "Resumed at 12:34" with a Start over button. */
     val resumedFromMs: Long? = null,
     val upNext: UpNextUi? = null,
@@ -148,6 +186,20 @@ data class PlayerUiState(
     val castingTo: String? = null,
     /** The subtitle download list while it is open; null = closed. */
     val subtitleSearch: SubtitleSearchUi? = null,
+    /** The file's chapters in order; empty when it has none (most files). */
+    val chapters: List<ChapterUi> = emptyList(),
+    /** A file:// or content:// URI to grab chapter pictures from (files on the phone only, like [scrubFrame]); null = none. */
+    val chapterFrameSource: String? = null,
+    /** Night mode (Settings.nightMode): voices lifted, booms softened. */
+    val nightMode: Boolean = false,
+    /** The equaliser is on (a preset or the person's own bands). */
+    val equalizerOn: Boolean = false,
+    /** The sleep timer while it runs; null = off. */
+    val sleepTimer: SleepTimerUi? = null,
+    /** The playing video's bookmarks, earliest first. */
+    val bookmarks: List<BookmarkUi> = emptyList(),
+    /** 0 to 1: how far the picture has dimmed as the sleep timer ran out; back to 0 on play. */
+    val sleepDim: Float = 0f,
 )
 
 /**
@@ -155,6 +207,9 @@ data class PlayerUiState(
  * Calls are cheap and main-thread safe.
  */
 interface PlayerActions {
+    /** Samsung's Capture: the frame on screen saved as a picture. */
+    fun captureFrame() {}
+
     fun togglePlay()
     fun play()
     fun pause()
@@ -164,13 +219,7 @@ interface PlayerActions {
     /** Live preview during a horizontal drag; [commit] = finger lifted. */
     fun scrub(targetMs: Long, commit: Boolean)
 
-    /** Vertical drag on the right half; [delta] is a fraction of full scale (+ = up). */
-    fun adjustVolume(delta: Float)
-
-    /** Vertical drag on the left half; [delta] is a fraction of full scale (+ = up). */
-    fun adjustBrightness(delta: Float)
-
-    /** Ends a volume/brightness/scrub gesture: lets the overlay fade. */
+    /** Ends a scrub gesture: lets the overlay fade. */
     fun endGesture()
 
     fun selectAudioTrack(id: Int)
@@ -179,6 +228,13 @@ interface PlayerActions {
     /** Opens the system file picker for an external subtitle file. */
     fun pickSubtitleFile()
     fun setSubtitleDelay(delayMs: Long)
+    fun setAudioDelay(delayMs: Long) {}
+
+    /** One frame on ([forward]) or back, paused, for a still to capture. */
+    fun stepFrame(forward: Boolean) {}
+
+    /** Holding the picture: 2× while [on], back to the chosen speed when let go. */
+    fun holdSpeed(on: Boolean) {}
 
     fun cycleAspect()
     fun setAspect(mode: AspectMode)
@@ -233,6 +289,31 @@ interface PlayerActions {
 
     /** Closes the list; a download already running still finishes and turns its subtitle on. */
     fun dismissSubtitleSearch() {}
+
+    // Sound and sleep. Default bodies keep other implementations compiling.
+
+    /** Night mode on or off; it stays so for every video (Settings.nightMode). */
+    fun toggleNightMode() {}
+
+    /** Changes the app's settings from the player (the equaliser sheet). */
+    fun updateSettings(transform: (Settings) -> Settings) {}
+
+    /**
+     * The sleep timer: in [minutes] the picture dims and the sound fades, then the video pauses;
+     * [SLEEP_END_OF_VIDEO] pauses at the end of this video instead of going on; 0 turns it off.
+     */
+    fun setSleepTimer(minutes: Int) {}
+
+    // Bookmarks and subtitle size. Default bodies keep other implementations compiling.
+
+    /** Saves the current position as a bookmark of this video ([PlayerUiState.bookmarks]). */
+    fun addBookmark() {}
+
+    /** Deletes the bookmark at [positionMs]. */
+    fun removeBookmark(positionMs: Long) {}
+
+    /** The subtitle text size, percent (50 to 200), changed live and kept as the app's setting. */
+    fun setSubtitleSize(percent: Int) {}
 }
 
 open class NoOpPlayerActions : PlayerActions {
@@ -242,8 +323,6 @@ open class NoOpPlayerActions : PlayerActions {
     override fun seekTo(positionMs: Long) {}
     override fun seekBy(deltaMs: Long) {}
     override fun scrub(targetMs: Long, commit: Boolean) {}
-    override fun adjustVolume(delta: Float) {}
-    override fun adjustBrightness(delta: Float) {}
     override fun endGesture() {}
     override fun selectAudioTrack(id: Int) {}
     override fun selectSubtitleTrack(id: Int) {}

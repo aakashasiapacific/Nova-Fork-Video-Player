@@ -79,6 +79,13 @@ object StoragePermissions {
         else -> granted(context, Manifest.permission.READ_EXTERNAL_STORAGE)
     }
 
+    /** The runtime permission music needs: READ_MEDIA_AUDIO on Android 13+, READ_EXTERNAL_STORAGE before. */
+    fun audioPermission(): String =
+        if (Build.VERSION.SDK_INT >= 33) Manifest.permission.READ_MEDIA_AUDIO else Manifest.permission.READ_EXTERNAL_STORAGE
+
+    /** Every music file on the device is visible: the audio permission, or All files access (Android 11+). */
+    fun hasAudioAccess(context: Context): Boolean = granted(context, audioPermission()) || isStorageManager()
+
     /** All files access is a separate special permission on Android 11+. */
     val canRequestAllFilesAccess: Boolean get() = Build.VERSION.SDK_INT >= 30
 
@@ -109,6 +116,7 @@ object StoragePermissions {
         return listOf(
             "Videos (READ_MEDIA_VIDEO)" to state(Manifest.permission.READ_MEDIA_VIDEO, since = 33),
             "Images (READ_MEDIA_IMAGES)" to state(Manifest.permission.READ_MEDIA_IMAGES, since = 33),
+            "Music (READ_MEDIA_AUDIO)" to state(Manifest.permission.READ_MEDIA_AUDIO, since = 33),
             "Limited access (READ_MEDIA_VISUAL_USER_SELECTED)" to
                 state(Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED, since = 34),
             "Storage (READ_EXTERNAL_STORAGE)" to state(Manifest.permission.READ_EXTERNAL_STORAGE, since = 0, until = 32),

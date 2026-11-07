@@ -95,6 +95,40 @@ internal class PlayQueue(private val random: Random = Random.Default) {
     }
 
     /**
+     * Queues [newIds] right after the playing item ([next], Apple Music's Play Next) or after
+     * everything else (Play Last). The playing item keeps its place.
+     */
+    fun insert(newIds: List<Long>, next: Boolean) {
+        if (newIds.isEmpty()) return
+        val first = ids.size
+        ids = ids + newIds
+        val added = newIds.indices.map { first + it }
+        if (order.isEmpty()) {
+            order = added
+            position = 0
+            return
+        }
+        order = if (next) {
+            order.subList(0, position + 1) + added + order.subList(position + 1, order.size)
+        } else {
+            order + added
+        }
+    }
+
+    /**
+     * Moves the item at play-order position [from] to [to], both after the playing item (Now
+     * Playing's Up Next, reordered by dragging); anything else is left as it is.
+     */
+    fun move(from: Int, to: Int) {
+        if (from == to || from !in order.indices || to !in order.indices || from <= position || to <= position) return
+        order = order.toMutableList().apply { add(to, removeAt(from)) }
+    }
+
+    /** The ids queued after the playing item, in play order (at most [limit]). */
+    fun upNext(limit: Int): List<Long> =
+        if (order.isEmpty()) emptyList() else order.drop(position + 1).take(limit).map { ids[it] }
+
+    /**
      * Drops [gone] videos (no longer in the library), except the playing one, which shows its
      * own error when it can't be opened.
      */
@@ -110,6 +144,32 @@ internal class PlayQueue(private val random: Random = Random.Default) {
         position = order.indexOf(newIndex[current]).coerceAtLeast(0)
     }
 
-    private fun shuffledOrder(first: Int): List<Int> =
-        listOf(first) + ids.indices.filter { it != first }.shuffled(random)
+    /** Drops everything queued after the playing item (and what was queued before it stays). */
+    fun clearUpcoming() {
+        if (order.isEmpty() || position >= order.lastIndex) return
+        val kept = order.take(position + 1)
+        val keptSet = kept.toSet()
+        val keep = ids.indices.filter { it in keptSet }
+        val newIndex = IntArray(ids.size) { -1 }
+        keep.forEachIndexed { new, old -> newIndex[old] = new }
+        ids = keep.map { ids[it] }
+        order = kept.map { newIndex[it] }
+    }
+
+    /**
+     * What an item belongs to for shuffling (a song's artist): a shuffle never plays two of the
+     * same in a row while another can go between (owner: smart shuffle). Nothing by default.
+     */
+    var groupOf: (Long) -> String? = { null }
+
+    private fun shuffledOrder(first: Int): List<Int> {
+        val rest = ids.indices.filter { it != first }.shuffled(random).toMutableList()
+        val result = mutableListOf(first)
+        while (rest.isNotEmpty()) {
+            val last = groupOf(ids[result.last()])
+            val pick = rest.indexOfFirst { last == null || groupOf(ids[it]) != last }.coerceAtLeast(0)
+            result += rest.removeAt(pick)
+        }
+        return result
+    }
 }

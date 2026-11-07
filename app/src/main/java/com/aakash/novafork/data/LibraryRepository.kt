@@ -98,6 +98,7 @@ interface LibraryRepository {
     val scanState: StateFlow<ScanState>
 
     suspend fun video(id: Long): VideoWithMeta?
+
     suspend fun source(id: Long): SourceEntity?
     suspend fun findByUri(uri: String): VideoWithMeta?
 
@@ -195,6 +196,13 @@ interface LibraryRepository {
 
     /** Also reported to the video's server, as [savePlayback] does. */
     suspend fun setWatched(videoId: Long, watched: Boolean)
+
+    /**
+     * The file of [videoId] was renamed on disk: stores [newFileName] (and [newUri] when the
+     * address changed, as on a share; a MediaStore address stays) and parses the name again, as
+     * the scan would. Watch progress and the rest stay with the row.
+     */
+    suspend fun renameVideoFile(videoId: Long, newFileName: String, newUri: String? = null)
 
     /** The episode after this one in the same show (next episode, else first of next season). */
     suspend fun nextEpisode(videoId: Long): VideoWithMeta?

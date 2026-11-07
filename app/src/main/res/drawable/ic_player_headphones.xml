@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Play in background, after One UI's video player: headphones. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path android:strokeColor="#FFFFFFFF" android:strokeWidth="1.7" android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M4.5,13 V12 A7.5,7.5 0 0 1 19.5,12 V13" />
+    <path android:strokeColor="#FFFFFFFF" android:strokeWidth="1.7" android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M6.2,13 H7.6 V19 H6.2 A1.7,1.7 0 0 1 4.5,17.3 V14.7 A1.7,1.7 0 0 1 6.2,13 Z" />
+    <path android:strokeColor="#FFFFFFFF" android:strokeWidth="1.7" android:strokeLineCap="round" android:strokeLineJoin="round" android:pathData="M17.8,13 H16.4 V19 H17.8 A1.7,1.7 0 0 0 19.5,17.3 V14.7 A1.7,1.7 0 0 0 17.8,13 Z" />
+</vector>

@@ -1,9 +1,7 @@
 package com.aakash.novafork.ui.dialogs
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
@@ -18,18 +16,10 @@ import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -54,7 +44,15 @@ import androidx.compose.ui.window.DialogProperties
 import com.aakash.novafork.R
 import com.aakash.novafork.data.db.SourceType
 import com.aakash.novafork.ui.NetworkForms
+import com.aakash.novafork.ui.common.IosCheckCircle
+import com.aakash.novafork.ui.common.IosColors
+import com.aakash.novafork.ui.common.IosFilledTonalButton
+import com.aakash.novafork.ui.common.IosIconButton
+import com.aakash.novafork.ui.common.IosSpinner
+import com.aakash.novafork.ui.common.IosTextButton
+import com.aakash.novafork.ui.common.NovaAlertDialog
 import com.aakash.novafork.ui.common.NovaIcon
+import com.aakash.novafork.ui.common.NovaTextField
 import com.aakash.novafork.ui.common.sourceTypeIcon
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.DialogUi
@@ -63,8 +61,10 @@ import com.aakash.novafork.ui.model.PlexServerUi
 import com.aakash.novafork.ui.model.PlexSignInUi
 import com.aakash.novafork.ui.model.ServerLibraryUi
 import com.aakash.novafork.ui.model.UpnpServerUi
+import com.aakash.novafork.ui.settings.IconTile
+import com.aakash.novafork.ui.settings.tileColor
 
-/** One kind of server the "Add network source" picker offers. */
+/** One kind of server the "Add Network Source" picker offers. */
 private class SourceKind(val type: SourceType, val title: String, val body: String)
 
 private val FileServerKinds = listOf(
@@ -82,13 +82,14 @@ private val MediaServerKinds = listOf(
     SourceKind(SourceType.PLEX, "Plex", "Sign in with a code, or paste a token"),
 )
 
-/** "Add network source": the kinds of server, each going on to its own dialog. */
+/** "Add Network Source": the kinds of server, each going on to its own dialog. */
 @Composable
 internal fun AddSourceDialog(actions: AppActions) {
-    AlertDialog(
+    NovaAlertDialog(
+        form = true,
         onDismissRequest = actions::dismissDialog,
         icon = { NovaIcon(R.drawable.ic_lan, contentDescription = null) },
-        title = { Text("Add network source") },
+        title = { Text("Add Network Source") },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState())) {
                 KindHeader("File servers")
@@ -99,7 +100,7 @@ internal fun AddSourceDialog(actions: AppActions) {
             }
         },
         confirmButton = {
-            TextButton(onClick = actions::dismissDialog) { Text("Cancel") }
+            IosTextButton(onClick = actions::dismissDialog) { Text("Cancel") }
         },
     )
 }
@@ -107,10 +108,11 @@ internal fun AddSourceDialog(actions: AppActions) {
 @Composable
 private fun KindHeader(title: String) {
     Text(
-        text = title,
-        style = MaterialTheme.typography.labelLarge,
-        color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.padding(start = 8.dp, top = 4.dp, bottom = 4.dp),
+        // iOS's grouped-list header: small grey capitals.
+        text = title.uppercase(),
+        style = MaterialTheme.typography.labelMedium,
+        color = IosColors.SecondaryLabel,
+        modifier = Modifier.padding(start = 8.dp, top = 8.dp, bottom = 4.dp),
     )
 }
 
@@ -129,7 +131,7 @@ private fun KindRow(kind: SourceKind, onClick: () -> Unit) {
             TypeBadge(kind.type)
             Spacer(Modifier.width(14.dp))
             Column(Modifier.weight(1f)) {
-                Text(kind.title, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(kind.title, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 Text(
                     text = kind.body,
                     style = MaterialTheme.typography.bodySmall,
@@ -144,15 +146,9 @@ private fun KindRow(kind: SourceKind, onClick: () -> Unit) {
 
 @Composable
 private fun TypeBadge(type: SourceType) {
-    Box(
-        Modifier
-            .size(40.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainerHighest),
-        contentAlignment = Alignment.Center,
-    ) {
-        NovaIcon(sourceTypeIcon(type), contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
-    }
+    // The same coloured tile the source gets in Preferences and Browse once it is added.
+    val icon = sourceTypeIcon(type)
+    IconTile(icon, tileColor(icon), size = 36.dp)
 }
 
 /**
@@ -198,7 +194,8 @@ internal fun NetworkServerDialog(dialog: DialogUi.NetworkServer, actions: AppAct
     val canTest = address.isNotBlank() && !dialog.testing
     val canSave = canTest && !noLibrary && (type != SourceType.PLEX || token.isNotBlank())
 
-    AlertDialog(
+    NovaAlertDialog(
+        form = true,
         onDismissRequest = actions::dismissDialog,
         properties = DialogProperties(dismissOnClickOutside = false),
         icon = { NovaIcon(sourceTypeIcon(type), contentDescription = null) },
@@ -272,18 +269,18 @@ internal fun NetworkServerDialog(dialog: DialogUi.NetworkServer, actions: AppAct
                 NetworkForms.cleartextWarning(connection)?.let { CleartextWarning(it) }
                 Spacer(Modifier.height(2.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    OutlinedButton(
+                    IosFilledTonalButton(
                         onClick = {
                             checked = connection
                             actions.testNetworkSource(form)
                         },
                         enabled = canTest,
                     ) {
-                        Text("Test connection")
+                        Text("Test Connection")
                     }
                     if (dialog.testing) {
                         Spacer(Modifier.width(16.dp))
-                        CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                        IosSpinner(Modifier.size(20.dp), strokeWidth = 2.dp)
                     }
                 }
                 if (!dialog.testing && result != null) TestResultLine(result)
@@ -299,7 +296,7 @@ internal fun NetworkServerDialog(dialog: DialogUi.NetworkServer, actions: AppAct
             }
         },
         confirmButton = {
-            TextButton(
+            IosTextButton(
                 onClick = {
                     checked = connection
                     actions.saveNetworkSource(form)
@@ -310,7 +307,7 @@ internal fun NetworkServerDialog(dialog: DialogUi.NetworkServer, actions: AppAct
             }
         },
         dismissButton = {
-            TextButton(onClick = actions::dismissDialog) { Text("Cancel") }
+            IosTextButton(onClick = actions::dismissDialog) { Text("Cancel") }
         },
     )
 }
@@ -411,8 +408,8 @@ private fun LibraryChoice(
                         .toggleable(value = on, role = Role.Checkbox, onValueChange = { onChoose(library, it) }),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Checkbox(checked = on, onCheckedChange = null, modifier = Modifier.padding(10.dp))
-                    Text(library.name, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    IosCheckCircle(checked = on, modifier = Modifier.padding(10.dp))
+                    Text(library.name, style = MaterialTheme.typography.bodyLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 }
             }
         }
@@ -452,7 +449,7 @@ private fun PlexSignInPanel(signIn: PlexSignInUi?, form: NetworkSourceForm, acti
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    FilledTonalButton(onClick = actions::startPlexSignIn) { Text("Sign in with a code") }
+                    IosFilledTonalButton(onClick = actions::startPlexSignIn) { Text("Sign In with a Code") }
                 }
                 servers != null -> {
                     Text("Pick a server", style = MaterialTheme.typography.titleSmall)
@@ -466,18 +463,18 @@ private fun PlexSignInPanel(signIn: PlexSignInUi?, form: NetworkSourceForm, acti
                     servers.forEach { server ->
                         PlexServerRow(server = server, onClick = { actions.pickPlexServer(server.id, form) })
                     }
-                    TextButton(onClick = actions::cancelPlexSignIn) { Text("Cancel") }
+                    IosTextButton(onClick = actions::cancelPlexSignIn) { Text("Cancel") }
                 }
                 error != null -> PanelButtons {
-                    FilledTonalButton(onClick = actions::startPlexSignIn) { Text("Get a new code") }
-                    TextButton(onClick = actions::cancelPlexSignIn) { Text("Cancel") }
+                    IosFilledTonalButton(onClick = actions::startPlexSignIn) { Text("Get a New Code") }
+                    IosTextButton(onClick = actions::cancelPlexSignIn) { Text("Cancel") }
                 }
                 else -> {
                     val link = signIn.linkUrl.substringAfter("://")
                     Text("Enter this code at $link", style = MaterialTheme.typography.bodyMedium)
                     val code = signIn.code
                     if (code == null) {
-                        CircularProgressIndicator(Modifier.size(28.dp), strokeWidth = 2.dp)
+                        IosSpinner(Modifier.size(28.dp), strokeWidth = 2.dp)
                     } else {
                         Text(
                             text = code,
@@ -486,7 +483,7 @@ private fun PlexSignInPanel(signIn: PlexSignInUi?, form: NetworkSourceForm, acti
                         )
                     }
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+                        IosSpinner(Modifier.size(16.dp), strokeWidth = 2.dp)
                         Spacer(Modifier.width(10.dp))
                         Text(
                             text = "Waiting for plex.tv…",
@@ -495,8 +492,8 @@ private fun PlexSignInPanel(signIn: PlexSignInUi?, form: NetworkSourceForm, acti
                         )
                     }
                     PanelButtons {
-                        FilledTonalButton(onClick = { actions.openWebPage(signIn.linkUrl) }) { Text("Open $link") }
-                        TextButton(onClick = actions::cancelPlexSignIn) { Text("Cancel") }
+                        IosFilledTonalButton(onClick = { actions.openWebPage(signIn.linkUrl) }) { Text("Open $link") }
+                        IosTextButton(onClick = actions::cancelPlexSignIn) { Text("Cancel") }
                     }
                 }
             }
@@ -531,12 +528,12 @@ private fun PlexServerRow(server: PlexServerUi, onClick: () -> Unit) {
             NovaIcon(sourceTypeIcon(SourceType.PLEX), contentDescription = null, tint = MaterialTheme.colorScheme.primary)
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
-                Text(server.name, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(server.name, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 Text(
                     text = server.detail,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
@@ -567,7 +564,7 @@ private fun CleartextWarning(text: String) {
 @Composable
 private fun SecretField(value: String, onValueChange: (String) -> Unit, label: String, supporting: String? = null) {
     var visible by remember { mutableStateOf(false) }
-    OutlinedTextField(
+    NovaTextField(
         value = value,
         onValueChange = onValueChange,
         modifier = Modifier.fillMaxWidth(),
@@ -581,7 +578,7 @@ private fun SecretField(value: String, onValueChange: (String) -> Unit, label: S
         visualTransformation = if (visible) VisualTransformation.None else PasswordVisualTransformation(),
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Next),
         trailingIcon = {
-            IconButton(onClick = { visible = !visible }) {
+            IosIconButton(onClick = { visible = !visible }) {
                 NovaIcon(
                     if (visible) R.drawable.ic_visibility_off else R.drawable.ic_visibility,
                     contentDescription = if (visible) "Hide ${label.lowercase()}" else "Show ${label.lowercase()}",
@@ -594,7 +591,8 @@ private fun SecretField(value: String, onValueChange: (String) -> Unit, label: S
 /** DLNA/UPnP servers that answered on this network; tapping one adds it. */
 @Composable
 internal fun UpnpServersDialog(dialog: DialogUi.UpnpServers, actions: AppActions) {
-    AlertDialog(
+    NovaAlertDialog(
+        form = true,
         onDismissRequest = actions::dismissDialog,
         icon = { NovaIcon(sourceTypeIcon(SourceType.UPNP), contentDescription = null) },
         title = { Text("DLNA servers") },
@@ -605,7 +603,7 @@ internal fun UpnpServersDialog(dialog: DialogUi.UpnpServers, actions: AppActions
             ) {
                 if (dialog.searching) {
                     Row(Modifier.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                        IosSpinner(Modifier.size(20.dp), strokeWidth = 2.dp)
                         Spacer(Modifier.width(12.dp))
                         Text("Looking for media servers on this network…", style = MaterialTheme.typography.bodyMedium)
                     }
@@ -624,16 +622,16 @@ internal fun UpnpServersDialog(dialog: DialogUi.UpnpServers, actions: AppActions
                     )
                 }
                 // Servers that don't answer the search (another subnet, multicast blocked) are added by address.
-                TextButton(onClick = { actions.showDialog(DialogUi.NetworkServer(NetworkSourceForm(type = SourceType.UPNP))) }) {
-                    Text("Enter an address instead")
+                IosTextButton(onClick = { actions.showDialog(DialogUi.NetworkServer(NetworkSourceForm(type = SourceType.UPNP))) }) {
+                    Text("Enter an Address Instead")
                 }
             }
         },
         confirmButton = {
-            TextButton(onClick = actions::discoverUpnpServers, enabled = !dialog.searching) { Text("Search again") }
+            IosTextButton(onClick = actions::discoverUpnpServers, enabled = !dialog.searching) { Text("Search Again") }
         },
         dismissButton = {
-            TextButton(onClick = actions::dismissDialog) { Text("Cancel") }
+            IosTextButton(onClick = actions::dismissDialog) { Text("Cancel") }
         },
     )
 }
@@ -652,7 +650,7 @@ private fun UpnpServerRow(server: UpnpServerUi, onClick: () -> Unit) {
             Text(
                 text = server.name,
                 style = MaterialTheme.typography.titleSmall,
-                maxLines = 1,
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
             )

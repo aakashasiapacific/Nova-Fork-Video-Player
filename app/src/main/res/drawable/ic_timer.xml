@@ -1,14 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Material Icons (Round), Apache License 2.0, https://github.com/google/material-design-icons -->
+<!-- Framework7 Icons (timer), MIT License, Copyright (c) 2016 Vladimir Kharlampidi, https://github.com/framework7io/framework7-icons -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"
     android:height="24dp"
-    android:viewportWidth="24"
-    android:viewportHeight="24">
-    <path
-        android:fillColor="#FFFFFFFF"
-        android:pathData="M10,3h4c0.55,0,1-0.45,1-1c0-0.55-0.45-1-1-1h-4C9.45,1,9,1.45,9,2C9,2.55,9.45,3,10,3z" />
-    <path
-        android:fillColor="#FFFFFFFF"
-        android:pathData="M19.03,7.39l0.75-0.75c0.38-0.38,0.39-1.01,0-1.4c0,0-0.01-0.01-0.01-0.01c-0.39-0.39-1.01-0.38-1.4,0l-0.75,0.75 C16.07,4.74,14.12,4,12,4c-4.8,0-8.88,3.96-9,8.76C2.87,17.84,6.94,22,12,22c4.98,0,9-4.03,9-9C21,10.88,20.26,8.93,19.03,7.39z M13,13c0,0.55-0.45,1-1,1s-1-0.45-1-1V9c0-0.55,0.45-1,1-1s1,0.45,1,1V13z" />
+    android:viewportWidth="60"
+    android:viewportHeight="60">
+    <group
+        android:translateX="2"
+        android:translateY="2">
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="M 27.9999 51.9063 C 41.0546 51.9063 51.9063 41.0781 51.9063 28 C 51.9063 14.9453 41.0780 4.0937 28.0234 4.0937 C 26.7812 4.0937 26.1718 4.8437 26.1718 6.0625 L 26.1718 15.1563 C 26.1718 16.1641 26.8514 16.9844 27.8827 16.9844 C 28.9140 16.9844 29.6171 16.1641 29.6171 15.1563 L 29.6171 8.1484 C 39.9296 8.9688 47.8983 17.5 47.8983 28 C 47.8983 39.0625 39.0390 47.9219 27.9999 47.9219 C 16.9374 47.9219 8.0546 39.0625 8.0780 28 C 8.1014 23.0781 9.8593 18.6016 12.7890 15.1563 C 13.5155 14.2422 13.5624 13.1406 12.7890 12.3203 C 12.0155 11.4766 10.7030 11.5469 9.8593 12.6016 C 6.2733 16.7734 4.0937 22.1641 4.0937 28 C 4.0937 41.0781 14.9218 51.9063 27.9999 51.9063 Z M 31.7499 31.6094 C 33.6014 29.6875 33.2265 27.0625 30.9999 25.5156 L 18.6014 16.8672 C 17.4296 16.0469 16.2109 17.2656 17.0312 18.4375 L 25.6796 30.8359 C 27.2265 33.0625 29.8514 33.4609 31.7499 31.6094 Z" />
+    </group>
 </vector>

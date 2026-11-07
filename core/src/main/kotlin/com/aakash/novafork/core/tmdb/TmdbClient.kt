@@ -75,11 +75,64 @@ class TmdbClient(
 
     suspend fun searchTv(query: String, year: Int? = null): List<TmdbTvSummary> = searchTvHits(query, year).map { it.summary }
 
+    /** With its images (textless and English posters and backdrops) and credits, in one request. */
     suspend fun movie(id: Int): TmdbMovieDetails =
-        get("movie/$id", listOf("language" to language()), TmdbMovieDetails.serializer())
+        get("movie/$id", detailParams(), TmdbMovieDetails.serializer()).let { it.copy(logoPath = it.images.logo(logoLanguage())) }
 
     suspend fun tv(id: Int): TmdbTvDetails =
-        get("tv/$id", listOf("language" to language()), TmdbTvDetails.serializer())
+        get("tv/$id", detailParams(), TmdbTvDetails.serializer()).let { it.copy(logoPath = it.images.logo(logoLanguage())) }
+
+    /** The age rating of a movie ("PG-13") for [country], else the US one; null when TMDB has none. */
+    suspend fun movieCertification(id: Int, country: String): String? =
+        get("movie/$id/release_dates", emptyList(), TmdbReleaseDates.serializer()).certification(country)
+
+    /** The age rating of a show ("TV-MA") for [country], else the US one; null when TMDB has none. */
+    suspend fun tvCertification(id: Int, country: String): String? =
+        get("tv/$id/content_ratings", emptyList(), TmdbContentRatings.serializer()).certification(country)
+
+    /** The episode of a show that TMDB says airs next (see [TmdbEpisode.airDate]), or null. */
+    suspend fun tvNextEpisode(id: Int): TmdbEpisode? =
+        get("tv/$id", listOf("language" to language()), TmdbTvNextEpisode.serializer()).nextEpisodeToAir
+
+    /**
+     * The YouTube key of a movie's or show's trailer ([type] "movie" or "tv"), preferring the device
+     * [languages] then English; null when TMDB lists none.
+     */
+    suspend fun trailerKey(type: String, id: Int, languages: List<String>): String? {
+        val videoLanguages = (languages.map { it.substringBefore('-').lowercase() } + listOf(logoLanguage(), "en", "null"))
+            .distinct()
+            .joinToString(",")
+        val videos = get(
+            "$type/$id/videos",
+            listOf("language" to language(), "include_video_language" to videoLanguages),
+            TmdbVideos.serializer(),
+        )
+        return videos.trailerKey(languages)
+    }
+
+    /** The top-billed cast of a movie ("movie") or show ("tv"), with photo paths, at most 15. */
+    suspend fun castOf(type: String, id: Int): List<CastMember> {
+        val path = if (type == "tv") "tv/$id/aggregate_credits" else "movie/$id/credits"
+        return get(path, listOf("language" to language()), TmdbCastCredits.serializer()).topCast()
+    }
+
+    private fun logoLanguage(): String = language().substringBefore('-').lowercase()
+
+    /** Every poster and backdrop TMDB has for a title, for "Change artwork" (any language). */
+    suspend fun images(type: String, id: Int): TmdbImages =
+        get("$type/$id/images", emptyList(), TmdbImages.serializer())
+
+    private fun detailParams(): List<Pair<String, String?>> {
+        val language = language()
+        val lang = logoLanguage()
+        // "null" = images without text (textless key art), for the tall Home hero.
+        val imageLanguages = listOf("null", lang, "en").distinct().joinToString(",")
+        return listOf(
+            "language" to language,
+            "append_to_response" to "images,credits",
+            "include_image_language" to imageLanguages,
+        )
+    }
 
     suspend fun season(tvId: Int, seasonNumber: Int): TmdbSeasonDetails =
         get("tv/$tvId/season/$seasonNumber", listOf("language" to language()), TmdbSeasonDetails.serializer())

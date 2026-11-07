@@ -3,6 +3,7 @@ package com.aakash.novafork.ui
 import android.app.Application
 import android.content.ContentResolver
 import android.net.Uri
+import android.text.format.DateFormat
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -10,8 +11,12 @@ import com.aakash.novafork.BuildConfig
 import com.aakash.novafork.CrashReporter
 import com.aakash.novafork.NovaApp
 import com.aakash.novafork.core.jellyfin.ServerSecrets
+import com.aakash.novafork.core.library.LibraryKeys
 import com.aakash.novafork.core.plex.PlexResource
 import com.aakash.novafork.core.smb.SmbUris
+import com.aakash.novafork.core.tmdb.CastMember
+import com.aakash.novafork.core.tmdb.NextEpisodeLabel
+import com.aakash.novafork.core.tmdb.TmdbClient
 import com.aakash.novafork.core.tmdb.TmdbDisabledException
 import com.aakash.novafork.core.tmdb.TmdbException
 import com.aakash.novafork.data.IdentifyType
@@ -25,31 +30,41 @@ import com.aakash.novafork.data.Settings
 import com.aakash.novafork.data.SmbCredentials
 import com.aakash.novafork.data.StoragePermissions
 import com.aakash.novafork.data.TmdbSearchResult
+import com.aakash.novafork.data.backup.AutoBackup
 import com.aakash.novafork.data.backup.BackupFormatException
 import com.aakash.novafork.data.backup.BackupManager
 import com.aakash.novafork.data.backup.BackupSummary
 import com.aakash.novafork.data.backup.NovaBackup
 import com.aakash.novafork.data.backup.RestoreReport
+import com.aakash.novafork.data.db.ArtworkChoiceEntity
 import com.aakash.novafork.data.db.SourceEntity
 import com.aakash.novafork.data.db.SourceType
 import com.aakash.novafork.data.db.VideoKind
+import com.aakash.novafork.data.db.VideoWithMeta
+import com.aakash.novafork.data.music.MusicLibraryData
 import com.aakash.novafork.sources.DeviceScanner
 import com.aakash.novafork.sources.media.MediaServerSources
 import com.aakash.novafork.sources.media.PlexSignIn
 import com.aakash.novafork.sources.net.FileServerSources
+import com.aakash.novafork.ui.common.FileRenames
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.AppUiState
 import com.aakash.novafork.ui.model.BackupUi
 import com.aakash.novafork.ui.model.BrowseDirUi
+import com.aakash.novafork.ui.model.CastUi
 import com.aakash.novafork.ui.model.DialogUi
 import com.aakash.novafork.ui.model.IdentifyResultUi
 import com.aakash.novafork.ui.model.KeyStatus
+import com.aakash.novafork.ui.model.LibraryCounts
 import com.aakash.novafork.ui.model.LibraryFilter
+import com.aakash.novafork.ui.model.LibraryHealthUi
 import com.aakash.novafork.ui.model.LibraryItemUi
 import com.aakash.novafork.ui.model.LibrarySort
 import com.aakash.novafork.ui.model.LibraryUi
+import com.aakash.novafork.ui.model.MediaKind
 import com.aakash.novafork.ui.model.NetworkSourceForm
 import com.aakash.novafork.ui.model.PermissionUi
+import com.aakash.novafork.ui.model.PlayRecord
 import com.aakash.novafork.ui.model.PlexServerUi
 import com.aakash.novafork.ui.model.PlexSignInUi
 import com.aakash.novafork.ui.model.RestorePreviewUi
@@ -57,13 +72,23 @@ import com.aakash.novafork.ui.model.Route
 import com.aakash.novafork.ui.model.SearchUi
 import com.aakash.novafork.ui.model.ServerLibraryUi
 import com.aakash.novafork.ui.model.SettingsUi
+import com.aakash.novafork.ui.model.ShowDetailsUi
 import com.aakash.novafork.ui.model.SmbForm
 import com.aakash.novafork.ui.model.SourceUi
+import com.aakash.novafork.ui.model.SpaceUsage
+import com.aakash.novafork.ui.model.StoredFile
 import com.aakash.novafork.ui.model.TopDestination
 import com.aakash.novafork.ui.model.UpnpServerUi
+import com.aakash.novafork.ui.model.VideoDetailsUi
+import com.aakash.novafork.ui.model.WatchStats
+import com.aakash.novafork.ui.model.spaceByFolder
+import com.aakash.novafork.ui.model.watchStats
+import com.aakash.novafork.ui.model.withRecentSearch
 import java.io.FileNotFoundException
 import java.io.IOException
 import java.io.OutputStream
+import java.time.LocalDate
+import java.util.Locale
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
@@ -76,19 +101,26 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapLatest
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.transformLatest
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 private const val TAG = "MainViewModel"
+
+/** A device video for MainActivity to rename in MediaStore: [uri] is its content:// address, [newFileName] the whole new name. */
+data class DeviceRename(val videoId: Long, val uri: String, val newFileName: String)
 
 /** A queue for MainActivity to start the player with (PlayerIntents.forQueue). */
 data class QueueStart(val videoIds: List<Long>, val startIndex: Int, val shuffle: Boolean)
@@ -118,6 +150,21 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
         val crashReport: String? = null,
         /** Folders of network sources (other than SMB) listed live, most recently updated last. */
         val listings: Map<ListingKey, RemoteListing> = emptyMap(),
+        val recentSearches: List<String> = emptyList(),
+        /** Videos taken off the History page, each with the lastPlayedAt it was hidden at. */
+        val historyHidden: Map<Long, Long> = emptyMap(),
+    )
+
+    /** Search's recent searches, kept across launches (they never leave the device). */
+    private val searchPrefs = app.getSharedPreferences("search_history", android.content.Context.MODE_PRIVATE)
+
+    /** History's hidden videos (video id to when it had last been played); only the list is hidden, never a file. */
+    private val historyPrefs = app.getSharedPreferences("history_hidden", android.content.Context.MODE_PRIVATE)
+
+    /** Hidden Videos: ids of videos kept out of the library's screens (never deleted; Browse still lists them). */
+    private val hiddenPrefs = app.getSharedPreferences("library_hidden", android.content.Context.MODE_PRIVATE)
+    private val hiddenVideoIds = MutableStateFlow(
+        hiddenPrefs.getStringSet(KEY_HIDDEN_VIDEOS, null).orEmpty().mapNotNull { it.toLongOrNull() }.toSet(),
     )
 
     private val local = MutableStateFlow(
@@ -125,6 +172,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
             permission = currentPermission(),
             allFilesAccess = StoragePermissions.hasAllFilesAccess(app),
             crashReport = CrashReporter.pending(app),
+            recentSearches = searchPrefs.getString(KEY_RECENT_SEARCHES, null)?.split('\n')?.filter { it.isNotBlank() }.orEmpty(),
+            historyHidden = readHistoryHidden(),
         ),
     )
 
@@ -132,15 +181,95 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
         library.observeVideos(),
         library.observeSources(),
         settingsStore.settings.map { it.preferLocalArtwork }.distinctUntilChanged(),
-    ) { videos, sources, preferLocal ->
-        LibraryIndex.build(videos, sources, preferLocal)
+        graph.database.metadataDao().observeArtworkChoices(),
+        combine(hiddenVideoIds, graph.titleOverrides.titles) { hidden, titles -> hidden to titles },
+    ) { videos, sources, preferLocal, choices, (hidden, titles) ->
+        LibraryIndex.build(withArtworkChoices(videos, choices), sources, preferLocal, hidden, titles)
     }
 
     // Only touched from the state combine below, which never runs concurrently with itself.
     private val libraryMemo = Memo<Triple<LibraryIndex, LibraryFilter, LibrarySort>, LibraryUi> { (index, filter, sort) ->
         UiMappers.library(index, filter, sort)
     }
-    private val searchMemo = Memo<Pair<LibraryIndex, String>, SearchUi> { (index, query) -> UiMappers.search(index, query) }
+    /** Preferences' Storage and Watch Stats, sums over the whole library; worked out only on a settings page. */
+    private val statsMemo = Memo<Pair<LibraryIndex, MusicLibraryData>, Pair<SpaceUsage, WatchStats>> { (index, music) ->
+        val names = index.sources.associate { it.id to it.name }
+        val files = index.allVideos.map { StoredFile(it.video.sourceId, it.video.folder, it.video.sizeBytes) } +
+            music.songs.map { StoredFile(it.sourceId, it.folder, it.sizeBytes) }
+        val records = index.allVideos.map {
+            PlayRecord(
+                isMovie = it.kind == MediaKind.MOVIE,
+                isEpisode = it.kind == MediaKind.EPISODE,
+                showKey = it.showKey,
+                showTitle = it.showTitle,
+                durationMs = it.video.durationMs,
+                positionMs = it.video.positionMs,
+                watched = it.video.watched,
+                playCount = it.video.playCount,
+                lastPlayedAt = it.video.lastPlayedAt,
+            )
+        }
+        spaceByFolder(files, names) to watchStats(records)
+    }
+    /** Preferences' "Duplicates use …" note; worked out only on a settings page. */
+    private val duplicateBytesMemo = Memo<LibraryIndex, Long> { index -> UiMappers.duplicateBytes(index) }
+    private val searchMemo = Memo<Triple<LibraryIndex, String, MusicLibraryData>, SearchUi> { (index, query, music) ->
+        UiMappers.search(index, query, music)
+    }
+
+    /** The library as last shown, for what a long-press menu saves (an episode saves its show). */
+    @Volatile private var latestIndex: LibraryIndex? = null
+
+    /** Watchlist keys, most recently added first. */
+    private val watchlist: StateFlow<List<String>> =
+        graph.music.observeWatchlist().stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    /** Starred movies, shows and videos, most recently starred first. */
+    private val videoFavorites: StateFlow<List<String>> =
+        graph.music.observeVideoFavorites().stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    private val favoritesMemo = Memo<Pair<LibraryIndex, List<String>>, List<LibraryItemUi>> { (index, keys) ->
+        if (keys.isEmpty()) {
+            emptyList()
+        } else {
+            val byKey = UiMappers.library(index, LibraryFilter.ALL, LibrarySort.RECENT).items.associateBy { it.key }
+            keys.mapNotNull { byKey[it] }
+        }
+    }
+
+    /** The watchlist row's items, rebuilt when the library or the list changes. */
+    private val watchlistMemo = Memo<Pair<LibraryIndex, List<String>>, List<LibraryItemUi>> { (index, keys) ->
+        if (keys.isEmpty()) {
+            emptyList()
+        } else {
+            val byKey = UiMappers.library(index, LibraryFilter.ALL, LibrarySort.RECENT).items.associateBy { it.key }
+            keys.mapNotNull { byKey[it] }
+        }
+    }
+
+    private val duplicatesMemo = Memo<LibraryIndex, List<LibraryItemUi>> { index -> UiMappers.duplicates(index) }
+
+    /** The music library, for search (one search over videos and music). */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private val musicLibrary: Flow<MusicLibraryData> = graph.music.observeLibrary()
+        // Home first: the music library is read a moment after start (the Audio tab has its own).
+        .onStart {
+            emit(MusicLibraryData())
+            delay(MUSIC_LOAD_DELAY_MS)
+        }
+        .transformLatest { music ->
+            // Lyrics are read after start-up settles, then kept, so search can find a sung line.
+            emit(music.copy(lyrics = lastLyrics))
+            val withLyrics = music.songs.filter { it.lyricsUri != null }
+            kotlinx.coroutines.delay(if (lastLyrics.isEmpty()) LYRICS_FIRST_INDEX_MS else LYRICS_REINDEX_MS)
+            val lyrics = graph.music.lyricsText(withLyrics)
+            if (lyrics != lastLyrics) {
+                lastLyrics = lyrics
+                emit(music.copy(lyrics = lyrics))
+            }
+        }
+
+    @Volatile private var lastLyrics: Map<Long, List<String>> = emptyMap()
     private val remoteDirMemo = Memo<RemoteDirInput, BrowseDirUi> { (index, source, path, listings) ->
         UiMappers.remoteDir(index, source, path, listings)
     }
@@ -163,13 +292,27 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
         library.scanState,
         settingsStore.settings,
         local,
-        playlists,
-    ) { index, scan, settings, user, lists ->
-        assemble(index, scan, settings, user, lists)
+        // The last input only makes the page rebuild when a rating or air date arrives (see TitleExtras).
+        combine(playlists, musicLibrary, watchlist, videoFavorites, graph.titleExtras.changes) { lists, music, saved, starred, _ ->
+            Saved(lists, music, saved, starred)
+        },
+    ) { index, scan, settings, user, extra ->
+        assemble(index, scan, settings, user, extra.lists, extra.music, extra.watchlist, extra.favorites)
     }
         .flowOn(Dispatchers.Default)
-        // Seeded with the real settings so the first frame already has the right theme and layout.
-        .stateIn(viewModelScope, SharingStarted.Eagerly, AppUiState(settings = SettingsUi(settings = settingsStore.settings.value)))
+        // Seeded with the real settings so the first frame already has the right theme and layout,
+        // and with the last Home page, so the app opens on something at once (see HomeSnapshot).
+        .stateIn(viewModelScope, SharingStarted.Eagerly, initialState())
+
+    private fun initialState(): AppUiState {
+        val settings = SettingsUi(settings = settingsStore.settings.value)
+        val cached = HomeSnapshot.read(getApplication<Application>().filesDir)
+        return if (cached != null) {
+            AppUiState(libraryLoaded = true, home = cached, settings = settings)
+        } else {
+            AppUiState(settings = settings)
+        }
+    }
 
     private val queueStarts = Channel<QueueStart>(Channel.BUFFERED)
 
@@ -190,8 +333,16 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
     private val plexSignIn: PlexSignIn by lazy { MediaServerSources.plexSignIn(graph) }
 
     private val backups: BackupManager by lazy {
-        BackupManager(getApplication<Application>(), graph.database, settingsStore, library, BuildConfig.VERSION_NAME)
+        BackupManager(
+            getApplication<Application>(),
+            graph.database,
+            settingsStore,
+            library,
+            BuildConfig.VERSION_NAME,
+            titleOverrides = graph.titleOverrides,
+        )
     }
+    private val autoBackup: AutoBackup by lazy { AutoBackup(getApplication<Application>(), backups) }
     private val backup = MutableStateFlow(BackupUi())
     private val backupUi: StateFlow<BackupUi> = backup.asStateFlow()
 
@@ -203,6 +354,24 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
 
     init {
         launchSafely("Couldn't scan the library") { library.refreshAll() }
+        // Weekly automatic backup: on start, if the last one is a week old, write one quietly.
+        graph.appScope.launch {
+            try {
+                withContext(Dispatchers.IO) { publishAutoBackup() }
+                if (autoBackup.runIfDue() != null) withContext(Dispatchers.IO) { publishAutoBackup() }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.w(TAG, "Automatic backup check failed", e)
+            }
+        }
+        viewModelScope.launch {
+            // Keep the latest Home on disk for the next start (a few seconds after it settles).
+            state.map { it.home }.distinctUntilChanged().collectLatest { home ->
+                delay(HOME_SNAPSHOT_DELAY_MS)
+                withContext(Dispatchers.IO) { HomeSnapshot.write(getApplication<Application>().filesDir, home) }
+            }
+        }
         viewModelScope.launch {
             // A result for the previous key or server says nothing about the new one.
             settingsStore.settings
@@ -236,7 +405,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
         settings: Settings,
         user: LocalState,
         lists: PlaylistsState,
+        music: MusicLibraryData,
+        saved: List<String>,
+        starred: List<String>,
     ): AppUiState {
+        latestIndex = index
         val route = user.backStack.lastOrNull() ?: Route.Home
         val previewKey = user.previewKey
         // Details follow the route; on a tablet's library page they follow the preview pane.
@@ -245,19 +418,49 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
         val showKey = (route as? Route.ShowDetails)?.showKey
             ?: previewKey?.takeIf { it.startsWith("s:") }?.removePrefix("s:")
         val browse = UiMappers.browse(index, scan, lists.all)
+        val stats = if (route == Route.Settings || route is Route.SettingsPage) statsMemo[index to music] else null
         val openPlaylist = lists.open
+        val home = if (saved.isEmpty() && starred.isEmpty()) {
+            index.home
+        } else {
+            val keys = saved.toHashSet()
+            val stars = starred.toHashSet()
+            index.home.copy(
+                hero = index.home.hero.map { hero ->
+                    hero.copy(onWatchlist = hero.itemKey in keys, favorite = hero.itemKey in stars)
+                },
+                watchlist = watchlistMemo[index to saved],
+            )
+        }
         return AppUiState(
+            libraryLoaded = true,
             route = route,
             canGoBack = user.backStack.size > 1,
-            home = index.home,
-            library = libraryMemo[Triple(index, user.filter, user.sort)],
+            stackDepth = user.backStack.size,
+            previousRoute = user.backStack.getOrNull(user.backStack.size - 2),
+            home = home.copy(
+                libraryCounts = LibraryCounts(
+                    favorites = if (starred.isEmpty()) 0 else favoritesMemo[index to starred].size,
+                    all = index.movies.size + index.shows.size + index.otherVideos.size,
+                ),
+            ),
+            library = when (user.filter) {
+                LibraryFilter.WATCHLIST -> LibraryUi(filter = user.filter, sort = user.sort, items = watchlistMemo[index to saved])
+                LibraryFilter.FAVORITES -> LibraryUi(filter = user.filter, sort = user.sort, items = favoritesMemo[index to starred])
+                LibraryFilter.DUPLICATES -> LibraryUi(filter = user.filter, sort = user.sort, items = duplicatesMemo[index])
+                else -> libraryMemo[Triple(index, user.filter, user.sort)]
+            },
             browse = browse,
             browseDir = (route as? Route.BrowseDir)?.let { browseDirFor(index, it, user.listings, scan) },
-            videoDetails = videoId?.let { UiMappers.videoDetails(index, it) },
-            showDetails = showKey?.let { UiMappers.showDetails(index, it) },
+            videoDetails = videoId?.let { withStreamBadges(index, it, withAgeRating(index, it, UiMappers.videoDetails(index, it))) },
+            showDetails = showKey?.let { withShowExtras(index, it, UiMappers.showDetails(index, it)) },
             previewKey = previewKey,
+            history = if (route == Route.History) UiMappers.history(index, user.historyHidden) else emptyList(),
+            person = (route as? Route.Person)?.let { UiMappers.person(index, it.name) }.orEmpty(),
+            health = if (route == Route.LibraryHealth) UiMappers.libraryHealth(index) else LibraryHealthUi(),
+            hidden = if (route == Route.HiddenVideos) UiMappers.hiddenVideos(index, hiddenVideoIds.value) else emptyList(),
             playlist = openPlaylist?.let { UiMappers.playlistDetails(index, it.id, it.name, lists.openVideoIds) },
-            search = searchMemo[index to user.query],
+            search = searchMemo[Triple(index, user.query, music)].copy(recent = user.recentSearches),
             settings = SettingsUi(
                 settings = settings,
                 hasBuiltInKey = settingsStore.hasBuiltInTmdbKey,
@@ -266,12 +469,72 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
                 sources = browse.sources,
                 allFilesAccess = user.allFilesAccess,
                 canRequestAllFilesAccess = StoragePermissions.canRequestAllFilesAccess,
+                space = stats?.first ?: SpaceUsage(),
+                watch = stats?.second ?: WatchStats(),
+                duplicateBytes = if (stats != null) duplicateBytesMemo[index] else 0L,
+                videoCount = index.allVideos.size,
+                songCount = music.songs.size,
+                lastScanAt = index.sources.mapNotNull { it.lastScanAt }.maxOrNull(),
             ),
             scan = UiMappers.scan(scan),
             permission = user.permission.copy(deviceScanning = settings.scanDeviceStorage),
             dialog = user.dialog,
             message = user.message,
             crashReport = user.crashReport,
+        )
+    }
+
+    /** A movie's page with its cached age rating; asks TMDB for it when it isn't cached. */
+    /** The "5.1" / "7.1" badge, once the video has been played and its tracks are known. */
+    private fun withStreamBadges(index: LibraryIndex, videoId: Long, details: VideoDetailsUi?): VideoDetailsUi? {
+        val traits = graph.streamTraits
+        val languageLine = listOfNotNull(
+            traits.audioLanguages(videoId)?.let { "Audio: $it" },
+            traits.subtitleLanguages(videoId)?.let { "Subtitles: $it" },
+        ).joinToString(" · ").ifEmpty { null }
+        val withLanguages = details?.copy(languageLine = languageLine)
+        val channels = traits.channels(videoId) ?: return withLanguages
+        val video = index.videosById[videoId]?.video ?: return withLanguages
+        return withLanguages?.copy(
+            qualityBadges = com.aakash.novafork.core.format.QualityBadges.of(
+                video.width,
+                video.height,
+                com.aakash.novafork.core.format.StreamTraits(channels = channels),
+            ),
+        )
+    }
+
+    private fun withAgeRating(index: LibraryIndex, videoId: Long, details: VideoDetailsUi?): VideoDetailsUi? {
+        val key = index.videosById[videoId]?.takeIf { it.kind == MediaKind.MOVIE }?.meta?.key
+        if (details == null || key == null) return details
+        val extras = graph.titleExtras
+        extras.request(key)
+        return details.copy(
+            ageRating = extras.certification(key),
+            trailerUrl = trailerUrlOf(extras.trailerKey(key)),
+            cast = castOf(extras.cast(key)),
+        )
+    }
+
+    private fun trailerUrlOf(youtubeKey: String?): String? = youtubeKey?.let { "https://www.youtube.com/watch?v=$it" }
+
+    private fun castOf(cast: List<CastMember>): List<CastUi> =
+        cast.map { CastUi(it.name, it.character, TmdbClient.imageUrl(it.profilePath, "w185")) }
+
+    /** A show's page with its cached age rating and next episode date; asks TMDB for what isn't cached. */
+    private fun withShowExtras(index: LibraryIndex, showKey: String, details: ShowDetailsUi?): ShowDetailsUi? {
+        val key = index.showsByKey[showKey]?.meta?.key
+        if (details == null || key == null) return details
+        val extras = graph.titleExtras
+        extras.request(key)
+        val locale = Locale.getDefault()
+        return details.copy(
+            ageRating = extras.certification(key),
+            trailerUrl = trailerUrlOf(extras.trailerKey(key)),
+            cast = castOf(extras.cast(key)),
+            nextEpisodeLabel = NextEpisodeLabel.of(extras.nextAirDate(key), LocalDate.now(), locale) { skeleton ->
+                DateFormat.getBestDateTimePattern(locale, skeleton)
+            },
         )
     }
 
@@ -306,19 +569,14 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
 
     override fun selectTab(tab: TopDestination) {
         val root = when (tab) {
-            TopDestination.HOME -> Route.Home
-            TopDestination.LIBRARY -> Route.Library
-            TopDestination.BROWSE -> Route.Browse
+            TopDestination.VIDEO -> Route.Home
+            TopDestination.AUDIO -> Route.Audio
             TopDestination.SETTINGS -> Route.Settings
+            TopDestination.SEARCH -> Route.Search
         }
         // Other tabs sit on top of Home, so system back from a tab's root returns Home first.
         val stack = if (root == Route.Home) listOf(Route.Home) else listOf(Route.Home, root)
-        local.update {
-            // Coming to Library from another tab shows everything again: a "See all" from Home
-            // used to leave it stuck on Movies, which hid home videos. (See all sets its filter after this.)
-            val freshLibrary = root == Route.Library && it.backStack.lastOrNull() != Route.Library
-            it.copy(backStack = stack, filter = if (freshLibrary) LibraryFilter.ALL else it.filter)
-        }
+        local.update { it.copy(backStack = stack) }
     }
 
     override fun preview(item: LibraryItemUi) {
@@ -331,6 +589,31 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
         // The refresh still scans folders and shares; it just can't see device storage.
         deviceScanBlocked()?.let(::showMessage)
         launchSafely("Couldn't scan the library") { library.refreshAll() }
+    }
+
+    override fun scanSource(sourceId: Long) {
+        launchSafely("Couldn't scan that source") { library.scanSource(sourceId) }
+    }
+
+    override fun refreshQuietly() {
+        viewModelScope.launch {
+            try {
+                library.refreshAll()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.w(TAG, "A background refresh failed", e)
+            }
+        }
+    }
+
+    /**
+     * Back in the app (owner: every opening rescans, silently): the launch's light refresh again,
+     * which skips folders and shares scanned in the last half hour.
+     */
+    fun onAppReturned() {
+        graph.onMainScreenCreated()
+        refreshQuietly()
     }
 
     override fun rescanSource(sourceId: Long) {
@@ -357,6 +640,160 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
 
     override fun search(query: String) {
         local.update { it.copy(query = query) }
+    }
+
+    private fun readHistoryHidden(): Map<Long, Long> =
+        historyPrefs.all.mapNotNull { (key, value) ->
+            val id = key.toLongOrNull() ?: return@mapNotNull null
+            val at = value as? Long ?: return@mapNotNull null
+            id to at
+        }.toMap()
+
+    override fun hideFromHistory(videoId: Long, playedAt: Long) {
+        local.update { it.copy(historyHidden = it.historyHidden + (videoId to playedAt)) }
+        historyPrefs.edit().putLong(videoId.toString(), playedAt).apply()
+    }
+
+    private fun setHidden(ids: Set<Long>) {
+        hiddenVideoIds.value = ids
+        hiddenPrefs.edit().putStringSet(KEY_HIDDEN_VIDEOS, ids.mapTo(HashSet()) { it.toString() }).apply()
+    }
+
+    override fun hideVideo(videoId: Long) {
+        setHidden(hiddenVideoIds.value + videoId)
+    }
+
+    override fun hideShow(showKey: String) {
+        val episodes = latestIndex?.showsByKey?.get(showKey)?.episodes ?: return
+        setHidden(hiddenVideoIds.value + episodes.map { it.id })
+    }
+
+    override fun unhideVideos(videoIds: List<Long>) {
+        setHidden(hiddenVideoIds.value - videoIds.toSet())
+    }
+
+    override fun rememberSearch(query: String) {
+        val recent = withRecentSearch(local.value.recentSearches, query)
+        local.update { it.copy(recentSearches = recent) }
+        searchPrefs.edit().putString(KEY_RECENT_SEARCHES, recent.joinToString("\n")).apply()
+    }
+
+    override fun clearRecentSearches() {
+        local.update { it.copy(recentSearches = emptyList()) }
+        searchPrefs.edit().remove(KEY_RECENT_SEARCHES).apply()
+    }
+
+    override fun forgetSearch(query: String) {
+        val recent = local.value.recentSearches - query
+        local.update { it.copy(recentSearches = recent) }
+        if (recent.isEmpty()) {
+            searchPrefs.edit().remove(KEY_RECENT_SEARCHES).apply()
+        } else {
+            searchPrefs.edit().putString(KEY_RECENT_SEARCHES, recent.joinToString("\n")).apply()
+        }
+    }
+
+    override fun changeArtwork(videoId: Long) {
+        launchSafely("Couldn't load artwork") {
+            val row = library.video(videoId) ?: return@launchSafely
+            val meta = row.meta
+            val tmdbId = meta?.key?.takeUnless { it.startsWith("server:") }?.let { LibraryKeys.tmdbId(it) }
+            if (meta == null || tmdbId == null) {
+                showMessage("Artwork can only be changed for titles matched with TMDB")
+                return@launchSafely
+            }
+            val key = meta.key
+            val type = if (key.startsWith("tv:")) "tv" else "movie"
+            val choice = graph.database.metadataDao().artworkChoices().firstOrNull { it.metadataKey == key }
+            val opened = DialogUi.ChangeArtwork(
+                metadataKey = key,
+                title = meta.title,
+                poster = choice?.posterPath ?: meta.posterPath,
+                backdrop = choice?.backdropPath ?: meta.backdropPath,
+                customised = choice != null,
+            )
+            showDialog(opened)
+            val loaded = try {
+                val images = graph.tmdb.images(type, tmdbId)
+                opened.copy(
+                    loading = false,
+                    posters = images.posters.sortedByDescending { it.voteAverage }.map { it.filePath }.filter { it.isNotBlank() }.distinct().take(ARTWORK_LIMIT),
+                    backdrops = images.backdrops.sortedByDescending { it.voteAverage }.map { it.filePath }.filter { it.isNotBlank() }.distinct().take(ARTWORK_LIMIT),
+                )
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.w(TAG, "TMDB images failed", e)
+                opened.copy(loading = false, error = "Couldn't reach TMDB. Check the connection and try again.")
+            }
+            local.update { state ->
+                val shown = state.dialog as? DialogUi.ChangeArtwork
+                if (shown != null && shown.metadataKey == key) state.copy(dialog = loaded.copy(poster = shown.poster, backdrop = shown.backdrop, customised = shown.customised)) else state
+            }
+        }
+    }
+
+    override fun chooseArtwork(metadataKey: String, posterPath: String?, backdropPath: String?) {
+        launchSafely("Couldn't change the artwork") {
+            val dao = graph.database.metadataDao()
+            val old = dao.artworkChoices().firstOrNull { it.metadataKey == metadataKey }
+            dao.setArtworkChoice(
+                ArtworkChoiceEntity(
+                    metadataKey = metadataKey,
+                    posterPath = posterPath ?: old?.posterPath,
+                    backdropPath = backdropPath ?: old?.backdropPath,
+                ),
+            )
+            local.update { state ->
+                val shown = state.dialog as? DialogUi.ChangeArtwork ?: return@update state
+                if (shown.metadataKey != metadataKey) return@update state
+                state.copy(
+                    dialog = shown.copy(
+                        poster = posterPath ?: shown.poster,
+                        backdrop = backdropPath ?: shown.backdrop,
+                        customised = true,
+                    ),
+                )
+            }
+        }
+    }
+
+    override fun resetArtwork(metadataKey: String) {
+        launchSafely("Couldn't change the artwork") {
+            graph.database.metadataDao().clearArtworkChoice(metadataKey)
+            dismissDialog()
+            showMessage("Back to TMDB's artwork")
+        }
+    }
+
+    override fun toggleFavorite(itemKey: String) {
+        val on = itemKey in videoFavorites.value
+        launchSafely("Couldn't change your favorites") { graph.music.setVideoFavorite(itemKey, favorite = !on) }
+    }
+
+    override fun toggleWatchlist(itemKey: String) {
+        val on = itemKey in watchlist.value
+        launchSafely("Couldn't change the watchlist") {
+            if (on) graph.music.removeFromWatchlist(itemKey) else graph.music.addToWatchlist(itemKey)
+        }
+    }
+
+    override fun saveKeyFor(videoId: Long): String? {
+        val video = latestIndex?.videosById?.get(videoId) ?: return null
+        return if (video.kind == MediaKind.EPISODE) video.showKey?.let { "s:$it" } else "v:$videoId"
+    }
+
+    override fun isFavorite(itemKey: String): Boolean = itemKey in videoFavorites.value
+
+    override fun isOnWatchlist(itemKey: String): Boolean = itemKey in watchlist.value
+
+    override fun playMusic(songIds: List<Long>, startIndex: Int) {
+        if (songIds.isNotEmpty()) graph.musicPlayer.playSongs(songIds, startIndex)
+    }
+
+    override fun setTitleOverride(key: String, title: String?) {
+        if (key.isBlank()) return
+        if (title.isNullOrBlank()) graph.titleOverrides.reset(key) else graph.titleOverrides.set(key, title)
     }
 
     override fun setWatched(videoId: Long, watched: Boolean) {
@@ -403,7 +840,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
         local.update { it.copy(dialog = dialog) }
     }
 
-    fun showMessage(text: String) {
+    override fun showMessage(text: String) {
         local.update { it.copy(message = text) }
     }
 
@@ -1048,6 +1485,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
                     settings = settingsStore.settings.value,
                     appVersion = BuildConfig.VERSION_NAME,
                     census = { DeviceScanner(app).census() },
+                    music = { graph.music.diagnostics() },
                 )
             } catch (e: CancellationException) {
                 throw e
@@ -1058,6 +1496,48 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
             local.update { state ->
                 if (state.dialog is DialogUi.LibraryDiagnostics) state.copy(dialog = DialogUi.LibraryDiagnostics(report)) else state
             }
+        }
+    }
+
+    // Renaming files: a share is renamed here; a device file needs the system's say-so, so
+    // MainActivity does it (see deviceRenameRequests, finishDeviceRename).
+
+    private val deviceRenames = Channel<DeviceRename>(Channel.BUFFERED)
+
+    /** Device videos to rename, for MainActivity to ask permission for and rename in MediaStore. */
+    val deviceRenameRequests: Flow<DeviceRename> = deviceRenames.receiveAsFlow()
+
+    override fun renameVideoFile(videoId: Long, newBaseName: String) {
+        viewModelScope.launch {
+            try {
+                val video = library.video(videoId)?.video
+                val type = library.sourceForVideo(videoId)?.type
+                val newName = video?.let { FileRenames.newFileName(it.fileName, newBaseName) }
+                if (video == null || newName == null || newName == video.fileName) return@launch
+                when {
+                    type == SourceType.SMB -> {
+                        val newUri = graph.smb.rename(video.uri, newName)
+                        library.renameVideoFile(videoId, newName, newUri)
+                        showMessage("Renamed")
+                    }
+                    type == SourceType.DEVICE && video.uri.startsWith("content://") ->
+                        deviceRenames.trySend(DeviceRename(videoId, video.uri, newName))
+                    else -> showMessage(FileRenames.FAILED)
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.w(TAG, "Couldn't rename video $videoId", e)
+                showMessage(FileRenames.FAILED)
+            }
+        }
+    }
+
+    /** MediaStore renamed the device file of [videoId]: the library row follows. */
+    fun finishDeviceRename(videoId: Long, newFileName: String) {
+        launchSafely(FileRenames.FAILED) {
+            library.renameVideoFile(videoId, newFileName)
+            showMessage("Renamed")
         }
     }
 
@@ -1212,6 +1692,40 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
         }
     }
 
+    /**
+     * The watch history as CSV at [uri]: every video ever played, last played first, with its
+     * show, season, episode, play count, watched state and file name. Nothing is changed.
+     */
+    fun writeHistoryCsv(uri: Uri) {
+        val index = latestIndex ?: return
+        val resolver = getApplication<Application>().contentResolver
+        launchSafely("Couldn't save the history") {
+            val rows = index.allVideos
+                .filter { it.video.lastPlayedAt != null || it.video.playCount > 0 }
+                .sortedByDescending { it.video.lastPlayedAt ?: 0L }
+            val text = buildString {
+                appendLine("Title,Show,Season,Episode,Last played,Play count,Watched,File")
+                for (item in rows) {
+                    val video = item.video
+                    val played = video.lastPlayedAt?.let { java.time.Instant.ofEpochMilli(it).toString() }.orEmpty()
+                    appendLine(
+                        listOf(
+                            item.title, item.showTitle.orEmpty(), video.season?.toString().orEmpty(), video.episode?.toString().orEmpty(),
+                            played, video.playCount.toString(), if (video.watched) "yes" else "no", video.fileName,
+                        ).joinToString(",") { csvField(it) },
+                    )
+                }
+            }
+            withContext(Dispatchers.IO) {
+                openForWriting(resolver, uri).use { it.write(text.toByteArray(Charsets.UTF_8)) }
+            }
+            showMessage(if (rows.size == 1) "1 video exported" else "${rows.size} videos exported")
+        }
+    }
+
+    private fun csvField(value: String): String =
+        if (value.any { it == ',' || it == '"' || it == '\n' || it == '\r' }) "\"" + value.replace("\"", "\"\"") + "\"" else value
+
     /** Reads and checks the backup file at [uri]; [BackupUi.confirm] then asks before restoring it. */
     fun readBackup(uri: Uri) {
         val resolver = getApplication<Application>().contentResolver
@@ -1241,6 +1755,36 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
             backup.update { it.copy(waiting = report.waiting.total) }
             showMessage(restoreMessage(report))
             if (report.addedSourceIds.isNotEmpty()) scanRestoredSources(report.addedSourceIds)
+        }
+    }
+
+    private fun publishAutoBackup() {
+        val state = autoBackup.state()
+        backup.update { it.copy(autoWeekly = state.weekly, autoFolderName = state.folderName, lastAutoAt = state.lastAt) }
+    }
+
+    override fun setAutoBackup(weekly: Boolean) {
+        autoBackup.setWeekly(weekly)
+        publishAutoBackup()
+        if (weekly) runAutoBackupSoon()
+    }
+
+    /** MainActivity took the grant for [tree], the folder picked for automatic backups. */
+    fun setBackupFolder(tree: Uri) {
+        autoBackup.setFolder(tree)
+        publishAutoBackup()
+        runAutoBackupSoon()
+    }
+
+    private fun runAutoBackupSoon() {
+        graph.appScope.launch {
+            try {
+                if (autoBackup.runIfDue() != null) withContext(Dispatchers.IO) { publishAutoBackup() }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.w(TAG, "Automatic backup failed", e)
+            }
         }
     }
 
@@ -1300,9 +1844,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
     }
 
     private fun backupMessage(summary: BackupSummary): String {
-        val what = listOf(
+        val what = listOfNotNull(
             plural(summary.sources, "source", "sources"),
             plural(summary.videos, "video with history", "videos with history"),
+            summary.songs.takeIf { it > 0 }?.let { plural(it, "song with plays", "songs with plays") },
+            summary.saved.takeIf { it > 0 }?.let { plural(it, "watchlist or favorites entry", "watchlist and favorites entries") },
             plural(summary.playlists, "playlist", "playlists"),
         ).joinToString(", ")
         return if (summary.includesSecrets) {
@@ -1318,13 +1864,15 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
             if (report.sourcesAdded > 0) add(plural(report.sourcesAdded, "source", "sources"))
             if (report.applied.videos > 0) add("history of ${plural(report.applied.videos, "video", "videos")}")
             if (report.applied.matches > 0) add(plural(report.applied.matches, "match", "matches"))
+            if (report.applied.songs > 0) add("plays of ${plural(report.applied.songs, "song", "songs")}")
+            if (report.applied.saved > 0) add("your watchlist and favorites")
             if (report.playlistsCreated > 0 || report.applied.playlistItems > 0) add("playlists")
         }
         val sentences = ArrayList<String>()
         sentences += if (restored.isEmpty()) "Nothing new to restore" else "Restored ${restored.joinToString(", ")}"
         val waiting = report.waiting.total
-        if (waiting == 1) sentences += "1 item waits for its video to be scanned"
-        if (waiting > 1) sentences += "$waiting items wait for their videos to be scanned"
+        if (waiting == 1) sentences += "1 item waits for its video or song to be scanned"
+        if (waiting > 1) sentences += "$waiting items wait for their videos and songs to be scanned"
         if (report.foldersToPick.isNotEmpty()) {
             sentences += "Add ${report.foldersToPick.joinToString(", ")} again under Folders"
         }
@@ -1345,6 +1893,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
         videos = videos,
         matches = matches,
         playlists = playlists,
+        songs = songs,
+        saved = saved,
     )
 
     /** "wt" truncates what a provider hands back; not every provider knows it, "w" is the fallback. */
@@ -1383,12 +1933,23 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
     }
 
     private companion object {
+        /** Lyrics search: the first read waits for start-up, later ones for a burst of changes. */
+        const val LYRICS_FIRST_INDEX_MS = 4_000L
+        const val HOME_SNAPSHOT_DELAY_MS = 3_000L
+        const val MUSIC_LOAD_DELAY_MS = 2_000L
+        const val LYRICS_REINDEX_MS = 1_000L
+
+        const val KEY_RECENT_SEARCHES = "recent"
+        const val KEY_HIDDEN_VIDEOS = "videos"
         val TRAILING_YEAR = Regex("""\s*\(?(19|20)\d{2}\)?$""")
 
         /** Live folder listings kept for going back without listing again. */
         const val MAX_LISTINGS = 40
 
         const val BACKUP_BUSY = "Wait for the backup or restore that is running"
+
+        /** "Change artwork" shows TMDB's best-voted images, up to this many of each. */
+        const val ARTWORK_LIMIT = 30
     }
 }
 
@@ -1418,5 +1979,31 @@ private class Memo<K, V>(private val compute: (K) -> V) {
         val cached = last
         if (cached != null && cached.first == key) return cached.second
         return compute(key).also { last = key to it }
+    }
+}
+
+/** The posters and backdrops the user picked in "Change artwork", over TMDB's defaults. */
+/** The playlists, music library, watchlist and favorites, combined as one input of the UI state. */
+private class Saved(
+    val lists: PlaylistsState,
+    val music: MusicLibraryData,
+    val watchlist: List<String>,
+    val favorites: List<String>,
+)
+
+private fun withArtworkChoices(rows: List<VideoWithMeta>, choices: List<ArtworkChoiceEntity>): List<VideoWithMeta> {
+    if (choices.isEmpty()) return rows
+    val byKey = choices.associateBy { it.metadataKey }
+    return rows.map { row ->
+        val meta = row.meta ?: return@map row
+        val choice = byKey[meta.key] ?: return@map row
+        row.copy(
+            meta = meta.copy(
+                posterPath = choice.posterPath ?: meta.posterPath,
+                backdropPath = choice.backdropPath ?: meta.backdropPath,
+                // A picked poster replaces TMDB's textless one wherever that would show.
+                textlessPosterPath = choice.posterPath ?: meta.textlessPosterPath,
+            ),
+        )
     }
 }

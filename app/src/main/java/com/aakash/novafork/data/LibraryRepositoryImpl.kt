@@ -201,7 +201,22 @@ class LibraryRepositoryImpl(
 
     /** The first call after [markLaunch] (or after this repository was created) is the launch's refresh. */
     override suspend fun refreshAll() {
+        wakeNas()
         refreshAll(force = !takeLaunch())
+    }
+
+    @Volatile private var lastWakeAt = 0L
+
+    /** Wake-on-LAN, when a MAC is set: wakes the NAS and gives it a few seconds, at most once in ten minutes. */
+    private suspend fun wakeNas() {
+        val mac = settings.settings.value.wakeOnLanMac
+        if (mac.isBlank()) return
+        val sent = withContext(Dispatchers.IO) { WakeOnLan.wake(mac) }
+        val now = System.currentTimeMillis()
+        if (sent && now - lastWakeAt > WAKE_REPEAT_MS) {
+            lastWakeAt = now
+            kotlinx.coroutines.delay(WAKE_WAIT_MS)
+        }
     }
 
     /**
@@ -496,6 +511,9 @@ class LibraryRepositoryImpl(
             localBackdrop = file.localBackdrop,
             localThumb = file.localThumb,
             remoteId = file.remoteId,
+            // Continue from another device: the server's progress for a video new here.
+            positionMs = file.serverPositionMs ?: 0L,
+            watched = file.serverWatched,
         ).withParse(parsed)
         val server = file.serverMetadata?.takeIf { it.isUsable() }
         return if (server != null) video.withServerMetadata(sourceId, server, now) else video
@@ -516,7 +534,15 @@ class LibraryRepositoryImpl(
             localThumb = file.localThumb,
             remoteId = file.remoteId ?: old.remoteId,
             present = true,
-        )
+        ).let { video ->
+            // Continue from another device: progress made elsewhere on the server reaches a video
+            // not started here. What was watched on this device is never overwritten.
+            if (old.positionMs == 0L && !old.watched && (file.serverPositionMs != null || file.serverWatched)) {
+                video.copy(positionMs = file.serverPositionMs ?: 0L, watched = file.serverWatched)
+            } else {
+                video
+            }
+        }
         val server = file.serverMetadata?.takeIf { it.isUsable() }
         return when {
             // The user's Identify outranks both the server and the file name.
@@ -927,6 +953,22 @@ class LibraryRepositoryImpl(
     override suspend fun setWatched(videoId: Long, watched: Boolean) {
         withContext(Dispatchers.IO) { videoDao.setWatched(videoId, watched) }
         reportRemote(RemoteReport(videoId, positionMs = 0L, durationMs = null, finished = watched))
+    }
+
+    override suspend fun renameVideoFile(videoId: Long, newFileName: String, newUri: String?) {
+        withContext(Dispatchers.IO) {
+            val old = videoDao.byId(videoId) ?: return@withContext
+            val renamed = old.copy(fileName = newFileName, uri = newUri ?: old.uri)
+            // A manual Identify outranks the file name, as in a rescan (refreshed).
+            val updated = if (old.matchState == MatchState.MANUAL) {
+                renamed
+            } else {
+                renamed.withParse(parseName(newFileName, old.folder.split('/').filter { it.isNotEmpty() }.asReversed()))
+            }
+            videoDao.update(updated)
+        }
+        // The new name may match something else; the matcher looks again.
+        enricher.request()
     }
 
     // Progress on media servers
@@ -1521,3 +1563,7 @@ private fun TmdbTvSummary.toSearchResult() = TmdbSearchResult(
     overview = overview.nonBlank(),
     posterUrl = TmdbClient.posterUrl(posterPath, "w342"),
 )
+
+/** Wake-on-LAN is repeated at most this often, and the NAS gets this long to wake. */
+private const val WAKE_REPEAT_MS = 10 * 60_000L
+private const val WAKE_WAIT_MS = 5_000L

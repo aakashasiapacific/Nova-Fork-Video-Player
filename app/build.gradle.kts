@@ -53,7 +53,9 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            // R8 (owner: snappier): Compose and the app are optimised; see proguard-rules.pro.
+            isMinifyEnabled = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             signingConfig = signingConfigs.getByName("release")
         }
         debug {
@@ -138,6 +140,8 @@ dependencies {
     implementation("androidx.compose.material:material-icons-core")
 
     implementation("androidx.core:core-ktx:1.13.1")
+    // Installs the baseline profile (src/main/baseline-prof.txt) for a faster first launch.
+    implementation("androidx.profileinstaller:profileinstaller:1.4.1")
     implementation("androidx.activity:activity-compose:1.9.3")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
