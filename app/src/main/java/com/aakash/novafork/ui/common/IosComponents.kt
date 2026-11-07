@@ -128,7 +128,7 @@ object IosColors {
     /** Hairline separators. */
     val Separator = Color(0xFF38383A)
     /** secondaryLabel: section headers, values. */
-    val SecondaryLabel = Color(0xFF8E8E93)
+    val SecondaryLabel = Color(0xFF98989F)
     /** tertiaryLabel: chevrons. */
     val TertiaryLabel = Color(0xFF5A5A5F)
     /** systemRed: destructive actions. */

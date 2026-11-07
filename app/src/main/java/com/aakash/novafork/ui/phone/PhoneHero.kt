@@ -398,7 +398,8 @@ private fun DetailsStyleHeroPage(
                     // Strongest where the backdrop fades out, so the two meet without a seam.
                     0f to shown.copy(alpha = 0.85f),
                     0.4f to shown.copy(alpha = 0.7f),
-                    0.8f to shown.copy(alpha = 0.3f),
+                    0.75f to shown.copy(alpha = 0.32f),
+                    0.9f to shown.copy(alpha = 0.12f),
                     1f to Color.Transparent,
                 ),
             )
