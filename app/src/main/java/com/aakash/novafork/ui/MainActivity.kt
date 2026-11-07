@@ -47,6 +47,7 @@ import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.DialogUi
 import com.aakash.novafork.ui.model.TopDestination
 import com.aakash.novafork.widget.ContinueWatchingWidget
+import com.aakash.novafork.widget.UpNextWidget
 import java.io.File
 import java.io.IOException
 import java.time.LocalDate
@@ -287,6 +288,15 @@ class MainActivity : ComponentActivity() {
                             ContinueWatchingWidget.update(this@MainActivity, card)
                         }
                     }
+            }
+        }
+        lifecycleScope.launch {
+            // The Up Next widget follows the first Up Next card.
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.state
+                    .map { it.home.upNext.firstOrNull() }
+                    .distinctUntilChangedBy { card -> card?.let { it.id to it.title } }
+                    .collect { card -> withContext(Dispatchers.Default) { UpNextWidget.update(this@MainActivity, card) } }
             }
         }
         holdLaunchScreenUntilLoaded()

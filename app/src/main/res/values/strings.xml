@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Nova Fork</string>
+    <string name="widget_up_next_description">The next episode waiting for you.</string>
+    <string name="widget_up_next_empty">Nothing up next</string>
     <string name="widget_continue_description">Pick up the video you left off, with how far you got.</string>
     <string name="widget_continue_empty">Nothing to continue</string>
     <string name="widget_now_playing_description">The song playing, with play, pause and next.</string>

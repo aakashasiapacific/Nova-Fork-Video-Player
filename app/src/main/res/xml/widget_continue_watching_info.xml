@@ -9,4 +9,4 @@
     android:previewLayout="@layout/widget_continue_watching"
     android:resizeMode="horizontal|vertical"
     android:updatePeriodMillis="0"
-    android:widgetCategory="home_screen" />
+    android:widgetCategory="home_screen|keyguard" />

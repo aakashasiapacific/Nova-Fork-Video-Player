@@ -182,6 +182,7 @@ private fun libraryGroups(state: SettingsUi, actions: AppActions): List<Settings
         ),
         downloadsGroup(actions),
         storageGroup(state.space, state.duplicateBytes, actions),
+        dataUsageGroup(),
         watchStatsGroup(state.watch),
         backupGroup(actions),
     )
@@ -477,6 +478,13 @@ private val SubtitleColors = listOf(
     Option(0xC8C8C8, "Grey"),
 )
 
+private val NetworkBuffers = listOf(
+    Option(1500, "Short (1.5 s)"),
+    Option(3000, "Normal (3 s)"),
+    Option(6000, "Long (6 s)"),
+    Option(12_000, "Extra long (12 s)"),
+)
+
 private val SubtitlePositions = listOf(
     Option(0, "Default"),
     Option(60, "Raised"),
@@ -552,9 +560,13 @@ private fun playerGroups(settings: Settings, actions: AppActions): List<Settings
             switchRow("autoplay-next", R.drawable.ic_skip_next, "Auto-play next episode", settings.autoPlayNext) { on ->
                 actions.updateSettings { it.copy(autoPlayNext = on) }
             },
+            choiceRow("network-buffer", R.drawable.ic_hd, "Network buffer", NetworkBuffers, settings.networkBufferMs, tile = IosPalette.Gray) { ms ->
+                actions.updateSettings { it.copy(networkBufferMs = ms) }
+            },
         ),
         footer = "Software only can help when a video shows green frames or stutters. " +
-            "Double-tap the video's sides to seek by this step.",
+            "Double-tap the video's sides to seek by this step. A longer network buffer rides out a slow connection " +
+            "and delays the start a little.",
     ),
     SettingsGroup(
         key = "background",
@@ -594,6 +606,9 @@ private fun playerGroups(settings: Settings, actions: AppActions): List<Settings
             },
             choiceRow("audio-language", R.drawable.ic_audiotrack, "Audio language", TrackLanguages, settings.preferredAudioLanguage) { language ->
                 actions.updateSettings { it.copy(preferredAudioLanguage = language) }
+            },
+            switchRow("captions-when-muted", R.drawable.ic_subtitles, "Captions when muted", settings.captionsWhenMuted) { on ->
+                actions.updateSettings { it.copy(captionsWhenMuted = on) }
             },
         ),
         footer = "Change the encoding if subtitles show garbled letters. Fetch missing subtitles adds one from " +

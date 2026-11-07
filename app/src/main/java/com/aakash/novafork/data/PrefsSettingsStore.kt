@@ -86,6 +86,8 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
             putBoolean(KEY_SUBTITLE_BACKGROUND, s.subtitleBackground)
             putInt(KEY_SUBTITLE_COLOR, s.subtitleColor)
             putBoolean(KEY_SUBTITLE_BOLD, s.subtitleBold)
+            putBoolean(KEY_CAPTIONS_WHEN_MUTED, s.captionsWhenMuted)
+            putInt(KEY_NETWORK_BUFFER_MS, s.networkBufferMs)
             putInt(KEY_SUBTITLE_MARGIN, s.subtitleMargin)
             putBoolean(KEY_HAPTICS, s.haptics)
             putBoolean(KEY_PIP_ON_LEAVE, s.pipOnLeave)
@@ -142,6 +144,8 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
         const val KEY_SUBTITLE_BACKGROUND = "subtitle_background"
         const val KEY_SUBTITLE_COLOR = "subtitle_color"
         const val KEY_SUBTITLE_BOLD = "subtitle_bold"
+        const val KEY_CAPTIONS_WHEN_MUTED = "captions_when_muted"
+        const val KEY_NETWORK_BUFFER_MS = "network_buffer_ms"
         const val KEY_SUBTITLE_MARGIN = "subtitle_margin"
         const val KEY_HAPTICS = "haptics"
         const val KEY_PIP_ON_LEAVE = "pip_on_leave"
@@ -193,6 +197,8 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
             KEY_SUBTITLE_BACKGROUND to SettingType.BOOLEAN,
             KEY_SUBTITLE_COLOR to SettingType.INT,
             KEY_SUBTITLE_BOLD to SettingType.BOOLEAN,
+            KEY_CAPTIONS_WHEN_MUTED to SettingType.BOOLEAN,
+            KEY_NETWORK_BUFFER_MS to SettingType.INT,
             KEY_SUBTITLE_MARGIN to SettingType.INT,
             KEY_HAPTICS to SettingType.BOOLEAN,
             KEY_PIP_ON_LEAVE to SettingType.BOOLEAN,
@@ -262,6 +268,8 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
                 subtitleBackground = prefs.boolean(KEY_SUBTITLE_BACKGROUND, defaults.subtitleBackground),
                 subtitleColor = prefs.int(KEY_SUBTITLE_COLOR, defaults.subtitleColor),
                 subtitleBold = prefs.boolean(KEY_SUBTITLE_BOLD, defaults.subtitleBold),
+                captionsWhenMuted = prefs.boolean(KEY_CAPTIONS_WHEN_MUTED, defaults.captionsWhenMuted),
+                networkBufferMs = prefs.int(KEY_NETWORK_BUFFER_MS, defaults.networkBufferMs).coerceIn(500, 30_000),
                 subtitleMargin = prefs.int(KEY_SUBTITLE_MARGIN, defaults.subtitleMargin).coerceIn(0, 300),
                 haptics = prefs.boolean(KEY_HAPTICS, defaults.haptics),
                 pipOnLeave = prefs.boolean(KEY_PIP_ON_LEAVE, defaults.pipOnLeave),

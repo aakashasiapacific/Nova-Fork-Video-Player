@@ -148,6 +148,10 @@ data class Settings(
     val subtitleColor: Int = 0xFFFFFF,
     /** Subtitle text in bold. */
     val subtitleBold: Boolean = false,
+    /** Subtitles turn on by themselves when the phone's media volume is off as a video opens. */
+    val captionsWhenMuted: Boolean = false,
+    /** How much of a network video libVLC buffers ahead, in ms (more rides out a slow connection). */
+    val networkBufferMs: Int = 1500,
     /** Leaving the app while a video plays shrinks it into a picture-in-picture window. */
     val pipOnLeave: Boolean = false,
     /** The small ticks on taps, swipes and switches; off silences every one. */

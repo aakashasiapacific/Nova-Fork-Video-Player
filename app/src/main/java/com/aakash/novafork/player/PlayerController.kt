@@ -2286,13 +2286,16 @@ class PlayerController(
         val embedded = realTracks(mediaPlayer.spuTracks)
         val remembered = rememberedSubtitle
         var selected: File? = null
+        // The setting asks for captions when the media volume is off as the video opens.
+        val mutedCaptions = graph.settings.settings.value.captionsWhenMuted &&
+            audioManager.getStreamVolume(AudioManager.STREAM_MUSIC) == 0
         when {
             remembered == DISABLED_TRACK -> mediaPlayer.setSpuTrack(DISABLED_TRACK)
             remembered != null && embedded.any { it.id == remembered } -> mediaPlayer.setSpuTrack(remembered)
             // Most likely an external file: its track appears once the slave below is loaded.
             remembered != null -> pendingSubtitleRestore = remembered
-            // This show's earlier episodes had them off.
-            showSubtitlesOff -> mediaPlayer.setSpuTrack(DISABLED_TRACK)
+            // This show's earlier episodes had them off (unless the phone is muted and captions follow that).
+            showSubtitlesOff && !mutedCaptions -> mediaPlayer.setSpuTrack(DISABLED_TRACK)
             else -> {
                 val preferred = embedded.firstOrNull { TrackLanguages.matches(it.name, subtitleLanguage) }
                 if (preferred != null) {
@@ -2300,6 +2303,8 @@ class PlayerController(
                 } else {
                     selected = external.firstOrNull { isPreferredLanguage(it) }
                         ?: external.firstOrNull().takeIf { embedded.isEmpty() }
+                    // Muted with no language match: some captions beat none.
+                    if (mutedCaptions && selected == null) embedded.firstOrNull()?.let { mediaPlayer.setSpuTrack(it.id) }
                 }
             }
         }
