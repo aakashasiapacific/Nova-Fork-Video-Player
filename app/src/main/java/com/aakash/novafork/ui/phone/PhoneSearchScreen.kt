@@ -1,5 +1,10 @@
 package com.aakash.novafork.ui.phone
 
+import android.app.Activity
+import android.content.Intent
+import android.speech.RecognizerIntent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -53,6 +58,7 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.TextRange
@@ -103,6 +109,25 @@ fun PhoneSearchScreen(
         mutableStateOf(TextFieldValue(search.query, TextRange(search.query.length)))
     }
     val focusRequester = remember { FocusRequester() }
+    // The microphone: the phone's own speech recogniser (Google's), when there is one.
+    val context = LocalContext.current
+    val speech = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        val said = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
+        if (result.resultCode == Activity.RESULT_OK && !said.isNullOrBlank()) {
+            field = TextFieldValue(said, TextRange(said.length))
+            actions.search(said)
+        }
+    }
+    val speechIntent = remember {
+        Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+            .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            .putExtra(RecognizerIntent.EXTRA_PROMPT, "Search")
+    }
+    val voice: (() -> Unit)? = if (speechIntent.resolveActivity(context.packageManager) != null) {
+        { speech.launch(speechIntent) }
+    } else {
+        null
+    }
     // Which kind of result the chips under the field show; All again once the field is emptied.
     var filter by remember { mutableStateOf(SearchFilter.ALL) }
     val fieldBlank = field.text.isBlank()
@@ -175,6 +200,7 @@ fun PhoneSearchScreen(
                     keyboard?.hide()
                 },
                 focusRequester = focusRequester,
+                onVoice = voice,
                 modifier = Modifier.padding(start = dims.gutter, end = dims.gutter, top = 8.dp, bottom = 12.dp),
             )
             if (!fieldBlank) {
@@ -363,6 +389,7 @@ private fun SearchField(
     onSearch: () -> Unit,
     focusRequester: FocusRequester,
     modifier: Modifier = Modifier,
+    onVoice: (() -> Unit)? = null,
 ) {
     Row(
         modifier
@@ -405,6 +432,11 @@ private fun SearchField(
         if (value.text.isNotEmpty()) {
             IosIconButton(onClick = onClear) {
                 NovaIcon(R.drawable.ic_close, contentDescription = "Clear", tint = Color.White.copy(alpha = 0.6f))
+            }
+        } else if (onVoice != null) {
+            // Say a title or a phrase ("comedies under two hours").
+            IosIconButton(onClick = onVoice) {
+                NovaIcon(R.drawable.ic_mic, contentDescription = "Search by voice", tint = Color.White.copy(alpha = 0.6f))
             }
         }
     }

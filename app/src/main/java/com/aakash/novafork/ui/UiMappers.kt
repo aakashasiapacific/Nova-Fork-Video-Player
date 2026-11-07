@@ -1073,6 +1073,23 @@ object UiMappers {
 
     // Search
 
+    private fun phraseMatches(video: IndexedVideo, phrase: SearchPhrase): Boolean {
+        if (phrase.unwatched && video.video.watched) return false
+        if (phrase.watched && !video.video.watched) return false
+        if (!phrase.lengthMatches(video.video.durationMs)) return false
+        if (!phrase.yearMatches(video.video.parsedYear ?: video.card.year)) return false
+        if (!phrase.sizeMatches(video.video.height)) return false
+        if (phrase.genres.isNotEmpty()) {
+            val have = genresOf(video.meta)
+            if (phrase.genres.any { want -> have.none { it.equals(want, ignoreCase = true) } }) return false
+        }
+        return phrase.words.all { word ->
+            video.title.contains(word, ignoreCase = true) ||
+                video.showTitle?.contains(word, ignoreCase = true) == true ||
+                creditsMatch(video.meta, word)
+        }
+    }
+
     /** Typing a genre's whole name finds that genre's titles. */
     private fun genreMatch(meta: MetadataEntity?, needle: String): Boolean =
         genresOf(meta).any { it.equals(needle, ignoreCase = true) }
@@ -1098,19 +1115,25 @@ object UiMappers {
         val songIds = found.songs.map { it.id }
         val entries = ArrayList<Entry>()
         val showKeys = LinkedHashSet<String>()
+        // "comedies under 2 hours", "unwatched 4k": words that name a filter narrow the library.
+        val phrase = SearchPhrase.parse(needle)
         for (video in index.videos) {
             if (video.id in index.extraIds) continue
-            val matches = video.title.contains(needle, ignoreCase = true) ||
-                video.showTitle?.contains(needle, ignoreCase = true) == true ||
-                video.video.fileName.contains(needle, ignoreCase = true) ||
-                creditsMatch(video.meta, needle) ||
-                genreMatch(video.meta, needle)
+            val matches = if (phrase != null) {
+                phraseMatches(video, phrase)
+            } else {
+                video.title.contains(needle, ignoreCase = true) ||
+                    video.showTitle?.contains(needle, ignoreCase = true) == true ||
+                    video.video.fileName.contains(needle, ignoreCase = true) ||
+                    creditsMatch(video.meta, needle) ||
+                    genreMatch(video.meta, needle)
+            }
             if (!matches) continue
             val showKey = video.showKey
             if (showKey != null) showKeys += showKey else entries += videoEntry(video)
         }
         // A matched show's TMDB name can differ from what its files are called.
-        index.shows.filter { it.title.contains(needle, ignoreCase = true) || creditsMatch(it.meta, needle) || genreMatch(it.meta, needle) }
+        index.shows.filter { phrase == null }.filter { it.title.contains(needle, ignoreCase = true) || creditsMatch(it.meta, needle) || genreMatch(it.meta, needle) }
             .forEach { showKeys += it.key }
         showKeys.mapNotNullTo(entries) { key -> index.showsByKey[key]?.let(::showEntry) }
         val ranked = entries.sortedWith(

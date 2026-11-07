@@ -45,6 +45,12 @@
     <!-- requestLegacyExternalStorage: Android 10 only (ignored from 11 on). With the storage
          permission, plain file access to the folders of device videos (subtitles, artwork) works
          there the way "All files access" makes it work on Android 11+. -->
+    <queries>
+        <intent>
+            <action android:name="android.speech.action.RECOGNIZE_SPEECH" />
+        </intent>
+    </queries>
+
     <application
         android:name=".NovaApp"
         android:allowBackup="true"
