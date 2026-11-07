@@ -1001,7 +1001,8 @@ private fun Route.isTitlePage(): Boolean = this is Route.VideoDetails || this is
 /**
  * How far below the status bar the page's always-on soft edge runs: shallow, so a large title at
  * the top of a page is not dimmed by it (the deeper [com.aakash.novafork.ui.common.SoftEdgeDepth]
- * only comes in as a page scrolls).
+ * only comes in as a page scrolls). It ends where a page's round top-bar buttons begin (8 dp below the
+ * status bar): deeper, it dimmed the top of the Back button into a dark band.
  */
-private val StatusEdgeDepth = 20.dp
+private val StatusEdgeDepth = 8.dp
 
