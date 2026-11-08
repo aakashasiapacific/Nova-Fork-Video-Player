@@ -241,6 +241,14 @@ internal fun NetworkServerDialog(dialog: DialogUi.NetworkServer, actions: AppAct
                         )
                     }
                 }
+                // Servers seen on this Wi-Fi: one tap fills in the address (adding only).
+                if (initial.id == null) {
+                    NearbyServers(type) { server ->
+                        address = if (type == SourceType.JELLYFIN || type == SourceType.EMBY) "http://${server.host}:${server.port ?: 8096}" else server.host
+                        if (NetworkForms.takesPort(type)) server.port?.let { port = it.toString() }
+                        if (name.isBlank()) name = server.name
+                    }
+                }
                 if (NetworkForms.takesPath(type)) {
                     FormField(
                         value = path,

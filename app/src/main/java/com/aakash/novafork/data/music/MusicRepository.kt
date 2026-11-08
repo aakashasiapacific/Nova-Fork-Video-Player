@@ -82,7 +82,14 @@ class MusicRepository(
 
     /** Shown songs grouped for the Audio tab; regrouped off the main thread on every change. */
     fun observeLibrary(): Flow<MusicLibraryData> =
-        songDao.observeShown().map { MusicLibrary.build(it) }.flowOn(Dispatchers.Default)
+        kotlinx.coroutines.flow.combine(songDao.observeShown(), names.changes) { songs, _ -> MusicLibrary.build(songs.map(names::apply)) }
+            .flowOn(Dispatchers.Default)
+
+    /** Names fixed in the app, shown instead of the file's tags (the files are never changed). */
+    private val names = SongNames(context)
+
+    /** Shows [title] and [artist] for the song instead of its tags; blank fields go back to the tags. */
+    fun renameSong(songId: Long, title: String, artist: String) = names.set(songId, title, artist)
 
     /** The songs the library shows right now, once (Autoplay chooses from them). */
     suspend fun shownSongs(): List<SongEntity> = songDao.observeShown().first()
@@ -264,7 +271,7 @@ class MusicRepository(
 
     // Songs
 
-    suspend fun song(id: Long): SongEntity? = songDao.byId(id)
+    suspend fun song(id: Long): SongEntity? = songDao.byId(id)?.let(names::apply)
 
     /** The songs of [ids] that still exist, in the order given. */
     suspend fun songs(ids: List<Long>): List<SongEntity> {

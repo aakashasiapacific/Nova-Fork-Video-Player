@@ -440,6 +440,7 @@ fun ShellNowPlaying(
     var equalizing by remember { mutableStateOf(false) }
     var showingInfo by remember { mutableStateOf(false) }
     var carMode by remember { mutableStateOf(false) }
+    var fixingName by remember { mutableStateOf(false) }
     // Read lazily, so the sample rate and depth (Hi-Res) can follow the tag shown from the name.
     val info = rememberAudioInfo(song)
     NowPlayingHost(
@@ -490,6 +491,14 @@ fun ShellNowPlaying(
                     },
                 )
                 NovaMenuItem(
+                    text = { Text("Fix Name…") },
+                    leadingIcon = { NovaIcon(R.drawable.ic_info, contentDescription = null) },
+                    onClick = {
+                        close()
+                        fixingName = true
+                    },
+                )
+                NovaMenuItem(
                     text = { Text("Car Mode") },
                     leadingIcon = { NovaIcon(R.drawable.ic_play_arrow, contentDescription = null) },
                     onClick = {
@@ -515,6 +524,20 @@ fun ShellNowPlaying(
         }
     }
     if (carMode) CarMode(player = player, actions = viewModel, onDone = { carMode = false })
+    if (fixingName) {
+        song?.let { current ->
+            AudioTheme {
+                FixSongNameDialog(
+                    song = current,
+                    onSave = { title, artist ->
+                        viewModel.renameSong(current.id, title, artist)
+                        fixingName = false
+                    },
+                    onDismiss = { fixingName = false },
+                )
+            }
+        }
+    }
     if (showingInfo) {
         song?.let { current ->
             AudioTheme { SongInfoSheet(song = current, onDismiss = { showingInfo = false }) }

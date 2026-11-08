@@ -95,6 +95,9 @@ class MusicViewModel(app: Application) : AndroidViewModel(app), AudioActions {
 
     override fun clearUpNext() = player.clearUpNext()
 
+    /** Now Playing's Fix Name: shown instead of the tags; the file is not changed. */
+    fun renameSong(songId: Long, title: String, artist: String) = music.renameSong(songId, title, artist)
+
     override fun saveQueueAsPlaylist() {
         val state = player.state.value
         val ids = listOfNotNull(state.nowPlaying?.songId) + state.upNext

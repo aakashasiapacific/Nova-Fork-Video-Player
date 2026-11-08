@@ -93,6 +93,13 @@ internal fun SmbServerDialog(dialog: DialogUi.SmbServer, actions: AppActions) {
                     placeholder = "Living room NAS",
                     capitalization = KeyboardCapitalization.Words,
                 )
+                // Shares seen on this Wi-Fi: one tap fills in the server (adding only).
+                if (initial.id == null) {
+                    NearbyServers(com.aakash.novafork.data.db.SourceType.SMB) { server ->
+                        host = server.host
+                        if (name.isBlank()) name = server.name
+                    }
+                }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FormField(
                         value = host,
