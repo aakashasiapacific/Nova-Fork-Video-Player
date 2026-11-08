@@ -50,6 +50,7 @@ import com.aakash.novafork.ui.common.FileRenames
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.AppUiState
 import com.aakash.novafork.ui.model.BackupUi
+import com.aakash.novafork.ui.model.VideoCardUi
 import com.aakash.novafork.ui.model.BrowseDirUi
 import com.aakash.novafork.ui.model.CastUi
 import com.aakash.novafork.ui.model.DialogUi
@@ -439,6 +440,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
             stackDepth = user.backStack.size,
             previousRoute = user.backStack.getOrNull(user.backStack.size - 2),
             home = home.copy(
+                continueWatching = withSeenNewDots(index, route, home.continueWatching),
                 libraryCounts = LibraryCounts(
                     favorites = if (starred.isEmpty()) 0 else favoritesMemo[index to starred].size,
                     all = index.movies.size + index.shows.size + index.otherVideos.size,
@@ -554,6 +556,30 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
     }
 
     // Navigation
+
+    /** Continue Watching cards whose new-episode dot was seen (their show's page was opened since). */
+    private val seenNewDots: MutableSet<Long> by lazy {
+        prefsOf(SEEN_DOTS_PREFS).getStringSet(SEEN_DOTS_KEY, emptySet()).orEmpty().mapNotNull { it.toLongOrNull() }.toMutableSet()
+    }
+
+    private fun prefsOf(name: String) = getApplication<Application>().getSharedPreferences(name, android.content.Context.MODE_PRIVATE)
+
+    /**
+     * Apple TV's blue dot goes once you've looked: opening a show's page marks the dot on its
+     * Continue Watching card as seen, and it stays gone for that episode.
+     */
+    private fun withSeenNewDots(index: LibraryIndex, route: Route, cards: List<VideoCardUi>): List<VideoCardUi> {
+        val openShow = (route as? Route.ShowDetails)?.showKey
+        if (openShow != null) {
+            val fresh = cards.filter { it.newEpisode && index.videosById[it.id]?.showKey == openShow && it.id !in seenNewDots }
+            if (fresh.isNotEmpty()) {
+                synchronized(seenNewDots) { seenNewDots += fresh.map { it.id } }
+                prefsOf(SEEN_DOTS_PREFS).edit().putStringSet(SEEN_DOTS_KEY, seenNewDots.map { it.toString() }.toSet()).apply()
+            }
+        }
+        if (cards.none { it.newEpisode && it.id in seenNewDots }) return cards
+        return cards.map { if (it.newEpisode && it.id in seenNewDots) it.copy(newEpisode = false) else it }
+    }
 
     override fun navigate(route: Route) {
         local.update { state ->
@@ -1937,6 +1963,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
         const val LYRICS_FIRST_INDEX_MS = 4_000L
         const val HOME_SNAPSHOT_DELAY_MS = 3_000L
         const val MUSIC_LOAD_DELAY_MS = 2_000L
+        const val SEEN_DOTS_PREFS = "seen_new_dots"
+        const val SEEN_DOTS_KEY = "ids"
         const val LYRICS_REINDEX_MS = 1_000L
 
         const val KEY_RECENT_SEARCHES = "recent"
