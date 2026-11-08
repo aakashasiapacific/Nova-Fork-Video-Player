@@ -142,6 +142,8 @@ dependencies {
     implementation("androidx.core:core-ktx:1.13.1")
     // Installs the baseline profile (src/main/baseline-prof.txt) for a faster first launch.
     implementation("androidx.profileinstaller:profileinstaller:1.4.1")
+    // Background library scans on a schedule (Preferences › Sources › Scan schedule).
+    implementation("androidx.work:work-runtime-ktx:2.9.1")
     implementation("androidx.activity:activity-compose:1.9.3")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")

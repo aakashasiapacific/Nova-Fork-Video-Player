@@ -152,6 +152,12 @@ data class Settings(
     val captionsWhenMuted: Boolean = false,
     /** The MAC address of a NAS to wake (Wake-on-LAN) before the library visits it; empty = never. */
     val wakeOnLanMac: String = "",
+    /** Scan the library in the background every this many hours; 0 = only when the app opens. */
+    val scanEveryHours: Int = 0,
+    /** A quiet note when episodes arrive for a show being watched (after a background scan). */
+    val newEpisodeAlerts: Boolean = false,
+    /** The player shows its stream's bitrate and dropped frames in a corner. */
+    val showStreamStats: Boolean = false,
     /** How much of a network video libVLC buffers ahead, in ms (more rides out a slow connection). */
     val networkBufferMs: Int = 1500,
     /** Leaving the app while a video plays shrinks it into a picture-in-picture window. */

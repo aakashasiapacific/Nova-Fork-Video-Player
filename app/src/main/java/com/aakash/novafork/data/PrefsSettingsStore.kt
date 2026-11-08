@@ -88,6 +88,9 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
             putBoolean(KEY_SUBTITLE_BOLD, s.subtitleBold)
             putBoolean(KEY_CAPTIONS_WHEN_MUTED, s.captionsWhenMuted)
             putString(KEY_WAKE_ON_LAN_MAC, s.wakeOnLanMac)
+            putInt(KEY_SCAN_EVERY_HOURS, s.scanEveryHours)
+            putBoolean(KEY_NEW_EPISODE_ALERTS, s.newEpisodeAlerts)
+            putBoolean(KEY_SHOW_STREAM_STATS, s.showStreamStats)
             putInt(KEY_NETWORK_BUFFER_MS, s.networkBufferMs)
             putInt(KEY_SUBTITLE_MARGIN, s.subtitleMargin)
             putBoolean(KEY_HAPTICS, s.haptics)
@@ -147,6 +150,9 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
         const val KEY_SUBTITLE_BOLD = "subtitle_bold"
         const val KEY_CAPTIONS_WHEN_MUTED = "captions_when_muted"
         const val KEY_WAKE_ON_LAN_MAC = "wake_on_lan_mac"
+        const val KEY_SCAN_EVERY_HOURS = "scan_every_hours"
+        const val KEY_NEW_EPISODE_ALERTS = "new_episode_alerts"
+        const val KEY_SHOW_STREAM_STATS = "show_stream_stats"
         const val KEY_NETWORK_BUFFER_MS = "network_buffer_ms"
         const val KEY_SUBTITLE_MARGIN = "subtitle_margin"
         const val KEY_HAPTICS = "haptics"
@@ -201,6 +207,9 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
             KEY_SUBTITLE_BOLD to SettingType.BOOLEAN,
             KEY_CAPTIONS_WHEN_MUTED to SettingType.BOOLEAN,
             KEY_WAKE_ON_LAN_MAC to SettingType.STRING,
+            KEY_SCAN_EVERY_HOURS to SettingType.INT,
+            KEY_NEW_EPISODE_ALERTS to SettingType.BOOLEAN,
+            KEY_SHOW_STREAM_STATS to SettingType.BOOLEAN,
             KEY_NETWORK_BUFFER_MS to SettingType.INT,
             KEY_SUBTITLE_MARGIN to SettingType.INT,
             KEY_HAPTICS to SettingType.BOOLEAN,
@@ -273,6 +282,9 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
                 subtitleBold = prefs.boolean(KEY_SUBTITLE_BOLD, defaults.subtitleBold),
                 captionsWhenMuted = prefs.boolean(KEY_CAPTIONS_WHEN_MUTED, defaults.captionsWhenMuted),
                 wakeOnLanMac = prefs.string(KEY_WAKE_ON_LAN_MAC) ?: defaults.wakeOnLanMac,
+                scanEveryHours = prefs.int(KEY_SCAN_EVERY_HOURS, defaults.scanEveryHours).coerceIn(0, 48),
+                newEpisodeAlerts = prefs.boolean(KEY_NEW_EPISODE_ALERTS, defaults.newEpisodeAlerts),
+                showStreamStats = prefs.boolean(KEY_SHOW_STREAM_STATS, defaults.showStreamStats),
                 networkBufferMs = prefs.int(KEY_NETWORK_BUFFER_MS, defaults.networkBufferMs).coerceIn(500, 30_000),
                 subtitleMargin = prefs.int(KEY_SUBTITLE_MARGIN, defaults.subtitleMargin).coerceIn(0, 300),
                 haptics = prefs.boolean(KEY_HAPTICS, defaults.haptics),

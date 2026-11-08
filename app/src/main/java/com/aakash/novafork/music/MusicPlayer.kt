@@ -495,6 +495,12 @@ class MusicPlayer(
                 onFailed(null, "This song is no longer in the library")
                 return@launch
             }
+            // Audiobooks, podcasts and other long files pick up where they were left (20 minutes or more).
+            val length = song.durationMs ?: 0L
+            if (pendingSeekMs == 0L && length >= LONG_AUDIO_MS) {
+                val kept = resumePrefs.getLong(LONG_AUDIO_KEY + song.id, 0L)
+                if (kept > 0L && kept < length - LONG_AUDIO_END_MS) pendingSeekMs = kept
+            }
             _state.update {
                 it.copy(
                     nowPlaying = nowPlaying(song),
@@ -607,6 +613,7 @@ class MusicPlayer(
                 val position = event.timeChanged.coerceAtLeast(0L)
                 _state.update { it.copy(positionMs = position) }
                 if (System.currentTimeMillis() - lastSavedAt > SAVE_EVERY_MS) saveResume()
+                rememberLongAudio(position)
                 nearingTheEnd(position)
             }
             MediaPlayer.Event.LengthChanged -> {
@@ -773,6 +780,20 @@ class MusicPlayer(
      * The playing song is near its end: with a crossfade set, the next song starts fading in over
      * it; without one, the next song is opened ahead so it follows with no gap.
      */
+    private var longAudioSavedAt = 0L
+
+    /** A long file's place, kept per song every few seconds; forgotten once it is nearly finished. */
+    private fun rememberLongAudio(positionMs: Long) {
+        val state = _state.value
+        val id = state.nowPlaying?.songId ?: return
+        if (state.durationMs < LONG_AUDIO_MS) return
+        val now = System.currentTimeMillis()
+        if (now - longAudioSavedAt < LONG_AUDIO_SAVE_MS) return
+        longAudioSavedAt = now
+        val keep = if (positionMs > state.durationMs - LONG_AUDIO_END_MS) 0L else positionMs
+        resumePrefs.edit().putLong(LONG_AUDIO_KEY + id, keep).apply()
+    }
+
     private fun nearingTheEnd(positionMs: Long) {
         val state = _state.value
         val duration = state.durationMs
@@ -995,6 +1016,10 @@ class MusicPlayer(
         const val KEY_QUEUE = "queue"
         const val KEY_POSITION = "position"
         const val KEY_POSITION_MS = "positionMs"
+        const val LONG_AUDIO_KEY = "long:"
+        const val LONG_AUDIO_MS = 20 * 60_000L
+        const val LONG_AUDIO_END_MS = 30_000L
+        const val LONG_AUDIO_SAVE_MS = 5_000L
         const val KEY_REPEAT = "repeat"
     }
 }

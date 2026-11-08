@@ -200,6 +200,8 @@ data class PlayerUiState(
     val bookmarks: List<BookmarkUi> = emptyList(),
     /** 0 to 1: how far the picture has dimmed as the sleep timer ran out; back to 0 on play. */
     val sleepDim: Float = 0f,
+    /** "4.2 Mb/s · 0 dropped" while Preferences' Stream stats is on; null otherwise. */
+    val streamStats: String? = null,
 )
 
 /**

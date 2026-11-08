@@ -385,6 +385,37 @@ class PlayerController(
         },
     )
 
+    /** Preferences' Stream stats: the input bitrate and dropped frames, read once a second. */
+    private val statsJob: Job = scope.launch {
+        var lastBytes = -1L
+        while (true) {
+            delay(STATS_EVERY_MS)
+            if (released) break
+            if (!graph.settings.settings.value.showStreamStats) {
+                lastBytes = -1L
+                if (_state.value.streamStats != null) _state.update { it.copy(streamStats = null) }
+                continue
+            }
+            val media = mediaPlayer.media ?: continue
+            try {
+                val stats = media.stats ?: continue
+                val bytes = stats.readBytes.toLong()
+                val mbps = if (lastBytes >= 0L && bytes >= lastBytes) (bytes - lastBytes) * 8.0 / 1_000_000.0 else null
+                lastBytes = bytes
+                val line = listOfNotNull(
+                    mbps?.let { String.format(java.util.Locale.ROOT, "%.1f Mb/s", it) },
+                    "${stats.lostPictures} dropped",
+                    if (stats.lostAbuffers > 0) "${stats.lostAbuffers} audio lost" else null,
+                ).joinToString(" · ")
+                _state.update { it.copy(streamStats = line) }
+            } catch (e: Exception) {
+                Log.w(TAG, "Couldn't read stream stats", e)
+            } finally {
+                media.release()
+            }
+        }
+    }
+
     init {
         mediaPlayer.setEventListener(eventListener)
         val settings = graph.settings.settings.value
@@ -1146,6 +1177,7 @@ class PlayerController(
         if (released) return
         saveProgress()
         released = true
+        statsJob.cancel()
         frameJob?.cancel()
         // Not while a read still runs; the retriever then goes with the process.
         if (frameLock.tryLock()) {
@@ -2861,6 +2893,7 @@ class PlayerController(
     }
 
     private companion object {
+        const val STATS_EVERY_MS = 1_000L
         const val TAG = "PlayerController"
 
         const val ENABLE_SUBTITLES = true

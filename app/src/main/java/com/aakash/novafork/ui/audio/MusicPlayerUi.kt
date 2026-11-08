@@ -439,6 +439,7 @@ fun ShellNowPlaying(
     var adding by remember { mutableStateOf<SongEntity?>(null) }
     var equalizing by remember { mutableStateOf(false) }
     var showingInfo by remember { mutableStateOf(false) }
+    var carMode by remember { mutableStateOf(false) }
     // Read lazily, so the sample rate and depth (Hi-Res) can follow the tag shown from the name.
     val info = rememberAudioInfo(song)
     NowPlayingHost(
@@ -489,6 +490,14 @@ fun ShellNowPlaying(
                     },
                 )
                 NovaMenuItem(
+                    text = { Text("Car Mode") },
+                    leadingIcon = { NovaIcon(R.drawable.ic_play_arrow, contentDescription = null) },
+                    onClick = {
+                        close()
+                        carMode = true
+                    },
+                )
+                NovaMenuItem(
                     text = { Text("Equaliser") },
                     leadingIcon = { NovaIcon(R.drawable.ic_tune, contentDescription = null) },
                     onClick = {
@@ -505,6 +514,7 @@ fun ShellNowPlaying(
             EqualizerSheet(settings = settings, onUpdate = viewModel::updateSettings, onDismiss = { equalizing = false })
         }
     }
+    if (carMode) CarMode(player = player, actions = viewModel, onDone = { carMode = false })
     if (showingInfo) {
         song?.let { current ->
             AudioTheme { SongInfoSheet(song = current, onDismiss = { showingInfo = false }) }

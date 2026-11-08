@@ -180,6 +180,20 @@ private fun libraryGroups(state: SettingsUi, actions: AppActions): List<Settings
             rows = listOf(actionRow("rescan", R.drawable.ic_refresh, "Rescan library", onClick = actions::refresh)),
             footer = "Looks for new, changed and removed videos in every source. Nova also does this each time it opens.",
         ),
+        SettingsGroup(
+            key = "scan-schedule",
+            title = "Scan schedule",
+            rows = listOf(
+                choiceRow("scan-every", R.drawable.ic_refresh, "Scan in the background", ScanSchedules, state.settings.scanEveryHours) { hours ->
+                    actions.updateSettings { it.copy(scanEveryHours = hours) }
+                },
+                switchRow("new-episode-alerts", R.drawable.ic_tv, "New episode note", state.settings.newEpisodeAlerts) { on ->
+                    actions.updateSettings { it.copy(newEpisodeAlerts = on) }
+                },
+            ),
+            footer = "Background scans run on any network when the battery isn't low. The note is quiet (no sound) and " +
+                "lists episodes that arrived for shows you're watching; it needs a background scan.",
+        ),
         downloadsGroup(actions),
         storageGroup(state.space, state.duplicateBytes, actions),
         wakeNasGroup(state.settings, actions),
@@ -479,6 +493,13 @@ private val SubtitleColors = listOf(
     Option(0xC8C8C8, "Grey"),
 )
 
+private val ScanSchedules = listOf(
+    Option(0, "Only when Nova opens"),
+    Option(6, "Every 6 hours"),
+    Option(12, "Every 12 hours"),
+    Option(24, "Once a day"),
+)
+
 private val NetworkBuffers = listOf(
     Option(1500, "Short (1.5 s)"),
     Option(3000, "Normal (3 s)"),
@@ -560,6 +581,9 @@ private fun playerGroups(settings: Settings, actions: AppActions): List<Settings
             },
             switchRow("autoplay-next", R.drawable.ic_skip_next, "Auto-play next episode", settings.autoPlayNext) { on ->
                 actions.updateSettings { it.copy(autoPlayNext = on) }
+            },
+            switchRow("stream-stats", R.drawable.ic_hd, "Stream stats", settings.showStreamStats) { on ->
+                actions.updateSettings { it.copy(showStreamStats = on) }
             },
             choiceRow("network-buffer", R.drawable.ic_hd, "Network buffer", NetworkBuffers, settings.networkBufferMs, tile = IosPalette.Gray) { ms ->
                 actions.updateSettings { it.copy(networkBufferMs = ms) }

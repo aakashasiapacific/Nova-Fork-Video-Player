@@ -99,6 +99,18 @@ fun PlayerScreen(
             contentAlignment = Alignment.Center,
         ) {
             surface()
+            state.streamStats?.let { stats ->
+                Text(
+                    stats,
+                    color = Color.White,
+                    style = androidx.compose.material3.MaterialTheme.typography.labelSmall,
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(start = 16.dp, top = 40.dp)
+                        .background(Color.Black.copy(alpha = 0.5f), androidx.compose.foundation.shape.RoundedCornerShape(6.dp))
+                        .padding(horizontal = 6.dp, vertical = 3.dp),
+                )
+            }
             // The sleep timer running out: the picture dims as the sound fades.
             if (state.sleepDim > 0f) {
                 Box(
