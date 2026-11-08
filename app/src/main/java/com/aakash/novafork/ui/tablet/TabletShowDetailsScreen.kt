@@ -464,7 +464,7 @@ private fun ShowText(details: ShowDetailsUi) {
             )
         }
         if (!details.overview.isNullOrBlank()) {
-            Text(details.overview, style = MaterialTheme.typography.bodyLarge)
+            Text(details.overview, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.widthIn(max = ReadableWidth))
         }
     }
 }
@@ -539,3 +539,6 @@ private fun TrailerlessMoreButton(onClick: () -> Unit) {
         NovaIcon(R.drawable.ic_more_vert, contentDescription = null, tint = androidx.compose.ui.graphics.Color.White)
     }
 }
+
+/** Overview text stays at a readable line length (about 70 characters) on a wide screen. */
+private val ReadableWidth = 640.dp

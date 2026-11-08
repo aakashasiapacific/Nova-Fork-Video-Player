@@ -818,7 +818,7 @@ private fun WideHeroArt(artwork: Artwork, modifier: Modifier = Modifier, alignme
 /** The bold line under the meta line on a wide hero: Apple TV's "#1 in Comedy"; ours says it is on your Watchlist. */
 private fun highlightOf(hero: HeroUi): String? = if (hero.onWatchlist) "On your Watchlist" else null
 
-/** Thin iOS page dots: the current one white, the rest 30% white. */
+/** Thin iOS page dots: the current one a white capsule, the rest 30% white dots. */
 @Composable
 private fun PagerDots(count: Int, current: Int, modifier: Modifier = Modifier) {
     Row(
@@ -832,9 +832,11 @@ private fun PagerDots(count: Int, current: Int, modifier: Modifier = Modifier) {
                 Motion.press(),
                 label = "pagerDot",
             )
+            // The current one stretches into a short capsule, so where you are reads at a glance.
+            val width by animateDpAsState(if (index == current) 16.dp else 5.dp, Motion.press(), label = "pagerDotWidth")
             Box(
                 Modifier
-                    .size(5.dp)
+                    .size(width = width, height = 5.dp)
                     .clip(CircleShape)
                     .background(color),
             )

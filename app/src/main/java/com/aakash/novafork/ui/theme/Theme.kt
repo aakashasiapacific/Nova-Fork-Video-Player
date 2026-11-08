@@ -110,6 +110,8 @@ private fun ios(size: Float, line: Float, weight: FontWeight, tracking: Float): 
     fontSize = size.sp,
     lineHeight = line.sp,
     letterSpacing = tracking.sp,
+    // Equal-width digits everywhere, so times and counts never jitter as they change.
+    fontFeatureSettings = "tnum",
 )
 
 private val Base = Typography()

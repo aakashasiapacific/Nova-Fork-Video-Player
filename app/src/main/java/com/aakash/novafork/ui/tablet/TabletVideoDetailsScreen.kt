@@ -272,7 +272,7 @@ private fun VideoBody(details: VideoDetailsUi, actions: AppActions) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        if (!details.overview.isNullOrBlank()) Text(details.overview, style = MaterialTheme.typography.bodyLarge)
+        if (!details.overview.isNullOrBlank()) Text(details.overview, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.widthIn(max = ReadableWidth))
         val next = details.nextEpisode
         if (next != null) {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -352,3 +352,6 @@ private fun VideoFileCard(details: VideoDetailsUi, modifier: Modifier = Modifier
         }
     }
 }
+
+/** Overview text stays at a readable line length (about 70 characters) on a wide screen. */
+private val ReadableWidth = 640.dp

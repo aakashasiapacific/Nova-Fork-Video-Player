@@ -113,8 +113,9 @@ internal fun SettingsGroupBlock(group: SettingsGroup, title: String?, modifier: 
 @Composable
 internal fun GroupHeader(title: String) {
     Text(
-        text = title,
-        style = MaterialTheme.typography.bodySmall.copy(fontSize = 13.sp, lineHeight = 18.sp, fontWeight = FontWeight.Normal),
+        // iOS's grouped-list header: small capitals, a little tracked.
+        text = title.uppercase(),
+        style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp, lineHeight = 16.sp, fontWeight = FontWeight.Normal, letterSpacing = 0.4.sp),
         color = IosColors.SecondaryLabel,
         modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
     )
