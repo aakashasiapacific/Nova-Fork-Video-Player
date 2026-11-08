@@ -13,6 +13,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.layout.offset
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -39,12 +42,16 @@ fun HomeSectionHeader(title: String, modifier: Modifier = Modifier, onOpen: (() 
     val titleStyle = MaterialTheme.typography.titleLarge.copy(fontSize = 22.sp, lineHeight = 28.sp, fontWeight = FontWeight.Bold)
     Column(modifier) {
         if (onOpen != null) {
+            // The chevron nudges right while the header is pressed, as if pointing the way in.
+            val press = androidx.compose.runtime.remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+            val pressed by press.collectIsPressedAsState()
+            val nudge by androidx.compose.animation.core.animateDpAsState(if (pressed) 3.dp else 0.dp, Motion.press(), label = "chevronNudge")
             Row(
                 Modifier
                     // The tap area reaches 4dp past the text, which stays on the gutter.
                     .padding(start = dims.gutter - 4.dp)
                     .clip(RoundedCornerShape(8.dp))
-                    .clickable(onClickLabel = "Open $title", onClick = onOpen)
+                    .clickable(interactionSource = press, indication = androidx.compose.foundation.LocalIndication.current, onClickLabel = "Open $title", onClick = onOpen)
                     .padding(horizontal = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -53,7 +60,7 @@ fun HomeSectionHeader(title: String, modifier: Modifier = Modifier, onOpen: (() 
                     R.drawable.ic_chevron_right,
                     contentDescription = null,
                     tint = IosColors.SecondaryLabel,
-                    modifier = Modifier.padding(start = 2.dp).size(18.dp),
+                    modifier = Modifier.padding(start = 2.dp).offset(x = nudge).size(18.dp),
                 )
             }
         } else {

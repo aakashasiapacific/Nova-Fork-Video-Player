@@ -124,7 +124,7 @@ import com.aakash.novafork.ui.theme.SoftRowIndication
 import com.aakash.novafork.ui.theme.Spacing
 import kotlinx.coroutines.delay
 
-private val ThumbShape = RoundedCornerShape(8.dp)
+private val ThumbShape = RoundedCornerShape(12.dp)
 
 // ---------------------------------------------------------------------------------------------
 // Labels
