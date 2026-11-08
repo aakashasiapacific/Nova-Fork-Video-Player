@@ -29,6 +29,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.background
 import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
 import com.aakash.novafork.ui.adaptive.DeviceLayout
@@ -121,6 +123,13 @@ internal fun TabletLibraryScreen(
                     modifier = Modifier
                         .weight(0.58f)
                         .fillMaxHeight(),
+                )
+                // A hairline between the grid and the preview, as iPad's split views have.
+                Box(
+                    Modifier
+                        .fillMaxHeight()
+                        .width(0.5.dp)
+                        .background(Color.White.copy(alpha = 0.14f)),
                 )
                 TabletPreviewPane(
                     previewKey = previewKey,

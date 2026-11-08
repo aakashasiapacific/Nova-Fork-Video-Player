@@ -30,6 +30,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
@@ -277,7 +280,20 @@ private fun PlaySection(details: VideoDetailsUi, actions: AppActions, modifier: 
                 onClick = { actions.play(details.id) },
                 modifier = Modifier
                     .weight(1f)
-                    .height(52.dp),
+                    .height(52.dp)
+                    // Resuming: a thin line along the foot of the button shows how far it got.
+                    .drawWithContent {
+                        drawContent()
+                        val watched = details.progress?.coerceIn(0f, 1f) ?: 0f
+                        if (watched > 0f) {
+                            val inset = size.height / 2f
+                            val y = size.height - 7.dp.toPx()
+                            val stroke = 3.dp.toPx()
+                            val end = size.width - inset
+                            drawLine(Color.White.copy(alpha = 0.25f), Offset(inset, y), Offset(end, y), stroke, StrokeCap.Round)
+                            drawLine(Color.White.copy(alpha = 0.95f), Offset(inset, y), Offset(inset + (end - inset) * watched, y), stroke, StrokeCap.Round)
+                        }
+                    },
                 colors = ButtonDefaults.buttonColors(
                     containerColor = rememberPlayColor(details.artwork, NovaColors.IosBlue),
                     contentColor = Color.White,
