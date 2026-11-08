@@ -83,8 +83,9 @@ internal fun TabletSideBar(
             .padding(end = 8.dp)
             .width(TabletSideBarWidth)
             .frostedGlass(RoundedCornerShape(percent = 50))
-            .padding(vertical = 10.dp, horizontal = 6.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
+            // 14 + 10 at the ends equals 10 + 4 + 10 between tabs: the bar's ends match its gaps.
+            .padding(vertical = 14.dp, horizontal = 6.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         TopDestination.entries.forEach { tab ->

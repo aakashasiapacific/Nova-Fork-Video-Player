@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -61,7 +62,12 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.foundation.border
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.Animatable
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.PointerEventPass
@@ -415,6 +421,18 @@ private fun WideCardLayout(
                         },
                     ),
             )
+            // A half-watched card is a paused frame: a soft shade at its foot keeps the progress
+            // line readable over a bright picture, and a faint edge sets it off the black page.
+            if (progress != null && progress > 0f && progress < 1f) {
+                Box(
+                    Modifier
+                        .align(Alignment.BottomStart)
+                        .fillMaxWidth()
+                        .fillMaxHeight(0.35f)
+                        .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.45f)))),
+                )
+            }
+            Box(Modifier.matchParentSize().border(0.5.dp, Color.White.copy(alpha = 0.08f), shape))
             if (watched) WatchedBadge(Modifier.align(Alignment.TopEnd).padding(6.dp))
             if (newEpisode) NewEpisodeDot(Modifier.align(Alignment.TopStart).padding(8.dp))
             ProgressStrip(progress, Modifier.align(Alignment.BottomStart))
@@ -917,11 +935,11 @@ private fun PinnedMonth(months: List<TimelineMonth>, headings: List<Int>, state:
     }
     val month = months.getOrNull(current) ?: return
     var height by remember { mutableIntStateOf(0) }
-    Text(
-        month.title,
-        style = MaterialTheme.typography.titleLarge,
-        fontWeight = FontWeight.Bold,
-        modifier = Modifier
+    // Once pinned the heading eases down a size, as a large title settles into a bar (iOS).
+    val squeeze = remember { Animatable(1f) }
+    LaunchedEffect(Unit) { squeeze.animateTo(PinnedMonthScale, tween(220)) }
+    Box(
+        Modifier
             .fillMaxWidth()
             .onSizeChanged { height = it.height }
             .graphicsLayer {
@@ -938,8 +956,22 @@ private fun PinnedMonth(months: List<TimelineMonth>, headings: List<Int>, state:
             }
             .padding(horizontal = dims.gutter)
             .padding(top = 12.dp, bottom = 6.dp),
-    )
+    ) {
+        Text(
+            month.title,
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.graphicsLayer {
+                scaleX = squeeze.value
+                scaleY = squeeze.value
+                transformOrigin = TransformOrigin(0f, 0.5f)
+            },
+        )
+    }
 }
+
+/** How small the pinned month heading settles to. */
+private const val PinnedMonthScale = 0.88f
 
 /**
  * The poster size picked by pinching a poster grid (All Videos, Recently Added), shared by both and
