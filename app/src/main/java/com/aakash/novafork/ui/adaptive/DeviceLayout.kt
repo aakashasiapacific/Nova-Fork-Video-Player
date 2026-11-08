@@ -59,10 +59,11 @@ data class NovaDimens(
 )
 
 val PhoneDimens = NovaDimens(
-    gutter = 16.dp,
-    posterWidth = 112.dp,
+    // 20 dp sides (iOS's readable margin), and row cards a touch narrower so more of the next one peeks in.
+    gutter = 20.dp,
+    posterWidth = 108.dp,
     gridMinCell = 104.dp,
-    landscapeCardWidth = 248.dp,
+    landscapeCardWidth = 236.dp,
     cardRadius = 12.dp,
     rowSpacing = 10.dp,
     sectionSpacing = 24.dp,
@@ -72,7 +73,8 @@ val PhoneDimens = NovaDimens(
 val TabletDimens = NovaDimens(
     gutter = 32.dp,
     posterWidth = 156.dp,
-    gridMinCell = 150.dp,
+    // Fewer, bigger posters on a tablet's library grid.
+    gridMinCell = 170.dp,
     landscapeCardWidth = 320.dp,
     cardRadius = 16.dp,
     rowSpacing = 16.dp,
