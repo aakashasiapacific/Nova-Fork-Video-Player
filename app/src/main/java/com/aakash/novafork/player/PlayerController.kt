@@ -832,7 +832,10 @@ class PlayerController(
         if (carry == null) showPreferences.rate(currentShowKey)?.let { rate -> _state.update { it.copy(rate = rate) } }
         // Likewise the subtitle language (or none) last chosen for the show.
         showSubtitlesOff = showPreferences.subtitlesOff(currentShowKey)
-        subtitleLanguage = showPreferences.subtitleLanguage(currentShowKey) ?: TrackLanguages.aliases(settings.preferredSubtitleLanguage)
+        // A show's own choice, then its source's language (Preferences › Library), then the general one.
+        val sourceLanguage = video?.sourceId?.let { com.aakash.novafork.data.SourceSubtitleLanguages.get(appContext, it) }
+        subtitleLanguage = showPreferences.subtitleLanguage(currentShowKey)
+            ?: TrackLanguages.aliases(sourceLanguage ?: settings.preferredSubtitleLanguage)
         audioChoicePending = rememberedAudio != null || audioLanguage.isNotEmpty()
         val resumeAt = if (
             video != null && settings.resumePlayback && !request.startOver && !video.watched &&

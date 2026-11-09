@@ -23,6 +23,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.platform.LocalFocusManager
@@ -32,6 +33,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
+import com.aakash.novafork.data.SourceSubtitleLanguages
 import com.aakash.novafork.ui.model.PlayerButton
 import com.aakash.novafork.data.AspectMode
 import com.aakash.novafork.data.DetailsHeaderStyle
@@ -258,7 +260,29 @@ private fun SourceRow(shape: Shape, source: SourceUi, onEdit: (() -> Unit)?, onR
         )
         // One "…" menu instead of a pencil and a bin on every row, as iOS keeps a list's actions.
         var menuOpen by remember { mutableStateOf(false) }
+        var languageOpen by remember { mutableStateOf(false) }
         Box {
+            // This source's subtitle language: its videos prefer it over the general one.
+            val context = LocalContext.current
+            var chosen by remember(source.id) { mutableStateOf(SourceSubtitleLanguages.get(context, source.id).orEmpty()) }
+            NovaDropdownMenu(
+                expanded = languageOpen,
+                onDismissRequest = { languageOpen = false },
+                title = "Subtitles for ${source.name}",
+                scrollToItem = TrackLanguages.indexOfFirst { it.value == chosen }.coerceAtLeast(0),
+            ) {
+                TrackLanguages.forEach { option ->
+                    NovaMenuItem(
+                        text = { Text(if (option.value.isBlank()) "Same as Player Setting" else option.label) },
+                        checked = option.value == chosen,
+                        onClick = {
+                            languageOpen = false
+                            chosen = option.value
+                            SourceSubtitleLanguages.set(context, source.id, option.value)
+                        },
+                    )
+                }
+            }
             IosIconButton(onClick = { menuOpen = true }) {
                 NovaIcon(R.drawable.ic_more_vert, contentDescription = "Options for ${source.name}")
             }
@@ -273,6 +297,14 @@ private fun SourceRow(shape: Shape, source: SourceUi, onEdit: (() -> Unit)?, onR
                         },
                     )
                 }
+                NovaMenuItem(
+                    text = { Text("Subtitle Language") },
+                    leadingIcon = { NovaIcon(R.drawable.ic_subtitles, contentDescription = null) },
+                    onClick = {
+                        menuOpen = false
+                        languageOpen = true
+                    },
+                )
                 if (onEdit != null) {
                     NovaMenuItem(
                         text = { Text("Edit") },
