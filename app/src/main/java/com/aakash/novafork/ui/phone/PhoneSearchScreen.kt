@@ -484,7 +484,8 @@ internal fun RecentSearchesBlock(
                 SwipeToDelete(onDelete = { onForget(query) }, label = "Remove") {
                     Column(Modifier.clickable { onPick(query) }) {
                         Row(Modifier.padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                            NovaIcon(R.drawable.ic_search, contentDescription = null, tint = IosColors.SecondaryLabel, modifier = Modifier.size(18.dp))
+                            // A clock: something searched before (iOS).
+                            NovaIcon(R.drawable.ic_history, contentDescription = null, tint = IosColors.SecondaryLabel, modifier = Modifier.size(18.dp))
                             Text(
                                 query,
                                 style = MaterialTheme.typography.bodyLarge,
