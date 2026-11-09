@@ -185,6 +185,11 @@ private fun TabletPage(state: AppUiState, actions: AppActions, layout: DeviceLay
             actions = actions,
             modifier = pageModifier,
         )
+        Route.Upcoming -> com.aakash.novafork.ui.phone.PhoneUpcomingScreen(
+            items = state.upcoming,
+            actions = actions,
+            modifier = pageModifier,
+        )
         Route.UpNext -> PhoneContinueWatchingScreen(
             cards = state.home.upNext,
             actions = actions,

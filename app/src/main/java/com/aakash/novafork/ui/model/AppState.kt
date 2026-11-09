@@ -52,6 +52,9 @@ sealed interface Route {
     /** Preferences › Hidden Videos: what was hidden from the library, each with "Unhide". */
     data object HiddenVideos : Route
 
+    /** Coming Up: new episodes on the way for the library's shows. */
+    data object Upcoming : Route
+
     /** Preferences › Library Health: videos without artwork or details, episodes the names gave no number. */
     data object LibraryHealth : Route
 }
@@ -60,7 +63,7 @@ sealed interface Route {
 val Route.top: TopDestination
     get() = when (this) {
         Route.Home, Route.Library, Route.ContinueWatching, Route.UpNext, Route.History, is Route.VideoDetails, is Route.ShowDetails, is Route.Playlist,
-        is Route.Person,
+        is Route.Person, Route.Upcoming,
         -> TopDestination.VIDEO
         // Sources are under Settings.
         Route.Browse, is Route.BrowseDir, Route.Settings, is Route.SettingsPage, Route.HiddenVideos, Route.LibraryHealth -> TopDestination.SETTINGS
@@ -298,6 +301,8 @@ data class AppUiState(
     val playlist: PlaylistDetailsUi? = null,
     /** The History page (route History): played videos by day, newest first. */
     val history: List<HistoryDayUi> = emptyList(),
+    /** Set while route is [Route.Upcoming]. */
+    val upcoming: List<UpcomingUi> = emptyList(),
     /** An actor's or director's page (route Person): the library's movies and shows they are credited in, newest first. */
     val person: List<LibraryItemUi> = emptyList(),
     /** Hidden Videos (route HiddenVideos): what was hidden from the library. */
@@ -614,3 +619,15 @@ open class NoOpAppActions : AppActions {
     override fun dismissCrashReport() {}
 }
 
+
+/** A show of Coming Up: the day its next episode airs. */
+@Immutable
+data class UpcomingUi(
+    val showKey: String,
+    val title: String,
+    val artwork: Artwork,
+    /** "Today", "Tomorrow", "Friday" or "14 Nov". */
+    val dayLabel: String,
+    /** The full date, "Friday 14 November 2026". */
+    val dateLabel: String,
+)

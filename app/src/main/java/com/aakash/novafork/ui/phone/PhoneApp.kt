@@ -588,6 +588,11 @@ private fun PhonePage(state: AppUiState, actions: AppActions) {
             actions = actions,
             modifier = pageModifier,
         )
+        Route.Upcoming -> PhoneUpcomingScreen(
+            items = state.upcoming,
+            actions = actions,
+            modifier = pageModifier,
+        )
         Route.UpNext -> PhoneContinueWatchingScreen(
             cards = state.home.upNext,
             actions = actions,

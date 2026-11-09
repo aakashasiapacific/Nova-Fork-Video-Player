@@ -52,6 +52,7 @@ import com.aakash.novafork.ui.model.AppUiState
 import com.aakash.novafork.ui.model.BackupUi
 import com.aakash.novafork.ui.model.VideoCardUi
 import com.aakash.novafork.ui.model.HomeUi
+import com.aakash.novafork.ui.model.UpcomingUi
 import com.aakash.novafork.ui.model.BrowseDirUi
 import com.aakash.novafork.ui.model.CastUi
 import com.aakash.novafork.ui.model.DialogUi
@@ -475,6 +476,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
             showDetails = showKey?.let { withShowExtras(index, it, UiMappers.showDetails(index, it)) },
             previewKey = previewKey,
             history = if (route == Route.History) UiMappers.history(index, user.historyHidden) else emptyList(),
+            upcoming = if (route == Route.Upcoming) upcomingOf(index) else emptyList(),
             person = (route as? Route.Person)?.let { UiMappers.person(index, it.name) }.orEmpty(),
             health = if (route == Route.LibraryHealth) UiMappers.libraryHealth(index) else LibraryHealthUi(),
             hidden = if (route == Route.HiddenVideos) UiMappers.hiddenVideos(index, hiddenVideoIds.value) else emptyList(),
@@ -555,6 +557,42 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
                 DateFormat.getBestDateTimePattern(locale, skeleton)
             },
         )
+    }
+
+    /** Coming Up: shows with a next episode dated today or later (TMDB, cached), soonest first. */
+    private fun upcomingOf(index: LibraryIndex): List<UpcomingUi> {
+        val extras = graph.titleExtras
+        val today = LocalDate.now()
+        val locale = Locale.getDefault()
+        val day = java.time.format.DateTimeFormatter.ofPattern("EEEE", locale)
+        val short = java.time.format.DateTimeFormatter.ofPattern("d MMM", locale)
+        val full = java.time.format.DateTimeFormatter.ofPattern("EEEE d MMMM yyyy", locale)
+        return index.shows.asSequence()
+            .take(UPCOMING_SHOW_LIMIT)
+            .mapNotNull { show ->
+                val key = show.meta?.key ?: return@mapNotNull null
+                extras.request(key)
+                val date = extras.nextAirDate(key)?.let { runCatching { LocalDate.parse(it.take(10)) }.getOrNull() }
+                    ?.takeIf { !it.isBefore(today) } ?: return@mapNotNull null
+                date to show
+            }
+            .sortedBy { it.first }
+            .map { (date, show) ->
+                val days = java.time.temporal.ChronoUnit.DAYS.between(today, date)
+                UpcomingUi(
+                    showKey = show.key,
+                    title = show.title,
+                    artwork = show.card.artwork,
+                    dayLabel = when {
+                        days == 0L -> "Today"
+                        days == 1L -> "Tomorrow"
+                        days < 7L -> date.format(day)
+                        else -> date.format(short)
+                    },
+                    dateLabel = date.format(full),
+                )
+            }
+            .toList()
     }
 
     /** Library folders for device, picked folders and SMB; the other network sources as listed live. */
@@ -2029,6 +2067,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
         const val KEY_RECENT_SEARCHES = "recent"
         const val KEY_HIDDEN_VIDEOS = "videos"
         const val HOME_HIDDEN_KEY = "hidden"
+        const val UPCOMING_SHOW_LIMIT = 80
         const val HOME_PINNED_KEY = "pinned"
         val TRAILING_YEAR = Regex("""\s*\(?(19|20)\d{2}\)?$""")
 
