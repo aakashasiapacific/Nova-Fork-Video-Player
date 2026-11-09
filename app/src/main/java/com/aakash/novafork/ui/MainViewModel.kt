@@ -1819,6 +1819,39 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
      * The watch history as CSV at [uri]: every video ever played, last played first, with its
      * show, season, episode, play count, watched state and file name. Nothing is changed.
      */
+    /** Preferences › Library › Export Library: every title as a CSV row (the files are untouched). */
+    fun writeLibraryCsv(uri: Uri) {
+        val index = latestIndex ?: return
+        val resolver = getApplication<Application>().contentResolver
+        launchSafely("Couldn't save the library list") {
+            val rows = index.allVideos.sortedWith(compareBy({ it.kind.name }, { (it.showTitle ?: it.title).lowercase() }, { it.video.season ?: 0 }, { it.video.episode ?: 0 }))
+            val text = buildString {
+                appendLine("Kind,Title,Year,Show,Season,Episode,Length (min),Watched,Source,File")
+                for (item in rows) {
+                    val video = item.video
+                    appendLine(
+                        listOf(
+                            item.kind.name.lowercase().replaceFirstChar { it.uppercase() },
+                            item.title,
+                            item.card.year?.toString().orEmpty(),
+                            item.showTitle.orEmpty(),
+                            video.season?.toString().orEmpty(),
+                            video.episode?.toString().orEmpty(),
+                            video.durationMs?.let { (it / 60_000L).toString() }.orEmpty(),
+                            if (video.watched) "yes" else "no",
+                            item.source?.name.orEmpty(),
+                            video.fileName,
+                        ).joinToString(",") { csvField(it) },
+                    )
+                }
+            }
+            withContext(Dispatchers.IO) {
+                openForWriting(resolver, uri).use { it.write(text.toByteArray(Charsets.UTF_8)) }
+            }
+            showMessage(if (rows.size == 1) "1 title exported" else "${rows.size} titles exported")
+        }
+    }
+
     fun writeHistoryCsv(uri: Uri) {
         val index = latestIndex ?: return
         val resolver = getApplication<Application>().contentResolver

@@ -569,6 +569,9 @@ interface AppActions {
     /** Saves the watch history as a CSV file the person picks (History's "Export"). */
     fun exportHistory() {}
 
+    /** Saves a CSV list of every title in the library. */
+    fun exportLibrary() {}
+
     /** Picks a backup file (system picker) and reads it; [BackupUi.confirm] then asks before restoring. */
     fun importBackup() {}
 

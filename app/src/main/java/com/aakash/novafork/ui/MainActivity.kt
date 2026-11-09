@@ -90,6 +90,11 @@ class MainActivity : ComponentActivity() {
             if (uri != null) viewModel.writeHistoryCsv(uri)
         }
 
+    private val librarySaver =
+        registerForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri ->
+            if (uri != null) viewModel.writeLibraryCsv(uri)
+        }
+
     private val backupFolderPicker = registerForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
         if (uri != null) {
             try {
@@ -198,6 +203,14 @@ class MainActivity : ComponentActivity() {
             override fun exportHistory() {
                 try {
                     historySaver.launch("NovaFork-history-${LocalDate.now()}.csv")
+                } catch (e: ActivityNotFoundException) {
+                    viewModel.showMessage("This device has no file picker to save with")
+                }
+            }
+
+            override fun exportLibrary() {
+                try {
+                    librarySaver.launch("NovaFork-library-${LocalDate.now()}.csv")
                 } catch (e: ActivityNotFoundException) {
                     viewModel.showMessage("This device has no file picker to save with")
                 }

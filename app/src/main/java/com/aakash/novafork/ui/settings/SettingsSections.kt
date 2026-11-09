@@ -131,6 +131,7 @@ private fun libraryGroups(state: SettingsUi, actions: AppActions): List<Settings
                 actionRow("duplicates", R.drawable.ic_video_library, "Find duplicates") { actions.openLibrary(LibraryFilter.DUPLICATES) },
                 actionRow("hidden", R.drawable.ic_visibility_off, "Hidden Videos") { actions.navigate(Route.HiddenVideos) },
                 actionRow("health", R.drawable.ic_check_circle, "Library Health") { actions.navigate(Route.LibraryHealth) },
+                actionRow("export-library", R.drawable.ic_video_library, "Export Library List") { actions.exportLibrary() },
                 SettingsRow("all-files", "All files access", R.drawable.ic_folder_special) { shape ->
                     AllFilesAccessRow(
                         shape = shape,
