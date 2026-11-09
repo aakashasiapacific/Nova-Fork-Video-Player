@@ -754,8 +754,15 @@ private fun appearanceGroups(settings: Settings, actions: AppActions): List<Sett
                 settings.layoutMode,
                 tile = IosPalette.Blue,
             ) { mode -> actions.updateSettings { it.copy(layoutMode = mode) } },
+            choiceRow(
+                "start-tab",
+                R.drawable.ic_home,
+                "Open On",
+                listOf(Option("VIDEO", "Video"), Option("AUDIO", "Audio"), Option("SEARCH", "Search")),
+                settings.startTab,
+            ) { tab -> actions.updateSettings { it.copy(startTab = tab) } },
         ),
-        footer = "Automatic uses the tablet layout from 600dp wide.",
+        footer = "Automatic uses the tablet layout from 600dp wide. Open On picks the tab the app starts on.",
     ),
     homeRowsGroup(settings, actions),
     SettingsGroup(
@@ -831,8 +838,10 @@ private fun aboutGroups(state: SettingsUi, actions: AppActions): List<SettingsGr
         rows = listOf(
             infoRow("version", R.drawable.ic_info, "Version", state.versionName.ifBlank { "Unknown" }),
             actionRow("diagnostics", R.drawable.ic_tune, "Library diagnostics", onClick = actions::openLibraryDiagnostics),
+            actionRow("share-diagnostics", R.drawable.ic_info, "Share Player Diagnostics", onClick = actions::shareDiagnostics),
         ),
-        footer = "Shows what Nova sees in each source, to copy or share.",
+        footer = "Library diagnostics shows what Nova sees in each source. Player diagnostics shares the app and " +
+            "device versions with the player's recent events, for a bug report; nothing is sent by itself.",
     ),
     whatsNewGroup(state.versionName),
     SettingsGroup(
@@ -841,6 +850,8 @@ private fun aboutGroups(state: SettingsUi, actions: AppActions): List<SettingsGr
         rows = listOf(
             infoRow("libvlc", R.drawable.ic_play_arrow, "Playback by libVLC", "LGPL"),
             infoRow("tmdb", R.drawable.ic_movie, "Metadata from TMDB", null, tile = IosPalette.Teal),
+            infoRow("lrclib", R.drawable.ic_music_notes, "Lyrics from LRCLIB", null),
+            infoRow("deezer", R.drawable.ic_album, "Artist photos from Deezer", null),
         ),
         footer = "libVLC is licensed under the LGPL. This product uses the TMDB API but is not endorsed or " +
             "certified by TMDB.",

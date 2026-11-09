@@ -455,6 +455,9 @@ interface AppActions {
 
     /** Shares the crash report text (Android share sheet). */
     fun shareCrashReport()
+
+    /** Shares a short report for a bug: the app and Android versions, the device, the player's recent events. */
+    fun shareDiagnostics() {}
     /** Forgets the crash report. */
     fun dismissCrashReport()
 

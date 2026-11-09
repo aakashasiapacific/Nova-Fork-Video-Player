@@ -185,6 +185,12 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
             historyHidden = readHistoryHidden(),
             homeHidden = homePrefs.getStringSet(HOME_HIDDEN_KEY, null).orEmpty().toSet(),
             homePinned = homePrefs.getString(HOME_PINNED_KEY, null),
+            // Preferences › Appearance › Open On: the tab the app starts on.
+            backStack = when (settingsStore.settings.value.startTab) {
+                "AUDIO" -> listOf(Route.Home, Route.Audio)
+                "SEARCH" -> listOf(Route.Home, Route.Search)
+                else -> listOf(Route.Home)
+            },
         ),
     )
 

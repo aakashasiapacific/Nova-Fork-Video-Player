@@ -186,6 +186,8 @@ data class Settings(
     val onlineLyrics: Boolean = false,
     /** Artist photos and missing album covers from Deezer's public catalogue (names are sent). */
     val onlineMusicArt: Boolean = false,
+    /** The tab the app opens on: "VIDEO", "AUDIO" or "SEARCH". */
+    val startTab: String = "VIDEO",
     /** The Home hero's look; see [HeroStyle]. */
     val heroStyle: HeroStyle = HeroStyle.BACKDROP,
     /** Library pages as a poster grid or a list. */

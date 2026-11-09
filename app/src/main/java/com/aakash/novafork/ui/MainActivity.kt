@@ -156,6 +156,18 @@ class MainActivity : ComponentActivity() {
                 shareText("Nova Fork crash report", report)
             }
 
+            override fun shareDiagnostics() {
+                val report = buildString {
+                    appendLine("Nova Fork ${com.aakash.novafork.BuildConfig.VERSION_NAME} (${com.aakash.novafork.BuildConfig.VERSION_CODE})")
+                    appendLine("Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT}) · ${Build.MANUFACTURER} ${Build.MODEL}")
+                    appendLine("ABIs: ${Build.SUPPORTED_ABIS.joinToString()}")
+                    appendLine()
+                    appendLine("Player events:")
+                    com.aakash.novafork.player.PlayerDiagnostics.recent().forEach { appendLine(it) }
+                }
+                shareText("Nova Fork diagnostics", report)
+            }
+
             override fun shareText(subject: String, text: String) {
                 val send = Intent(Intent.ACTION_SEND)
                     .setType("text/plain")
