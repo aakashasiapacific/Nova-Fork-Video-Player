@@ -65,6 +65,18 @@ fun PhoneBrowseDirScreen(
             onBack = actions::back,
             actions = {
                 if (dir != null) {
+                    // Bookmark this folder: it then sits on Browse for a quick way back.
+                    val context = androidx.compose.ui.platform.LocalContext.current
+                    val marked = com.aakash.novafork.ui.common.FolderBookmarks.isBookmarked(dir.sourceId, dir.path)
+                    IosIconButton(onClick = {
+                        com.aakash.novafork.ui.common.FolderBookmarks.toggle(context, dir.sourceId, dir.path, dir.title)
+                    }) {
+                        NovaIcon(
+                            R.drawable.ic_bookmark,
+                            contentDescription = if (marked) "Remove Bookmark" else "Bookmark Folder",
+                            tint = if (marked) com.aakash.novafork.ui.theme.NovaColors.IosBlue else androidx.compose.ui.graphics.Color.White,
+                        )
+                    }
                     IosIconButton(onClick = { actions.rescanSource(dir.sourceId) }, enabled = !dir.isLoading) {
                         NovaIcon(R.drawable.ic_refresh, contentDescription = "Rescan")
                     }

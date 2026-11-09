@@ -50,6 +50,7 @@ import com.aakash.novafork.ui.common.ScanBanner
 import com.aakash.novafork.ui.common.deviceAccessNotice
 import com.aakash.novafork.ui.dialogs.playlistCountLabel
 import com.aakash.novafork.ui.model.AppActions
+import com.aakash.novafork.ui.model.Route
 import com.aakash.novafork.ui.model.BrowseUi
 import com.aakash.novafork.ui.model.DialogUi
 import com.aakash.novafork.ui.model.PermissionUi
@@ -141,6 +142,18 @@ private fun LazyListScope.browseItems(
         }
     }
 
+    val bookmarks = com.aakash.novafork.ui.common.FolderBookmarks.all.toList()
+    if (bookmarks.isNotEmpty()) {
+        cardSection(
+            "bookmarks",
+            "Bookmarks",
+            bookmarks.map { mark ->
+                "mark:${mark.sourceId}:${mark.path}" to @Composable {
+                    ActionRow(R.drawable.ic_bookmark, mark.name) { actions.navigate(Route.BrowseDir(mark.sourceId, mark.path)) }
+                }
+            },
+        )
+    }
     cardSection(
         "folders",
         "Folders",
