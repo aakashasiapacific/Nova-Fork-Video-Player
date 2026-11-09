@@ -24,6 +24,8 @@ import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -365,6 +367,32 @@ internal fun PlayerTitle(state: PlayerUiState, modifier: Modifier = Modifier, la
                 overflow = TextOverflow.Ellipsis,
             )
         }
+        // The status bar is hidden while a video plays: the time and battery stay in sight here.
+        PlayerClock(large)
+    }
+}
+
+/** "21:04 · 86%": the time and the battery, small and grey, refreshed every half minute. */
+@Composable
+private fun PlayerClock(large: Boolean) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var line by remember { mutableStateOf("") }
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        val format = android.text.format.DateFormat.getTimeFormat(context)
+        val battery = context.getSystemService(android.content.Context.BATTERY_SERVICE) as? android.os.BatteryManager
+        while (true) {
+            val level = battery?.getIntProperty(android.os.BatteryManager.BATTERY_PROPERTY_CAPACITY)?.takeIf { it in 0..100 }
+            line = listOfNotNull(format.format(java.util.Date()), level?.let { "$it%" }).joinToString(" · ")
+            kotlinx.coroutines.delay(30_000L)
+        }
+    }
+    if (line.isNotEmpty()) {
+        Text(
+            text = line,
+            style = if (large) MaterialTheme.typography.bodySmall else MaterialTheme.typography.labelSmall,
+            color = Color.White.copy(alpha = 0.55f),
+            maxLines = 1,
+        )
     }
 }
 
