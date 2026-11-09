@@ -318,7 +318,8 @@ internal fun BoxScope.ControlScrims(top: Dp, bottom: Dp) {
             .align(Alignment.TopCenter)
             .fillMaxWidth()
             .height(top)
-            .background(Brush.verticalGradient(listOf(NovaColors.PlayerScrim, Color.Transparent))),
+            // A deeper shade at the very top, easing out, so the title and clock read over any picture.
+            .background(Brush.verticalGradient(0f to Color.Black.copy(alpha = 0.85f), 0.45f to NovaColors.PlayerScrim.copy(alpha = 0.45f), 1f to Color.Transparent)),
     )
     Box(
         Modifier
