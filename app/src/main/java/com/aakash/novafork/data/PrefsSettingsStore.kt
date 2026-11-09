@@ -108,6 +108,8 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
             putString(KEY_HIDDEN_PLAYER_BUTTONS, s.hiddenPlayerButtons)
             putString(KEY_HOME_ROW_ORDER, s.homeRowOrder)
             putString(KEY_HOME_HIDDEN_ROWS, s.homeHiddenRows)
+            putBoolean(KEY_ONLINE_LYRICS, s.onlineLyrics)
+            putBoolean(KEY_ONLINE_MUSIC_ART, s.onlineMusicArt)
         }
     }
 
@@ -178,6 +180,8 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
         const val KEY_HIDDEN_PLAYER_BUTTONS = "hidden_player_buttons"
         const val KEY_HOME_ROW_ORDER = "home_row_order"
         const val KEY_HOME_HIDDEN_ROWS = "home_hidden_rows"
+        const val KEY_ONLINE_LYRICS = "online_lyrics"
+        const val KEY_ONLINE_MUSIC_ART = "online_music_art"
 
         /**
          * The type [write] stores each key with. A restored backup's entry of another type is
@@ -243,6 +247,8 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
             KEY_HIDDEN_PLAYER_BUTTONS to SettingType.STRING,
             KEY_HOME_ROW_ORDER to SettingType.STRING,
             KEY_HOME_HIDDEN_ROWS to SettingType.STRING,
+            KEY_ONLINE_LYRICS to SettingType.BOOLEAN,
+            KEY_ONLINE_MUSIC_ART to SettingType.BOOLEAN,
         )
 
         /**
@@ -326,6 +332,8 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
                 hiddenPlayerButtons = prefs.string(KEY_HIDDEN_PLAYER_BUTTONS) ?: defaults.hiddenPlayerButtons,
                 homeRowOrder = prefs.string(KEY_HOME_ROW_ORDER) ?: defaults.homeRowOrder,
                 homeHiddenRows = prefs.string(KEY_HOME_HIDDEN_ROWS) ?: defaults.homeHiddenRows,
+                onlineLyrics = prefs.boolean(KEY_ONLINE_LYRICS, defaults.onlineLyrics),
+                onlineMusicArt = prefs.boolean(KEY_ONLINE_MUSIC_ART, defaults.onlineMusicArt),
             )
         }
 

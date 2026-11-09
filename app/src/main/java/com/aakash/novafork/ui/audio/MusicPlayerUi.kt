@@ -1699,6 +1699,7 @@ private fun SleepButton(sleep: SleepTimer?, actions: AudioActions) {
                     when (sleep) {
                         is SleepTimer.At -> "${((sleep.endsAt - now).coerceAtLeast(0L) + 59_999L) / 60_000L} min"
                         SleepTimer.EndOfSong -> "End of song"
+                        SleepTimer.EndOfAlbum -> "End of album"
                     },
                     style = LocalTextStyle.current.copy(fontSize = 11.sp),
                     color = Color.White.copy(alpha = 0.7f),
@@ -1711,10 +1712,11 @@ private fun SleepButton(sleep: SleepTimer?, actions: AudioActions) {
                 val chosen = when (sleep) {
                     null -> minutes == 0
                     is SleepTimer.At -> sleep.minutes == minutes
-                    SleepTimer.EndOfSong -> minutes < 0
+                    SleepTimer.EndOfSong -> minutes == -1
+                    SleepTimer.EndOfAlbum -> minutes == -2
                 }
-                // The end of the song stands apart from the times, as iOS 27 sections a menu.
-                if (minutes < 0) NovaMenuDivider()
+                // The ends of the song and album stand apart from the times, as iOS 27 sections a menu.
+                if (minutes == -1) NovaMenuDivider()
                 NovaMenuItem(
                     text = { Text(label) },
                     checked = chosen,
@@ -1736,6 +1738,7 @@ private val SLEEP_CHOICES = listOf(
     45 to "45 Minutes",
     60 to "1 Hour",
     -1 to "End of Song",
+    -2 to "End of Album",
 )
 private const val SLEEP_TICK_MS = 15_000L
 
@@ -1784,7 +1787,15 @@ private fun PaneButton(
  * takes its size from [modifier] (a grid cell, the album page).
  */
 @Composable
-internal fun Cover(uri: String?, size: Int, corner: Int = 8, round: Boolean = false, modifier: Modifier = Modifier) {
+internal fun Cover(
+    uri: String?,
+    size: Int,
+    corner: Int = 8,
+    round: Boolean = false,
+    modifier: Modifier = Modifier,
+    /** Shown when [uri] has no picture: an online cover (OnlineMusicArt), when that setting is on. */
+    fallback: String? = null,
+) {
     val shape = if (round) CircleShape else RoundedCornerShape(corner.dp)
     Box(
         (if (size > 0) modifier.size(size.dp) else modifier)
@@ -1799,11 +1810,25 @@ internal fun Cover(uri: String?, size: Int, corner: Int = 8, round: Boolean = fa
             // Without a set size (a cell of a cover grid, a big cover) the note takes 40% of the box.
             modifier = if (size > 0) Modifier.size((size * 0.4f).dp) else Modifier.fillMaxSize(0.4f),
         )
+        val online = fallback?.takeIf { LocalOnlineMusicArt.current }
+        var failed by remember(uri) { mutableStateOf(false) }
+        if (online != null && (uri == null || failed)) {
+            AsyncImage(model = online, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+        }
         if (uri != null) {
-            AsyncImage(model = uri, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+            AsyncImage(
+                model = uri,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+                onError = { failed = true },
+            )
         }
     }
 }
+
+/** Preferences › Player › Music › Artist Photos and Covers: online pictures may stand in. */
+internal val LocalOnlineMusicArt = androidx.compose.runtime.compositionLocalOf { false }
 
 
 internal fun formatTime(ms: Long): String {

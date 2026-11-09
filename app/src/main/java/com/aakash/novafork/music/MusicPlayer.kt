@@ -53,6 +53,9 @@ sealed interface SleepTimer {
     data class At(val endsAt: Long, val minutes: Int) : SleepTimer
 
     data object EndOfSong : SleepTimer
+
+    /** Stops once the album playing ends (the next song is from another album, or none). */
+    data object EndOfAlbum : SleepTimer
 }
 
 data class MusicPlayerState(
@@ -223,6 +226,7 @@ class MusicPlayer(
         ).withQueue()
         lyricsJob = scope.launch {
             val lyrics = music.lyrics(song)
+                ?: if (settings().onlineLyrics) com.aakash.novafork.data.music.OnlineLyrics.lyrics(appContext, song) else null
             if (_state.value.nowPlaying?.songId == song.id) _state.update { it.copy(lyrics = lyrics) }
         }
     }
@@ -310,6 +314,7 @@ class MusicPlayer(
         mediaPlayer?.volume = songVolume
         when {
             minutes == 0 -> _state.update { it.copy(sleep = null) }
+            minutes == SLEEP_END_OF_ALBUM -> _state.update { it.copy(sleep = SleepTimer.EndOfAlbum) }
             minutes < 0 -> _state.update { it.copy(sleep = SleepTimer.EndOfSong) }
             else -> {
                 val length = minutes * 60_000L
@@ -648,6 +653,22 @@ class MusicPlayer(
         }
         val songId = _state.value.nowPlaying?.songId
         if (songId != null) scope.launch { runCatchingLogged { music.markPlayed(songId) } }
+        // Asleep at the end of the album: once the next song is from another album (or there is none).
+        if (_state.value.sleep == SleepTimer.EndOfAlbum) {
+            val next = queue.nextPosition(wrap = false)
+            val nextId = next?.let { queue.idAt(it) }
+            val album = songId?.let { albumOf[it] }
+            if (nextId == null || album == null || albumOf[nextId] != album) {
+                _state.update { it.copy(sleep = null) }
+                if (next != null) {
+                    holdNextStart = true
+                    moveTo(next)
+                    return
+                }
+                endQueue()
+                return
+            }
+        }
         // Asleep at the end of this song: the next one loads but waits, paused.
         if (_state.value.sleep == SleepTimer.EndOfSong) {
             _state.update { it.copy(sleep = null) }
@@ -799,13 +820,13 @@ class MusicPlayer(
         val duration = state.durationMs
         if (duration <= 0L || ended || !state.playRequested) return
         // The last song of the queue: Autoplay chooses what follows before it ends, so it follows with no gap.
-        if (autoplayJob == null && duration - positionMs <= AUTOPLAY_BEFORE_END_MS && queue.nextPosition(wrap = false) == null && state.sleep != SleepTimer.EndOfSong && autoplayOn()) {
+        if (autoplayJob == null && duration - positionMs <= AUTOPLAY_BEFORE_END_MS && queue.nextPosition(wrap = false) == null && state.sleep != SleepTimer.EndOfSong && state.sleep != SleepTimer.EndOfAlbum && autoplayOn()) {
             autoplayJob = scope.launch { extendWithAutoplay() }
         }
         val fadeMs = settings().crossfadeSeconds.coerceIn(0, MAX_CROSSFADE_SECONDS) * 1_000L
         if (fadeMs > 0L) {
             // Not into the same song again (repeat one), nor past a sleep timer set for the song's end.
-            if (crossfadeJob != null || !state.isPlaying || state.repeat == RepeatMode.ONE || state.sleep == SleepTimer.EndOfSong) return
+            if (crossfadeJob != null || !state.isPlaying || state.repeat == RepeatMode.ONE || state.sleep == SleepTimer.EndOfSong || state.sleep == SleepTimer.EndOfAlbum) return
             if (duration < fadeMs * 3 || positionMs < duration - fadeMs) return
             val next = queue.nextPosition(wrap = state.repeat == RepeatMode.ALL) ?: return
             val nextId = queue.idAt(next) ?: return
@@ -923,6 +944,7 @@ class MusicPlayer(
         SongPulses.prepare(appContext, scope, song.id, song.uri)
         lyricsJob = scope.launch {
             val lyrics = music.lyrics(song)
+                ?: if (settings().onlineLyrics) com.aakash.novafork.data.music.OnlineLyrics.lyrics(appContext, song) else null
             if (_state.value.nowPlaying?.songId == song.id) _state.update { it.copy(lyrics = lyrics) }
         }
         saveResume()
@@ -991,6 +1013,8 @@ class MusicPlayer(
         const val DUCKED_VOLUME = 30
 
         /** The sleep timer's fade: how long, and in how many steps. */
+        /** setSleepTimer's value for "stop at the end of the album". */
+        const val SLEEP_END_OF_ALBUM = -2
         const val SLEEP_FADE_MS = 6_000L
         const val SLEEP_FADE_STEPS = 30
 

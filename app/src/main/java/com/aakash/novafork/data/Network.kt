@@ -54,6 +54,7 @@ object Network {
                 add(VideoFrameDecoder.Factory())
                 add(SmbFetcher.Factory(smb))
                 add(SongArtFetcher.Factory())
+                add(com.aakash.novafork.sources.music.OnlineMusicArtFetcher.Factory())
                 add(SystemThumbnailFetcher.Factory())
                 add(coil.key.Keyer<SystemThumbnail> { data, _ -> "systhumb:${data.uri}" })
             }

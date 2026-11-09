@@ -104,6 +104,7 @@ import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.aakash.novafork.R
+import com.aakash.novafork.sources.music.OnlineMusicArt
 import com.aakash.novafork.data.db.MusicPlaylistRow
 import com.aakash.novafork.data.db.SongEntity
 import com.aakash.novafork.data.music.Album
@@ -559,7 +560,7 @@ private fun ArtistsPage(artists: List<Artist>, ctx: PageContext) {
             row("a:${artist.key}") {
                 ListRow(
                     title = artist.name,
-                    art = { Cover(artist.albums.firstOrNull()?.artUri, size = 48, round = true) },
+                    art = { Cover(artist.albums.firstOrNull()?.artUri, size = 48, round = true, fallback = OnlineMusicArt.artist(artist.name)) },
                     onClick = { ctx.onOpen(ARTIST + artist.key) },
                 )
             }
@@ -716,11 +717,11 @@ private fun AlbumPage(album: Album, ctx: PageContext) {
                         // Held, the cover shows large over the blurred page.
                         .combinedClickable(onClick = {}, onLongClickLabel = "Show the cover large", onLongClick = { coverLarge = true }),
                 ) {
-                    Cover(album.artUri, size = 0, corner = 10, modifier = Modifier.fillMaxSize())
+                    Cover(album.artUri, size = 0, corner = 10, modifier = Modifier.fillMaxSize(), fallback = OnlineMusicArt.album(album.artist, album.title))
                 }
                 if (coverLarge) {
                     ArtViewer(onDismiss = { coverLarge = false }) { art ->
-                        Cover(album.artUri, size = 0, corner = 14, modifier = art.fillMaxWidth().aspectRatio(1f))
+                        Cover(album.artUri, size = 0, corner = 14, modifier = art.fillMaxWidth().aspectRatio(1f), fallback = OnlineMusicArt.album(album.artist, album.title))
                     }
                 }
                 Text(
@@ -839,6 +840,23 @@ private fun ArtistHero(artist: Artist, ctx: PageContext) {
                     scaleY = 1.08f
                 },
         )
+        // With online pictures on, the artist's own photo covers the album picture once it loads.
+        if (LocalOnlineMusicArt.current) {
+            coil.compose.AsyncImage(
+                model = OnlineMusicArt.artist(artist.name),
+                contentDescription = null,
+                contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        val hero = grid?.layoutInfo?.visibleItemsInfo?.firstOrNull { it.key == ARTIST_HERO_KEY }
+                        val under = if (hero == null) 0f else (-hero.offset.y).toFloat().coerceAtLeast(0f)
+                        translationY = under * 0.5f
+                        scaleX = 1.08f
+                        scaleY = 1.08f
+                    },
+            )
+        }
         Box(
             Modifier
                 .fillMaxSize()
@@ -1251,7 +1269,7 @@ private fun AlbumTileContent(album: Album, onClick: () -> Unit, onLongClick: () 
                 .aspectRatio(1f)
                 .clip(RoundedCornerShape(8.dp)),
         ) {
-            Cover(album.artUri, size = 0, modifier = Modifier.fillMaxSize())
+            Cover(album.artUri, size = 0, modifier = Modifier.fillMaxSize(), fallback = OnlineMusicArt.album(album.artist, album.title))
         }
         Text(
             album.title,

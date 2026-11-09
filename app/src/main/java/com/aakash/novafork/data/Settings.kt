@@ -182,6 +182,10 @@ data class Settings(
     val homeRowOrder: String = "",
     /** Home rows turned off (HomeRow keys, comma separated). */
     val homeHiddenRows: String = "",
+    /** Songs without a .lrc get time-synced lyrics from LRCLIB (title and artist are sent). */
+    val onlineLyrics: Boolean = false,
+    /** Artist photos and missing album covers from Deezer's public catalogue (names are sent). */
+    val onlineMusicArt: Boolean = false,
     /** The Home hero's look; see [HeroStyle]. */
     val heroStyle: HeroStyle = HeroStyle.BACKDROP,
     /** Library pages as a poster grid or a list. */

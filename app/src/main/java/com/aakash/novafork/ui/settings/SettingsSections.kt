@@ -725,8 +725,14 @@ private fun playerGroups(settings: Settings, actions: AppActions): List<Settings
             switchRow("sound-check", R.drawable.ic_volume_up, "Sound Check", settings.soundCheck) { on ->
                 actions.updateSettings { it.copy(soundCheck = on) }
             },
+            switchRow("online-lyrics", R.drawable.ic_music_notes, "Lyrics from LRCLIB", settings.onlineLyrics) { on ->
+                actions.updateSettings { it.copy(onlineLyrics = on) }
+            },
+            switchRow("online-music-art", R.drawable.ic_album, "Artist Photos and Covers", settings.onlineMusicArt) { on ->
+                actions.updateSettings { it.copy(onlineMusicArt = on) }
+            },
         ),
-        footer = "Autoplay keeps the music going with similar songs when the queue ends; with Album After Album, a whole album ends into another album. Sound Check evens out song volumes from their ReplayGain tags.",
+        footer = "Autoplay keeps the music going with similar songs when the queue ends; with Album After Album, a whole album ends into another album. Sound Check evens out song volumes from their ReplayGain tags. Lyrics from LRCLIB looks up synced lyrics for songs without a .lrc file (the title and artist are sent to lrclib.net). Artist Photos and Covers fetches artist pictures and covers for albums without one from Deezer.",
     ),
 ) + subtitleDownloadGroups(settings, actions)
 
