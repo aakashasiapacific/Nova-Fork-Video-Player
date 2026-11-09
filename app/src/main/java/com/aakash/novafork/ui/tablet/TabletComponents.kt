@@ -620,7 +620,10 @@ internal fun TabletEpisodeCard(
         onClick = onClick,
         onLongClick = onLongClick,
         modifier = modifier,
-        description = episode.overview,
+        // Spoiler-safe: an episode not started yet keeps its summary to itself.
+        description = episode.overview.takeUnless {
+            com.aakash.novafork.ui.common.LocalSpoilerSafe.current && !episode.watched && (episode.progress ?: 0f) <= 0f
+        },
         footnote = metaLine(durationLabel(episode.durationMs), episode.airDate),
         progress = episode.progress,
         watched = episode.watched,

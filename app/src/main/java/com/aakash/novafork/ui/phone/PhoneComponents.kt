@@ -57,6 +57,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawBehind
@@ -617,6 +618,8 @@ internal fun PhoneEpisodeRow(
     modifier: Modifier = Modifier,
     upNext: Boolean = false,
 ) {
+    // Spoiler-safe: an episode not started yet keeps its picture and summary to itself.
+    val spoilerHidden = com.aakash.novafork.ui.common.LocalSpoilerSafe.current && !episode.watched && (episode.progress ?: 0f) <= 0f
     val dims = LocalNovaDimens.current
     Row(
         modifier
@@ -639,7 +642,13 @@ internal fun PhoneEpisodeRow(
                 .clip(ThumbShape)
                 .background(MaterialTheme.colorScheme.surfaceContainerHigh),
         ) {
-            LandscapeArt(artwork = episode.artwork, title = episode.title, modifier = Modifier.fillMaxSize())
+            LandscapeArt(
+                artwork = episode.artwork,
+                title = episode.title,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .then(if (spoilerHidden) Modifier.blur(18.dp) else Modifier),
+            )
             if (episode.watched) WatchedBadge(Modifier.align(Alignment.TopEnd).padding(Spacing.xs + 2.dp))
             ProgressStrip(episode.progress, Modifier.align(Alignment.BottomStart))
         }
@@ -652,7 +661,7 @@ internal fun PhoneEpisodeRow(
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
-            val overview = episode.overview
+            val overview = episode.overview.takeUnless { spoilerHidden }
             if (!overview.isNullOrBlank()) {
                 Text(
                     text = overview,

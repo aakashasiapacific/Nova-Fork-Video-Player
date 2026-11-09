@@ -761,8 +761,11 @@ private fun appearanceGroups(settings: Settings, actions: AppActions): List<Sett
                 listOf(Option("VIDEO", "Video"), Option("AUDIO", "Audio"), Option("SEARCH", "Search")),
                 settings.startTab,
             ) { tab -> actions.updateSettings { it.copy(startTab = tab) } },
+            switchRow("spoiler-safe", R.drawable.ic_visibility_off, "Spoiler-Safe Episodes", settings.spoilerSafe) { on ->
+                actions.updateSettings { it.copy(spoilerSafe = on) }
+            },
         ),
-        footer = "Automatic uses the tablet layout from 600dp wide. Open On picks the tab the app starts on.",
+        footer = "Automatic uses the tablet layout from 600dp wide. Open On picks the tab the app starts on. Spoiler-Safe Episodes blurs the stills and hides the summaries of episodes not started yet.",
     ),
     homeRowsGroup(settings, actions),
     SettingsGroup(

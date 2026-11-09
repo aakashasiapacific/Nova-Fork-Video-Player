@@ -566,7 +566,8 @@ object UiMappers {
                 MediaKind.VIDEO -> null
             },
             year = item.card.year,
-            runtimeLabel = runtime,
+            // The cut, when the file name says it ("Director's Cut · 2h 51m").
+            runtimeLabel = if (isMovie) joinMeta(com.aakash.novafork.data.MovieEditions.of(video.fileName), runtime) else runtime,
             rating = item.card.rating,
             genres = genresOf(meta),
             artwork = item.card.artwork,

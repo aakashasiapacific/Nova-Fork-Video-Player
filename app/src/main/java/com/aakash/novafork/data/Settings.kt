@@ -188,6 +188,8 @@ data class Settings(
     val onlineMusicArt: Boolean = false,
     /** The tab the app opens on: "VIDEO", "AUDIO" or "SEARCH". */
     val startTab: String = "VIDEO",
+    /** Unwatched episodes hide their summary and blur their still. */
+    val spoilerSafe: Boolean = false,
     /** The Home hero's look; see [HeroStyle]. */
     val heroStyle: HeroStyle = HeroStyle.BACKDROP,
     /** Library pages as a poster grid or a list. */

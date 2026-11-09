@@ -1,6 +1,7 @@
 package com.aakash.novafork.ui.common
 
 import android.content.Context
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -41,3 +42,6 @@ object EpisodeView {
         return if (newestFirst) shown.asReversed() else shown
     }
 }
+
+/** Spoiler-safe mode (Preferences › Appearance): unwatched episodes hide their summary and blur their still. */
+val LocalSpoilerSafe = compositionLocalOf { false }
