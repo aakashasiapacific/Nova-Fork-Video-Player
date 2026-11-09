@@ -178,6 +178,10 @@ data class Settings(
     val doubleTapZonePercent: Int = 33,
     /** Player buttons the person has hidden (keys of PlayerButton), comma separated. */
     val hiddenPlayerButtons: String = "",
+    /** Home's rows in the person's order (HomeRow keys, comma separated); "" = the default order. */
+    val homeRowOrder: String = "",
+    /** Home rows turned off (HomeRow keys, comma separated). */
+    val homeHiddenRows: String = "",
     /** The Home hero's look; see [HeroStyle]. */
     val heroStyle: HeroStyle = HeroStyle.BACKDROP,
     /** Library pages as a poster grid or a list. */

@@ -62,6 +62,9 @@ fun NovaRoot(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
             LocalDetailsHeaderStyle provides settings.detailsHeaderStyle,
             LocalLibraryLayout provides settings.libraryLayout,
             LocalPosterColumns provides settings.posterColumns,
+            com.aakash.novafork.ui.common.LocalHomeRows provides remember(settings.homeRowOrder, settings.homeHiddenRows) {
+                com.aakash.novafork.ui.common.HomeRow.shown(settings.homeRowOrder, settings.homeHiddenRows)
+            },
             LocalSheetDepth provides remember { SheetDepth() },
         ) {
             HapticsSetting(settings.haptics) {

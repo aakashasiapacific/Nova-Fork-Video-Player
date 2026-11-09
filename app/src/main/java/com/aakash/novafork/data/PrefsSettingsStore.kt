@@ -106,6 +106,8 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
             putInt(KEY_DEINTERLACE, s.deinterlace)
             putInt(KEY_DOUBLE_TAP_ZONE, s.doubleTapZonePercent)
             putString(KEY_HIDDEN_PLAYER_BUTTONS, s.hiddenPlayerButtons)
+            putString(KEY_HOME_ROW_ORDER, s.homeRowOrder)
+            putString(KEY_HOME_HIDDEN_ROWS, s.homeHiddenRows)
         }
     }
 
@@ -174,6 +176,8 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
         const val KEY_DEINTERLACE = "deinterlace"
         const val KEY_DOUBLE_TAP_ZONE = "double_tap_zone"
         const val KEY_HIDDEN_PLAYER_BUTTONS = "hidden_player_buttons"
+        const val KEY_HOME_ROW_ORDER = "home_row_order"
+        const val KEY_HOME_HIDDEN_ROWS = "home_hidden_rows"
 
         /**
          * The type [write] stores each key with. A restored backup's entry of another type is
@@ -237,6 +241,8 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
             KEY_DEINTERLACE to SettingType.INT,
             KEY_DOUBLE_TAP_ZONE to SettingType.INT,
             KEY_HIDDEN_PLAYER_BUTTONS to SettingType.STRING,
+            KEY_HOME_ROW_ORDER to SettingType.STRING,
+            KEY_HOME_HIDDEN_ROWS to SettingType.STRING,
         )
 
         /**
@@ -318,6 +324,8 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
                 deinterlace = prefs.int(KEY_DEINTERLACE, defaults.deinterlace).coerceIn(-1, 1),
                 doubleTapZonePercent = prefs.int(KEY_DOUBLE_TAP_ZONE, defaults.doubleTapZonePercent).coerceIn(20, 50),
                 hiddenPlayerButtons = prefs.string(KEY_HIDDEN_PLAYER_BUTTONS) ?: defaults.hiddenPlayerButtons,
+                homeRowOrder = prefs.string(KEY_HOME_ROW_ORDER) ?: defaults.homeRowOrder,
+                homeHiddenRows = prefs.string(KEY_HOME_HIDDEN_ROWS) ?: defaults.homeHiddenRows,
             )
         }
 

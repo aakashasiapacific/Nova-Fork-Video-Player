@@ -751,6 +751,7 @@ private fun appearanceGroups(settings: Settings, actions: AppActions): List<Sett
         ),
         footer = "Automatic uses the tablet layout from 600dp wide.",
     ),
+    homeRowsGroup(settings, actions),
     SettingsGroup(
         key = "headers",
         title = null,

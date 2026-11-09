@@ -363,6 +363,17 @@ interface AppActions {
     /** Hides a video from the library's screens (Browse still lists it); nothing is deleted. */
     fun hideVideo(videoId: Long) {}
 
+    /** Keeps a title ("v:<id>" / "s:<showKey>") off Home; it stays in the library. */
+    fun hideFromHome(itemKey: String) {}
+
+    /** Pins a title to the front of Home's hero, or unpins it. */
+    fun toggleHomePin(itemKey: String) {}
+
+    fun isPinnedToHome(itemKey: String): Boolean = false
+
+    /** Brings back every title kept off Home. */
+    fun restoreHomeTitles() {}
+
     /** Hides a show (all its episodes) from the library's screens. */
     fun hideShow(showKey: String) {}
 

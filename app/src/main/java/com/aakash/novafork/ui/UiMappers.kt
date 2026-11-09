@@ -211,6 +211,15 @@ object UiMappers {
         return (main + personal).take(HERO_LIMIT)
     }
 
+    /** The hero for a pinned title ("v:<id>" / "s:<showKey>"), or null when it has gone. */
+    fun pinnedHero(index: LibraryIndex, itemKey: String): HeroUi? = when {
+        itemKey.startsWith("v:") -> itemKey.removePrefix("v:").toLongOrNull()?.let { index.videosById[it] }?.let { video ->
+            if (video.inProgress) heroForInProgress(index, video) else heroForVideo(video)
+        }
+        itemKey.startsWith("s:") -> index.showsByKey[itemKey.removePrefix("s:")]?.let(::heroForShow)
+        else -> null
+    }
+
     private fun heroForInProgress(index: LibraryIndex, video: IndexedVideo): HeroUi {
         val show = video.showKey?.let { index.showsByKey[it] } ?: return heroForVideo(video)
         val code = episodeLabel(video.video.season, video.video.episode, video.video.episodeEnd)

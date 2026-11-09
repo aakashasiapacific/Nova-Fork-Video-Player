@@ -65,6 +65,7 @@ import com.aakash.novafork.ui.common.Motion
 import com.aakash.novafork.ui.common.NovaDropdownMenu
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.NovaMenuItem
+import com.aakash.novafork.ui.common.EpisodeView
 import com.aakash.novafork.ui.common.SectionHeader
 import com.aakash.novafork.ui.common.VideoMenuBox
 import com.aakash.novafork.ui.common.metaLine
@@ -90,7 +91,10 @@ fun PhoneShowDetailsScreen(
     val haptics = LocalHapticFeedback.current
     // Lazy keys must be unique; a file listed twice in a season must not crash the list.
     val episodes = remember(season) { season?.episodes.orEmpty().distinctBy { it.videoId } }
-    val rows = remember(episodes) { episodeRowsWithGaps(episodes) }
+    val rows = remember(episodes, EpisodeView.hideWatched, EpisodeView.newestFirst) {
+        EpisodeView.arrange(episodeRowsWithGaps(episodes)) { (it as? EpisodeListRow.Row)?.episode?.watched }
+    }
+    val viewContext = androidx.compose.ui.platform.LocalContext.current
     val episodeCount = remember(seasons) { seasons.sumOf { it.episodes.size } }
     // Identify works on a file; any episode of the show leads to the right show search.
     val identifyVideoId = nextUp?.videoId ?: seasons.firstNotNullOfOrNull { it.episodes.firstOrNull()?.videoId }
@@ -231,6 +235,23 @@ fun PhoneShowDetailsScreen(
                                     )
                                 }
                                 if (season != null && season.episodes.isNotEmpty()) {
+                                    NovaMenuDivider()
+                                    NovaMenuItem(
+                                        text = { Text("Hide Watched Episodes") },
+                                        checked = EpisodeView.hideWatched,
+                                        onClick = {
+                                            seasonMenu = false
+                                            EpisodeView.setHideWatched(viewContext, !EpisodeView.hideWatched)
+                                        },
+                                    )
+                                    NovaMenuItem(
+                                        text = { Text("Newest First") },
+                                        checked = EpisodeView.newestFirst,
+                                        onClick = {
+                                            seasonMenu = false
+                                            EpisodeView.setNewestFirst(viewContext, !EpisodeView.newestFirst)
+                                        },
+                                    )
                                     NovaMenuDivider()
                                     val allWatched = season.episodes.all { it.watched }
                                     NovaMenuItem(

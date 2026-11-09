@@ -86,6 +86,7 @@ fun VideoMenuBox(
                     actions.addToPlaylist(listOf(videoId), title)
                 },
             )
+            HomePickItems(itemKey = "v:$videoId", actions = actions, close = { open = false })
             // Library only: the file stays, and Browse still lists it (Preferences › Hidden Videos brings it back).
             NovaMenuItem(
                 text = { Text("Hide") },
@@ -123,6 +124,7 @@ fun ShowMenuBox(
                     actions.openShow(showKey)
                 },
             )
+            HomePickItems(itemKey = "s:$showKey", actions = actions, close = { open = false })
             NovaMenuItem(
                 text = { Text("Hide") },
                 leadingIcon = { NovaIcon(R.drawable.ic_visibility_off, contentDescription = null) },
@@ -133,6 +135,28 @@ fun ShowMenuBox(
             )
         }
     }
+}
+
+/** Pin to Top of Home and Hide from Home: Home only, the title stays in the library. */
+@Composable
+private fun HomePickItems(itemKey: String, actions: AppActions, close: () -> Unit) {
+    val pinned = actions.isPinnedToHome(itemKey)
+    NovaMenuItem(
+        text = { Text(if (pinned) "Unpin from Home" else "Pin to Top of Home") },
+        leadingIcon = { NovaIcon(R.drawable.ic_home, contentDescription = null) },
+        onClick = {
+            close()
+            actions.toggleHomePin(itemKey)
+        },
+    )
+    NovaMenuItem(
+        text = { Text("Hide from Home") },
+        leadingIcon = { NovaIcon(R.drawable.ic_visibility_off, contentDescription = null) },
+        onClick = {
+            close()
+            actions.hideFromHome(itemKey)
+        },
+    )
 }
 
 /**

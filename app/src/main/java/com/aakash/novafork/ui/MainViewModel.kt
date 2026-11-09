@@ -51,6 +51,7 @@ import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.AppUiState
 import com.aakash.novafork.ui.model.BackupUi
 import com.aakash.novafork.ui.model.VideoCardUi
+import com.aakash.novafork.ui.model.HomeUi
 import com.aakash.novafork.ui.model.BrowseDirUi
 import com.aakash.novafork.ui.model.CastUi
 import com.aakash.novafork.ui.model.DialogUi
@@ -154,6 +155,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
         val recentSearches: List<String> = emptyList(),
         /** Videos taken off the History page, each with the lastPlayedAt it was hidden at. */
         val historyHidden: Map<Long, Long> = emptyMap(),
+        /** Titles kept off Home ("v:<id>" / "s:<showKey>"); they stay in the library. */
+        val homeHidden: Set<String> = emptySet(),
+        /** The title pinned to the front of Home's hero, if any. */
+        val homePinned: String? = null,
     )
 
     /** Search's recent searches, kept across launches (they never leave the device). */
@@ -161,6 +166,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
 
     /** History's hidden videos (video id to when it had last been played); only the list is hidden, never a file. */
     private val historyPrefs = app.getSharedPreferences("history_hidden", android.content.Context.MODE_PRIVATE)
+
+    /** Home's picks: titles kept off Home, and the one pinned to its front. */
+    private val homePrefs = app.getSharedPreferences("home_picks", android.content.Context.MODE_PRIVATE)
 
     /** Hidden Videos: ids of videos kept out of the library's screens (never deleted; Browse still lists them). */
     private val hiddenPrefs = app.getSharedPreferences("library_hidden", android.content.Context.MODE_PRIVATE)
@@ -175,6 +183,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
             crashReport = CrashReporter.pending(app),
             recentSearches = searchPrefs.getString(KEY_RECENT_SEARCHES, null)?.split('\n')?.filter { it.isNotBlank() }.orEmpty(),
             historyHidden = readHistoryHidden(),
+            homeHidden = homePrefs.getStringSet(HOME_HIDDEN_KEY, null).orEmpty().toSet(),
+            homePinned = homePrefs.getString(HOME_PINNED_KEY, null),
         ),
     )
 
@@ -421,13 +431,14 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
         val browse = UiMappers.browse(index, scan, lists.all)
         val stats = if (route == Route.Settings || route is Route.SettingsPage) statsMemo[index to music] else null
         val openPlaylist = lists.open
+        val baseHome = withHomePicks(index, index.home, user.homeHidden, user.homePinned)
         val home = if (saved.isEmpty() && starred.isEmpty()) {
-            index.home
+            baseHome
         } else {
             val keys = saved.toHashSet()
             val stars = starred.toHashSet()
-            index.home.copy(
-                hero = index.home.hero.map { hero ->
+            baseHome.copy(
+                hero = baseHome.hero.map { hero ->
                     hero.copy(onWatchlist = hero.itemKey in keys, favorite = hero.itemKey in stars)
                 },
                 watchlist = watchlistMemo[index to saved],
@@ -683,6 +694,48 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
     private fun setHidden(ids: Set<Long>) {
         hiddenVideoIds.value = ids
         hiddenPrefs.edit().putStringSet(KEY_HIDDEN_VIDEOS, ids.mapTo(HashSet()) { it.toString() }).apply()
+    }
+
+    /** Home without the titles kept off it, and the pinned one first in the hero. */
+    private fun withHomePicks(index: LibraryIndex, home: HomeUi, hidden: Set<String>, pinned: String?): HomeUi {
+        if (hidden.isEmpty() && pinned == null) return home
+        fun off(card: VideoCardUi): Boolean =
+            "v:${card.id}" in hidden || index.videosById[card.id]?.showKey?.let { "s:$it" in hidden } == true
+        var hero = home.hero.filter { it.itemKey !in hidden }
+        if (pinned != null && pinned !in hidden) {
+            val pinnedHero = hero.firstOrNull { it.itemKey == pinned } ?: UiMappers.pinnedHero(index, pinned)
+            if (pinnedHero != null) hero = listOf(pinnedHero) + hero.filter { it.itemKey != pinned }
+        }
+        return home.copy(
+            hero = hero,
+            continueWatching = home.continueWatching.filterNot(::off),
+            upNext = home.upNext.filterNot(::off),
+        )
+    }
+
+    override fun hideFromHome(itemKey: String) {
+        local.update { it.copy(homeHidden = it.homeHidden + itemKey, homePinned = it.homePinned.takeIf { pin -> pin != itemKey }) }
+        saveHomePicks()
+    }
+
+    override fun toggleHomePin(itemKey: String) {
+        local.update { it.copy(homePinned = if (it.homePinned == itemKey) null else itemKey, homeHidden = it.homeHidden - itemKey) }
+        saveHomePicks()
+    }
+
+    override fun isPinnedToHome(itemKey: String): Boolean = local.value.homePinned == itemKey
+
+    override fun restoreHomeTitles() {
+        local.update { it.copy(homeHidden = emptySet()) }
+        saveHomePicks()
+    }
+
+    private fun saveHomePicks() {
+        val state = local.value
+        homePrefs.edit()
+            .putStringSet(HOME_HIDDEN_KEY, state.homeHidden)
+            .putString(HOME_PINNED_KEY, state.homePinned)
+            .apply()
     }
 
     override fun hideVideo(videoId: Long) {
@@ -1969,6 +2022,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
 
         const val KEY_RECENT_SEARCHES = "recent"
         const val KEY_HIDDEN_VIDEOS = "videos"
+        const val HOME_HIDDEN_KEY = "hidden"
+        const val HOME_PINNED_KEY = "pinned"
         val TRAILING_YEAR = Regex("""\s*\(?(19|20)\d{2}\)?$""")
 
         /** Live folder listings kept for going back without listing again. */

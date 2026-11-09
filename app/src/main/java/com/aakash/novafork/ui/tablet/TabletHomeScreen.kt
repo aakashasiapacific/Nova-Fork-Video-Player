@@ -1,5 +1,7 @@
 package com.aakash.novafork.ui.tablet
 
+import com.aakash.novafork.ui.common.HomeRow
+import com.aakash.novafork.ui.common.LocalHomeRows
 import com.aakash.novafork.ui.common.HomeSkeleton
 import com.aakash.novafork.ui.common.LocalLibraryLoading
 import androidx.compose.animation.Crossfade
@@ -134,6 +136,7 @@ private fun HomeFeed(home: HomeUi, scan: ScanUi, permission: PermissionUi, layou
     BoxWithConstraints(Modifier.fillMaxSize()) {
         // The iPad's hero: most of the screen, leaving the top of the first row in view.
         val heroHeight = if (constraints.hasBoundedHeight) (maxHeight * 0.72f).coerceIn(420.dp, 760.dp) else 560.dp
+        val homeRows = LocalHomeRows.current
         LazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize(),
@@ -179,24 +182,29 @@ private fun HomeFeed(home: HomeUi, scan: ScanUi, permission: PermissionUi, layou
                     )
                 }
             }
-            if (home.continueWatching.isNotEmpty()) {
-                item(key = "continue", contentType = "landscapeRow") {
-                    HomeSection(title = "Continue Watching", onOpen = { actions.navigate(Route.ContinueWatching) }) {
-                        ContinueWatchingRow(home.continueWatching, actions)
+            // The rows in the person's order (Preferences › Appearance › Home Rows).
+            for (row in homeRows) {
+                when (row) {
+                    HomeRow.CONTINUE -> if (home.continueWatching.isNotEmpty()) {
+                        item(key = "continue", contentType = "landscapeRow") {
+                            HomeSection(title = "Continue Watching", onOpen = { actions.navigate(Route.ContinueWatching) }) {
+                                ContinueWatchingRow(home.continueWatching, actions)
+                            }
+                        }
                     }
-                }
-            }
-            if (home.upNext.isNotEmpty()) {
-                item(key = "upNext", contentType = "landscapeRow") {
-                    HomeSection(title = "Up Next", onOpen = { actions.navigate(Route.UpNext) }) {
-                        UpNextRow(home.upNext, actions)
+                    HomeRow.UP_NEXT -> if (home.upNext.isNotEmpty()) {
+                        item(key = "upNext", contentType = "landscapeRow") {
+                            HomeSection(title = "Up Next", onOpen = { actions.navigate(Route.UpNext) }) {
+                                UpNextRow(home.upNext, actions)
+                            }
+                        }
                     }
-                }
-            }
-            if (home.watchlist.isNotEmpty()) {
-                item(key = "watchlist", contentType = "landscapeRow") {
-                    HomeSection(title = "Watchlist", onOpen = { actions.openLibrary(LibraryFilter.WATCHLIST) }) {
-                        WatchlistRow(home.watchlist, actions)
+                    HomeRow.WATCHLIST -> if (home.watchlist.isNotEmpty()) {
+                        item(key = "watchlist", contentType = "landscapeRow") {
+                            HomeSection(title = "Watchlist", onOpen = { actions.openLibrary(LibraryFilter.WATCHLIST) }) {
+                                WatchlistRow(home.watchlist, actions)
+                            }
+                        }
                     }
                 }
             }

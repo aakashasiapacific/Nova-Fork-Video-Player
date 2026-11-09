@@ -1,5 +1,7 @@
 package com.aakash.novafork.ui.phone
 
+import com.aakash.novafork.ui.common.HomeRow
+import com.aakash.novafork.ui.common.LocalHomeRows
 import com.aakash.novafork.ui.common.HomeSkeleton
 import com.aakash.novafork.ui.common.LocalLibraryLoading
 import androidx.annotation.DrawableRes
@@ -237,6 +239,7 @@ private fun HomeFeed(home: HomeUi, scan: ScanUi, permission: PermissionUi, actio
         val portrait = maxWidth <= maxHeight
         val statusBar = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
         val heroHeight = if (portrait) heroHeightFor(LocalHeroStyle.current, statusBar, maxWidth, dims.detailPosterWidth) else maxHeight * 0.85f
+        val homeRows = LocalHomeRows.current
         LazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize(),
@@ -274,29 +277,35 @@ private fun HomeFeed(home: HomeUi, scan: ScanUi, permission: PermissionUi, actio
                     )
                 }
             }
-            if (home.continueWatching.isNotEmpty()) {
-                item(key = "continue", contentType = "landscapeRow") {
-                    // Right under the hero's dots (owner: no empty band before it).
-                    HomeSection(title = "Continue Watching", topPadding = 0.dp, onOpen = { actions.navigate(Route.ContinueWatching) }) {
-                        LandscapeRow(home.continueWatching, actions)
+            // The rows in the person's order (Preferences › Appearance › Home Rows); the first
+            // one shown sits right under the hero's dots (owner: no empty band before it).
+            var firstRow = true
+            for (row in homeRows) {
+                val top = if (firstRow) 0.dp else null
+                when (row) {
+                    HomeRow.CONTINUE -> if (home.continueWatching.isNotEmpty()) {
+                        firstRow = false
+                        item(key = "continue", contentType = "landscapeRow") {
+                            HomeSection(title = "Continue Watching", topPadding = top, onOpen = { actions.navigate(Route.ContinueWatching) }) {
+                                LandscapeRow(home.continueWatching, actions)
+                            }
+                        }
                     }
-                }
-            }
-            if (home.upNext.isNotEmpty()) {
-                item(key = "upNext", contentType = "landscapeRow") {
-                    HomeSection(title = "Up Next", topPadding = if (home.continueWatching.isEmpty()) 0.dp else null, onOpen = { actions.navigate(Route.UpNext) }) {
-                        UpNextRow(home.upNext, actions)
+                    HomeRow.UP_NEXT -> if (home.upNext.isNotEmpty()) {
+                        firstRow = false
+                        item(key = "upNext", contentType = "landscapeRow") {
+                            HomeSection(title = "Up Next", topPadding = top, onOpen = { actions.navigate(Route.UpNext) }) {
+                                UpNextRow(home.upNext, actions)
+                            }
+                        }
                     }
-                }
-            }
-            if (home.watchlist.isNotEmpty()) {
-                item(key = "watchlist", contentType = "landscapeRow") {
-                    HomeSection(
-                        title = "Watchlist",
-                        topPadding = if (home.continueWatching.isEmpty() && home.upNext.isEmpty()) 0.dp else null,
-                        onOpen = { actions.openLibrary(LibraryFilter.WATCHLIST) },
-                    ) {
-                        WatchlistRow(home.watchlist, actions)
+                    HomeRow.WATCHLIST -> if (home.watchlist.isNotEmpty()) {
+                        firstRow = false
+                        item(key = "watchlist", contentType = "landscapeRow") {
+                            HomeSection(title = "Watchlist", topPadding = top, onOpen = { actions.openLibrary(LibraryFilter.WATCHLIST) }) {
+                                WatchlistRow(home.watchlist, actions)
+                            }
+                        }
                     }
                 }
             }

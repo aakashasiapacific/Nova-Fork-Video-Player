@@ -258,6 +258,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        com.aakash.novafork.ui.common.EpisodeView.load(this)
         // Android 12+: the black launch screen fades into Home instead of cutting (iOS).
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             splashScreen.setOnExitAnimationListener { view ->
