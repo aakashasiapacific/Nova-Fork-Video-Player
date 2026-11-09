@@ -387,6 +387,9 @@ interface AppActions {
     /** Whether a video is set to play with software decoding (its hold menu), whatever the setting. */
     fun isSoftwareDecoded(videoId: Long): Boolean = false
 
+    /** Shares a picture of the title's poster with its name and [line] ("2024 · 2h 10m"). */
+    fun sharePosterCard(title: String, line: String?, posterUrl: String?) {}
+
     fun toggleSoftwareDecoding(videoId: Long) {}
 
     /** Hides a show (all its episodes) from the library's screens. */

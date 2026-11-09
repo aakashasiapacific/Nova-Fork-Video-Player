@@ -257,6 +257,18 @@ fun PhoneVideoDetailsScreen(
                         actions.addToPlaylist(listOf(details.id), details.title)
                     },
                 )
+                NovaMenuItem(
+                    text = { Text("Share Poster Card") },
+                    leadingIcon = { NovaIcon(R.drawable.ic_share, contentDescription = null) },
+                    onClick = {
+                        close()
+                        actions.sharePosterCard(
+                            details.showTitle ?: details.title,
+                            listOfNotNull(details.episodeCode, details.year?.toString(), details.runtimeLabel).joinToString(" · ").ifBlank { null },
+                            details.artwork.posterUrl,
+                        )
+                    },
+                )
                 DownloadMenuItem(details, close)
                 RenameInLibraryMenuItems(
                     titleKey = details.titleKey,

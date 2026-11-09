@@ -182,6 +182,22 @@ class MainActivity : ComponentActivity() {
                 shareText("Nova Fork diagnostics", report)
             }
 
+            override fun sharePosterCard(title: String, line: String?, posterUrl: String?) {
+                lifecycleScope.launch {
+                    try {
+                        val file = com.aakash.novafork.ui.PosterCard.render(this@MainActivity, title, line, posterUrl)
+                        val uri = androidx.core.content.FileProvider.getUriForFile(this@MainActivity, "$packageName.share", file)
+                        val send = Intent(Intent.ACTION_SEND)
+                            .setType("image/png")
+                            .putExtra(Intent.EXTRA_STREAM, uri)
+                            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        tryStart(Intent.createChooser(send, "Share $title"))
+                    } catch (e: Exception) {
+                        viewModel.showMessage("Couldn't make the poster card")
+                    }
+                }
+            }
+
             override fun shareText(subject: String, text: String) {
                 val send = Intent(Intent.ACTION_SEND)
                     .setType("text/plain")
