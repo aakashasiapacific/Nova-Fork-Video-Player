@@ -103,6 +103,27 @@ fun ProgressStrip(progress: Float?, modifier: Modifier = Modifier, height: Dp = 
 }
 
 /** A quiet check on watched items: white on a faint 20% white disc with a soft shadow, no dark circle. */
+/**
+ * [WatchedBadge] while [watched]: it pops in with a spring when a title becomes watched, and is
+ * simply there for one that already was (no pop while scrolling past).
+ */
+@Composable
+fun WatchedMark(watched: Boolean, modifier: Modifier = Modifier) {
+    val state = remember { androidx.compose.animation.core.MutableTransitionState(watched) }
+    state.targetState = watched
+    androidx.compose.animation.AnimatedVisibility(
+        visibleState = state,
+        modifier = modifier,
+        enter = androidx.compose.animation.scaleIn(
+            androidx.compose.animation.core.spring(dampingRatio = 0.5f, stiffness = 500f),
+            initialScale = 0.3f,
+        ) + androidx.compose.animation.fadeIn(),
+        exit = androidx.compose.animation.fadeOut(),
+    ) {
+        WatchedBadge()
+    }
+}
+
 @Composable
 fun WatchedBadge(modifier: Modifier = Modifier) {
     Box(

@@ -110,6 +110,8 @@ import com.aakash.novafork.ui.common.RollingText
 import com.aakash.novafork.ui.common.ShowMenuBox
 import com.aakash.novafork.ui.common.VideoMenuBox
 import com.aakash.novafork.ui.common.WatchedBadge
+import com.aakash.novafork.ui.common.WatchedMark
+import com.aakash.novafork.ui.common.fadeLastLine
 import com.aakash.novafork.ui.common.iosScrollIndicator
 import com.aakash.novafork.ui.common.metaLine
 import com.aakash.novafork.ui.common.pressDim
@@ -227,7 +229,7 @@ private fun PosterCardLayout(
                 .pressDim(press),
         ) {
             PosterArt(artwork = artwork, title = title, modifier = Modifier.fillMaxSize())
-            if (watched) WatchedBadge(Modifier.align(Alignment.TopEnd).padding(6.dp))
+            WatchedMark(watched, Modifier.align(Alignment.TopEnd).padding(6.dp))
             ProgressStrip(progress, Modifier.align(Alignment.BottomStart))
         }
         if (!bare) {
@@ -434,7 +436,7 @@ private fun WideCardLayout(
                 )
             }
             Box(Modifier.matchParentSize().border(0.5.dp, Color.White.copy(alpha = 0.08f), shape))
-            if (watched) WatchedBadge(Modifier.align(Alignment.TopEnd).padding(6.dp))
+            WatchedMark(watched, Modifier.align(Alignment.TopEnd).padding(6.dp))
             if (newEpisode) NewEpisodeDot(Modifier.align(Alignment.TopStart).padding(8.dp))
             ProgressStrip(progress, Modifier.align(Alignment.BottomStart))
         }
@@ -446,7 +448,10 @@ private fun WideCardLayout(
             style = MaterialTheme.typography.titleSmall,
             minLines = 1,
             maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
+            softWrap = false,
+            overflow = TextOverflow.Clip,
+            // A long title fades out at the card's edge instead of ending in "…" (iOS 27).
+            modifier = Modifier.fadeLastLine(1),
         )
         if (rollingSubtitle) {
             // iOS's rolling digits: "42m left" counts down to "30m left" on coming back from playing.
@@ -542,7 +547,7 @@ internal fun PhoneVideoRow(
                 .background(MaterialTheme.colorScheme.surfaceContainerHigh),
         ) {
             LandscapeArt(artwork = card.artwork, title = card.title, modifier = Modifier.fillMaxSize())
-            if (card.watched) WatchedBadge(Modifier.align(Alignment.TopEnd).padding(4.dp))
+            WatchedMark(card.watched, Modifier.align(Alignment.TopEnd).padding(4.dp))
             ProgressStrip(card.progress, Modifier.align(Alignment.BottomStart))
         }
         Spacer(Modifier.width(14.dp))
@@ -649,12 +654,23 @@ internal fun PhoneEpisodeRow(
                     .fillMaxSize()
                     .then(if (spoilerHidden) Modifier.blur(18.dp) else Modifier),
             )
-            if (episode.watched) WatchedBadge(Modifier.align(Alignment.TopEnd).padding(Spacing.xs + 2.dp))
+            WatchedMark(episode.watched, Modifier.align(Alignment.TopEnd).padding(Spacing.xs + 2.dp))
             ProgressStrip(episode.progress, Modifier.align(Alignment.BottomStart))
         }
         Spacer(Modifier.width(Spacing.md))
         Column(Modifier.weight(0.6f)) {
-            val heading = if (episode.episode > 0) "${episode.episode}. ${episode.title}" else episode.title.ifBlank { episode.code }
+            // The episode's number in large grey figures before its title (Apple TV).
+            val heading = buildAnnotatedString {
+                if (episode.episode > 0) {
+                    withStyle(SpanStyle(color = IosColors.SecondaryLabel, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)) {
+                        append("${episode.episode}")
+                    }
+                    append("  ")
+                    append(episode.title)
+                } else {
+                    append(episode.title.ifBlank { episode.code })
+                }
+            }
             Text(
                 text = heading,
                 style = MaterialTheme.typography.titleSmall,
@@ -760,7 +776,7 @@ private fun PhoneLibraryListRow(
                 )
             }
         }
-        if (watched) WatchedBadge(Modifier.padding(start = Spacing.sm))
+        WatchedMark(watched, Modifier.padding(start = Spacing.sm))
     }
 }
 

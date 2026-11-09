@@ -89,6 +89,7 @@ import com.aakash.novafork.data.HeroStyle
 import com.aakash.novafork.ui.adaptive.LocalDeviceLayout
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
 import com.aakash.novafork.ui.audio.coverColors
+import com.aakash.novafork.ui.common.fadeLastLine
 import com.aakash.novafork.ui.common.ArtImage
 import com.aakash.novafork.ui.common.ArtPlaceholder
 import com.aakash.novafork.ui.common.BackdropArt
@@ -340,9 +341,9 @@ private fun PhoneHeroPage(hero: HeroUi, preview: Boolean, muted: Boolean, action
                     text = overview,
                     style = MaterialTheme.typography.bodyMedium,
                     color = Color.White.copy(alpha = 0.82f),
-                    maxLines = 3,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(top = 10.dp),
+                    maxLines = 2,
+                    overflow = TextOverflow.Clip,
+                    modifier = Modifier.padding(top = 10.dp).fadeLastLine(2),
                 )
             }
             if (!wide) {

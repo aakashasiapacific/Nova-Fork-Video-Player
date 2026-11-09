@@ -82,6 +82,7 @@ import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.PosterArt
 import com.aakash.novafork.ui.common.ProgressStrip
 import com.aakash.novafork.ui.common.WatchedBadge
+import com.aakash.novafork.ui.common.WatchedMark
 import com.aakash.novafork.ui.theme.Spacing
 import com.aakash.novafork.ui.common.bottomScrim
 import com.aakash.novafork.ui.common.iosOverscroll
@@ -497,7 +498,7 @@ internal fun TabletLandscapeCard(
                 }
             }
         }
-        if (card.watched) WatchedBadge(Modifier.align(Alignment.TopEnd).padding(10.dp))
+        WatchedMark(card.watched, Modifier.align(Alignment.TopEnd).padding(10.dp))
         if (card.newEpisode) {
             Box(
                 Modifier
@@ -561,7 +562,7 @@ internal fun TabletStillCard(
         ) {
             LandscapeArt(artwork = artwork, title = title, modifier = Modifier.fillMaxSize())
             if (badge != null) ImageLabel(badge, Modifier.align(Alignment.TopStart).padding(10.dp), emphasized = true)
-            if (watched) WatchedBadge(Modifier.align(Alignment.TopEnd).padding(10.dp))
+            WatchedMark(watched, Modifier.align(Alignment.TopEnd).padding(10.dp))
             if (cornerLabel != null) {
                 ImageLabel(cornerLabel, Modifier.align(Alignment.BottomEnd).padding(start = 10.dp, end = 10.dp, bottom = 12.dp))
             }

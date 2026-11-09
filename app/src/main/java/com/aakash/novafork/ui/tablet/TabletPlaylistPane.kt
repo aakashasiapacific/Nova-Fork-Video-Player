@@ -40,6 +40,7 @@ import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.ProgressStrip
 import com.aakash.novafork.ui.common.VideoMenuBox
 import com.aakash.novafork.ui.common.WatchedBadge
+import com.aakash.novafork.ui.common.WatchedMark
 import com.aakash.novafork.ui.dialogs.playlistCountLabel
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.DialogUi
@@ -173,7 +174,7 @@ private fun PlaylistItemRow(
                 .background(MaterialTheme.colorScheme.surfaceContainerHigh),
         ) {
             LandscapeArt(artwork = video.artwork, title = video.title, modifier = Modifier.fillMaxSize())
-            if (video.watched) WatchedBadge(Modifier.align(Alignment.TopEnd).padding(6.dp))
+            WatchedMark(video.watched, Modifier.align(Alignment.TopEnd).padding(6.dp))
             ProgressStrip(video.progress, Modifier.align(Alignment.BottomStart))
         }
         Spacer(Modifier.width(20.dp))
