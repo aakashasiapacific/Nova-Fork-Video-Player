@@ -75,8 +75,31 @@ internal object MediaSource {
      * The decoding [uri] gets: the setting, except that "Automatic" stays in software for a video
      * whose hardware decoding already failed in this process, so a fallback never repeats itself.
      */
-    fun decodingFor(uri: String, setting: HwDecoding): HwDecoding =
-        if (setting == HwDecoding.AUTO && uri in softwareOnly) HwDecoding.DISABLED else setting
+    fun decodingFor(uri: String, setting: HwDecoding): HwDecoding = when {
+        // Chosen for this video in its hold menu: software, whatever the setting.
+        uri in pinnedSoftware -> HwDecoding.DISABLED
+        setting == HwDecoding.AUTO && uri in softwareOnly -> HwDecoding.DISABLED
+        else -> setting
+    }
+
+    /** Videos (by URI) set to play in software from their hold menu, kept across launches. */
+    private val pinnedSoftware: MutableSet<String> = ConcurrentHashMap.newKeySet<String>()
+    private const val DECODING_PREFS = "per_video_decoding"
+    private const val SOFTWARE_KEY = "software"
+
+    fun loadPerVideoDecoding(context: Context) {
+        val saved = context.getSharedPreferences(DECODING_PREFS, Context.MODE_PRIVATE).getStringSet(SOFTWARE_KEY, null).orEmpty()
+        pinnedSoftware.clear()
+        pinnedSoftware.addAll(saved)
+    }
+
+    fun isSoftwareForVideo(uri: String): Boolean = uri in pinnedSoftware
+
+    fun setSoftwareForVideo(context: Context, uri: String, on: Boolean) {
+        if (on) pinnedSoftware.add(uri) else pinnedSoftware.remove(uri)
+        context.getSharedPreferences(DECODING_PREFS, Context.MODE_PRIVATE).edit()
+            .putStringSet(SOFTWARE_KEY, HashSet(pinnedSoftware)).apply()
+    }
 
     /** Plays [uri] with software decoding (under "Automatic") until the process ends. */
     fun rememberSoftwareDecoding(uri: String) {

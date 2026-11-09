@@ -86,6 +86,16 @@ fun VideoMenuBox(
                     actions.addToPlaylist(listOf(videoId), title)
                 },
             )
+            // For a file that shows green frames or stutters: software decoding for it alone.
+            val software = actions.isSoftwareDecoded(videoId)
+            NovaMenuItem(
+                text = { Text(if (software) "Use Hardware Decoding" else "Use Software Decoding") },
+                leadingIcon = { NovaIcon(R.drawable.ic_hd, contentDescription = null) },
+                onClick = {
+                    open = false
+                    actions.toggleSoftwareDecoding(videoId)
+                },
+            )
             NovaMenuDivider()
             HomePickItems(itemKey = "v:$videoId", actions = actions, close = { open = false })
             // Library only: the file stays, and Browse still lists it (Preferences › Hidden Videos brings it back).

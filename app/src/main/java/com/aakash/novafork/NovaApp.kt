@@ -19,6 +19,7 @@ class NovaApp : Application(), ImageLoaderFactory {
         // First, so a crash anywhere below still leaves a report for the next start.
         CrashReporter.install(this)
         super.onCreate()
+        com.aakash.novafork.player.MediaSource.loadPerVideoDecoding(this)
         graph = AppGraph(this)
         registerActivityLifecycleCallbacks(MainScreenLaunches())
         // Preferences › Sources › Scan schedule: keeps the background scan in step with the setting.

@@ -769,6 +769,16 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
 
     override fun isPinnedToHome(itemKey: String): Boolean = local.value.homePinned == itemKey
 
+    override fun isSoftwareDecoded(videoId: Long): Boolean =
+        latestIndex?.videosById?.get(videoId)?.video?.uri?.let(com.aakash.novafork.player.MediaSource::isSoftwareForVideo) == true
+
+    override fun toggleSoftwareDecoding(videoId: Long) {
+        val uri = latestIndex?.videosById?.get(videoId)?.video?.uri ?: return
+        val on = !com.aakash.novafork.player.MediaSource.isSoftwareForVideo(uri)
+        // No message (owner: no pop-ups): the menu item says which it is next time.
+        com.aakash.novafork.player.MediaSource.setSoftwareForVideo(getApplication(), uri, on)
+    }
+
     override fun restoreHomeTitles() {
         local.update { it.copy(homeHidden = emptySet()) }
         saveHomePicks()

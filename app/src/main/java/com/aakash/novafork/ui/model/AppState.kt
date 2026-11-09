@@ -379,6 +379,11 @@ interface AppActions {
     /** Brings back every title kept off Home. */
     fun restoreHomeTitles() {}
 
+    /** Whether a video is set to play with software decoding (its hold menu), whatever the setting. */
+    fun isSoftwareDecoded(videoId: Long): Boolean = false
+
+    fun toggleSoftwareDecoding(videoId: Long) {}
+
     /** Hides a show (all its episodes) from the library's screens. */
     fun hideShow(showKey: String) {}
 
