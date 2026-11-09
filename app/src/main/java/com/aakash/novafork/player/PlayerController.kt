@@ -853,6 +853,20 @@ class PlayerController(
         // Turn the screen to the video's shape from the file itself, before the first frame: a
         // phone's reel opens in portrait straight away instead of landscape (owner).
         fileShape = if (kind == UriKind.CONTENT || kind == UriKind.FILE) readFileShape(uri) else null
+        // A network video names its source under the buffering ring.
+        _state.update { it.copy(sourceName = null) }
+        if (!kind.isLocal) {
+            scope.launch {
+                val name = try {
+                    graph.library.sourceForUri(uri)?.name
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    null
+                }
+                if (name != null && nowPlaying?.uri == uri) _state.update { it.copy(sourceName = name) }
+            }
+        }
         fileShape?.let { applyOrientation(it) }
 
         val decoding = MediaSource.decodingFor(uri, settings.hardwareDecoding)

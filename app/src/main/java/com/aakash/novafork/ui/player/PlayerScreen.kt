@@ -307,6 +307,14 @@ private fun PlayerChrome(
             SeekBubbles(seekBubble)
             if (state.isBuffering && state.error == null && !controlsVisible) {
                 BufferingIndicator(Modifier.align(Alignment.Center))
+                state.sourceName?.let { name ->
+                    androidx.compose.material3.Text(
+                        "From $name",
+                        style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
+                        color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.7f),
+                        modifier = Modifier.align(Alignment.Center).padding(top = 76.dp),
+                    )
+                }
             }
             FeedbackOverlay(
                 feedback = state.feedback,

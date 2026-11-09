@@ -129,6 +129,8 @@ data class PlayerUiState(
     val finished: Boolean = false,
     val isPlaying: Boolean = false,
     val isBuffering: Boolean = false,
+    /** A network video's source ("Living Room NAS"), named under the buffering ring. */
+    val sourceName: String? = null,
     val positionMs: Long = 0,
     val durationMs: Long = 0,
     val seekable: Boolean = true,
