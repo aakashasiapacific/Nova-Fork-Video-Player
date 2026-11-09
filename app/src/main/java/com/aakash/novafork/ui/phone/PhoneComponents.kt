@@ -293,7 +293,12 @@ internal fun PhoneShowCard(
 ) {
     PosterCardLayout(
         title = show.title,
-        subtitle = show.watchedCaption ?: countLabel(show.episodeCount, "episode"),
+        // "3 seasons · 24 episodes" (one season says only its episodes).
+        subtitle = show.watchedCaption ?: if (show.seasonCount > 1) {
+            "${countLabel(show.seasonCount, "season")} · ${countLabel(show.episodeCount, "episode")}"
+        } else {
+            countLabel(show.episodeCount, "episode")
+        },
         artwork = show.artwork,
         onClick = onClick,
         modifier = modifier,
@@ -366,7 +371,12 @@ internal fun PhoneWideShowCard(
 ) {
     WideCardLayout(
         title = show.title,
-        subtitle = show.watchedCaption ?: countLabel(show.episodeCount, "episode"),
+        // "3 seasons · 24 episodes" (one season says only its episodes).
+        subtitle = show.watchedCaption ?: if (show.seasonCount > 1) {
+            "${countLabel(show.seasonCount, "season")} · ${countLabel(show.episodeCount, "episode")}"
+        } else {
+            countLabel(show.episodeCount, "episode")
+        },
         artwork = show.artwork,
         artTitle = show.title,
         onClick = onClick,

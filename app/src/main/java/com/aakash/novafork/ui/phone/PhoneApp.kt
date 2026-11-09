@@ -419,6 +419,8 @@ fun PhoneApp(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
                         }
                     }
                 }
+                // A scan in progress: a thin moving line under the status bar.
+                if (state.scan.running) ScanLine(Modifier.align(Alignment.TopCenter).padding(top = with(LocalDensity.current) { statusBarTop.toDp() }))
             }
             if (music != null) {
                 val (viewModel, musicState) = music
@@ -1016,3 +1018,33 @@ private fun Route.isTitlePage(): Boolean = this is Route.VideoDetails || this is
  */
 private val StatusEdgeDepth = 8.dp
 
+
+/** A thin blue line sweeping across while the library scans. */
+@Composable
+private fun ScanLine(modifier: Modifier = Modifier) {
+    val transition = androidx.compose.animation.core.rememberInfiniteTransition(label = "scanLine")
+    val phase by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+            androidx.compose.animation.core.tween(1_400, easing = androidx.compose.animation.core.LinearEasing),
+        ),
+        label = "scanPhase",
+    )
+    Box(
+        modifier
+            .fillMaxWidth()
+            .height(2.dp)
+            .drawWithContent {
+                val segment = size.width * 0.3f
+                val x = -segment + (size.width + segment) * phase
+                drawRect(
+                    brush = Brush.horizontalGradient(
+                        listOf(Color.Transparent, com.aakash.novafork.ui.theme.NovaColors.IosBlue, Color.Transparent),
+                        startX = x,
+                        endX = x + segment,
+                    ),
+                )
+            },
+    )
+}
