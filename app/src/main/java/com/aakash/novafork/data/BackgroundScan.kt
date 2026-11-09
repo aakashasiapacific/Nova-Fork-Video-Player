@@ -124,6 +124,8 @@ object NewEpisodeAlerts {
         if (lines.size > MAX_LINES) style.setSummaryText("and ${lines.size - MAX_LINES} more")
         val notification = NotificationCompat.Builder(context, CHANNEL)
             .setSmallIcon(R.drawable.ic_tv)
+            // The app's blue on the note's icon and name (Android tints with it).
+            .setColor(0xFF0A84FF.toInt())
             .setContentTitle(title)
             .setContentText(lines.first())
             .setStyle(style)
