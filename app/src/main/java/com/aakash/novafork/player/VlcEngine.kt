@@ -48,6 +48,10 @@ object VlcEngine {
         /** 0xRRGGBB. */
         val color: Int = 0xFFFFFF,
         val bold: Boolean = false,
+        /** An Android font family ("serif", "monospace") or "" for libVLC's own. */
+        val font: String = "",
+        /** 0 none, 2 thin, 4 normal (libVLC's own), 6 thick. */
+        val outline: Int = 4,
     ) {
         val options: List<String>
             get() = buildList {
@@ -59,6 +63,8 @@ object VlcEngine {
                 if (margin > 0) add("--sub-margin=$margin")
                 if (color != 0xFFFFFF) add("--freetype-color=${color and 0xFFFFFF}")
                 if (bold) add("--freetype-bold")
+                if (font.isNotBlank()) add("--freetype-font=$font")
+                if (outline != 4) add("--freetype-outline-thickness=${outline.coerceIn(0, 6)}")
             }
     }
 

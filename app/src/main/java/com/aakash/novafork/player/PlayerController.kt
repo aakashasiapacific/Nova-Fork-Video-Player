@@ -154,6 +154,8 @@ class PlayerController(
                 settings.subtitleMargin,
                 color = settings.subtitleColor,
                 bold = settings.subtitleBold,
+                font = settings.subtitleFont,
+                outline = settings.subtitleOutline,
             ),
         )
     }
@@ -423,6 +425,8 @@ class PlayerController(
         _state.value = PlayerUiState(
             aspect = settings.defaultAspect,
             seekStepMs = seekStepMs(settings),
+            doubleTapZone = settings.doubleTapZonePercent / 100f,
+            hiddenButtons = hiddenButtons(settings),
             // Both come from the screen once one attaches.
             canEnterPictureInPicture = false,
             canRotate = canRotateScreen(appContext.resources.configuration),
@@ -1035,6 +1039,8 @@ class PlayerController(
         canEnterPictureInPicture = old.canEnterPictureInPicture,
         canRotate = old.canRotate,
         seekStepMs = seekStepMs(graph.settings.settings.value),
+        doubleTapZone = graph.settings.settings.value.doubleTapZonePercent / 100f,
+        hiddenButtons = hiddenButtons(graph.settings.settings.value),
         subtitleSize = graph.settings.settings.value.subtitleSize,
         volume = old.volume,
         brightness = old.brightness,
@@ -2345,8 +2351,18 @@ class PlayerController(
             // This show's earlier episodes had them off (unless the phone is muted and captions follow that).
             showSubtitlesOff && !mutedCaptions -> mediaPlayer.setSpuTrack(DISABLED_TRACK)
             else -> {
-                val preferred = embedded.firstOrNull { TrackLanguages.matches(it.name, subtitleLanguage) }
-                if (preferred != null) {
+                val forcedOnly = graph.settings.settings.value.forcedSubtitlesOnly && !mutedCaptions
+                // Forced only: a forced track (signs, foreign lines) turns on; full subtitles stay off.
+                val preferred = if (forcedOnly) {
+                    embedded.firstOrNull { it.name.orEmpty().contains("forced", ignoreCase = true) && TrackLanguages.matches(it.name, subtitleLanguage) }
+                        ?: embedded.firstOrNull { it.name.orEmpty().contains("forced", ignoreCase = true) }
+                } else {
+                    embedded.firstOrNull { TrackLanguages.matches(it.name, subtitleLanguage) }
+                }
+                if (forcedOnly && preferred == null) {
+                    selected = external.firstOrNull { it.name.contains("forced", ignoreCase = true) }
+                    if (selected == null && embedded.isNotEmpty()) mediaPlayer.setSpuTrack(DISABLED_TRACK)
+                } else if (preferred != null) {
                     mediaPlayer.setSpuTrack(preferred.id)
                 } else {
                     selected = external.firstOrNull { isPreferredLanguage(it) }
@@ -2959,6 +2975,9 @@ class PlayerController(
         fun canRotateScreen(configuration: Configuration): Boolean =
             Build.VERSION.SDK_INT < ORIENTATION_IGNORED_SDK ||
                 configuration.smallestScreenWidthDp < LARGE_SCREEN_DP
+
+        fun hiddenButtons(settings: Settings): Set<String> =
+            settings.hiddenPlayerButtons.split(',').map { it.trim() }.filter { it.isNotEmpty() }.toSet()
 
         fun seekStepMs(settings: Settings): Long = settings.seekStepSeconds.coerceAtLeast(1) * 1_000L
 

@@ -231,6 +231,8 @@ class MainActivity : ComponentActivity() {
                         settings.subtitleMargin,
                         color = settings.subtitleColor,
                         bold = settings.subtitleBold,
+                        font = settings.subtitleFont,
+                        outline = settings.subtitleOutline,
                     ),
                 )
             } catch (e: Throwable) {

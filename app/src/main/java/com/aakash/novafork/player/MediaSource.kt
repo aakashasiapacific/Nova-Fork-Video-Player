@@ -156,6 +156,14 @@ internal object MediaSource {
             media.addOption(":no-mediacodec-dr")
             media.addOption(":no-omxil-dr")
         }
+        // Deinterlacing for old TV recordings; -1 leaves it to libVLC.
+        when (settings.deinterlace) {
+            0 -> media.addOption(":deinterlace=0")
+            1 -> {
+                media.addOption(":deinterlace=1")
+                media.addOption(":deinterlace-mode=yadif")
+            }
+        }
         val encoding = settings.subtitleEncoding.trim()
         if (encoding.isNotEmpty()) media.addOption(":subsdec-encoding=$encoding")
         // The subtitle size is an instance option too (see VlcEngine.videoLibVLC); stated here as

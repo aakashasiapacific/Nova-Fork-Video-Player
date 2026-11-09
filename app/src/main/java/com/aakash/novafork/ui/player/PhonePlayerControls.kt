@@ -43,6 +43,7 @@ import com.aakash.novafork.ui.common.playerGlass
 import com.aakash.novafork.ui.common.RollingText
 import com.aakash.novafork.ui.common.rememberEndsAt
 import com.aakash.novafork.ui.model.PlayerActions
+import com.aakash.novafork.ui.model.PlayerButton
 import com.aakash.novafork.ui.model.PlayerUiState
 
 /**
@@ -90,7 +91,7 @@ internal fun PhonePlayerControls(
                 PhoneTransportRow(state = state, actions = actions, modifier = Modifier.align(Alignment.Center))
             }
             // Portrait: Samsung's Capture sits under the title, on the left.
-            if (portrait && state.castingTo == null) {
+            if (portrait && state.castingTo == null && PlayerButton.CAPTURE.key !in state.hiddenButtons) {
                 PlayerIconButton(
                     icon = R.drawable.ic_player_capture,
                     contentDescription = "Capture",
@@ -235,7 +236,7 @@ private fun PhoneBottomBar(
         PlayerOptionRows(
             options = playerOptions(state, actions, onOpenPanel, onOpenSheet),
             // Landscape: Samsung's Capture at the far left of the row (portrait puts it under the title).
-            onCapture = if (!portrait && state.castingTo == null) actions::captureFrame else null,
+            onCapture = if (!portrait && state.castingTo == null && PlayerButton.CAPTURE.key !in state.hiddenButtons) actions::captureFrame else null,
         )
     }
 }
@@ -255,15 +256,16 @@ private fun playerOptions(
     onOpenSheet: (PlayerSheet) -> Unit,
 ): List<PlayerOption> = buildList {
     add(PlayerOption { PlayerIconButton(R.drawable.ic_player_fit, "Fit or fill: ${state.aspect.label}", actions::cycleAspect) })
-    if (state.canEnterPictureInPicture) {
+    val hidden = state.hiddenButtons
+    if (state.canEnterPictureInPicture && PlayerButton.POPUP.key !in hidden) {
         add(PlayerOption { PlayerIconButton(R.drawable.ic_player_popup, "Pop-up play", actions::enterPictureInPicture) })
     }
     add(PlayerOption { SpeedPill(rate = state.rate, onClick = { onOpenPanel(PlayerPanel.SPEED) }) })
-    if (state.canRotate) {
+    if (state.canRotate && PlayerButton.ROTATE.key !in hidden) {
         add(PlayerOption { PlayerIconButton(R.drawable.ic_player_rotate, "Rotate", actions::rotate) })
     }
-    add(PlayerOption { PlayerIconButton(R.drawable.ic_player_lock, "Lock screen", actions::toggleLock) })
-    add(PlayerOption { PlayerIconButton(state.repeatMode.iconRes(), state.repeatMode.label, actions::cycleRepeat) })
+    if (PlayerButton.LOCK.key !in hidden) add(PlayerOption { PlayerIconButton(R.drawable.ic_player_lock, "Lock screen", actions::toggleLock) })
+    if (PlayerButton.REPEAT.key !in hidden) add(PlayerOption { PlayerIconButton(state.repeatMode.iconRes(), state.repeatMode.label, actions::cycleRepeat) })
     add(
         PlayerOption {
             PlayerIconButton(
@@ -276,10 +278,10 @@ private fun playerOptions(
     )
     add(PlayerOption { PlayerIconButton(R.drawable.ic_player_audio, "Audio track", { onOpenPanel(PlayerPanel.AUDIO) }) })
     // The sound: the equaliser, night mode and the sleep timer.
-    add(PlayerOption { EqualizerButton(on = state.equalizerOn) })
-    add(PlayerOption { NightModeButton(on = state.nightMode, onClick = actions::toggleNightMode) })
-    add(PlayerOption { SleepTimerButton(sleep = state.sleepTimer, onSet = actions::setSleepTimer) })
-    add(PlayerOption { CastButton(castingTo = state.castingTo, onClick = { onOpenSheet(PlayerSheet.CAST) }) })
+    if (PlayerButton.EQUALIZER.key !in hidden) add(PlayerOption { EqualizerButton(on = state.equalizerOn) })
+    if (PlayerButton.NIGHT.key !in hidden) add(PlayerOption { NightModeButton(on = state.nightMode, onClick = actions::toggleNightMode) })
+    if (PlayerButton.SLEEP.key !in hidden) add(PlayerOption { SleepTimerButton(sleep = state.sleepTimer, onSet = actions::setSleepTimer) })
+    if (PlayerButton.CAST.key !in hidden || state.castingTo != null) add(PlayerOption { CastButton(castingTo = state.castingTo, onClick = { onOpenSheet(PlayerSheet.CAST) }) })
     if (state.queue.size > 1) {
         add(PlayerOption { PlayerIconButton(R.drawable.ic_player_queue, "Queue", { onOpenSheet(PlayerSheet.QUEUE) }) })
     }
@@ -287,7 +289,7 @@ private fun playerOptions(
     if (state.chapters.size > 1) {
         add(PlayerOption { PlayerIconButton(R.drawable.ic_player_chapters, "Chapters", { onOpenSheet(PlayerSheet.CHAPTERS) }) })
     }
-    add(PlayerOption { PlayerIconButton(R.drawable.ic_bookmark, "Bookmarks", { onOpenSheet(PlayerSheet.BOOKMARKS) }) })
+    if (PlayerButton.BOOKMARKS.key !in hidden) add(PlayerOption { PlayerIconButton(R.drawable.ic_bookmark, "Bookmarks", { onOpenSheet(PlayerSheet.BOOKMARKS) }) })
     if (state.canShuffle) {
         add(
             PlayerOption {
@@ -300,7 +302,7 @@ private fun playerOptions(
             },
         )
     }
-    add(PlayerOption { PlayerIconButton(R.drawable.ic_player_headphones, "Play in background", actions::playInBackground) })
+    if (PlayerButton.BACKGROUND.key !in hidden) add(PlayerOption { PlayerIconButton(R.drawable.ic_player_headphones, "Play in background", actions::playInBackground) })
 }
 
 /**

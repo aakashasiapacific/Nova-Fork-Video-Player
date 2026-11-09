@@ -166,6 +166,18 @@ data class Settings(
     val haptics: Boolean = true,
     /** Opening Hidden Videos asks for a fingerprint or the screen lock first. */
     val requireFingerprint: Boolean = false,
+    /** Subtitle typeface: an Android font family ("serif", "monospace" …) or "" for libVLC's own. */
+    val subtitleFont: String = "",
+    /** Subtitle outline thickness as libVLC takes it: 0 none, 2 thin, 4 normal, 6 thick. */
+    val subtitleOutline: Int = 4,
+    /** Subtitles turn on by themselves only for a forced track (signs and foreign lines). */
+    val forcedSubtitlesOnly: Boolean = false,
+    /** Deinterlacing: -1 libVLC decides, 0 off, 1 on (for old TV recordings with comb lines). */
+    val deinterlace: Int = -1,
+    /** How much of the screen's width each side's double-tap seek zone takes, in percent. */
+    val doubleTapZonePercent: Int = 33,
+    /** Player buttons the person has hidden (keys of PlayerButton), comma separated. */
+    val hiddenPlayerButtons: String = "",
     /** The Home hero's look; see [HeroStyle]. */
     val heroStyle: HeroStyle = HeroStyle.BACKDROP,
     /** Library pages as a poster grid or a list. */

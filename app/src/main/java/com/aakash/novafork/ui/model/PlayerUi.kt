@@ -164,6 +164,10 @@ data class PlayerUiState(
     val error: String? = null,
     /** Seek step for buttons/double tap, from Settings. */
     val seekStepMs: Long = 10_000,
+    /** The share of the screen's width each side's double-tap seek zone takes (Settings). */
+    val doubleTapZone: Float = 1f / 3f,
+    /** Player buttons hidden in Preferences (PlayerButton keys). */
+    val hiddenButtons: Set<String> = emptySet(),
     /** Current volume/brightness 0–1 (for the gesture overlay start value). */
     val volume: Float = 0.5f,
     val brightness: Float = 0.5f,
@@ -352,4 +356,19 @@ open class NoOpPlayerActions : PlayerActions {
     override fun searchSubtitles() {}
     override fun downloadSubtitle(id: String) {}
     override fun dismissSubtitleSearch() {}
+}
+
+/** The player buttons Preferences › Player can hide, by key, with the name its tick box shows. */
+enum class PlayerButton(val key: String, val label: String) {
+    POPUP("popup", "Pop-up play"),
+    ROTATE("rotate", "Rotate"),
+    LOCK("lock", "Lock screen"),
+    REPEAT("repeat", "Repeat"),
+    EQUALIZER("equalizer", "Equaliser"),
+    NIGHT("night", "Night mode"),
+    SLEEP("sleep", "Sleep timer"),
+    CAST("cast", "Cast"),
+    BOOKMARKS("bookmarks", "Bookmarks"),
+    BACKGROUND("background", "Play in background"),
+    CAPTURE("capture", "Capture"),
 }

@@ -86,8 +86,8 @@ internal fun PlayerGestureLayer(
                                 currentActions.holdSpeed(true)
                             }
                         },
-                        onDoubleTap = { offset -> currentOnDoubleTap(tapZone(offset.x, size.width.toFloat())) },
-                        onTap = { offset -> currentOnTap(tapZone(offset.x, size.width.toFloat())) },
+                        onDoubleTap = { offset -> currentOnDoubleTap(tapZone(offset.x, size.width.toFloat(), currentState.doubleTapZone)) },
+                        onTap = { offset -> currentOnTap(tapZone(offset.x, size.width.toFloat(), currentState.doubleTapZone)) },
                     )
                 }
             }
@@ -155,9 +155,9 @@ internal fun Modifier.observeTouches(onTouchingChanged: (Boolean) -> Unit): Modi
     }
 }
 
-private fun tapZone(x: Float, width: Float): TapZone = when {
-    x < width / 3f -> TapZone.LEFT
-    x > width * 2f / 3f -> TapZone.RIGHT
+private fun tapZone(x: Float, width: Float, side: Float): TapZone = when {
+    x < width * side -> TapZone.LEFT
+    x > width * (1f - side) -> TapZone.RIGHT
     else -> TapZone.CENTER
 }
 

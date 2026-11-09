@@ -100,6 +100,12 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
             putString(KEY_LIBRARY_LAYOUT, s.libraryLayout.name)
             putString(KEY_POSTER_COLUMNS, s.posterColumns.name)
             putString(KEY_DETAILS_HEADER_STYLE, s.detailsHeaderStyle.name)
+            putString(KEY_SUBTITLE_FONT, s.subtitleFont)
+            putInt(KEY_SUBTITLE_OUTLINE, s.subtitleOutline)
+            putBoolean(KEY_FORCED_SUBTITLES_ONLY, s.forcedSubtitlesOnly)
+            putInt(KEY_DEINTERLACE, s.deinterlace)
+            putInt(KEY_DOUBLE_TAP_ZONE, s.doubleTapZonePercent)
+            putString(KEY_HIDDEN_PLAYER_BUTTONS, s.hiddenPlayerButtons)
         }
     }
 
@@ -162,6 +168,12 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
         const val KEY_LIBRARY_LAYOUT = "library_layout"
         const val KEY_POSTER_COLUMNS = "poster_columns"
         const val KEY_DETAILS_HEADER_STYLE = "details_header_style"
+        const val KEY_SUBTITLE_FONT = "subtitle_font"
+        const val KEY_SUBTITLE_OUTLINE = "subtitle_outline"
+        const val KEY_FORCED_SUBTITLES_ONLY = "forced_subtitles_only"
+        const val KEY_DEINTERLACE = "deinterlace"
+        const val KEY_DOUBLE_TAP_ZONE = "double_tap_zone"
+        const val KEY_HIDDEN_PLAYER_BUTTONS = "hidden_player_buttons"
 
         /**
          * The type [write] stores each key with. A restored backup's entry of another type is
@@ -219,6 +231,12 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
             KEY_LIBRARY_LAYOUT to SettingType.STRING,
             KEY_POSTER_COLUMNS to SettingType.STRING,
             KEY_DETAILS_HEADER_STYLE to SettingType.STRING,
+            KEY_SUBTITLE_FONT to SettingType.STRING,
+            KEY_SUBTITLE_OUTLINE to SettingType.INT,
+            KEY_FORCED_SUBTITLES_ONLY to SettingType.BOOLEAN,
+            KEY_DEINTERLACE to SettingType.INT,
+            KEY_DOUBLE_TAP_ZONE to SettingType.INT,
+            KEY_HIDDEN_PLAYER_BUTTONS to SettingType.STRING,
         )
 
         /**
@@ -294,6 +312,12 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
                 libraryLayout = enumOrDefault(prefs.string(KEY_LIBRARY_LAYOUT), defaults.libraryLayout),
                 posterColumns = enumOrDefault(prefs.string(KEY_POSTER_COLUMNS), defaults.posterColumns),
                 detailsHeaderStyle = enumOrDefault(prefs.string(KEY_DETAILS_HEADER_STYLE), defaults.detailsHeaderStyle),
+                subtitleFont = prefs.string(KEY_SUBTITLE_FONT) ?: defaults.subtitleFont,
+                subtitleOutline = prefs.int(KEY_SUBTITLE_OUTLINE, defaults.subtitleOutline).coerceIn(0, 6),
+                forcedSubtitlesOnly = prefs.boolean(KEY_FORCED_SUBTITLES_ONLY, defaults.forcedSubtitlesOnly),
+                deinterlace = prefs.int(KEY_DEINTERLACE, defaults.deinterlace).coerceIn(-1, 1),
+                doubleTapZonePercent = prefs.int(KEY_DOUBLE_TAP_ZONE, defaults.doubleTapZonePercent).coerceIn(20, 50),
+                hiddenPlayerButtons = prefs.string(KEY_HIDDEN_PLAYER_BUTTONS) ?: defaults.hiddenPlayerButtons,
             )
         }
 

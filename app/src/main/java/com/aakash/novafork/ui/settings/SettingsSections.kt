@@ -32,6 +32,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
+import com.aakash.novafork.ui.model.PlayerButton
 import com.aakash.novafork.data.AspectMode
 import com.aakash.novafork.data.DetailsHeaderStyle
 import com.aakash.novafork.data.HeroStyle
@@ -548,6 +549,37 @@ private val TrackLanguages = listOf(
 
 private val SeekSteps = listOf(5, 10, 15, 30).map { Option(it, "$it seconds") }
 
+/** Android's own font families, which libVLC's text renderer finds by name. */
+private val SubtitleFonts = listOf(
+    Option("", "Default"),
+    Option("sans-serif", "Sans serif"),
+    Option("serif", "Serif"),
+    Option("monospace", "Monospace"),
+    Option("sans-serif-condensed", "Condensed"),
+)
+
+private val SubtitleOutlines = listOf(Option(0, "None"), Option(2, "Thin"), Option(4, "Normal"), Option(6, "Thick"))
+
+private val DeinterlaceChoices = listOf(Option(-1, "Automatic"), Option(0, "Off"), Option(1, "On"))
+
+private val DoubleTapZones = listOf(Option(25, "Narrow"), Option(33, "Normal"), Option(40, "Wide"), Option(50, "Half each"))
+
+/** Preferences › Player › Player Buttons: a switch per button the player can do without. */
+private fun playerButtonsGroup(settings: Settings, actions: AppActions): SettingsGroup {
+    val hidden = settings.hiddenPlayerButtons.split(',').map { it.trim() }.filter { it.isNotEmpty() }.toSet()
+    return SettingsGroup(
+        key = "player-buttons",
+        title = "Player buttons",
+        rows = PlayerButton.entries.map { button ->
+            switchRow("player-button-${button.key}", R.drawable.ic_grid_view, button.label, button.key !in hidden) { shown ->
+                val next = if (shown) hidden - button.key else hidden + button.key
+                actions.updateSettings { it.copy(hiddenPlayerButtons = next.sorted().joinToString(",")) }
+            }
+        },
+        footer = "Turned off, a button leaves the player. Cast still shows while something is casting.",
+    )
+}
+
 /**
  * The player's settings, each tile coloured by what it is about (owner: a page of orange tiles
  * did not look like iOS): playback orange, the screen blue, sound pink, subtitles red.
@@ -588,11 +620,18 @@ private fun playerGroups(settings: Settings, actions: AppActions): List<Settings
             choiceRow("network-buffer", R.drawable.ic_hd, "Network buffer", NetworkBuffers, settings.networkBufferMs, tile = IosPalette.Gray) { ms ->
                 actions.updateSettings { it.copy(networkBufferMs = ms) }
             },
+            choiceRow("deinterlace", R.drawable.ic_hd, "Deinterlace", DeinterlaceChoices, settings.deinterlace, tile = IosPalette.Gray) { mode ->
+                actions.updateSettings { it.copy(deinterlace = mode) }
+            },
+            choiceRow("double-tap-zone", R.drawable.ic_replay, "Double-tap area", DoubleTapZones, settings.doubleTapZonePercent) { percent ->
+                actions.updateSettings { it.copy(doubleTapZonePercent = percent) }
+            },
         ),
         footer = "Software only can help when a video shows green frames or stutters. " +
             "Double-tap the video's sides to seek by this step. A longer network buffer rides out a slow connection " +
             "and delays the start a little.",
     ),
+    playerButtonsGroup(settings, actions),
     SettingsGroup(
         key = "background",
         title = null,
@@ -635,6 +674,9 @@ private fun playerGroups(settings: Settings, actions: AppActions): List<Settings
             switchRow("captions-when-muted", R.drawable.ic_subtitles, "Captions when muted", settings.captionsWhenMuted) { on ->
                 actions.updateSettings { it.copy(captionsWhenMuted = on) }
             },
+            switchRow("forced-subtitles", R.drawable.ic_subtitles, "Forced subtitles only", settings.forcedSubtitlesOnly) { on ->
+                actions.updateSettings { it.copy(forcedSubtitlesOnly = on) }
+            },
         ),
         footer = "Change the encoding if subtitles show garbled letters. Fetch missing subtitles adds one from " +
             "OpenSubtitles when a video has none in your language (needs the key below).",
@@ -657,6 +699,12 @@ private fun playerGroups(settings: Settings, actions: AppActions): List<Settings
             },
             choiceRow("subtitle-position", R.drawable.ic_subtitles, "Position", SubtitlePositions, settings.subtitleMargin) { margin ->
                 actions.updateSettings { it.copy(subtitleMargin = margin) }
+            },
+            choiceRow("subtitle-font", R.drawable.ic_subtitles, "Font", SubtitleFonts, settings.subtitleFont) { font ->
+                actions.updateSettings { it.copy(subtitleFont = font) }
+            },
+            choiceRow("subtitle-outline", R.drawable.ic_subtitles, "Outline", SubtitleOutlines, settings.subtitleOutline) { outline ->
+                actions.updateSettings { it.copy(subtitleOutline = outline) }
             },
         ),
         footer = "Applies from the next video you open.",

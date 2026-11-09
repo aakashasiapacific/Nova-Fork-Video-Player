@@ -32,6 +32,7 @@ import com.aakash.novafork.R
 import com.aakash.novafork.ui.adaptive.DeviceLayout
 import com.aakash.novafork.ui.common.IosTextButton
 import com.aakash.novafork.ui.model.PlayerActions
+import com.aakash.novafork.ui.model.PlayerButton
 import com.aakash.novafork.ui.model.PlayerUiState
 
 private val TransportButtonSize = 64.dp
@@ -110,12 +111,14 @@ private fun TabletTopBar(
         Spacer(Modifier.width(12.dp))
         PlayerTitle(state, Modifier.weight(1f), large = true)
         Spacer(Modifier.width(12.dp))
-        CastButton(
-            castingTo = state.castingTo,
-            onClick = { onOpenSheet(PlayerSheet.CAST) },
-            buttonSize = 56.dp,
-            iconSize = 26.dp,
-        )
+        if (PlayerButton.CAST.key !in state.hiddenButtons || state.castingTo != null) {
+            CastButton(
+                castingTo = state.castingTo,
+                onClick = { onOpenSheet(PlayerSheet.CAST) },
+                buttonSize = 56.dp,
+                iconSize = 26.dp,
+            )
+        }
         if (state.queue.size > 1) {
             PlayerIconButton(
                 icon = R.drawable.ic_player_queue,
@@ -125,13 +128,15 @@ private fun TabletTopBar(
                 iconSize = 26.dp,
             )
         }
-        PlayerIconButton(
-            icon = R.drawable.ic_bookmark,
-            contentDescription = "Bookmarks",
-            onClick = { onOpenSheet(PlayerSheet.BOOKMARKS) },
-            buttonSize = 56.dp,
-            iconSize = 26.dp,
-        )
+        if (PlayerButton.BOOKMARKS.key !in state.hiddenButtons) {
+            PlayerIconButton(
+                icon = R.drawable.ic_bookmark,
+                contentDescription = "Bookmarks",
+                onClick = { onOpenSheet(PlayerSheet.BOOKMARKS) },
+                buttonSize = 56.dp,
+                iconSize = 26.dp,
+            )
+        }
         if (state.chapters.size > 1) {
             PlayerIconButton(
                 icon = R.drawable.ic_player_chapters,
@@ -270,7 +275,7 @@ private fun TabletBottomBar(
                     buttonSize = 56.dp,
                     iconSize = 26.dp,
                 )
-                PlayerIconButton(
+                if (PlayerButton.REPEAT.key !in state.hiddenButtons) PlayerIconButton(
                     icon = state.repeatMode.iconRes(),
                     contentDescription = state.repeatMode.label,
                     onClick = actions::cycleRepeat,
@@ -287,7 +292,7 @@ private fun TabletBottomBar(
                         iconSize = 26.dp,
                     )
                 }
-                if (state.canRotate) {
+                if (state.canRotate && PlayerButton.ROTATE.key !in state.hiddenButtons) {
                     PlayerIconButton(
                         icon = R.drawable.ic_player_rotate,
                         contentDescription = "Rotate",
@@ -296,7 +301,7 @@ private fun TabletBottomBar(
                         iconSize = 26.dp,
                     )
                 }
-                PlayerIconButton(
+                if (PlayerButton.BACKGROUND.key !in state.hiddenButtons) PlayerIconButton(
                     icon = R.drawable.ic_player_headphones,
                     contentDescription = "Play in background",
                     onClick = actions::playInBackground,
@@ -304,18 +309,20 @@ private fun TabletBottomBar(
                     iconSize = 26.dp,
                 )
                 // The sound: the equaliser, night mode and the sleep timer.
-                EqualizerButton(on = state.equalizerOn, buttonSize = 56.dp, iconSize = 26.dp)
-                NightModeButton(on = state.nightMode, onClick = actions::toggleNightMode, buttonSize = 56.dp, iconSize = 26.dp)
-                SleepTimerButton(sleep = state.sleepTimer, onSet = actions::setSleepTimer, buttonSize = 56.dp, iconSize = 26.dp)
+                if (PlayerButton.EQUALIZER.key !in state.hiddenButtons) EqualizerButton(on = state.equalizerOn, buttonSize = 56.dp, iconSize = 26.dp)
+                if (PlayerButton.NIGHT.key !in state.hiddenButtons) NightModeButton(on = state.nightMode, onClick = actions::toggleNightMode, buttonSize = 56.dp, iconSize = 26.dp)
+                if (PlayerButton.SLEEP.key !in state.hiddenButtons) SleepTimerButton(sleep = state.sleepTimer, onSet = actions::setSleepTimer, buttonSize = 56.dp, iconSize = 26.dp)
             }
             Spacer(Modifier.width(8.dp))
-            LabelledButton(
-                icon = R.drawable.ic_player_lock,
-                label = "Lock",
-                onClick = actions::toggleLock,
-                showLabel = labelSecondary,
-            )
-            if (state.canEnterPictureInPicture) {
+            if (PlayerButton.LOCK.key !in state.hiddenButtons) {
+                LabelledButton(
+                    icon = R.drawable.ic_player_lock,
+                    label = "Lock",
+                    onClick = actions::toggleLock,
+                    showLabel = labelSecondary,
+                )
+            }
+            if (state.canEnterPictureInPicture && PlayerButton.POPUP.key !in state.hiddenButtons) {
                 LabelledButton(
                     icon = R.drawable.ic_player_popup,
                     label = "Picture-in-picture",
