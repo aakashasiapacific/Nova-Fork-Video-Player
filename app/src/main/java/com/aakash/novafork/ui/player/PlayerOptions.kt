@@ -209,14 +209,39 @@ internal fun SubtitleSizeRow(sizePercent: Int, onChange: (Int) -> Unit, modifier
 
 @Composable
 internal fun SpeedChips(rate: Float, onSelect: (Float) -> Unit, modifier: Modifier = Modifier) {
-    ChoiceChips(
-        options = SpeedPresets,
-        isSelected = { isRate(rate, it) },
-        label = { formatRate(it) },
-        onSelect = onSelect,
-        modifier = modifier,
-    )
+    Column(modifier) {
+        ChoiceChips(
+            options = SpeedPresets,
+            isSelected = { isRate(rate, it) },
+            label = { formatRate(it) },
+            onSelect = onSelect,
+        )
+        // A fine slider under the presets: 0.25× to 3×, in steps of 0.05, heard as it moves.
+        Row(
+            Modifier.padding(horizontal = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Slider(
+                value = rate.coerceIn(SPEED_MIN, SPEED_MAX),
+                onValueChange = { onSelect((it / SPEED_STEP).roundToInt() * SPEED_STEP) },
+                valueRange = SPEED_MIN..SPEED_MAX,
+                modifier = Modifier
+                    .weight(1f)
+                    .semantics { contentDescription = "Playback speed" },
+            )
+            Text(
+                text = formatRate(rate),
+                style = MaterialTheme.typography.titleMedium.merge(TextStyle(fontFeatureSettings = "tnum")),
+                textAlign = TextAlign.End,
+                modifier = Modifier.widthIn(min = 56.dp),
+            )
+        }
+    }
 }
+
+private const val SPEED_MIN = 0.25f
+private const val SPEED_MAX = 3f
+private const val SPEED_STEP = 0.05f
 
 @Composable
 internal fun AspectChips(aspect: AspectMode, onSelect: (AspectMode) -> Unit, modifier: Modifier = Modifier) {
