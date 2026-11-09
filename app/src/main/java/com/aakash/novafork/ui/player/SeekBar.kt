@@ -48,6 +48,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.sp
 import com.aakash.novafork.core.format.Formats
 import com.aakash.novafork.ui.common.Motion
 import com.aakash.novafork.ui.common.RollingText
@@ -181,8 +183,19 @@ internal fun PlayerSeekBar(
     LaunchedEffect(dragging != null) { bigTime.animateTo(if (dragging != null) 1f else 0f, Motion.content()) }
     val bigTimeLabel: @Composable BoxScope.() -> Unit = {
         if (bigTime.value > 0f) {
+            // The chapter the finger is in, above the time, when the file has named chapters.
+            val chapterName = state.chapters.lastOrNull { it.startMs <= shownMs }?.name?.takeIf { it.isNotBlank() && state.chapters.size > 1 }
             Text(
-                text = Formats.clock(shownMs),
+                text = androidx.compose.ui.text.buildAnnotatedString {
+                    if (chapterName != null) {
+                        withStyle(androidx.compose.ui.text.SpanStyle(fontSize = 13.sp, fontWeight = FontWeight.Medium, color = Color.White.copy(alpha = 0.8f))) {
+                            append(chapterName)
+                        }
+                        append("\n")
+                    }
+                    append(Formats.clock(shownMs))
+                },
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                 style = MaterialTheme.typography.headlineSmall.merge(TextStyle(fontFeatureSettings = "tnum")),
                 fontWeight = FontWeight.SemiBold,
                 color = Color.White,
@@ -190,7 +203,8 @@ internal fun PlayerSeekBar(
                     .align(Alignment.TopCenter)
                     .graphicsLayer {
                         alpha = bigTime.value
-                        translationY = -BigTimeRise.toPx() - (1f - bigTime.value) * 6.dp.toPx()
+                        translationY = -BigTimeRise.toPx() - (1f - bigTime.value) * 6.dp.toPx() -
+                            (if (chapterName != null) ChapterLineRise.toPx() else 0f)
                     },
             )
         }
@@ -245,6 +259,9 @@ private fun TimeLabel(text: String, style: TextStyle, rolling: Boolean, alignmen
         }
     }
 }
+
+/** The extra rise when a chapter's name sits above the scrubbing time. */
+private val ChapterLineRise = 18.dp
 
 /** How far above the seek bar's top the large scrubbing time sits. */
 private val BigTimeRise = 40.dp
