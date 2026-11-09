@@ -27,6 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -88,7 +89,10 @@ internal fun PhonePlayerControls(
                     .graphicsLayer { translationY = -(1f - shown()) * ControlsSlide.toPx() },
             )
             if (state.error == null) {
-                PhoneTransportRow(state = state, actions = actions, modifier = Modifier.align(Alignment.Center))
+                // While seeking the buttons step back so the picture and the time lead.
+                val seeking = state.feedback is com.aakash.novafork.ui.model.GestureFeedback.Seek || state.scrubFrame != null
+                val dim by androidx.compose.animation.core.animateFloatAsState(if (seeking) 0.35f else 1f, label = "transportDim")
+                PhoneTransportRow(state = state, actions = actions, modifier = Modifier.align(Alignment.Center).graphicsLayer { alpha = dim })
             }
             // Portrait: Samsung's Capture sits under the title, on the left.
             if (portrait && state.castingTo == null && PlayerButton.CAPTURE.key !in state.hiddenButtons) {
