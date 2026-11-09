@@ -136,6 +136,7 @@ object HomeSnapshot {
         put("source", c.sourceLabel)
         put("sourceId", c.sourceId)
         put("newEpisode", c.newEpisode)
+        put("uhd", c.uhd)
     }
 
     private fun show(s: ShowCardUi): JsonObject = buildJsonObject {
@@ -221,6 +222,7 @@ object HomeSnapshot {
             sourceLabel = o.str("source"),
             sourceId = o.long("sourceId"),
             newEpisode = o.bool("newEpisode"),
+            uhd = o.bool("uhd"),
         )
     }
 

@@ -209,6 +209,7 @@ private fun PosterCardLayout(
     bare: Boolean = false,
     /** The video's source, for the source colour dot (Preferences › Appearance). */
     sourceId: Long? = null,
+    uhd: Boolean = false,
 ) {
     val dims = LocalNovaDimens.current
     val shape = RoundedCornerShape(dims.cardRadius)
@@ -235,6 +236,7 @@ private fun PosterCardLayout(
             if (sourceId != null && com.aakash.novafork.ui.common.LocalSourceDots.current) {
                 com.aakash.novafork.ui.common.SourceDot(sourceId, Modifier.align(Alignment.TopStart).padding(7.dp))
             }
+            if (uhd) UhdTag(Modifier.align(Alignment.BottomEnd).padding(6.dp))
             ProgressStrip(progress, Modifier.align(Alignment.BottomStart))
         }
         if (!bare) {
@@ -280,6 +282,22 @@ internal fun PhonePosterCard(
         onLongClick = onLongClick,
         bare = bare,
         sourceId = card.sourceId,
+        uhd = card.uhd,
+    )
+}
+
+/** Apple TV's tiny "4K" tag in a poster's corner: white letters on a dark frosted chip. */
+@Composable
+private fun UhdTag(modifier: Modifier = Modifier) {
+    Text(
+        "4K",
+        fontSize = 9.sp,
+        fontWeight = FontWeight.Bold,
+        letterSpacing = 0.4.sp,
+        color = Color.White.copy(alpha = 0.92f),
+        modifier = modifier
+            .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(3.dp))
+            .padding(horizontal = 4.dp, vertical = 1.dp),
     )
 }
 

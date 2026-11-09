@@ -67,6 +67,8 @@ data class VideoCardUi(
     val sourceId: Long? = null,
     /** Continue Watching: its show's next episode arrived after the show was last watched (Apple TV's blue dot). */
     val newEpisode: Boolean = false,
+    /** Apple TV's small "4K" tag on the poster, when the file is 4K. */
+    val uhd: Boolean = false,
 )
 
 @Immutable

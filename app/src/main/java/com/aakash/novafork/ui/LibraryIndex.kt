@@ -282,6 +282,7 @@ private fun indexVideo(
         season = video.season,
         episode = video.episode,
         sourceLabel = source?.let(::sourceLabel),
+        uhd = (video.width ?: 0) >= 3200 || (video.height ?: 0) >= 2000,
     )
     return IndexedVideo(
         video = video,
