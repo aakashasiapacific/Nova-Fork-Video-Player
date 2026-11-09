@@ -28,6 +28,7 @@ import androidx.compose.foundation.indication
 import androidx.compose.foundation.interaction.InteractionSource
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -876,9 +877,13 @@ private const val MAX_PRESS_SHRINK = 0.04f
 @Composable
 fun Modifier.pressDim(source: InteractionSource): Modifier {
     val down by source.collectIsPressedAsState()
+    // A mouse or stylus resting on it: a faint lift of light (iPadOS's hover).
+    val hovered by source.collectIsHoveredAsState()
     val dim by animateFloatAsState(if (down) 0.22f else 0f, if (down) Motion.press() else Motion.content(), label = "pressDim")
+    val glow by animateFloatAsState(if (hovered && !down) 0.08f else 0f, Motion.content(), label = "hoverGlow")
     return drawWithContent {
         drawContent()
         if (dim > 0f) drawRect(Color.Black.copy(alpha = dim))
+        if (glow > 0f) drawRect(Color.White.copy(alpha = glow))
     }
 }
