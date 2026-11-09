@@ -207,6 +207,8 @@ private fun PosterCardLayout(
     watched: Boolean,
     onLongClick: (() -> Unit)?,
     bare: Boolean = false,
+    /** The video's source, for the source colour dot (Preferences › Appearance). */
+    sourceId: Long? = null,
 ) {
     val dims = LocalNovaDimens.current
     val shape = RoundedCornerShape(dims.cardRadius)
@@ -230,6 +232,9 @@ private fun PosterCardLayout(
         ) {
             PosterArt(artwork = artwork, title = title, modifier = Modifier.fillMaxSize())
             WatchedMark(watched, Modifier.align(Alignment.TopEnd).padding(6.dp))
+            if (sourceId != null && com.aakash.novafork.ui.common.LocalSourceDots.current) {
+                com.aakash.novafork.ui.common.SourceDot(sourceId, Modifier.align(Alignment.TopStart).padding(7.dp))
+            }
             ProgressStrip(progress, Modifier.align(Alignment.BottomStart))
         }
         if (!bare) {
@@ -274,6 +279,7 @@ internal fun PhonePosterCard(
         watched = card.watched,
         onLongClick = onLongClick,
         bare = bare,
+        sourceId = card.sourceId,
     )
 }
 

@@ -63,6 +63,7 @@ fun NovaRoot(state: AppUiState, actions: AppActions, modifier: Modifier = Modifi
             LocalLibraryLayout provides settings.libraryLayout,
             LocalPosterColumns provides settings.posterColumns,
             com.aakash.novafork.ui.common.LocalSpoilerSafe provides settings.spoilerSafe,
+            com.aakash.novafork.ui.common.LocalSourceDots provides settings.sourceDots,
             com.aakash.novafork.ui.audio.LocalOnlineMusicArt provides settings.onlineMusicArt,
             com.aakash.novafork.ui.common.LocalHomeRows provides remember(settings.homeRowOrder, settings.homeHiddenRows) {
                 com.aakash.novafork.ui.common.HomeRow.shown(settings.homeRowOrder, settings.homeHiddenRows)

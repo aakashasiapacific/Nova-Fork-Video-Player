@@ -194,6 +194,8 @@ data class Settings(
     val resumeOnHeadphones: Boolean = false,
     /** Folders whose videos stay out of the library's screens, one per line (Browse still lists them). */
     val hiddenFolders: String = "",
+    /** A small colour dot on posters says which source a video is on. */
+    val sourceDots: Boolean = false,
     /** The Home hero's look; see [HeroStyle]. */
     val heroStyle: HeroStyle = HeroStyle.BACKDROP,
     /** Library pages as a poster grid or a list. */

@@ -786,8 +786,11 @@ private fun appearanceGroups(settings: Settings, actions: AppActions): List<Sett
             switchRow("spoiler-safe", R.drawable.ic_visibility_off, "Spoiler-Safe Episodes", settings.spoilerSafe) { on ->
                 actions.updateSettings { it.copy(spoilerSafe = on) }
             },
+            switchRow("source-dots", R.drawable.ic_folder, "Source Colours", settings.sourceDots) { on ->
+                actions.updateSettings { it.copy(sourceDots = on) }
+            },
         ),
-        footer = "Automatic uses the tablet layout from 600dp wide. Open On picks the tab the app starts on. Spoiler-Safe Episodes blurs the stills and hides the summaries of episodes not started yet.",
+        footer = "Automatic uses the tablet layout from 600dp wide. Open On picks the tab the app starts on. Spoiler-Safe Episodes blurs the stills and hides the summaries of episodes not started yet. Source Colours puts a small dot on posters, one colour per source.",
     ),
     homeRowsGroup(settings, actions),
     SettingsGroup(
