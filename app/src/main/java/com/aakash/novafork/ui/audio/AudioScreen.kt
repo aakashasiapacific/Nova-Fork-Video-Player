@@ -62,6 +62,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -1258,10 +1259,12 @@ private fun AlbumTile(album: Album, ctx: PageContext, modifier: Modifier = Modif
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun AlbumTileContent(album: Album, onClick: () -> Unit, onLongClick: () -> Unit) {
+    val press = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+    val pressed by press.collectIsPressedAsState()
     Column(
         Modifier
             .padding(bottom = 18.dp)
-            .combinedClickable(onClick = onClick, onLongClickLabel = "More", onLongClick = onLongClick),
+            .combinedClickable(interactionSource = press, indication = null, onClick = onClick, onLongClickLabel = "More", onLongClick = onLongClick),
     ) {
         Box(
             Modifier
@@ -1270,6 +1273,23 @@ private fun AlbumTileContent(album: Album, onClick: () -> Unit, onLongClick: () 
                 .clip(RoundedCornerShape(8.dp)),
         ) {
             Cover(album.artUri, size = 0, modifier = Modifier.fillMaxSize(), fallback = OnlineMusicArt.album(album.artist, album.title))
+            // Held, the cover dims and Apple Music's round play mark rises in its corner.
+            androidx.compose.animation.AnimatedVisibility(
+                visible = pressed,
+                enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.scaleIn(initialScale = 0.6f),
+                exit = androidx.compose.animation.fadeOut(),
+                modifier = Modifier.align(Alignment.BottomEnd).padding(8.dp),
+            ) {
+                Box(
+                    Modifier
+                        .size(34.dp)
+                        .background(Color.Black.copy(alpha = 0.55f), CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    NovaIcon(R.drawable.ic_play_arrow, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
+                }
+            }
+            if (pressed) Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.18f)))
         }
         Text(
             album.title,
