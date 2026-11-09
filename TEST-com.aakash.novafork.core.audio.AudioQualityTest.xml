@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.aakash.novafork.core.audio.AudioQualityTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-11-09T12:28:01.423Z" hostname="runnervm7aw5e" time="0.02">
+  <properties/>
+  <testcase name="anM4aIsLosslessOnlyWhenItsCodecIsAlac" classname="com.aakash.novafork.core.audio.AudioQualityTest" time="0.001"/>
+  <testcase name="flacWavAndAiffAreLosslessByName" classname="com.aakash.novafork.core.audio.AudioQualityTest" time="0.0"/>
+  <testcase name="labelsLosslessAndHiRes" classname="com.aakash.novafork.core.audio.AudioQualityTest" time="0.0"/>
+  <testcase name="formatsTheNumbers" classname="com.aakash.novafork.core.audio.AudioQualityTest" time="0.015"/>
+  <testcase name="averagesTheBitrateFromSizeAndLength" classname="com.aakash.novafork.core.audio.AudioQualityTest" time="0.0"/>
+  <testcase name="namesTheFormat" classname="com.aakash.novafork.core.audio.AudioQualityTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

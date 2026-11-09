@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.aakash.novafork.core.audio.ReplayGainTest" tests="10" skipped="0" failures="0" errors="0" timestamp="2026-11-09T12:28:01.536Z" hostname="runnervm7aw5e" time="0.024">
+  <properties/>
+  <testcase name="gainIsClampedToTwelveDecibels" classname="com.aakash.novafork.core.audio.ReplayGainTest" time="0.008"/>
+  <testcase name="untaggedFilesHaveNoGain" classname="com.aakash.novafork.core.audio.ReplayGainTest" time="0.002"/>
+  <testcase name="readsAVorbisComment" classname="com.aakash.novafork.core.audio.ReplayGainTest" time="0.002"/>
+  <testcase name="replayGainBeatsITunNorm" classname="com.aakash.novafork.core.audio.ReplayGainTest" time="0.0"/>
+  <testcase name="readsAnId3TxxxFrame" classname="com.aakash.novafork.core.audio.ReplayGainTest" time="0.001"/>
+  <testcase name="volumeFollowsTheGain" classname="com.aakash.novafork.core.audio.ReplayGainTest" time="0.003"/>
+  <testcase name="id3HeaderSaysHowMuchToRead" classname="com.aakash.novafork.core.audio.ReplayGainTest" time="0.0"/>
+  <testcase name="readsAUtf16Id3Frame" classname="com.aakash.novafork.core.audio.ReplayGainTest" time="0.001"/>
+  <testcase name="readsAnMp4Atom" classname="com.aakash.novafork.core.audio.ReplayGainTest" time="0.0"/>
+  <testcase name="readsITunNorm" classname="com.aakash.novafork.core.audio.ReplayGainTest" time="0.006"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

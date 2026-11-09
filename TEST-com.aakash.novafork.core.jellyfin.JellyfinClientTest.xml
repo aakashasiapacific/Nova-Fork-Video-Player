@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.aakash.novafork.core.jellyfin.JellyfinClientTest" tests="21" skipped="0" failures="0" errors="0" timestamp="2026-11-09T12:28:01.653Z" hostname="runnervm7aw5e" time="1.45">
+  <properties/>
+  <testcase name="newerJellyfinRoutesAreTriedWhenTheOldOnesAreGone" classname="com.aakash.novafork.core.jellyfin.JellyfinClientTest" time="0.606"/>
+  <testcase name="aServerThatDoesNotAnswerGivesAReadableMessage" classname="com.aakash.novafork.core.jellyfin.JellyfinClientTest" time="0.243"/>
+  <testcase name="aServerThatIsOffGivesAReadableMessage" classname="com.aakash.novafork.core.jellyfin.JellyfinClientTest" time="0.023"/>
+  <testcase name="anUnknownHostGivesAReadableMessage" classname="com.aakash.novafork.core.jellyfin.JellyfinClientTest" time="0.007"/>
+  <testcase name="embyGetsItsPrefixAndTokenHeader" classname="com.aakash.novafork.core.jellyfin.JellyfinClientTest" time="0.011"/>
+  <testcase name="somethingElseAtTheAddressIsNotTakenForAServer" classname="com.aakash.novafork.core.jellyfin.JellyfinClientTest" time="0.016"/>
+  <testcase name="anAddressCopiedFromTheWebClientStillWorks" classname="com.aakash.novafork.core.jellyfin.JellyfinClientTest" time="0.014"/>
+  <testcase name="signedInRequestsCarryTheToken" classname="com.aakash.novafork.core.jellyfin.JellyfinClientTest" time="0.015"/>
+  <testcase name="imageAndStreamUrls" classname="com.aakash.novafork.core.jellyfin.JellyfinClientTest" time="0.01"/>
+  <testcase name="playbackIsReportedInTicks" classname="com.aakash.novafork.core.jellyfin.JellyfinClientTest" time="0.058"/>
+  <testcase name="tokensAreKeptOutOfLogs" classname="com.aakash.novafork.core.jellyfin.JellyfinClientTest" time="0.01"/>
+  <testcase name="itemsArePagedUntilTheTotal" classname="com.aakash.novafork.core.jellyfin.JellyfinClientTest" time="0.124"/>
+  <testcase name="pagingStopsAtAShortPageWhenTheServerGivesNoTotal" classname="com.aakash.novafork.core.jellyfin.JellyfinClientTest" time="0.057"/>
+  <testcase name="aFailedGetIsRetriedButAPostIsNot" classname="com.aakash.novafork.core.jellyfin.JellyfinClientTest" time="0.061"/>
+  <testcase name="anEmbyAddressEndingInEmbyIsNotPrefixedTwice" classname="com.aakash.novafork.core.jellyfin.JellyfinClientTest" time="0.016"/>
+  <testcase name="aRefusedTokenIsA401" classname="com.aakash.novafork.core.jellyfin.JellyfinClientTest" time="0.013"/>
+  <testcase name="anApiKeyStandsInForTheFirstAdministrator" classname="com.aakash.novafork.core.jellyfin.JellyfinClientTest" time="0.065"/>
+  <testcase name="aWrongPasswordIsReportedAsSuch" classname="com.aakash.novafork.core.jellyfin.JellyfinClientTest" time="0.017"/>
+  <testcase name="anEpisodeDecodesWithWhatScansNeed" classname="com.aakash.novafork.core.jellyfin.JellyfinClientTest" time="0.033"/>
+  <testcase name="datesOfEitherServerAreRead" classname="com.aakash.novafork.core.jellyfin.JellyfinClientTest" time="0.022"/>
+  <testcase name="signingInSendsTheClientIdentityAndReturnsTheToken" classname="com.aakash.novafork.core.jellyfin.JellyfinClientTest" time="0.026"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[Nov 09, 2026 12:28:02 PM okhttp3.mockwebserver.MockWebServer$SocketHandler handle
+WARNING: MockWebServer[52077] connection from /127.0.0.1 didn't make a request
+]]></system-err>
+</testsuite>

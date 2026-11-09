@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.aakash.novafork.core.webdav.WebDavClientTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-11-09T12:28:09.571Z" hostname="runnervm7aw5e" time="0.149">
+  <properties/>
+  <testcase name="anHtmlPageIsNotAListing" classname="com.aakash.novafork.core.webdav.WebDavClientTest" time="0.017"/>
+  <testcase name="invalidAddressIsRejected" classname="com.aakash.novafork.core.webdav.WebDavClientTest" time="0.006"/>
+  <testcase name="statusCodesBecomeUserMessages" classname="com.aakash.novafork.core.webdav.WebDavClientTest" time="0.024"/>
+  <testcase name="noLoginSendsNoAuthorization" classname="com.aakash.novafork.core.webdav.WebDavClientTest" time="0.019"/>
+  <testcase name="followsASameHostRedirectWithPropfind" classname="com.aakash.novafork.core.webdav.WebDavClientTest" time="0.066"/>
+  <testcase name="listsWithPropfindDepthOneAndBasicAuth" classname="com.aakash.novafork.core.webdav.WebDavClientTest" time="0.017"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

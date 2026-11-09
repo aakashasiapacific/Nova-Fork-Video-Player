@@ -1,0 +1,40 @@
+72:> Task :app:compileReleaseKotlin FAILED
+73:e: file:///home/runner/work/Nova-Fork-Video-Player/Nova-Fork-Video-Player/app/src/main/java/com/aakash/novafork/ui/phone/PhoneApp.kt:1026:29 Unresolved reference 'animateFloat'.
+74:e: file:///home/runner/work/Nova-Fork-Video-Player/Nova-Fork-Video-Player/app/src/main/java/com/aakash/novafork/ui/phone/PhoneApp.kt:1029:57 Cannot infer type for this parameter. Please specify it explicitly.
+75:e: file:///home/runner/work/Nova-Fork-Video-Player/Nova-Fork-Video-Player/app/src/main/java/com/aakash/novafork/ui/phone/PhoneApp.kt:1030:45 Cannot infer type for this parameter. Please specify it explicitly.
+76:e: file:///home/runner/work/Nova-Fork-Video-Player/Nova-Fork-Video-Player/app/src/main/java/com/aakash/novafork/ui/phone/PhoneApp.kt:1045:34 Overload resolution ambiguity between candidates:
+77-fun String?.plus(other: Any?): String
+78-fun <T> Array<T>.plus(element: T): Array<T>
+79-fun FloatArray.plus(element: Float): FloatArray
+80-fun <T> Collection<T>.plus(element: T): List<T>
+81-fun <T> Iterable<T>.plus(element: T): List<T>
+82-fun <T> Set<T>.plus(element: T): Set<T>
+--
+86:FAILURE: Build failed with an exception.
+87-
+88:* What went wrong:
+89-Execution failed for task ':app:compileReleaseKotlin'.
+90-> A failure occurred while executing org.jetbrains.kotlin.compilerRunner.GradleCompilerRunnerWithWorkers$GradleKotlinCompilerWorkAction
+91-   > Compilation error. See log for more details
+92-
+93-* Try:
+94-> Run with --info or --debug option to get more log output.
+--
+132:Caused by: org.gradle.workers.internal.DefaultWorkerExecutor$WorkExecutionException: A failure occurred while executing org.jetbrains.kotlin.compilerRunner.GradleCompilerRunnerWithWorkers$GradleKotlinCompilerWorkAction
+133-	at org.gradle.workers.internal.DefaultWorkerExecutor$WorkItemExecution.waitForCompletion(DefaultWorkerExecutor.java:287)
+134-	at org.gradle.internal.work.DefaultAsyncWorkTracker.lambda$waitForItemsAndGatherFailures$2(DefaultAsyncWorkTracker.java:130)
+135-	at org.gradle.internal.Factories$1.create(Factories.java:31)
+136-	at org.gradle.internal.work.DefaultWorkerLeaseService.withoutLocks(DefaultWorkerLeaseService.java:335)
+137-	at org.gradle.internal.work.DefaultWorkerLeaseService.withoutLocks(DefaultWorkerLeaseService.java:318)
+138-	at org.gradle.internal.work.DefaultWorkerLeaseService.withoutLock(DefaultWorkerLeaseService.java:323)
+--
+257:Caused by: org.jetbrains.kotlin.gradle.tasks.CompilationErrorException: Compilation error. See log for more details
+258-	at org.jetbrains.kotlin.gradle.tasks.TasksUtilsKt.throwExceptionIfCompilationFailed(tasksUtils.kt:21)
+259-	at org.jetbrains.kotlin.compilerRunner.GradleKotlinCompilerWork.run(GradleKotlinCompilerWork.kt:119)
+260-	at org.jetbrains.kotlin.compilerRunner.GradleCompilerRunnerWithWorkers$GradleKotlinCompilerWorkAction.execute(GradleCompilerRunnerWithWorkers.kt:76)
+261-	at org.gradle.workers.internal.DefaultWorkerServer.execute(DefaultWorkerServer.java:63)
+262-	at org.gradle.workers.internal.NoIsolationWorkerFactory$1$1.create(NoIsolationWorkerFactory.java:66)
+263-	at org.gradle.workers.internal.NoIsolationWorkerFactory$1$1.create(NoIsolationWorkerFactory.java:62)
+--
+290:BUILD FAILED in 2m 40s
+291-40 actionable tasks: 40 executed

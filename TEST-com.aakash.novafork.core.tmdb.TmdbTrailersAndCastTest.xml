@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.aakash.novafork.core.tmdb.TmdbTrailersAndCastTest" tests="8" skipped="0" failures="0" errors="0" timestamp="2026-11-09T12:28:09.561Z" hostname="runnervm7aw5e" time="0.008">
+  <properties/>
+  <testcase name="onlyYouTubeTrailersCount" classname="com.aakash.novafork.core.tmdb.TmdbTrailersAndCastTest" time="0.002"/>
+  <testcase name="showCastUsesTheRoleWithMostEpisodes" classname="com.aakash.novafork.core.tmdb.TmdbTrailersAndCastTest" time="0.003"/>
+  <testcase name="castIsLimitedAndHasNoRepeats" classname="com.aakash.novafork.core.tmdb.TmdbTrailersAndCastTest" time="0.001"/>
+  <testcase name="videosDecodeFromTmdbJson" classname="com.aakash.novafork.core.tmdb.TmdbTrailersAndCastTest" time="0.001"/>
+  <testcase name="deviceLanguageThenEnglishThenAnyOther" classname="com.aakash.novafork.core.tmdb.TmdbTrailersAndCastTest" time="0.001"/>
+  <testcase name="newestOfficialTrailerWins" classname="com.aakash.novafork.core.tmdb.TmdbTrailersAndCastTest" time="0.0"/>
+  <testcase name="officialBeatsUnofficialEvenWhenOlder" classname="com.aakash.novafork.core.tmdb.TmdbTrailersAndCastTest" time="0.0"/>
+  <testcase name="movieCastKeepsBillingOrderAndPhotos" classname="com.aakash.novafork.core.tmdb.TmdbTrailersAndCastTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
