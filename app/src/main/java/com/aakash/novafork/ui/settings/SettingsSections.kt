@@ -732,8 +732,11 @@ private fun playerGroups(settings: Settings, actions: AppActions): List<Settings
             switchRow("online-music-art", R.drawable.ic_album, "Artist Photos and Covers", settings.onlineMusicArt) { on ->
                 actions.updateSettings { it.copy(onlineMusicArt = on) }
             },
+            switchRow("resume-on-headphones", R.drawable.ic_player_headphones, "Resume on Headphones", settings.resumeOnHeadphones) { on ->
+                actions.updateSettings { it.copy(resumeOnHeadphones = on) }
+            },
         ),
-        footer = "Autoplay keeps the music going with similar songs when the queue ends; with Album After Album, a whole album ends into another album. Sound Check evens out song volumes from their ReplayGain tags. Lyrics from LRCLIB looks up synced lyrics for songs without a .lrc file (the title and artist are sent to lrclib.net). Artist Photos and Covers fetches artist pictures and covers for albums without one from Deezer.",
+        footer = "Autoplay keeps the music going with similar songs when the queue ends; with Album After Album, a whole album ends into another album. Sound Check evens out song volumes from their ReplayGain tags. Lyrics from LRCLIB looks up synced lyrics for songs without a .lrc file (the title and artist are sent to lrclib.net). Artist Photos and Covers fetches artist pictures and covers for albums without one from Deezer. Resume on Headphones carries on music that headphones paused when they come back within 30 minutes.",
     ),
 ) + subtitleDownloadGroups(settings, actions)
 

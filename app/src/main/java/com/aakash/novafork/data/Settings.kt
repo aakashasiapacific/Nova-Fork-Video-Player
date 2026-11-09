@@ -190,6 +190,8 @@ data class Settings(
     val startTab: String = "VIDEO",
     /** Unwatched episodes hide their summary and blur their still. */
     val spoilerSafe: Boolean = false,
+    /** Music paused by headphones going away carries on when they come back (within 30 minutes). */
+    val resumeOnHeadphones: Boolean = false,
     /** The Home hero's look; see [HeroStyle]. */
     val heroStyle: HeroStyle = HeroStyle.BACKDROP,
     /** Library pages as a poster grid or a list. */

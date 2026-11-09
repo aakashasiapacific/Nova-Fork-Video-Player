@@ -184,10 +184,41 @@ class MusicPlayer(
                 mediaPlayer?.setVolume(if (ducked) DUCKED_VOLUME * songVolume / FULL_VOLUME else songVolume)
             }
 
-            override fun onBecomingNoisy() = pause()
+            override fun onBecomingNoisy() {
+                pausedByUnplugAt = SystemClock.elapsedRealtime()
+                pause()
+            }
         },
         contentType = AudioAttributes.CONTENT_TYPE_MUSIC,
     )
+
+    /** When headphones going away paused the music; 0 = they didn't. */
+    private var pausedByUnplugAt = 0L
+
+    /**
+     * Preferences › Player › Music › Resume on Headphones: Bluetooth headphones (or a wired pair)
+     * coming back within half an hour of being taken away carry on the music they paused.
+     */
+    private val headphonesBack = object : android.media.AudioDeviceCallback() {
+        override fun onAudioDevicesAdded(added: Array<out android.media.AudioDeviceInfo>) {
+            val headphones = added.any {
+                it.isSink && it.type in HEADPHONE_TYPES
+            }
+            val pausedAt = pausedByUnplugAt
+            if (!headphones || pausedAt == 0L || !settings().resumeOnHeadphones) return
+            pausedByUnplugAt = 0L
+            if (SystemClock.elapsedRealtime() - pausedAt <= RESUME_WINDOW_MS && !_state.value.isPlaying && _state.value.active) play()
+        }
+    }
+
+    init {
+        try {
+            (appContext.getSystemService(Context.AUDIO_SERVICE) as android.media.AudioManager)
+                .registerAudioDeviceCallback(headphonesBack, android.os.Handler(android.os.Looper.getMainLooper()))
+        } catch (e: Exception) {
+            // No callback: headphones simply don't resume the music.
+        }
+    }
 
     val hasContent: Boolean get() = _state.value.active
 
@@ -1015,6 +1046,13 @@ class MusicPlayer(
         /** The sleep timer's fade: how long, and in how many steps. */
         /** setSleepTimer's value for "stop at the end of the album". */
         const val SLEEP_END_OF_ALBUM = -2
+        const val RESUME_WINDOW_MS = 30 * 60_000L
+        val HEADPHONE_TYPES = setOf(
+            android.media.AudioDeviceInfo.TYPE_BLUETOOTH_A2DP,
+            android.media.AudioDeviceInfo.TYPE_WIRED_HEADPHONES,
+            android.media.AudioDeviceInfo.TYPE_WIRED_HEADSET,
+            android.media.AudioDeviceInfo.TYPE_USB_HEADSET,
+        )
         const val SLEEP_FADE_MS = 6_000L
         const val SLEEP_FADE_STEPS = 30
 

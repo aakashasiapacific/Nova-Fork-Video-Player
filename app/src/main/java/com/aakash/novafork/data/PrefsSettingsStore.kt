@@ -112,6 +112,7 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
             putBoolean(KEY_ONLINE_MUSIC_ART, s.onlineMusicArt)
             putString(KEY_START_TAB, s.startTab)
             putBoolean(KEY_SPOILER_SAFE, s.spoilerSafe)
+            putBoolean(KEY_RESUME_ON_HEADPHONES, s.resumeOnHeadphones)
         }
     }
 
@@ -186,6 +187,7 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
         const val KEY_ONLINE_MUSIC_ART = "online_music_art"
         const val KEY_START_TAB = "start_tab"
         const val KEY_SPOILER_SAFE = "spoiler_safe"
+        const val KEY_RESUME_ON_HEADPHONES = "resume_on_headphones"
 
         /**
          * The type [write] stores each key with. A restored backup's entry of another type is
@@ -255,6 +257,7 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
             KEY_ONLINE_MUSIC_ART to SettingType.BOOLEAN,
             KEY_START_TAB to SettingType.STRING,
             KEY_SPOILER_SAFE to SettingType.BOOLEAN,
+            KEY_RESUME_ON_HEADPHONES to SettingType.BOOLEAN,
         )
 
         /**
@@ -342,6 +345,7 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
                 onlineMusicArt = prefs.boolean(KEY_ONLINE_MUSIC_ART, defaults.onlineMusicArt),
                 startTab = prefs.string(KEY_START_TAB) ?: defaults.startTab,
                 spoilerSafe = prefs.boolean(KEY_SPOILER_SAFE, defaults.spoilerSafe),
+                resumeOnHeadphones = prefs.boolean(KEY_RESUME_ON_HEADPHONES, defaults.resumeOnHeadphones),
             )
         }
 
