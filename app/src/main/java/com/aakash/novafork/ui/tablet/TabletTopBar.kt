@@ -107,7 +107,7 @@ internal fun TabletSideBar(
                     .padding(vertical = 10.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                NovaIcon(tab.tabIconRes(), contentDescription = null, tint = tint, modifier = Modifier.size(24.dp))
+                NovaIcon(tab.tabIconRes(), contentDescription = null, tint = tint, modifier = Modifier.size(26.dp))
                 Text(
                     tab.label,
                     style = MaterialTheme.typography.labelSmall,

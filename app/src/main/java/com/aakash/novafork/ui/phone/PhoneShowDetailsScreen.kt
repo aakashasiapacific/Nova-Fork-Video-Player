@@ -226,7 +226,7 @@ fun PhoneShowDetailsScreen(
                             NovaDropdownMenu(expanded = seasonMenu, onDismissRequest = { seasonMenu = false }, title = "Seasons") {
                                 seasons.forEach { s ->
                                     NovaMenuItem(
-                                        text = { Text(s.title) },
+                                        text = { Text("${s.title} · ${s.episodes.size}") },
                                         checked = s.number == season?.number,
                                         onClick = {
                                             seasonMenu = false
