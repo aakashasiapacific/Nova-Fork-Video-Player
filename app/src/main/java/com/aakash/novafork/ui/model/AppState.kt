@@ -55,6 +55,9 @@ sealed interface Route {
     /** Coming Up: new episodes on the way for the library's shows. */
     data object Upcoming : Route
 
+    /** The channels of an IPTV list (an .m3u link). */
+    data class Channels(val url: String) : Route
+
     /** Preferences › Library Health: videos without artwork or details, episodes the names gave no number. */
     data object LibraryHealth : Route
 }
@@ -63,7 +66,7 @@ sealed interface Route {
 val Route.top: TopDestination
     get() = when (this) {
         Route.Home, Route.Library, Route.ContinueWatching, Route.UpNext, Route.History, is Route.VideoDetails, is Route.ShowDetails, is Route.Playlist,
-        is Route.Person, Route.Upcoming,
+        is Route.Person, Route.Upcoming, is Route.Channels,
         -> TopDestination.VIDEO
         // Sources are under Settings.
         Route.Browse, is Route.BrowseDir, Route.Settings, is Route.SettingsPage, Route.HiddenVideos, Route.LibraryHealth -> TopDestination.SETTINGS
@@ -303,6 +306,8 @@ data class AppUiState(
     val history: List<HistoryDayUi> = emptyList(),
     /** Set while route is [Route.Upcoming]. */
     val upcoming: List<UpcomingUi> = emptyList(),
+    /** Set while route is [Route.Channels]. */
+    val channels: ChannelsUi? = null,
     /** An actor's or director's page (route Person): the library's movies and shows they are credited in, newest first. */
     val person: List<LibraryItemUi> = emptyList(),
     /** Hidden Videos (route HiddenVideos): what was hidden from the library. */
@@ -638,4 +643,13 @@ data class UpcomingUi(
     val dayLabel: String,
     /** The full date, "Friday 14 November 2026". */
     val dateLabel: String,
+)
+
+/** An IPTV list being read, or its channels. */
+@Immutable
+data class ChannelsUi(
+    val url: String,
+    val loading: Boolean = true,
+    val error: String? = null,
+    val channels: List<com.aakash.novafork.data.IptvChannel> = emptyList(),
 )

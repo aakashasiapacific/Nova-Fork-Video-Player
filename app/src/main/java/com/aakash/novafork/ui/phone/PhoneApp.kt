@@ -588,6 +588,11 @@ private fun PhonePage(state: AppUiState, actions: AppActions) {
             actions = actions,
             modifier = pageModifier,
         )
+        is Route.Channels -> PhoneChannelsScreen(
+            channels = state.channels,
+            actions = actions,
+            modifier = pageModifier,
+        )
         Route.Upcoming -> PhoneUpcomingScreen(
             items = state.upcoming,
             actions = actions,

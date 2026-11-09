@@ -185,6 +185,11 @@ private fun TabletPage(state: AppUiState, actions: AppActions, layout: DeviceLay
             actions = actions,
             modifier = pageModifier,
         )
+        is Route.Channels -> com.aakash.novafork.ui.phone.PhoneChannelsScreen(
+            channels = state.channels,
+            actions = actions,
+            modifier = pageModifier,
+        )
         Route.Upcoming -> com.aakash.novafork.ui.phone.PhoneUpcomingScreen(
             items = state.upcoming,
             actions = actions,

@@ -139,10 +139,19 @@ class MainActivity : ComponentActivity() {
                     return
                 }
                 viewModel.dismissDialog()
+                // An IPTV channel list opens as a page of its channels.
+                if (com.aakash.novafork.data.IptvPlaylist.isChannelList(link)) {
+                    viewModel.openChannelList(link)
+                    return
+                }
                 startActivity(PlayerIntents.forUri(this@MainActivity, link), growFromTouch())
             }
 
             override fun playRemote(uri: String, title: String) {
+                if (com.aakash.novafork.data.IptvPlaylist.isChannelList(uri)) {
+                    viewModel.openChannelList(uri)
+                    return
+                }
                 startActivity(PlayerIntents.forUri(this@MainActivity, uri, title.ifBlank { null }), growFromTouch())
             }
 

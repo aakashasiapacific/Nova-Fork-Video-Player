@@ -53,6 +53,7 @@ import com.aakash.novafork.ui.model.BackupUi
 import com.aakash.novafork.ui.model.VideoCardUi
 import com.aakash.novafork.ui.model.HomeUi
 import com.aakash.novafork.ui.model.UpcomingUi
+import com.aakash.novafork.ui.model.ChannelsUi
 import com.aakash.novafork.ui.model.BrowseDirUi
 import com.aakash.novafork.ui.model.CastUi
 import com.aakash.novafork.ui.model.DialogUi
@@ -156,6 +157,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
         val recentSearches: List<String> = emptyList(),
         /** Videos taken off the History page, each with the lastPlayedAt it was hidden at. */
         val historyHidden: Map<Long, Long> = emptyMap(),
+        /** The IPTV list being shown (Route.Channels). */
+        val channels: ChannelsUi? = null,
         /** Titles kept off Home ("v:<id>" / "s:<showKey>"); they stay in the library. */
         val homeHidden: Set<String> = emptySet(),
         /** The title pinned to the front of Home's hero, if any. */
@@ -485,6 +488,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
             previewKey = previewKey,
             history = if (route == Route.History) UiMappers.history(index, user.historyHidden) else emptyList(),
             upcoming = if (route == Route.Upcoming) upcomingOf(index) else emptyList(),
+            channels = user.channels?.takeIf { route is Route.Channels && route.url == it.url },
             person = (route as? Route.Person)?.let { UiMappers.person(index, it.name) }.orEmpty(),
             health = if (route == Route.LibraryHealth) UiMappers.libraryHealth(index) else LibraryHealthUi(),
             hidden = if (route == Route.HiddenVideos) UiMappers.hiddenVideos(index, hiddenVideoIds.value) else emptyList(),
@@ -774,6 +778,23 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
     override fun toggleHomePin(itemKey: String) {
         local.update { it.copy(homePinned = if (it.homePinned == itemKey) null else itemKey, homeHidden = it.homeHidden - itemKey) }
         saveHomePicks()
+    }
+
+    /** Opens an IPTV list's page and reads its channels. */
+    fun openChannelList(url: String) {
+        local.update { it.copy(channels = ChannelsUi(url)) }
+        navigate(Route.Channels(url))
+        viewModelScope.launch {
+            val result = try {
+                val list = withContext(Dispatchers.IO) { com.aakash.novafork.data.IptvPlaylist.load(url) }
+                ChannelsUi(url, loading = false, channels = list, error = if (list.isEmpty()) "No channels in this list" else null)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                ChannelsUi(url, loading = false, error = "Couldn't read the list: ${e.message ?: e.javaClass.simpleName}")
+            }
+            local.update { state -> if (state.channels?.url == url) state.copy(channels = result) else state }
+        }
     }
 
     override fun isPinnedToHome(itemKey: String): Boolean = local.value.homePinned == itemKey
