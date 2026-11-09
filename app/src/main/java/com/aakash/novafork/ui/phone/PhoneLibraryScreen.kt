@@ -98,6 +98,9 @@ fun PhoneLibraryScreen(
                             onFilter = actions::setLibraryFilter,
                             onSort = actions::setLibrarySort,
                             onSelect = if (library.items.isNotEmpty()) ({ selection = VideoSelection() }) else null,
+                            sources = library.sources,
+                            source = library.sourceFilter,
+                            onSource = actions::setLibrarySource,
                         )
                     }
                 }
@@ -144,6 +147,10 @@ private fun SortMenu(
     onSort: (LibrarySort) -> Unit,
     /** Starts picking videos (Select), when there are any. */
     onSelect: (() -> Unit)? = null,
+    /** The library's sources; with two or more the menu offers one at a time. */
+    sources: List<Pair<Long, String>> = emptyList(),
+    source: Long? = null,
+    onSource: (Long?) -> Unit = {},
 ) {
     var expanded by remember { mutableStateOf(false) }
     Box {
@@ -184,6 +191,28 @@ private fun SortMenu(
                     },
                     checked = option == sort,
                 )
+            }
+            if (sources.size > 1) {
+                NovaMenuDivider()
+                MenuHeading("Source")
+                NovaMenuItem(
+                    text = { Text("All Sources") },
+                    onClick = {
+                        expanded = false
+                        onSource(null)
+                    },
+                    checked = source == null,
+                )
+                sources.forEach { (id, name) ->
+                    NovaMenuItem(
+                        text = { Text(name, maxLines = 1) },
+                        onClick = {
+                            expanded = false
+                            onSource(id)
+                        },
+                        checked = source == id,
+                    )
+                }
             }
         }
     }

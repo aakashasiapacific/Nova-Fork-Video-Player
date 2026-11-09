@@ -219,6 +219,10 @@ data class LibraryUi(
     val timeline: List<VideoCardUi> = emptyList(),
     /** [timeline] by the month the videos arrived ("October", "March 2024"), as Photos groups. */
     val timelineMonths: List<TimelineMonth> = emptyList(),
+    /** The sources with videos (id to name), for the sort menu's Source section. */
+    val sources: List<Pair<Long, String>> = emptyList(),
+    /** The one source shown; null = all. */
+    val sourceFilter: Long? = null,
 )
 
 /** One month of the timeline: its heading and its videos, newest first. */

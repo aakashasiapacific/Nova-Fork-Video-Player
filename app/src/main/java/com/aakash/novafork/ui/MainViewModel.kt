@@ -157,6 +157,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
         val recentSearches: List<String> = emptyList(),
         /** Videos taken off the History page, each with the lastPlayedAt it was hidden at. */
         val historyHidden: Map<Long, Long> = emptyMap(),
+        /** The library's source filter (its sort menu); null = every source. */
+        val librarySource: Long? = null,
         /** The IPTV list being shown (Route.Channels). */
         val channels: ChannelsUi? = null,
         /** Titles kept off Home ("v:<id>" / "s:<showKey>"); they stay in the library. */
@@ -479,7 +481,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
                 LibraryFilter.WATCHLIST -> LibraryUi(filter = user.filter, sort = user.sort, items = watchlistMemo[index to saved])
                 LibraryFilter.FAVORITES -> LibraryUi(filter = user.filter, sort = user.sort, items = favoritesMemo[index to starred])
                 LibraryFilter.DUPLICATES -> LibraryUi(filter = user.filter, sort = user.sort, items = duplicatesMemo[index])
-                else -> libraryMemo[Triple(index, user.filter, user.sort)]
+                else -> withSourceFilter(index, libraryMemo[Triple(index, user.filter, user.sort)], user.librarySource)
             },
             browse = browse,
             browseDir = (route as? Route.BrowseDir)?.let { browseDirFor(index, it, user.listings, scan) },
@@ -795,6 +797,31 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
             }
             local.update { state -> if (state.channels?.url == url) state.copy(channels = result) else state }
         }
+    }
+
+    override fun setLibrarySource(sourceId: Long?) {
+        local.update { it.copy(librarySource = sourceId) }
+    }
+
+    /** The library page with only [sourceId]'s titles (a show counts when any episode is there). */
+    private fun withSourceFilter(index: LibraryIndex, library: LibraryUi, sourceId: Long?): LibraryUi {
+        val counts = index.videoCountBySource
+        val sources = index.sources.filter { (counts[it.id] ?: 0) > 0 }.map { it.id to it.name }
+        if (sourceId == null || sources.none { it.first == sourceId }) return library.copy(sources = sources)
+        fun onSource(item: LibraryItemUi): Boolean = when (item) {
+            is LibraryItemUi.Video -> item.card.sourceId == sourceId
+            is LibraryItemUi.Show -> index.showsByKey[item.card.key]?.episodes?.any { it.video.sourceId == sourceId } == true
+        }
+        val timeline = library.timeline.filter { it.sourceId == sourceId }
+        return library.copy(
+            items = library.items.filter(::onSource),
+            timeline = timeline,
+            timelineMonths = library.timelineMonths.mapNotNull { month ->
+                month.cards.filter { it.sourceId == sourceId }.takeIf { it.isNotEmpty() }?.let { month.copy(cards = it) }
+            },
+            sources = sources,
+            sourceFilter = sourceId,
+        )
     }
 
     override fun isPinnedToHome(itemKey: String): Boolean = local.value.homePinned == itemKey

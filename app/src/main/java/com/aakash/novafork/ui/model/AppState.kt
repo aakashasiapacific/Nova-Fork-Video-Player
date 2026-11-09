@@ -585,6 +585,9 @@ interface AppActions {
     /** Saves a CSV list of every title in the library. */
     fun exportLibrary() {}
 
+    /** Shows only one source's titles in the library (null = every source). */
+    fun setLibrarySource(sourceId: Long?) {}
+
     /** Picks a backup file (system picker) and reads it; [BackupUi.confirm] then asks before restoring. */
     fun importBackup() {}
 
