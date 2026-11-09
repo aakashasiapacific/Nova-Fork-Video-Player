@@ -1013,7 +1013,9 @@ class LibraryRepositoryImpl(
     override suspend fun nextEpisode(videoId: Long): VideoWithMeta? = withContext(Dispatchers.IO) {
         val current = videoDao.byId(videoId) ?: return@withContext null
         val showKey = current.showKey
-        if (current.kind != VideoKind.EPISODE || showKey == null) return@withContext null
+        // A movie in parts (CD1, CD2 / Part 1, Part 2) goes on to its next part as an episode would.
+        if (current.kind != VideoKind.EPISODE) return@withContext nextPart(current)
+        if (showKey == null) return@withContext null
         // No season (absolute numbering not placed yet) is listed as season 1, as in the UI.
         val season = current.season ?: 1
         val lastEpisode = current.episodeEnd ?: current.episode ?: return@withContext null
@@ -1032,6 +1034,17 @@ class LibraryRepositoryImpl(
                     { it.video.fileName.lowercase() },
                 ),
             )
+    }
+
+    /** The next part of a multi-part movie: same title match, same folder, part number one higher. */
+    private suspend fun nextPart(current: VideoEntity): VideoWithMeta? {
+        val part = MovieParts.partOf(current.fileName) ?: return null
+        val key = current.metadataKey ?: return null
+        val folder = current.uri.substringBeforeLast('/')
+        val next = videoDao.byMetadataKey(key).firstOrNull { other ->
+            other.id != current.id && other.uri.substringBeforeLast('/') == folder && MovieParts.partOf(other.fileName) == part + 1
+        } ?: return null
+        return videoDao.withMeta(next.id)
     }
 
     // TMDB

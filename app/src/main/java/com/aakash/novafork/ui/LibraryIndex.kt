@@ -102,8 +102,23 @@ class LibraryIndex(
     /** By [com.aakash.novafork.data.db.VideoEntity.uri], for matching live network listings to the library. */
     val videosByUri: Map<String, IndexedVideo> by lazy { allVideos.associateBy { it.video.uri } }
 
+    /** Later parts of a movie in parts (CD2, Part 3) whose first part is here too: they play on from it. */
+    private val laterParts: Set<Long> = run {
+        val firstParts = videos
+            .filter { it.kind == MediaKind.MOVIE && com.aakash.novafork.data.MovieParts.partOf(it.video.fileName) == 1 }
+            .mapNotNullTo(HashSet()) { it.video.metadataKey }
+        if (firstParts.isEmpty()) {
+            emptySet()
+        } else {
+            videos.filter { video ->
+                video.kind == MediaKind.MOVIE && video.video.metadataKey in firstParts &&
+                    (com.aakash.novafork.data.MovieParts.partOf(video.video.fileName) ?: 1) > 1
+            }.mapTo(HashSet()) { it.id }
+        }
+    }
+
     /** Movies from device, folders and shares (matched movie streams stay with the streams). Newest first. */
-    val movies: List<IndexedVideo> = videos.filter { it.kind == MediaKind.MOVIE && it.id !in extraIds }
+    val movies: List<IndexedVideo> = videos.filter { it.kind == MediaKind.MOVIE && it.id !in extraIds && it.id !in laterParts }
 
     /** Home videos, unidentified files and streams. Newest first. */
     val otherVideos: List<IndexedVideo> =

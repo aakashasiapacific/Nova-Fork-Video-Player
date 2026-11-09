@@ -2375,6 +2375,7 @@ class PlayerController(
         for (file in external) {
             if (file.absolutePath !in addedSubtitleFiles) addSubtitleFile(file, select = file == selected)
         }
+        addExternalAudioTracks()
         refreshTracks()
         if (!showSubtitlesOff || remembered != null) {
             maybeDownloadSubtitles(embedded, external, remembered)
@@ -2414,6 +2415,49 @@ class PlayerController(
     }
 
     /** Adds [file] to the playing video as a subtitle track ([select]: turned on); false when libVLC refused it. */
+    /**
+     * Separate audio tracks next to the video (Movie.mka, Movie.ac3, Movie.eng.dts …) join the
+     * audio menu, as VLC adds them: same name, an audio-only extension. Local files only.
+     */
+    private fun addExternalAudioTracks() {
+        val current = nowPlaying ?: return
+        if (current.kind != UriKind.FILE && current.kind != UriKind.CONTENT) return
+        scope.launch {
+            val files = withContext(Dispatchers.IO) {
+                try {
+                    val path = localFilePath(current.uri) ?: return@withContext emptyList()
+                    val video = File(path)
+                    val base = VideoFiles.baseName(video.name)
+                    video.parentFile?.listFiles()?.filter { file ->
+                        file.isFile && file.canRead() &&
+                            VideoFiles.extension(file.name) in EXTERNAL_AUDIO_EXTENSIONS &&
+                            VideoFiles.baseName(file.name).let { it.equals(base, ignoreCase = true) || it.startsWith("$base.", ignoreCase = true) }
+                    }.orEmpty().take(4)
+                } catch (e: Exception) {
+                    emptyList()
+                }
+            }
+            if (released || nowPlaying !== current) return@launch
+            for (file in files) mediaPlayer.addSlave(IMedia.Slave.Type.Audio, Uri.fromFile(file), false)
+            if (files.isNotEmpty()) refreshTracks()
+        }
+    }
+
+    /** A java.io path for [uri]: itself, a file:// path, or MediaStore's DATA column when it is readable. */
+    private fun localFilePath(uri: String): String? {
+        if (uri.startsWith("/")) return uri
+        val parsed = Uri.parse(uri)
+        if (parsed.scheme == "file") return parsed.path
+        if (parsed.authority != android.provider.MediaStore.AUTHORITY) return null
+        return try {
+            appContext.contentResolver.query(parsed, arrayOf(android.provider.MediaStore.MediaColumns.DATA), null, null, null)?.use { c ->
+                if (c.moveToFirst()) c.getString(0) else null
+            }?.takeIf { File(it).canRead() }
+        } catch (e: Exception) {
+            null
+        }
+    }
+
     private fun addSubtitleFile(file: File, select: Boolean): Boolean {
         if (tracksBeforeFiles == null) tracksBeforeFiles = realTracks(mediaPlayer.spuTracks).map { it.id }.toSet()
         if (!mediaPlayer.addSlave(IMedia.Slave.Type.Subtitle, Uri.fromFile(file), select)) return false
@@ -2915,6 +2959,9 @@ class PlayerController(
         const val ENABLE_SUBTITLES = true
         const val USE_TEXTURE_VIEW = false
         const val DISABLED_TRACK = -1
+
+        /** Audio-only files VLC takes as extra tracks of a video with the same name. */
+        val EXTERNAL_AUDIO_EXTENSIONS = setOf("mka", "ac3", "eac3", "dts", "thd", "aac", "flac", "opus")
         const val FULL_VOLUME = 100
         const val DUCKED_VOLUME = 30
 
