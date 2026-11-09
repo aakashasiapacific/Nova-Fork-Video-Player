@@ -719,10 +719,10 @@ internal fun OverviewBlock(
                 )
                 if (canToggle) {
                     Text(
-                        // Apple TV's caps "MORE" in white after a cut-off synopsis.
+                        // Apple TV's caps "MORE" after a cut-off synopsis, in the Video tab's blue.
                         text = if (expanded) "LESS" else "MORE",
                         style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, letterSpacing = 0.4.sp),
-                        color = MaterialTheme.colorScheme.onSurface,
+                        color = com.aakash.novafork.ui.theme.NovaColors.IosBlue,
                         modifier = Modifier.padding(vertical = 6.dp),
                     )
                 }
