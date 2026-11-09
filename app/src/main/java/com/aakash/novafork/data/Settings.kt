@@ -192,6 +192,8 @@ data class Settings(
     val spoilerSafe: Boolean = false,
     /** Music paused by headphones going away carries on when they come back (within 30 minutes). */
     val resumeOnHeadphones: Boolean = false,
+    /** Folders whose videos stay out of the library's screens, one per line (Browse still lists them). */
+    val hiddenFolders: String = "",
     /** The Home hero's look; see [HeroStyle]. */
     val heroStyle: HeroStyle = HeroStyle.BACKDROP,
     /** Library pages as a poster grid or a list. */

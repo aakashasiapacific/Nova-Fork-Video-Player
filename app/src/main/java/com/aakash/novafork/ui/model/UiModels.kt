@@ -595,6 +595,8 @@ data class SettingsUi(
     val songCount: Int = 0,
     /** When a source last finished scanning (epoch ms); null when none has. */
     val lastScanAt: Long? = null,
+    /** Every folder with videos (hidden ones too) and how many it holds, for Hidden Folders. */
+    val videoFolders: List<Pair<String, Int>> = emptyList(),
 )
 
 @Immutable

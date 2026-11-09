@@ -113,6 +113,7 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
             putString(KEY_START_TAB, s.startTab)
             putBoolean(KEY_SPOILER_SAFE, s.spoilerSafe)
             putBoolean(KEY_RESUME_ON_HEADPHONES, s.resumeOnHeadphones)
+            putString(KEY_HIDDEN_FOLDERS, s.hiddenFolders)
         }
     }
 
@@ -188,6 +189,7 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
         const val KEY_START_TAB = "start_tab"
         const val KEY_SPOILER_SAFE = "spoiler_safe"
         const val KEY_RESUME_ON_HEADPHONES = "resume_on_headphones"
+        const val KEY_HIDDEN_FOLDERS = "hidden_folders"
 
         /**
          * The type [write] stores each key with. A restored backup's entry of another type is
@@ -258,6 +260,7 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
             KEY_START_TAB to SettingType.STRING,
             KEY_SPOILER_SAFE to SettingType.BOOLEAN,
             KEY_RESUME_ON_HEADPHONES to SettingType.BOOLEAN,
+            KEY_HIDDEN_FOLDERS to SettingType.STRING,
         )
 
         /**
@@ -346,6 +349,7 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
                 startTab = prefs.string(KEY_START_TAB) ?: defaults.startTab,
                 spoilerSafe = prefs.boolean(KEY_SPOILER_SAFE, defaults.spoilerSafe),
                 resumeOnHeadphones = prefs.boolean(KEY_RESUME_ON_HEADPHONES, defaults.resumeOnHeadphones),
+                hiddenFolders = prefs.string(KEY_HIDDEN_FOLDERS) ?: defaults.hiddenFolders,
             )
         }
 

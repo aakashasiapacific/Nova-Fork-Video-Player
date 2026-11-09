@@ -202,6 +202,24 @@ private fun libraryGroups(state: SettingsUi, actions: AppActions): List<Settings
         dataUsageGroup(),
         watchStatsGroup(state.watch),
         backupGroup(actions),
+    ) + listOfNotNull(hiddenFoldersGroup(state, actions))
+}
+
+/** Preferences › Library › Folders: a switch per folder; off keeps its videos out of the library. */
+private fun hiddenFoldersGroup(state: SettingsUi, actions: AppActions): SettingsGroup? {
+    if (state.videoFolders.size < 2) return null
+    val hidden = state.settings.hiddenFolders.split('\n').filter { it.isNotBlank() }.toSet()
+    return SettingsGroup(
+        key = "video-folders",
+        title = "Folders",
+        rows = state.videoFolders.map { (folder, count) ->
+            val name = folder.trimEnd('/').substringAfterLast('/').ifBlank { folder.ifBlank { "Top level" } }
+            switchRow("folder-$folder", R.drawable.ic_folder, "$name · $count", folder !in hidden) { shown ->
+                val next = if (shown) hidden - folder else hidden + folder
+                actions.updateSettings { it.copy(hiddenFolders = next.sorted().joinToString("\n")) }
+            }
+        },
+        footer = "Turn a folder off to keep its videos out of Home, the library and search. Browse still lists them, and nothing is deleted.",
     )
 }
 

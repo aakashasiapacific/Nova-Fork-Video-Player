@@ -195,14 +195,22 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
         ),
     )
 
+    /** Every folder with videos and how many (hidden folders too), for Preferences › Hidden Folders. */
+    @Volatile
+    private var allVideoFolders: List<Pair<String, Int>> = emptyList()
+
     private val libraryIndex = combine(
         library.observeVideos(),
         library.observeSources(),
-        settingsStore.settings.map { it.preferLocalArtwork }.distinctUntilChanged(),
+        settingsStore.settings.map { it.preferLocalArtwork to it.hiddenFolders }.distinctUntilChanged(),
         graph.database.metadataDao().observeArtworkChoices(),
         combine(hiddenVideoIds, graph.titleOverrides.titles) { hidden, titles -> hidden to titles },
-    ) { videos, sources, preferLocal, choices, (hidden, titles) ->
-        LibraryIndex.build(withArtworkChoices(videos, choices), sources, preferLocal, hidden, titles)
+    ) { videos, sources, (preferLocal, hiddenFolders), choices, (hidden, titles) ->
+        allVideoFolders = videos.groupingBy { it.video.folder }.eachCount().toList().sortedBy { it.first.lowercase() }
+        // Hidden Folders: their videos stay out of the library's screens (Browse still lists them).
+        val folders = hiddenFolders.split('\n').filter { it.isNotBlank() }.toSet()
+        val shown = if (folders.isEmpty()) videos else videos.filter { it.video.folder !in folders }
+        LibraryIndex.build(withArtworkChoices(shown, choices), sources, preferLocal, hidden, titles)
     }
 
     // Only touched from the state combine below, which never runs concurrently with itself.
@@ -496,6 +504,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app), AppActions {
                 videoCount = index.allVideos.size,
                 songCount = music.songs.size,
                 lastScanAt = index.sources.mapNotNull { it.lastScanAt }.maxOrNull(),
+                videoFolders = if (stats != null) allVideoFolders else emptyList(),
             ),
             scan = UiMappers.scan(scan),
             permission = user.permission.copy(deviceScanning = settings.scanDeviceStorage),
