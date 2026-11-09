@@ -86,6 +86,7 @@ fun VideoMenuBox(
                     actions.addToPlaylist(listOf(videoId), title)
                 },
             )
+            NovaMenuDivider()
             HomePickItems(itemKey = "v:$videoId", actions = actions, close = { open = false })
             // Library only: the file stays, and Browse still lists it (Preferences › Hidden Videos brings it back).
             NovaMenuItem(
@@ -124,6 +125,7 @@ fun ShowMenuBox(
                     actions.openShow(showKey)
                 },
             )
+            NovaMenuDivider()
             HomePickItems(itemKey = "s:$showKey", actions = actions, close = { open = false })
             NovaMenuItem(
                 text = { Text("Hide") },

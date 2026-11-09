@@ -337,7 +337,7 @@ internal fun SettingsSearchField(query: String, onQueryChange: (String) -> Unit,
                     contentAlignment = Alignment.CenterStart,
                 ) {
                     if (query.isEmpty()) {
-                        Text("Search", style = MaterialTheme.typography.bodyLarge, color = IosColors.SecondaryLabel, maxLines = 1)
+                        Text("Search", style = MaterialTheme.typography.bodyLarge, color = IosColors.TertiaryLabel, maxLines = 1)
                     }
                     inner()
                 }

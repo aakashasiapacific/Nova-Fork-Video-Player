@@ -429,17 +429,15 @@ internal fun <T> ChoiceRow(
                 RowValue(current)
                 NovaIcon(R.drawable.ic_chevron_up_down, contentDescription = null, tint = IosColors.SecondaryLabel, modifier = Modifier.size(14.dp))
             }
-            NovaDropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            NovaDropdownMenu(
+                expanded = open,
+                onDismissRequest = { open = false },
+                scrollToItem = options.indexOfFirst { it.value == selected }.coerceAtLeast(0),
+            ) {
                 options.forEach { option ->
                     NovaMenuItem(
                         text = { Text(option.label, maxLines = 2, overflow = TextOverflow.Ellipsis) },
-                        leadingIcon = {
-                            Box(Modifier.size(18.dp), contentAlignment = Alignment.Center) {
-                                if (option.value == selected) {
-                                    NovaIcon(R.drawable.ic_check, contentDescription = "Selected", modifier = Modifier.size(16.dp))
-                                }
-                            }
-                        },
+                        checked = option.value == selected,
                         onClick = {
                             open = false
                             if (option.value != selected) onSelect(option.value)

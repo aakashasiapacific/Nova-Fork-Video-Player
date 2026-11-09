@@ -411,7 +411,7 @@ private fun SearchField(
                 Text(
                     "Movies, music and more",
                     style = MaterialTheme.typography.bodyLarge,
-                    color = IosColors.SecondaryLabel,
+                    color = IosColors.TertiaryLabel,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )

@@ -80,6 +80,8 @@ fun NovaDropdownMenu(
     modifier: Modifier = Modifier,
     offset: DpOffset = DpOffset(0.dp, 0.dp),
     title: String? = null,
+    /** A long pick-one menu opens scrolled so this row (the current choice) is in view. */
+    scrollToItem: Int = 0,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val shown = remember { MutableTransitionState(false) }
@@ -108,6 +110,11 @@ fun NovaDropdownMenu(
                 transitionSpec = { Motion.press<Float>() },
                 label = "novaMenuAlpha",
             ) { open -> if (open) 1f else 0f }
+            val menuScroll = rememberScrollState()
+            androidx.compose.runtime.LaunchedEffect(Unit) {
+                // Rows are 44dp; leave two above the chosen one so it reads in context.
+                if (scrollToItem > 2) menuScroll.scrollTo(with(density) { ((scrollToItem - 2) * 44).dp.roundToPx() })
+            }
             Surface(
                 modifier = Modifier.graphicsLayer {
                     scaleX = scale
@@ -126,7 +133,7 @@ fun NovaDropdownMenu(
                         .widthIn(min = 250.dp)
                         .padding(vertical = 6.dp)
                         .width(IntrinsicSize.Max)
-                        .verticalScroll(rememberScrollState()),
+                        .verticalScroll(menuScroll),
                 ) {
                     if (title != null) {
                         Text(
@@ -165,12 +172,13 @@ fun NovaMenuItem(
     val tint = if (destructive) IosColors.Red else Color.White
     // iOS's grey row highlight while pressed (the ripple is off).
     val press = remember { MutableInteractionSource() }
+    // iOS 27: a menu row's glyph sits at its end; the leading side is only for a pick-one tick.
     val lead: (@Composable () -> Unit)? = if (checked != null) {
         { MenuTick(on = checked == true) }
     } else {
-        leadingIcon
+        null
     }
-    val trail: (@Composable () -> Unit)? = if (checked != null && trailingIcon == null) leadingIcon else trailingIcon
+    val trail: (@Composable () -> Unit)? = trailingIcon ?: leadingIcon
     DropdownMenuItem(
         text = { ProvideTextStyle(MaterialTheme.typography.bodyLarge) { text() } },
         onClick = onClick,
@@ -250,8 +258,26 @@ fun NovaMenuQuickAction(
 /** The tick of a pick-one menu's current choice; room for it on the others. */
 @Composable
 private fun MenuTick(on: Boolean) {
+    // The tick draws itself in with a small pop as the menu opens (iOS).
+    val shown = remember { androidx.compose.animation.core.Animatable(0f) }
+    androidx.compose.runtime.LaunchedEffect(on) {
+        if (on) shown.animateTo(1f, androidx.compose.animation.core.spring(dampingRatio = 0.55f, stiffness = 600f)) else shown.snapTo(0f)
+    }
     Box(Modifier.size(18.dp), contentAlignment = Alignment.Center) {
-        if (on) NovaIcon(R.drawable.ic_check, contentDescription = "Selected", modifier = Modifier.size(15.dp))
+        if (on) {
+            NovaIcon(
+                R.drawable.ic_check,
+                contentDescription = "Selected",
+                modifier = Modifier
+                    .size(15.dp)
+                    .graphicsLayer {
+                        val t = shown.value
+                        scaleX = 0.4f + 0.6f * t
+                        scaleY = 0.4f + 0.6f * t
+                        alpha = t.coerceIn(0f, 1f)
+                    },
+            )
+        }
     }
 }
 
