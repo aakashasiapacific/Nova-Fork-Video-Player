@@ -932,8 +932,9 @@ private fun NowPlayingButtons(
     onQueue: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    androidx.compose.foundation.layout.Column(modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
     Row(
-        modifier.fillMaxWidth(),
+        Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceEvenly,
     ) {
         PaneButton(
@@ -951,7 +952,54 @@ private fun NowPlayingButtons(
             onClick = onQueue,
         )
     }
+    // Apple Music names where the sound goes: "AirPods Pro", "Car Audio", "Headphones".
+    rememberAudioOutputName()?.let { name ->
+        Text(
+            name,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Medium,
+            color = NovaColors.AppleMusicRed.copy(alpha = 0.9f),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(top = 6.dp, start = 32.dp, end = 32.dp),
+        )
+    }
+    }
 }
+
+/** The connected headphones' or Bluetooth speaker's name, kept current; null on the phone's speaker. */
+@Composable
+private fun rememberAudioOutputName(): String? {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var name by remember { mutableStateOf<String?>(null) }
+    androidx.compose.runtime.DisposableEffect(context) {
+        val audio = context.getSystemService(android.media.AudioManager::class.java)
+        fun refresh() {
+            val out = audio?.getDevices(android.media.AudioManager.GET_DEVICES_OUTPUTS).orEmpty()
+            val device = out.firstOrNull { it.type in OUTPUT_ROUTE_TYPES }
+            name = device?.let { d ->
+                d.productName?.toString()?.trim()?.takeIf { it.isNotEmpty() && !it.equals(android.os.Build.MODEL, ignoreCase = true) }
+                    ?: if (d.type == android.media.AudioDeviceInfo.TYPE_BLUETOOTH_A2DP) "Bluetooth" else "Headphones"
+            }
+        }
+        val callback = object : android.media.AudioDeviceCallback() {
+            override fun onAudioDevicesAdded(added: Array<out android.media.AudioDeviceInfo>) = refresh()
+            override fun onAudioDevicesRemoved(removed: Array<out android.media.AudioDeviceInfo>) = refresh()
+        }
+        refresh()
+        audio?.registerAudioDeviceCallback(callback, null)
+        onDispose { audio?.unregisterAudioDeviceCallback(callback) }
+    }
+    return name
+}
+
+private val OUTPUT_ROUTE_TYPES = setOf(
+    android.media.AudioDeviceInfo.TYPE_BLUETOOTH_A2DP,
+    android.media.AudioDeviceInfo.TYPE_BLE_HEADSET,
+    android.media.AudioDeviceInfo.TYPE_WIRED_HEADPHONES,
+    android.media.AudioDeviceInfo.TYPE_WIRED_HEADSET,
+    android.media.AudioDeviceInfo.TYPE_USB_HEADSET,
+)
 
 /**
  * Title and artist, each scrolling sideways when too long for its line (a pause, a slow pass,
