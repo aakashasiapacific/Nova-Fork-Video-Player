@@ -7,6 +7,10 @@ import com.aakash.novafork.ui.common.LocalLibraryLoading
 import androidx.annotation.DrawableRes
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.AnimationVector1D
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -405,11 +409,40 @@ private fun HomeSection(
     }
 }
 
+// A row's first few cards fade and rise in one after another, only the first time the row
+// appears; cards scrolled back into view (or the row rebuilt) just sit there.
+private const val RowEntranceCount = 6
+private const val RowEntranceStepMs = 30f
+private const val RowEntranceCardMs = 220f
+private const val RowEntranceTotalMs = RowEntranceStepMs * (RowEntranceCount - 1) + RowEntranceCardMs
+
+@Composable
+private fun rememberRowEntrance(): Animatable<Float, AnimationVector1D> {
+    var played by rememberSaveable { mutableStateOf(false) }
+    val clock = remember { Animatable(if (played) RowEntranceTotalMs else 0f) }
+    LaunchedEffect(Unit) {
+        if (!played) {
+            played = true
+            clock.animateTo(RowEntranceTotalMs, tween(RowEntranceTotalMs.toInt(), easing = LinearEasing))
+        }
+    }
+    return clock
+}
+
+private fun Modifier.rowEntrance(clock: Animatable<Float, AnimationVector1D>, index: Int): Modifier =
+    if (index >= RowEntranceCount) this else graphicsLayer {
+        val t = ((clock.value - index * RowEntranceStepMs) / RowEntranceCardMs).coerceIn(0f, 1f)
+        val eased = FastOutSlowInEasing.transform(t)
+        alpha = eased
+        translationY = (1f - eased) * 12.dp.toPx()
+    }
+
 /** What the hero's "+" saved: backdrop cards that open the title. */
 @Composable
 private fun WatchlistRow(items: List<LibraryItemUi>, actions: AppActions) {
     val dims = LocalNovaDimens.current
     val rowState = rememberLazyListState()
+    val entrance = rememberRowEntrance()
     LazyRow(
         state = rowState,
         flingBehavior = rememberRowSnap(rowState),
@@ -420,11 +453,13 @@ private fun WatchlistRow(items: List<LibraryItemUi>, actions: AppActions) {
     ) {
         itemsIndexed(items, key = { _, item -> item.key }) { index, item ->
             // The pictures drift against the scroll inside their frames (Apple TV).
-            CompositionLocalProvider(LocalCardParallax provides remember(rowState, index) { rowState.parallaxAt(index) }) {
-                when (item) {
-                    is LibraryItemUi.Video -> PhoneWideVideoCard(card = item.card, onClick = { actions.openVideo(item.card.id) })
-                    is LibraryItemUi.Show -> ShowMenuBox(showKey = item.card.key, actions = actions) { openMenu ->
-                        PhoneWideShowCard(show = item.card, onClick = { actions.openShow(item.card.key) }, onLongClick = openMenu)
+            Box(Modifier.rowEntrance(entrance, index)) {
+                CompositionLocalProvider(LocalCardParallax provides remember(rowState, index) { rowState.parallaxAt(index) }) {
+                    when (item) {
+                        is LibraryItemUi.Video -> PhoneWideVideoCard(card = item.card, onClick = { actions.openVideo(item.card.id) })
+                        is LibraryItemUi.Show -> ShowMenuBox(showKey = item.card.key, actions = actions) { openMenu ->
+                            PhoneWideShowCard(show = item.card, onClick = { actions.openShow(item.card.key) }, onLongClick = openMenu)
+                        }
                     }
                 }
             }
@@ -443,6 +478,7 @@ internal fun continueCaption(card: VideoCardUi): String? {
 private fun UpNextRow(cards: List<VideoCardUi>, actions: AppActions) {
     val dims = LocalNovaDimens.current
     val rowState = rememberLazyListState()
+    val entrance = rememberRowEntrance()
     LazyRow(
         state = rowState,
         flingBehavior = rememberRowSnap(rowState),
@@ -452,9 +488,11 @@ private fun UpNextRow(cards: List<VideoCardUi>, actions: AppActions) {
         horizontalArrangement = Arrangement.spacedBy(dims.rowSpacing),
     ) {
         itemsIndexed(cards, key = { _, card -> card.id }) { index, card ->
-            CompositionLocalProvider(LocalCardParallax provides remember(rowState, index) { rowState.parallaxAt(index) }) {
-                VideoMenuBox(videoId = card.id, title = card.displayTitle(), actions = actions) { openMenu ->
-                    PhoneLandscapeCard(card = card, onClick = { actions.play(card.id) }, onLongClick = openMenu)
+            Box(Modifier.rowEntrance(entrance, index)) {
+                CompositionLocalProvider(LocalCardParallax provides remember(rowState, index) { rowState.parallaxAt(index) }) {
+                    VideoMenuBox(videoId = card.id, title = card.displayTitle(), actions = actions) { openMenu ->
+                        PhoneLandscapeCard(card = card, onClick = { actions.play(card.id) }, onLongClick = openMenu)
+                    }
                 }
             }
         }
@@ -465,6 +503,7 @@ private fun UpNextRow(cards: List<VideoCardUi>, actions: AppActions) {
 private fun LandscapeRow(cards: List<VideoCardUi>, actions: AppActions) {
     val dims = LocalNovaDimens.current
     val rowState = rememberLazyListState()
+    val entrance = rememberRowEntrance()
     LazyRow(
         state = rowState,
         flingBehavior = rememberRowSnap(rowState),
@@ -474,8 +513,10 @@ private fun LandscapeRow(cards: List<VideoCardUi>, actions: AppActions) {
         horizontalArrangement = Arrangement.spacedBy(dims.rowSpacing),
     ) {
         itemsIndexed(cards) { index, card ->
-            CompositionLocalProvider(LocalCardParallax provides remember(rowState, index) { rowState.parallaxAt(index) }) {
-                ContinueWatchingCard(card, actions)
+            Box(Modifier.rowEntrance(entrance, index)) {
+                CompositionLocalProvider(LocalCardParallax provides remember(rowState, index) { rowState.parallaxAt(index) }) {
+                    ContinueWatchingCard(card, actions)
+                }
             }
         }
     }
