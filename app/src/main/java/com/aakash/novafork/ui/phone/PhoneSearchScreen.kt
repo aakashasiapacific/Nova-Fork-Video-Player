@@ -50,14 +50,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -71,6 +74,7 @@ import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
 import com.aakash.novafork.ui.common.CollapsedTitleBar
+import com.aakash.novafork.ui.common.CollapsingTitle
 import com.aakash.novafork.ui.common.Hairline
 import com.aakash.novafork.ui.common.IosColors
 import com.aakash.novafork.ui.common.IosIconButton
@@ -94,6 +98,7 @@ import com.aakash.novafork.ui.model.LibraryItemUi
 import com.aakash.novafork.ui.model.MediaKind
 import com.aakash.novafork.ui.model.SearchUi
 import kotlin.math.abs
+import kotlin.math.roundToInt
 
 @Composable
 fun PhoneSearchScreen(
@@ -144,7 +149,13 @@ fun PhoneSearchScreen(
     val keyboard = LocalSoftwareKeyboardController.current
     val focusManager = LocalFocusManager.current
     // Tapping Search again goes to the field, keyboard up, as on iOS.
-    OnTabReselect { focusRequester.requestFocus() }
+    // iOS: once the title has shrunk, scrolling on tucks the field up out of the way too; it
+    // comes back (before the title) when the results are pulled back to the top.
+    val fieldTuck = rememberCollapsingTitle()
+    OnTabReselect {
+        fieldTuck.offset = 0f
+        focusRequester.requestFocus()
+    }
     LaunchedEffect(focusRequester) {
         // Coming back to existing results should not pop the keyboard over them.
         if (field.text.isEmpty()) focusRequester.requestFocus()
@@ -169,7 +180,7 @@ fun PhoneSearchScreen(
     // the results moving up with it; scrolling back to the top brings it back.
     val searchTitle = rememberCollapsingTitle()
     Box(modifier.fillMaxSize()) {
-        Column(Modifier.fillMaxSize().nestedScroll(hideOnScroll).nestedScroll(searchTitle.connection)) {
+        Column(Modifier.fillMaxSize().nestedScroll(hideOnScroll).nestedScroll(searchTitle.connection).nestedScroll(fieldTuck.connection)) {
             Text(
                 "Search",
                 style = MaterialTheme.typography.headlineLarge,
@@ -201,7 +212,9 @@ fun PhoneSearchScreen(
                 },
                 focusRequester = focusRequester,
                 onVoice = voice,
-                modifier = Modifier.padding(start = dims.gutter, end = dims.gutter, top = 8.dp, bottom = 12.dp),
+                modifier = Modifier
+                    .tuckable(fieldTuck)
+                    .padding(start = dims.gutter, end = dims.gutter, top = 8.dp, bottom = 12.dp),
             )
             if (!fieldBlank) {
                 // All, Movies, Shows and Songs, as in the TV and Music apps' search.
@@ -304,6 +317,24 @@ fun PhoneSearchScreen(
         }
     }
 }
+
+/**
+ * The search field's place shrinks by how far [tuck] has collapsed, the field sliding up under the
+ * bar (clipped) and fading as it goes, so the results move up with it.
+ */
+private fun Modifier.tuckable(tuck: CollapsingTitle): Modifier = this
+    .clipToBounds()
+    .layout { measurable, constraints ->
+        val placeable = measurable.measure(constraints)
+        val limit = placeable.height.toFloat()
+        tuck.limit = limit
+        val shift = tuck.offset.coerceIn(0f, limit).roundToInt()
+        layout(placeable.width, placeable.height - shift) { placeable.placeRelative(0, -shift) }
+    }
+    .graphicsLayer {
+        val limit = tuck.limit
+        alpha = if (limit > 0f) 1f - (tuck.offset / limit).coerceIn(0f, 1f) else 1f
+    }
 
 /** The chips under the search field: what kind of result is shown. */
 private enum class SearchFilter(val label: String) {

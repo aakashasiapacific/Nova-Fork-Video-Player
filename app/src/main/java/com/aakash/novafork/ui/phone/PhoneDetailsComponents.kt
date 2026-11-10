@@ -1,5 +1,6 @@
 package com.aakash.novafork.ui.phone
 
+import android.content.res.Configuration
 import androidx.annotation.DrawableRes
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
@@ -40,6 +41,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -65,6 +67,7 @@ import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.SpanStyle
@@ -105,6 +108,26 @@ import com.aakash.novafork.ui.model.Artwork
  * details pages alike (so opening a title from the hero keeps the poster where it was).
  */
 internal val PosterOverlap = 40.dp
+
+/** Extra side margin for a details page's text on a phone in landscape. */
+private val LandscapeExtraGutter = 48.dp
+
+/**
+ * A details page on a phone in landscape: its title, overview, buttons and rows sit in from the
+ * long edges by a wider margin, as Apple's apps do, while backdrops stay full bleed. Portrait is
+ * unchanged.
+ */
+@Composable
+internal fun DetailsPageMargins(content: @Composable () -> Unit) {
+    val landscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
+    if (!landscape) {
+        content()
+        return
+    }
+    val dims = LocalNovaDimens.current
+    val wider = remember(dims) { dims.copy(gutter = dims.gutter + LandscapeExtraGutter) }
+    CompositionLocalProvider(LocalNovaDimens provides wider, content = content)
+}
 
 /** At most half the page for the picture, so a phone in landscape still shows the title. */
 internal fun detailsBackdropHeight(pageHeight: Dp): Dp = pageHeight * 0.5f

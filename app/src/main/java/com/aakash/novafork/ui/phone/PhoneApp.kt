@@ -642,7 +642,7 @@ private fun PhonePage(state: AppUiState, actions: AppActions) {
             if (details == null) {
                 PhoneDetailsLoading(onBack = actions::back, modifier = pageModifier)
             } else {
-                PhoneVideoDetailsScreen(details = details, actions = actions, modifier = pageModifier)
+                DetailsPageMargins { PhoneVideoDetailsScreen(details = details, actions = actions, modifier = pageModifier) }
             }
         }
         is Route.ShowDetails -> {
@@ -650,7 +650,7 @@ private fun PhonePage(state: AppUiState, actions: AppActions) {
             if (details == null) {
                 PhoneDetailsLoading(onBack = actions::back, modifier = pageModifier)
             } else {
-                PhoneShowDetailsScreen(details = details, actions = actions, modifier = pageModifier)
+                DetailsPageMargins { PhoneShowDetailsScreen(details = details, actions = actions, modifier = pageModifier) }
             }
         }
         Route.Search -> PhoneSearchScreen(
