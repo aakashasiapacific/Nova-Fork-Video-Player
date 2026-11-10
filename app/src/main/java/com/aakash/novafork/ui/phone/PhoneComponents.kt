@@ -11,6 +11,7 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -215,8 +216,20 @@ private fun PosterCardLayout(
     val shape = RoundedCornerShape(dims.cardRadius)
     // Apple TV's press: the card sinks in and darkens while held, no ripple.
     val press = remember { MutableInteractionSource() }
+    // Keyboard, D-pad or remote focus: Apple TV's lift, the card grows a touch and its art gets
+    // a white ring. Touch never focuses it, so it looks unchanged there.
+    val focused by press.collectIsFocusedAsState()
+    val focusScale by androidx.compose.animation.core.animateFloatAsState(
+        if (focused) 1.05f else 1f,
+        com.aakash.novafork.ui.common.Motion.content(),
+        label = "focusScale",
+    )
     Column(
         modifier
+            .graphicsLayer {
+                scaleX = focusScale
+                scaleY = focusScale
+            }
             .pressScale(press, pressed = CardPressScale)
             .pressTilt()
             .clip(shape)
@@ -232,6 +245,7 @@ private fun PosterCardLayout(
                 .pressDim(press),
         ) {
             PosterArt(artwork = artwork, title = title, modifier = Modifier.fillMaxSize())
+            if (focused) Box(Modifier.matchParentSize().border(2.5.dp, Color.White, shape))
             WatchedMark(watched, Modifier.align(Alignment.TopEnd).padding(6.dp))
             if (sourceId != null && com.aakash.novafork.ui.common.LocalSourceDots.current) {
                 com.aakash.novafork.ui.common.SourceDot(sourceId, Modifier.align(Alignment.TopStart).padding(7.dp))
