@@ -259,17 +259,17 @@ private fun playerOptions(
     onOpenPanel: (PlayerPanel) -> Unit,
     onOpenSheet: (PlayerSheet) -> Unit,
 ): List<PlayerOption> = buildList {
-    add(PlayerOption { PlayerIconButton(R.drawable.ic_player_fit, "Fit or fill: ${state.aspect.label}", actions::cycleAspect) })
+    add(PlayerOption { PlayerIconButton(state.aspect.iconRes(), "Fit or fill: ${state.aspect.label}", actions::cycleAspect, iconSize = OptionIcon) })
     val hidden = state.hiddenButtons
     if (state.canEnterPictureInPicture && PlayerButton.POPUP.key !in hidden) {
-        add(PlayerOption { PlayerIconButton(R.drawable.ic_player_popup, "Pop-up play", actions::enterPictureInPicture) })
+        add(PlayerOption { PlayerIconButton(R.drawable.ic_player_popup, "Pop-up play", actions::enterPictureInPicture, iconSize = OptionIcon) })
     }
     add(PlayerOption { SpeedPill(rate = state.rate, onClick = { onOpenPanel(PlayerPanel.SPEED) }) })
     if (state.canRotate && PlayerButton.ROTATE.key !in hidden) {
-        add(PlayerOption { PlayerIconButton(R.drawable.ic_player_rotate, "Rotate", actions::rotate) })
+        add(PlayerOption { PlayerIconButton(R.drawable.ic_player_rotate, "Rotate", actions::rotate, iconSize = OptionIcon) })
     }
-    if (PlayerButton.LOCK.key !in hidden) add(PlayerOption { PlayerIconButton(R.drawable.ic_player_lock, "Lock screen", actions::toggleLock) })
-    if (PlayerButton.REPEAT.key !in hidden) add(PlayerOption { PlayerIconButton(state.repeatMode.iconRes(), state.repeatMode.label, actions::cycleRepeat) })
+    if (PlayerButton.LOCK.key !in hidden) add(PlayerOption { PlayerIconButton(R.drawable.ic_player_lock, "Lock screen", actions::toggleLock, iconSize = OptionIcon) })
+    if (PlayerButton.REPEAT.key !in hidden) add(PlayerOption { PlayerIconButton(state.repeatMode.iconRes(), state.repeatMode.label, actions::cycleRepeat, iconSize = OptionIcon) })
     add(
         PlayerOption {
             PlayerIconButton(
@@ -277,23 +277,24 @@ private fun playerOptions(
                 "Subtitles",
                 { onOpenPanel(PlayerPanel.SUBTITLES) },
                 tint = Color.White.copy(alpha = if (subtitlesOn(state.subtitleTracks)) 1f else 0.6f),
+                iconSize = OptionIcon,
             )
         },
     )
-    add(PlayerOption { PlayerIconButton(R.drawable.ic_player_audio, "Audio track", { onOpenPanel(PlayerPanel.AUDIO) }) })
+    add(PlayerOption { PlayerIconButton(R.drawable.ic_player_audio, "Audio track", { onOpenPanel(PlayerPanel.AUDIO) }, iconSize = OptionIcon) })
     // The sound: the equaliser, night mode and the sleep timer.
-    if (PlayerButton.EQUALIZER.key !in hidden) add(PlayerOption { EqualizerButton(on = state.equalizerOn) })
-    if (PlayerButton.NIGHT.key !in hidden) add(PlayerOption { NightModeButton(on = state.nightMode, onClick = actions::toggleNightMode) })
-    if (PlayerButton.SLEEP.key !in hidden) add(PlayerOption { SleepTimerButton(sleep = state.sleepTimer, onSet = actions::setSleepTimer) })
-    if (PlayerButton.CAST.key !in hidden || state.castingTo != null) add(PlayerOption { CastButton(castingTo = state.castingTo, onClick = { onOpenSheet(PlayerSheet.CAST) }) })
+    if (PlayerButton.EQUALIZER.key !in hidden) add(PlayerOption { EqualizerButton(on = state.equalizerOn, iconSize = OptionIcon) })
+    if (PlayerButton.NIGHT.key !in hidden) add(PlayerOption { NightModeButton(on = state.nightMode, onClick = actions::toggleNightMode, iconSize = OptionIcon) })
+    if (PlayerButton.SLEEP.key !in hidden) add(PlayerOption { SleepTimerButton(sleep = state.sleepTimer, onSet = actions::setSleepTimer, iconSize = OptionIcon) })
+    if (PlayerButton.CAST.key !in hidden || state.castingTo != null) add(PlayerOption { CastButton(castingTo = state.castingTo, onClick = { onOpenSheet(PlayerSheet.CAST) }, iconSize = OptionIcon) })
     if (state.queue.size > 1) {
-        add(PlayerOption { PlayerIconButton(R.drawable.ic_player_queue, "Queue", { onOpenSheet(PlayerSheet.QUEUE) }) })
+        add(PlayerOption { PlayerIconButton(R.drawable.ic_player_queue, "Queue", { onOpenSheet(PlayerSheet.QUEUE) }, iconSize = OptionIcon) })
     }
     // A file with chapters: their list (the seek bar marks where each starts).
     if (state.chapters.size > 1) {
-        add(PlayerOption { PlayerIconButton(R.drawable.ic_player_chapters, "Chapters", { onOpenSheet(PlayerSheet.CHAPTERS) }) })
+        add(PlayerOption { PlayerIconButton(R.drawable.ic_player_chapters, "Chapters", { onOpenSheet(PlayerSheet.CHAPTERS) }, iconSize = OptionIcon) })
     }
-    if (PlayerButton.BOOKMARKS.key !in hidden) add(PlayerOption { PlayerIconButton(R.drawable.ic_bookmark, "Bookmarks", { onOpenSheet(PlayerSheet.BOOKMARKS) }) })
+    if (PlayerButton.BOOKMARKS.key !in hidden) add(PlayerOption { PlayerIconButton(R.drawable.ic_bookmark, "Bookmarks", { onOpenSheet(PlayerSheet.BOOKMARKS) }, iconSize = OptionIcon) })
     if (state.canShuffle) {
         add(
             PlayerOption {
@@ -302,11 +303,12 @@ private fun playerOptions(
                     contentDescription = if (state.shuffle) "Shuffle On" else "Shuffle Off",
                     checked = state.shuffle,
                     onClick = actions::toggleShuffle,
+                    iconSize = OptionIcon,
                 )
             },
         )
     }
-    if (PlayerButton.BACKGROUND.key !in hidden) add(PlayerOption { PlayerIconButton(R.drawable.ic_player_headphones, "Play in background", actions::playInBackground) })
+    if (PlayerButton.BACKGROUND.key !in hidden) add(PlayerOption { PlayerIconButton(R.drawable.ic_player_headphones, "Play in background", actions::playInBackground, iconSize = OptionIcon) })
 }
 
 /**
@@ -318,7 +320,7 @@ private fun playerOptions(
 @Composable
 private fun PlayerOptionRows(options: List<PlayerOption>, onCapture: (() -> Unit)?, modifier: Modifier = Modifier) {
     val capture = onCapture?.let { onClick ->
-        PlayerOption { PlayerIconButton(R.drawable.ic_player_capture, "Capture", onClick) }
+        PlayerOption { PlayerIconButton(R.drawable.ic_player_capture, "Capture", onClick, iconSize = OptionIcon) }
     }
     BoxWithConstraints(modifier.fillMaxWidth()) {
         val total = options.size + if (capture != null) 1 else 0
@@ -360,6 +362,8 @@ private fun OptionCell(option: PlayerOption, width: Dp) {
 
 private val OptionCellMin = 44.dp
 private val OptionCellMax = 56.dp
+/** One glyph size for every control under the seek bar (owner: 28dp, evenly spaced). */
+private val OptionIcon = 28.dp
 private val OptionHeight = 48.dp
 
 /** Samsung's speed button: the rate, "1.0x", small in a low grey pill, in a full-size touch target. */

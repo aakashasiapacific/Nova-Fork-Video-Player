@@ -31,6 +31,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.AbsoluteAlignment
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -42,6 +43,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -174,12 +178,16 @@ internal fun PlayerSeekBar(
                 }
                 dragFraction = null
             },
-            modifier = sliderModifier,
+            modifier = sliderModifier.onGloballyPositioned { bubbleCoords[1] = it },
         )
     }
 
     // Samsung: while the bar is dragged, the time it points at shows large above it.
     val bigTime = remember { Animatable(0f) }
+    // The large time follows the finger along the bar, kept within the bar's ends (iOS).
+    // [0] is this seek bar's box, [1] the slider; read at draw time, after layout.
+    val bubbleCoords = remember { arrayOfNulls<LayoutCoordinates>(2) }
+    val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
     LaunchedEffect(dragging != null) { bigTime.animateTo(if (dragging != null) 1f else 0f, Motion.content()) }
     val bigTimeLabel: @Composable BoxScope.() -> Unit = {
         if (bigTime.value > 0f) {
@@ -200,9 +208,21 @@ internal fun PlayerSeekBar(
                 fontWeight = FontWeight.SemiBold,
                 color = Color.White,
                 modifier = Modifier
-                    .align(Alignment.TopCenter)
+                    .align(AbsoluteAlignment.TopLeft)
                     .graphicsLayer {
                         alpha = bigTime.value
+                        val box = bubbleCoords[0]
+                        val bar = bubbleCoords[1]
+                        translationX = if (box != null && bar != null && box.isAttached && bar.isAttached) {
+                            val barLeft = box.localPositionOf(bar, Offset.Zero).x
+                            val barWidth = bar.size.width.toFloat()
+                            val along = if (rtl) 1f - fraction else fraction
+                            val centre = barLeft + along * barWidth
+                            val maxLeft = (barLeft + barWidth - size.width).coerceAtLeast(barLeft)
+                            (centre - size.width / 2f).coerceIn(barLeft, maxLeft)
+                        } else {
+                            (box?.size?.width?.toFloat()?.minus(size.width) ?: 0f) / 2f
+                        }
                         translationY = -BigTimeRise.toPx() - (1f - bigTime.value) * 6.dp.toPx() -
                             (if (chapterName != null) ChapterLineRise.toPx() else 0f)
                     },
@@ -210,7 +230,7 @@ internal fun PlayerSeekBar(
         }
     }
 
-    Box(modifier) {
+    Box(modifier.onGloballyPositioned { bubbleCoords[0] = it }) {
         if (stacked) {
             Column(Modifier.fillMaxWidth()) {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {

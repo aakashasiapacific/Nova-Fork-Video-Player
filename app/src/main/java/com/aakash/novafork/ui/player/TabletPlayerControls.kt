@@ -269,7 +269,7 @@ private fun TabletBottomBar(
                 )
                 // What the ⋮ menu held, as icons beside them (owner: nothing hidden in a menu).
                 PlayerIconButton(
-                    icon = R.drawable.ic_player_fit,
+                    icon = state.aspect.iconRes(),
                     contentDescription = "Aspect ratio: ${state.aspect.label}",
                     onClick = { onOpenPanel(PlayerPanel.ASPECT) },
                     buttonSize = 56.dp,

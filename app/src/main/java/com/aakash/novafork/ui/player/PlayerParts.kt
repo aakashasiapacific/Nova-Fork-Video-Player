@@ -50,6 +50,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
 import com.aakash.novafork.core.format.Formats
+import com.aakash.novafork.data.AspectMode
 import com.aakash.novafork.ui.common.IosIconButton
 import com.aakash.novafork.ui.common.playerGlass
 import com.aakash.novafork.ui.common.SymbolSwap
@@ -113,6 +114,16 @@ internal fun formatDelay(delayMs: Long): String = when {
 internal fun trackLabel(track: TrackUi): String = if (track.id == DISABLED_TRACK_ID) "Off" else track.name
 
 internal fun subtitlesOn(tracks: List<TrackUi>): Boolean = tracks.any { it.selected && it.id != DISABLED_TRACK_ID }
+
+/** The fit or fill button's glyph for how the picture is shown now. */
+@DrawableRes
+internal fun AspectMode.iconRes(): Int = when (this) {
+    AspectMode.BEST_FIT -> R.drawable.ic_player_fit
+    AspectMode.FIT_SCREEN -> R.drawable.ic_fullscreen_exit
+    AspectMode.FILL -> R.drawable.ic_fullscreen
+    AspectMode.RATIO_16_9, AspectMode.RATIO_4_3 -> R.drawable.ic_pref_aspect_ratio
+    AspectMode.ORIGINAL -> R.drawable.ic_aspect_ratio
+}
 
 @DrawableRes
 internal fun RepeatMode.iconRes(): Int = when (this) {
