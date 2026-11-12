@@ -101,6 +101,7 @@ import com.aakash.novafork.ui.common.PictureStatusBar
 import com.aakash.novafork.ui.common.PosterArt
 import com.aakash.novafork.ui.common.RatingPill
 import com.aakash.novafork.ui.common.bottomScrim
+import com.aakash.novafork.ui.common.easedVerticalFade
 import com.aakash.novafork.ui.model.Artwork
 
 /**
@@ -194,7 +195,7 @@ internal fun BackdropPosterHeader(
                         Modifier.drawWithContent {
                             drawContent()
                             drawRect(
-                                Brush.verticalGradient(0.5f to Color.Black, 1f to Color.Transparent),
+                                easedVerticalFade(Color.Black, start = 0.5f, fromAlpha = 1f, toAlpha = 0f),
                                 blendMode = BlendMode.DstIn,
                             )
                         }
@@ -207,13 +208,7 @@ internal fun BackdropPosterHeader(
             Box(
                 Modifier
                     .fillMaxSize()
-                    .background(
-                        Brush.verticalGradient(
-                            0f to Color.Transparent,
-                            0.6f to Color.Transparent,
-                            1f to (fadeTo ?: background),
-                        ),
-                    ),
+                    .background(easedVerticalFade(fadeTo ?: background, start = 0.6f)),
             )
         }
         if (!showPoster) {
@@ -352,13 +347,7 @@ internal fun FramePicture(artwork: Artwork, modifier: Modifier = Modifier) {
         Box(
             Modifier
                 .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        0f to Color.Transparent,
-                        0.88f to Color.Transparent,
-                        1f to background,
-                    ),
-                ),
+                .background(easedVerticalFade(background, start = 0.88f)),
         )
     }
 }

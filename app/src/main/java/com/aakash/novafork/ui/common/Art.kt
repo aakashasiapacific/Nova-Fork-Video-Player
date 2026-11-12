@@ -284,13 +284,34 @@ fun ArtPlaceholder(seed: String, title: String?, modifier: Modifier = Modifier) 
  */
 fun Modifier.bottomScrim(color: Color, startFraction: Float = 0.35f): Modifier = drawWithContent {
     drawContent()
-    drawRect(
-        Brush.verticalGradient(
-            0f to Color.Transparent,
-            startFraction to Color.Transparent,
-            1f to color,
-        ),
-    )
+    drawRect(easedVerticalFade(color, start = startFraction))
+}
+
+/** How many colour stops an eased fade uses: enough that no step shows as a band on an AMOLED screen. */
+private const val EasedFadeStops = 12
+
+/**
+ * A vertical fade with no colour banding: [color] at [fromAlpha] of its own alpha down to
+ * [start], easing to [toAlpha] at [end] along a smoothstep curve drawn with many stops instead
+ * of a straight two-stop ramp (which shows a visible edge where it starts and stops).
+ */
+fun easedVerticalFade(
+    color: Color,
+    start: Float = 0f,
+    end: Float = 1f,
+    fromAlpha: Float = 0f,
+    toAlpha: Float = 1f,
+): Brush {
+    val stops = ArrayList<Pair<Float, Color>>(EasedFadeStops + 3)
+    if (start > 0f) stops.add(0f to color.copy(alpha = color.alpha * fromAlpha))
+    for (i in 0..EasedFadeStops) {
+        val t = i / EasedFadeStops.toFloat()
+        val eased = t * t * (3f - 2f * t)
+        val alpha = fromAlpha + (toAlpha - fromAlpha) * eased
+        stops.add((start + (end - start) * t) to color.copy(alpha = color.alpha * alpha))
+    }
+    if (end < 1f) stops.add(1f to color.copy(alpha = color.alpha * toAlpha))
+    return Brush.verticalGradient(*stops.toTypedArray())
 }
 
 /** Darkens the start edge (tablet heroes keep text on the left over the backdrop). */

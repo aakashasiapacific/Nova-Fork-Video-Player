@@ -103,6 +103,7 @@ import com.aakash.novafork.ui.common.LocalHeroStyle
 import com.aakash.novafork.ui.common.Motion
 import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.common.PosterArt
+import com.aakash.novafork.ui.common.easedVerticalFade
 import com.aakash.novafork.ui.common.glassRim
 import com.aakash.novafork.ui.common.metaLine
 import com.aakash.novafork.ui.common.popOnChange
@@ -432,7 +433,7 @@ private fun Modifier.fadeOutFoot(from: Float): Modifier = this
     .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
     .drawWithContent {
         drawContent()
-        drawRect(Brush.verticalGradient(from to Color.Black, 1f to Color.Transparent), blendMode = BlendMode.DstIn)
+        drawRect(easedVerticalFade(Color.Black, start = from, fromAlpha = 1f, toAlpha = 0f), blendMode = BlendMode.DstIn)
     }
 
 /** Apple TV's hero: the backdrop fills the width and a square below the status bar; the title and meta sit over its foot. */
