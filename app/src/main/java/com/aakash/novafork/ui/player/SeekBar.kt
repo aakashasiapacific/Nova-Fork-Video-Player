@@ -105,6 +105,9 @@ internal fun PlayerSeekBar(
     // iOS's scrubbing ticks: a light one each time the drag passes a 10-second mark or a chapter.
     val haptics = LocalHapticFeedback.current
     val lastTick = remember { longArrayOf(0L) }
+    // The large time follows the finger along the bar, kept within the bar's ends (iOS).
+    // [0] is this seek bar's box, [1] the slider; read at draw time, after layout.
+    val bubbleCoords = remember { arrayOfNulls<LayoutCoordinates>(2) }
 
     val dragging = dragFraction
     val pending = pendingSeekMs
@@ -184,9 +187,6 @@ internal fun PlayerSeekBar(
 
     // Samsung: while the bar is dragged, the time it points at shows large above it.
     val bigTime = remember { Animatable(0f) }
-    // The large time follows the finger along the bar, kept within the bar's ends (iOS).
-    // [0] is this seek bar's box, [1] the slider; read at draw time, after layout.
-    val bubbleCoords = remember { arrayOfNulls<LayoutCoordinates>(2) }
     val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
     LaunchedEffect(dragging != null) { bigTime.animateTo(if (dragging != null) 1f else 0f, Motion.content()) }
     val bigTimeLabel: @Composable BoxScope.() -> Unit = {
