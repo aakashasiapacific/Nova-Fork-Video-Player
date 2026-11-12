@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.aakash.novafork.data.NetworkSourceMigrationTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-11-12T06:55:04.654Z" hostname="runnervm7aw5e" time="0.068">
+  <properties/>
+  <testcase name="versionTwoUpgradesWithItsLibraryAndTakesNetworkSources" classname="com.aakash.novafork.data.NetworkSourceMigrationTest" time="0.068"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

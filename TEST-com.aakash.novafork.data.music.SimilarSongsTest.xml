@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.aakash.novafork.data.music.SimilarSongsTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-11-12T06:55:07.921Z" hostname="runnervm7aw5e" time="0.007">
+  <properties/>
+  <testcase name="nothing is picked without seeds or a library" classname="com.aakash.novafork.data.music.SimilarSongsTest" time="0.006"/>
+  <testcase name="excluded and missing songs are never picked" classname="com.aakash.novafork.data.music.SimilarSongsTest" time="0.0"/>
+  <testcase name="songs that match nothing are left out" classname="com.aakash.novafork.data.music.SimilarSongsTest" time="0.0"/>
+  <testcase name="an era is within five years of any seed" classname="com.aakash.novafork.data.music.SimilarSongsTest" time="0.0"/>
+  <testcase name="at most the limit is picked, best first" classname="com.aakash.novafork.data.music.SimilarSongsTest" time="0.001"/>
+  <testcase name="same artist ranks above same genre above the same era" classname="com.aakash.novafork.data.music.SimilarSongsTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

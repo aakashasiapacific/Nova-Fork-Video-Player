@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.aakash.novafork.data.music.AutoPlaylistsTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-11-12T06:55:07.217Z" hostname="runnervm7aw5e" time="0.002">
+  <properties/>
+  <testcase name="recentlyAddedIsNewestFirstAndStopsAt50" classname="com.aakash.novafork.data.music.AutoPlaylistsTest" time="0.001"/>
+  <testcase name="recentlyPlayedIsLatestFirstAndSkipsNeverPlayed" classname="com.aakash.novafork.data.music.AutoPlaylistsTest" time="0.0"/>
+  <testcase name="onlyPlaylistsWithSongsAreShown" classname="com.aakash.novafork.data.music.AutoPlaylistsTest" time="0.001"/>
+  <testcase name="favouritesFollowTheStarOrderAndComeFirst" classname="com.aakash.novafork.data.music.AutoPlaylistsTest" time="0.0"/>
+  <testcase name="topPlayedStopsAt25" classname="com.aakash.novafork.data.music.AutoPlaylistsTest" time="0.0"/>
+  <testcase name="topPlayedIsMostPlayedFirstAndSkipsUnplayed" classname="com.aakash.novafork.data.music.AutoPlaylistsTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

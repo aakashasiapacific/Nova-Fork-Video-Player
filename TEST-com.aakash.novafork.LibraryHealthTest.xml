@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.aakash.novafork.LibraryHealthTest" tests="8" skipped="0" failures="0" errors="0" timestamp="2026-11-12T06:54:20.970Z" hostname="runnervm7aw5e" time="0.057">
+  <properties/>
+  <testcase name="renamedTitlesApplyWhereverTheTitleShows" classname="com.aakash.novafork.LibraryHealthTest" time="0.017"/>
+  <testcase name="historyLineCountsPlaysAndNamesTheLastDay" classname="com.aakash.novafork.LibraryHealthTest" time="0.03"/>
+  <testcase name="healthListsOnlyGroupsWithProblems" classname="com.aakash.novafork.LibraryHealthTest" time="0.004"/>
+  <testcase name="anOverrideOfAnUnidentifiedTitleSurvivesIdentifying" classname="com.aakash.novafork.LibraryHealthTest" time="0.001"/>
+  <testcase name="duplicateBytesCountsTheExtraCopies" classname="com.aakash.novafork.LibraryHealthTest" time="0.002"/>
+  <testcase name="downloadedCopiesAreMarkedOnBothSides" classname="com.aakash.novafork.LibraryHealthTest" time="0.001"/>
+  <testcase name="aCleanLibraryHasNoProblems" classname="com.aakash.novafork.LibraryHealthTest" time="0.0"/>
+  <testcase name="watchedCaptionNeedsAnEpisodeWatched" classname="com.aakash.novafork.LibraryHealthTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

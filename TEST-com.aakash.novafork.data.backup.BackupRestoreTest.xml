@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.aakash.novafork.data.backup.BackupRestoreTest" tests="13" skipped="0" failures="0" errors="0" timestamp="2026-11-12T06:55:06.454Z" hostname="runnervm7aw5e" time="0.664">
+  <properties/>
+  <testcase name="roundTripBringsBackSettingsSourcesHistoryMatchesAndPlaylists" classname="com.aakash.novafork.data.backup.BackupRestoreTest" time="0.138"/>
+  <testcase name="everySettingTypeSurvivesTheRoundTrip" classname="com.aakash.novafork.data.backup.BackupRestoreTest" time="0.03"/>
+  <testcase name="everyStoredSettingHasItsTypeListed" classname="com.aakash.novafork.data.backup.BackupRestoreTest" time="0.019"/>
+  <testcase name="newerAndForeignFilesAreRefused" classname="com.aakash.novafork.data.backup.BackupRestoreTest" time="0.024"/>
+  <testcase name="newerHistoryOnTheDeviceWins" classname="com.aakash.novafork.data.backup.BackupRestoreTest" time="0.015"/>
+  <testcase name="filesThatCantBeBackupsAreRefusedEarly" classname="com.aakash.novafork.data.backup.BackupRestoreTest" time="0.049"/>
+  <testcase name="videosAreFoundByFolderAndNameThenByNameAndSize" classname="com.aakash.novafork.data.backup.BackupRestoreTest" time="0.047"/>
+  <testcase name="settingsOfAnotherTypeAreNotRestored" classname="com.aakash.novafork.data.backup.BackupRestoreTest" time="0.032"/>
+  <testcase name="secretsStayOutUnlessAskedFor" classname="com.aakash.novafork.data.backup.BackupRestoreTest" time="0.058"/>
+  <testcase name="aMediaStoreIdOnAnotherDeviceIsAnotherFile" classname="com.aakash.novafork.data.backup.BackupRestoreTest" time="0.054"/>
+  <testcase name="waitingEntriesExpireAfterThirtyDays" classname="com.aakash.novafork.data.backup.BackupRestoreTest" time="0.052"/>
+  <testcase name="watchlistAndFavoritesTravelAndWaitForTheirVideos" classname="com.aakash.novafork.data.backup.BackupRestoreTest" time="0.069"/>
+  <testcase name="waitingEntriesAreAppliedWhenTheirSourceIsScanned" classname="com.aakash.novafork.data.backup.BackupRestoreTest" time="0.077"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

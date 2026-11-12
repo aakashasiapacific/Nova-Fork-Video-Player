@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.aakash.novafork.data.music.MusicSearchTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-11-12T06:55:07.797Z" hostname="runnervm7aw5e" time="0.123">
+  <properties/>
+  <testcase name="findsSongsAlbumsAndArtistsIgnoringAccents" classname="com.aakash.novafork.data.music.MusicSearchTest" time="0.026"/>
+  <testcase name="searchResultsPlayFromTheSongTapped" classname="com.aakash.novafork.data.music.MusicSearchTest" time="0.027"/>
+  <testcase name="namesStartingWithTheQueryComeFirst" classname="com.aakash.novafork.data.music.MusicSearchTest" time="0.014"/>
+  <testcase name="aSungLineFindsItsSong" classname="com.aakash.novafork.data.music.MusicSearchTest" time="0.015"/>
+  <testcase name="postersLoadAtTheSizeTheirCardNeeds" classname="com.aakash.novafork.data.music.MusicSearchTest" time="0.025"/>
+  <testcase name="aBlankQueryFindsNothing" classname="com.aakash.novafork.data.music.MusicSearchTest" time="0.016"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

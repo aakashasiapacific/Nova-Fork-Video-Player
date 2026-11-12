@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.aakash.novafork.data.LibraryDiagnosticsTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-11-12T06:55:01.518Z" hostname="runnervm7aw5e" time="0.096">
+  <properties/>
+  <testcase name="reportSaysWhyDeviceStorageIsNotScanned" classname="com.aakash.novafork.data.LibraryDiagnosticsTest" time="0.043"/>
+  <testcase name="reportNeverHoldsSecretsOrServerDetails" classname="com.aakash.novafork.data.LibraryDiagnosticsTest" time="0.023"/>
+  <testcase name="reportShowsAccessMediaStoreSourcesAndTheLibrary" classname="com.aakash.novafork.data.LibraryDiagnosticsTest" time="0.029"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

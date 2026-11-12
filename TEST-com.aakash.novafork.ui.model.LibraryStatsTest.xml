@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.aakash.novafork.ui.model.LibraryStatsTest" tests="10" skipped="0" failures="0" errors="0" timestamp="2026-11-12T06:55:09.644Z" hostname="runnervm7aw5e" time="0.005">
+  <properties/>
+  <testcase name="only the largest folders are listed but all are in the total" classname="com.aakash.novafork.ui.model.LibraryStatsTest" time="0.002"/>
+  <testcase name="nothing played gives empty stats" classname="com.aakash.novafork.ui.model.LibraryStatsTest" time="0.001"/>
+  <testcase name="all time is finished viewings plus the part under way" classname="com.aakash.novafork.ui.model.LibraryStatsTest" time="0.0"/>
+  <testcase name="films finished counts only movies played to the end this month" classname="com.aakash.novafork.ui.model.LibraryStatsTest" time="0.001"/>
+  <testcase name="watch time reads in minutes then hours" classname="com.aakash.novafork.ui.model.LibraryStatsTest" time="0.0"/>
+  <testcase name="files without a known size are not counted" classname="com.aakash.novafork.ui.model.LibraryStatsTest" time="0.0"/>
+  <testcase name="the month starts at midnight in the given zone" classname="com.aakash.novafork.ui.model.LibraryStatsTest" time="0.0"/>
+  <testcase name="folders are grouped by source and sorted largest first with a total" classname="com.aakash.novafork.ui.model.LibraryStatsTest" time="0.0"/>
+  <testcase name="top shows are the three with most episodes watched" classname="com.aakash.novafork.ui.model.LibraryStatsTest" time="0.001"/>
+  <testcase name="this month counts the videos last played this month once each" classname="com.aakash.novafork.ui.model.LibraryStatsTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

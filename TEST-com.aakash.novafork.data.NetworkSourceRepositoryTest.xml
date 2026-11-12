@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.aakash.novafork.data.NetworkSourceRepositoryTest" tests="8" skipped="0" failures="0" errors="0" timestamp="2026-11-12T06:55:04.725Z" hostname="runnervm7aw5e" time="0.26">
+  <properties/>
+  <testcase name="editingKeepsTheTokenOnlyForTheSameAccount" classname="com.aakash.novafork.data.NetworkSourceRepositoryTest" time="0.046"/>
+  <testcase name="editingWithAnIdOfAnotherTypeAddsANewSource" classname="com.aakash.novafork.data.NetworkSourceRepositoryTest" time="0.028"/>
+  <testcase name="savingAnFtpServerStoresItNormalised" classname="com.aakash.novafork.data.NetworkSourceRepositoryTest" time="0.027"/>
+  <testcase name="aTypeWithoutAScannerIsSavedButNotScanned" classname="com.aakash.novafork.data.NetworkSourceRepositoryTest" time="0.026"/>
+  <testcase name="badInputIsRefusedBeforeAnythingIsStored" classname="com.aakash.novafork.data.NetworkSourceRepositoryTest" time="0.024"/>
+  <testcase name="scanningAServerUsesItsScanner" classname="com.aakash.novafork.data.NetworkSourceRepositoryTest" time="0.029"/>
+  <testcase name="removingAnFtpFolderHandsItsFilesToTheServerAboveIt" classname="com.aakash.novafork.data.NetworkSourceRepositoryTest" time="0.038"/>
+  <testcase name="sourcesAreFoundForVideosAndForFilesNextToThem" classname="com.aakash.novafork.data.NetworkSourceRepositoryTest" time="0.041"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

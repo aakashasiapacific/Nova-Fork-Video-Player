@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.aakash.novafork.data.LibraryMatchingTest" tests="8" skipped="0" failures="0" errors="0" timestamp="2026-11-12T06:55:01.619Z" hostname="runnervm7aw5e" time="1.706">
+  <properties/>
+  <testcase name="clearingMetadataFetchesManualMatchesAgain" classname="com.aakash.novafork.data.LibraryMatchingTest" time="0.121"/>
+  <testcase name="newMetadataLanguageFetchesEverythingAgain" classname="com.aakash.novafork.data.LibraryMatchingTest" time="0.095"/>
+  <testcase name="rejectedKeyStopsThePassUntilMatchingIsRetried" classname="com.aakash.novafork.data.LibraryMatchingTest" time="0.089"/>
+  <testcase name="offlinePassWaitsForTheNetwork" classname="com.aakash.novafork.data.LibraryMatchingTest" time="1.064"/>
+  <testcase name="automaticMatchPlacesAbsoluteEpisodesIntoSeasons" classname="com.aakash.novafork.data.LibraryMatchingTest" time="0.074"/>
+  <testcase name="filesOfAnIdentifiedShowAddedLaterJoinIt" classname="com.aakash.novafork.data.LibraryMatchingTest" time="0.114"/>
+  <testcase name="unreachableTmdbStopsThePassUntilTheNextRefresh" classname="com.aakash.novafork.data.LibraryMatchingTest" time="0.086"/>
+  <testcase name="titleTmdbDoesNotKnowIsMarkedUnmatched" classname="com.aakash.novafork.data.LibraryMatchingTest" time="0.061"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
