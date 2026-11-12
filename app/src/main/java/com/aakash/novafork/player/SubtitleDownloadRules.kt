@@ -174,6 +174,10 @@ internal object SubtitleDownloadRules {
     fun missingLanguages(languages: List<String>, has: (String) -> Boolean): List<String> =
         languages.takeWhile { !has(it) }
 
+    /** The one language worth fetching quietly: the first of [languages] when the video has no subtitle in it ([has]). */
+    fun quietLanguages(languages: List<String>, has: (String) -> Boolean): List<String> =
+        missingLanguages(languages, has).take(1)
+
     /** A message to show for a failed search or download. */
     fun errorMessage(error: Throwable): String = when (error) {
         is OpenSubtitlesException -> error.message ?: OpenSubtitlesException.NETWORK_MESSAGE

@@ -1,12 +1,20 @@
 package com.aakash.novafork.ui
 
 import com.aakash.novafork.core.format.Formats
+import com.aakash.novafork.core.format.QualityBadges
+import com.aakash.novafork.core.library.VideoFiles
 import com.aakash.novafork.core.smb.SmbUris
 import com.aakash.novafork.core.tmdb.TmdbClient
 import com.aakash.novafork.data.PlaylistWithCount
 import com.aakash.novafork.data.ScanState
+import com.aakash.novafork.data.db.MetadataEntity
 import com.aakash.novafork.data.db.SourceEntity
 import com.aakash.novafork.data.db.SourceType
+import com.aakash.novafork.data.db.VideoEntity
+import com.aakash.novafork.data.music.MusicLibrary
+import com.aakash.novafork.data.music.MusicLibraryData
+import com.aakash.novafork.data.music.MusicSearch
+import com.aakash.novafork.download.VideoDownloads
 import com.aakash.novafork.ui.model.Artwork
 import com.aakash.novafork.ui.model.BrowseDirUi
 import com.aakash.novafork.ui.model.BrowseUi
@@ -14,13 +22,21 @@ import com.aakash.novafork.ui.model.Crumb
 import com.aakash.novafork.ui.model.EpisodeUi
 import com.aakash.novafork.ui.model.FolderUi
 import com.aakash.novafork.ui.model.HeroTarget
+import com.aakash.novafork.ui.model.HealthGroupUi
+import com.aakash.novafork.ui.model.HealthItemUi
+import com.aakash.novafork.ui.model.HealthKind
 import com.aakash.novafork.ui.model.HeroUi
+import com.aakash.novafork.ui.model.HiddenItemUi
+import com.aakash.novafork.ui.model.HistoryDayUi
+import com.aakash.novafork.ui.model.HistoryEntryUi
 import com.aakash.novafork.ui.model.HomeUi
 import com.aakash.novafork.ui.model.LibraryFilter
+import com.aakash.novafork.ui.model.LibraryHealthUi
 import com.aakash.novafork.ui.model.LibraryItemUi
 import com.aakash.novafork.ui.model.LibrarySort
 import com.aakash.novafork.ui.model.LibraryUi
 import com.aakash.novafork.ui.model.MediaKind
+import com.aakash.novafork.ui.model.MusicResultUi
 import com.aakash.novafork.ui.model.PlaylistDetailsUi
 import com.aakash.novafork.ui.model.PlaylistUi
 import com.aakash.novafork.ui.model.RemoteFileUi
@@ -29,17 +45,30 @@ import com.aakash.novafork.ui.model.SearchUi
 import com.aakash.novafork.ui.model.SeasonUi
 import com.aakash.novafork.ui.model.ShowDetailsUi
 import com.aakash.novafork.ui.model.SourceUi
+import com.aakash.novafork.ui.model.TimelineMonth
 import com.aakash.novafork.ui.model.VideoCardUi
 import com.aakash.novafork.ui.model.VideoDetailsUi
+import java.time.Instant
+import java.time.LocalDate
+import java.time.YearMonth
+import java.time.ZoneId
+import java.time.format.TextStyle
+import java.time.temporal.ChronoUnit
+import java.util.Locale
 
 /**
  * Turns a [LibraryIndex] (plus the scan state and what the user picked) into the screen models.
  * Pure Kotlin, so every rule here can be unit-tested without Android.
  */
 object UiMappers {
-    private const val CONTINUE_WATCHING_LIMIT = 20
+    private const val CONTINUE_WATCHING_LIMIT = 60
+    private const val MORE_LIKE_THIS_LIMIT = 12
+    /** A shared genre counts for less than a shared actor in More Like This. */
+    private const val GENRE_WEIGHT = 2
+    private const val CAST_WEIGHT = 3
     private const val RECENTLY_ADDED_LIMIT = 30
     private const val HERO_LIMIT = 6
+    private const val UP_NEXT_LIMIT = 15
     /** Newest movies and shows considered for the hero before the backdrop preference is applied. */
     private const val HERO_RECENT_CANDIDATES = 12
     private const val SEARCH_LIMIT = 60
@@ -52,7 +81,17 @@ object UiMappers {
         val inProgress = continueWatching(index)
         return HomeUi(
             hero = hero(index, inProgress),
-            continueWatching = inProgress.map { it.card },
+            continueWatching = inProgress.map { video ->
+                // A file on the phone shows the moment it was left, as Apple TV's Up Next does.
+                val art = video.card.artwork
+                val card = if (art.frameSource != null && video.video.positionMs > 0) {
+                    video.card.copy(artwork = art.copy(frameAtMs = video.video.positionMs))
+                } else {
+                    video.card
+                }
+                if (hasNewEpisode(index, video)) card.copy(newEpisode = true) else card
+            },
+            upNext = upNext(index, inProgress),
             recentlyAdded = recentlyAdded(index),
             movies = index.movies.sortedWith(TITLE_ORDER).map { it.card },
             shows = index.shows.map { it.card },
@@ -64,10 +103,49 @@ object UiMappers {
     /** Partly watched videos, last played first, one per show. */
     private fun continueWatching(index: LibraryIndex): List<IndexedVideo> =
         index.videos
-            .filter { it.inProgress }
+            .filter { it.inProgress && it.id !in index.extraIds }
             .sortedByDescending { it.video.lastPlayedAt ?: 0L }
             .distinctBy { it.showKey ?: "v:${it.id}" }
             .take(CONTINUE_WATCHING_LIMIT)
+
+    /**
+     * Apple TV's Up Next: for each show with a watched or partly watched episode, the episode to
+     * watch next (the first unwatched one after the episode touched last), the show touched most
+     * recently first. A show whose episode is still partly watched is already in Continue
+     * Watching ([continuing]) and is left out here.
+     */
+    private fun upNext(index: LibraryIndex, continuing: List<IndexedVideo>): List<VideoCardUi> {
+        val inRow = continuing.mapTo(HashSet()) { it.id }
+        return index.shows
+            .mapNotNull { show ->
+                val last = show.episodes
+                    .filter { it.inProgress || it.video.watched }
+                    .maxByOrNull { it.video.lastPlayedAt ?: 0L }
+                    ?: return@mapNotNull null
+                val next = if (last.inProgress) {
+                    last
+                } else {
+                    show.episodes.drop(show.episodes.indexOf(last) + 1).firstOrNull { !it.video.watched }
+                }
+                if (next == null || next.id in inRow) null else (last.video.lastPlayedAt ?: 0L) to next.card
+            }
+            .sortedByDescending { it.first }
+            .take(UP_NEXT_LIMIT)
+            .map { it.second }
+    }
+
+    /**
+     * Apple TV's blue dot: the episode after [video] (the one being watched) reached the library
+     * after its show was last played, so there is something new to watch. Derived from the
+     * episodes' dateAdded and lastPlayedAt, so nothing is stored.
+     */
+    internal fun hasNewEpisode(index: LibraryIndex, video: IndexedVideo): Boolean {
+        val show = video.showKey?.let { index.showsByKey[it] } ?: return false
+        val lastPlayed = show.episodes.maxOf { it.video.lastPlayedAt ?: 0L }
+        if (lastPlayed <= 0L) return false
+        val next = nextEpisode(index, video) ?: return false
+        return !next.video.watched && next.video.dateAdded > lastPlayed
+    }
 
     /** Newest first; a show's new episodes collapse into one card for its newest episode. */
     private fun recentlyAdded(index: LibraryIndex): List<VideoCardUi> {
@@ -75,6 +153,7 @@ object UiMappers {
         val seenShows = HashSet<String>()
         for (video in index.videos) {
             if (cards.size == RECENTLY_ADDED_LIMIT) break
+            if (video.id in index.extraIds) continue
             val showKey = video.showKey
             if (showKey == null) {
                 cards += video.card
@@ -92,27 +171,53 @@ object UiMappers {
     }
 
     /** In-progress items first, then the newest movies and shows; items with a backdrop win. */
+    /** How many not-started titles lead the hero before what is under way. */
+    private const val HERO_NEW_FIRST = 3
+
     private fun hero(index: LibraryIndex, inProgress: List<IndexedVideo>): List<HeroUi> {
         val candidates = LinkedHashMap<HeroTarget, HeroUi>()
         fun add(hero: HeroUi) {
             if (hero.target !in candidates) candidates[hero.target] = hero
         }
-        inProgress.forEach { video -> add(heroForInProgress(index, video)) }
-
+        // Owner: something new to start first; what is already under way follows (it also has its
+        // own Continue Watching row), then the rest of what arrived lately.
         val recentMovies = index.movies
             .take(HERO_RECENT_CANDIDATES)
-            .map { it.video.dateAdded to heroForVideo(it) }
+            .map { Triple(it.video.dateAdded, it.video.positionMs <= 0L && !it.video.watched, heroForVideo(it)) }
         val recentShows = index.shows
             .sortedByDescending { it.latestAdded }
             .take(HERO_RECENT_CANDIDATES)
-            .map { it.latestAdded to heroForShow(it) }
-        (recentMovies + recentShows)
-            .sortedByDescending { it.first }
-            .forEach { add(it.second) }
+            .map { show ->
+                val untouched = show.episodes.none { it.video.watched || it.video.positionMs > 0L }
+                Triple(show.latestAdded, untouched, heroForShow(show))
+            }
+        val recent = (recentMovies + recentShows).sortedByDescending { it.first }
+        recent.filter { it.second }.take(HERO_NEW_FIRST).forEach { add(it.third) }
+        inProgress.forEach { video -> add(heroForInProgress(index, video)) }
+        recent.forEach { add(it.third) }
         // sortedByDescending is stable, so the order above survives within each group.
-        return candidates.values
-            .sortedByDescending { it.artwork.backdropUrl != null }
+        val main = candidates.values
+            .sortedByDescending { it.artwork.tallUrl != null || it.artwork.backdropUrl != null }
             .take(HERO_LIMIT)
+        if (main.size >= HERO_LIMIT) return main
+        // A library with few movies and shows fills the hero with its newest personal videos too,
+        // shown with a frame of the video (or their own picture) instead of a backdrop.
+        val taken = main.mapTo(HashSet()) { it.target }
+        val personal = index.otherVideos
+            .filter { video -> video.card.artwork.let { it.frameSource != null || it.posterUrl != null || it.backdropUrl != null } }
+            .sortedByDescending { it.video.dateAdded }
+            .map(::heroForVideo)
+            .filter { it.target !in taken }
+        return (main + personal).take(HERO_LIMIT)
+    }
+
+    /** The hero for a pinned title ("v:<id>" / "s:<showKey>"), or null when it has gone. */
+    fun pinnedHero(index: LibraryIndex, itemKey: String): HeroUi? = when {
+        itemKey.startsWith("v:") -> itemKey.removePrefix("v:").toLongOrNull()?.let { index.videosById[it] }?.let { video ->
+            if (video.inProgress) heroForInProgress(index, video) else heroForVideo(video)
+        }
+        itemKey.startsWith("s:") -> index.showsByKey[itemKey.removePrefix("s:")]?.let(::heroForShow)
+        else -> null
     }
 
     private fun heroForInProgress(index: LibraryIndex, video: IndexedVideo): HeroUi {
@@ -128,7 +233,7 @@ object UiMappers {
             genres = genresOf(show.meta),
             progress = video.card.progress,
             playVideoId = video.id,
-            playLabel = playLabel(resume = true, code = code),
+            playLabel = resumeLabel(video.video),
         )
     }
 
@@ -149,7 +254,7 @@ object UiMappers {
             genres = genres,
             progress = video.card.progress,
             playVideoId = video.id,
-            playLabel = if (video.inProgress) "Resume" else "Play",
+            playLabel = if (video.inProgress) resumeLabel(video.video) else "Play",
         )
     }
 
@@ -175,7 +280,124 @@ object UiMappers {
 
     // Library
 
-    fun library(index: LibraryIndex, filter: LibraryFilter, sort: LibrarySort): LibraryUi {
+    /**
+     * Videos stored more than once: the same matched film, the same episode of a show, or an
+     * unmatched file with the same title and length. Each copy shows where it lives and its size.
+     */
+    fun duplicates(index: LibraryIndex): List<LibraryItemUi> =
+        duplicateGroups(index)
+            .flatMap { copies ->
+                copies.map { copy ->
+                    val where = listOfNotNull(
+                        copy.card.sourceLabel,
+                        copy.relativeFolder.ifEmpty { null },
+                        copy.video.sizeBytes?.let(::shortSize),
+                    ).joinToString(" · ")
+                    LibraryItemUi.Video(copy.card.copy(subtitle = where.ifEmpty { copy.video.fileName }))
+                }
+            }
+
+    /**
+     * An actor's or director's page: every movie and show of the library whose cast or directors
+     * (creators, for shows) include [name] (exact name, any case), newest first.
+     */
+    fun person(index: LibraryIndex, name: String): List<LibraryItemUi> {
+        val wanted = name.trim()
+        if (wanted.isEmpty()) return emptyList()
+        fun credited(meta: MetadataEntity?): Boolean =
+            creditNames(meta?.castNames).any { it.equals(wanted, ignoreCase = true) } ||
+                creditNames(meta?.directors).any { it.equals(wanted, ignoreCase = true) }
+        val found = ArrayList<Pair<Long, LibraryItemUi>>()
+        index.movies.filter { credited(it.meta) }.mapTo(found) { it.video.dateAdded to LibraryItemUi.Video(it.card) }
+        index.shows.filter { credited(it.meta) }.mapTo(found) { it.latestAdded to LibraryItemUi.Show(it.card) }
+        return found.sortedByDescending { it.first }.map { it.second }
+    }
+
+    /**
+     * The videos hidden from the library that still exist, as Preferences lists them: a show's
+     * hidden episodes are one row, every other video its own. By title.
+     */
+    fun hiddenVideos(index: LibraryIndex, hidden: Set<Long>): List<HiddenItemUi> {
+        if (hidden.isEmpty()) return emptyList()
+        val items = ArrayList<HiddenItemUi>()
+        val episodes = LinkedHashMap<String, MutableList<IndexedVideo>>()
+        for (video in index.allVideos) {
+            if (video.id !in hidden) continue
+            val showKey = video.showKey
+            if (showKey != null) {
+                episodes.getOrPut(showKey) { ArrayList() }.add(video)
+            } else {
+                items += HiddenItemUi(
+                    key = "v:${video.id}",
+                    title = video.title,
+                    subtitle = video.card.subtitle,
+                    artwork = video.card.artwork,
+                    videoIds = listOf(video.id),
+                )
+            }
+        }
+        for ((key, list) in episodes) {
+            val first = list.first()
+            items += HiddenItemUi(
+                key = "s:$key",
+                title = first.showTitle ?: first.title,
+                subtitle = countLabel(list.size, "episode"),
+                artwork = first.card.artwork,
+                videoIds = list.map { it.id },
+            )
+        }
+        return items.sortedWith(compareBy(NaturalOrder) { sortKeyOf(it.title) })
+    }
+
+    /** Each set of copies of one film or episode (two or more), by title. */
+    private fun duplicateGroups(index: LibraryIndex): List<List<IndexedVideo>> =
+        index.videos
+            // A trailer named after its film is a bonus, not a second copy.
+            .filter { it.id !in index.extraIds }
+            .groupBy(::duplicateKey)
+            .filterKeys { it != null }
+            .values
+            .filter { it.size > 1 }
+            .sortedBy { it.first().sortKey.lowercase() }
+
+    /**
+     * The room the extra copies of duplicates take, in bytes: every set of copies minus its
+     * largest one (the copy you would keep). Copies of unknown size count as nothing. 0 when
+     * there are no duplicates.
+     */
+    fun duplicateBytes(index: LibraryIndex): Long =
+        duplicateGroups(index).sumOf { copies ->
+            val sizes = copies.map { it.video.sizeBytes ?: 0L }
+            sizes.sum() - (sizes.maxOrNull() ?: 0L)
+        }
+
+    private fun duplicateKey(video: IndexedVideo): String? {
+        val row = video.video
+        return when {
+            video.showKey != null && row.season != null && row.episode != null ->
+                "e:${video.showKey}:${row.season}:${row.episode}"
+            video.kind == MediaKind.MOVIE && video.meta != null -> "m:${video.meta.key}"
+            video.kind == MediaKind.STREAM -> null
+            else -> {
+                val title = row.parsedTitle.lowercase().filter { it.isLetterOrDigit() }
+                val length = row.durationMs?.let { it / 5_000 } ?: row.sizeBytes ?: return null
+                if (title.isEmpty()) null else "f:$title:${row.parsedYear}:$length"
+            }
+        }
+    }
+
+    private fun shortSize(bytes: Long): String = when {
+        bytes >= 1L shl 30 -> String.format(java.util.Locale.US, "%.1f GB", bytes / (1L shl 30).toDouble())
+        else -> "${bytes / (1L shl 20)} MB"
+    }
+
+    fun library(
+        index: LibraryIndex,
+        filter: LibraryFilter,
+        sort: LibrarySort,
+        now: Long = System.currentTimeMillis(),
+        zone: ZoneId = ZoneId.systemDefault(),
+    ): LibraryUi {
         val movies = index.movies.map(::videoEntry)
         val shows = index.shows.map(::showEntry)
         val videos = index.otherVideos.map(::videoEntry)
@@ -184,7 +406,11 @@ object UiMappers {
             LibraryFilter.MOVIES -> movies
             LibraryFilter.SHOWS -> shows
             LibraryFilter.VIDEOS -> videos
+            // Built from their saved keys by the view model.
+            LibraryFilter.WATCHLIST, LibraryFilter.FAVORITES, LibraryFilter.DUPLICATES -> emptyList()
         }
+        val timelineMonths = if (filter == LibraryFilter.ALL && sort == LibrarySort.RECENT) timeline(index, now, zone) else emptyList()
+        val timeline = timelineMonths.flatMap { it.cards }
         return LibraryUi(
             filter = filter,
             sort = sort,
@@ -195,7 +421,53 @@ object UiMappers {
                 LibraryFilter.SHOWS to shows.size,
                 LibraryFilter.VIDEOS to videos.size,
             ),
+            timeline = timeline,
+            timelineMonths = timelineMonths,
         )
+    }
+
+    /**
+     * Every video (episodes one by one), newest first by when it reached the device, as one
+     * gapless grid under month headings; each card's second line is its episode label, year or length.
+     */
+    private fun timeline(index: LibraryIndex, now: Long, zone: ZoneId): List<TimelineMonth> {
+        val today = Instant.ofEpochMilli(now).atZone(zone).toLocalDate()
+        return index.videos
+            .filter { it.id !in index.extraIds }
+            .sortedWith(compareByDescending<IndexedVideo> { it.video.dateAdded }.thenBy(NaturalOrder) { it.sortKey })
+            .map { video ->
+                val card = video.card
+                val day = Instant.ofEpochMilli(video.video.dateAdded).atZone(zone).toLocalDate()
+                // The month headings already say when; episodes keep "S1 · E4", movies "2021 · 2h 35m",
+                // the rest show their length.
+                val detail = if (card.kind == MediaKind.EPISODE || card.kind == MediaKind.MOVIE) card.subtitle else timelineDuration(card.durationMs)
+                YearMonth.from(day) to card.copy(subtitle = detail)
+            }
+            .groupBy({ it.first }, { it.second })
+            .map { (month, cards) -> TimelineMonth(monthTitle(month, today), cards) }
+    }
+
+    /** "October" this year, "October 2024" before. */
+    internal fun monthTitle(month: YearMonth, today: LocalDate): String {
+        val name = month.month.getDisplayName(TextStyle.FULL, Locale.getDefault())
+        return if (month.year == today.year) name else "$name ${month.year}"
+    }
+
+    private fun timelineDuration(durationMs: Long?): String? {
+        if (durationMs == null || durationMs <= 0L) return null
+        return if (durationMs < 60_000L) Formats.clock(durationMs) else Formats.runtime(((durationMs + 30_000L) / 60_000L).toInt())
+    }
+
+    /** "Today", "Yesterday", a weekday this week, then "12 Mar", and "12 Mar 2024" for earlier years. */
+    internal fun arrivedLabel(day: LocalDate, today: LocalDate): String {
+        val month = day.month.getDisplayName(TextStyle.SHORT, Locale.getDefault())
+        return when {
+            !day.isBefore(today) -> "Today"
+            day == today.minusDays(1) -> "Yesterday"
+            day.isAfter(today.minusDays(7)) -> day.dayOfWeek.getDisplayName(TextStyle.FULL, Locale.getDefault())
+            day.year == today.year -> "${day.dayOfMonth} $month"
+            else -> "${day.dayOfMonth} $month ${day.year}"
+        }
     }
 
     private class Entry(
@@ -204,6 +476,10 @@ object UiMappers {
         val sortKey: String,
         val year: Int?,
         val rating: Float?,
+        /** File size in bytes (a show: all its episodes). */
+        val size: Long,
+        /** File modified time (a show: its newest episode); falls back to when it was added. */
+        val modified: Long,
     )
 
     private fun videoEntry(video: IndexedVideo) = Entry(
@@ -212,6 +488,8 @@ object UiMappers {
         sortKey = video.sortKey,
         year = video.card.year,
         rating = video.card.rating,
+        size = video.video.sizeBytes ?: 0L,
+        modified = modifiedOf(video),
     )
 
     private fun showEntry(show: IndexedShow) = Entry(
@@ -220,7 +498,11 @@ object UiMappers {
         sortKey = show.sortKey,
         year = show.card.year,
         rating = show.card.rating,
+        size = show.episodes.sumOf { it.video.sizeBytes ?: 0L },
+        modified = show.episodes.maxOf(::modifiedOf),
     )
+
+    private fun modifiedOf(video: IndexedVideo): Long = video.video.dateModified ?: video.video.dateAdded
 
     private val ENTRY_TITLE_ORDER: Comparator<Entry> = compareBy(NaturalOrder) { it.sortKey }
 
@@ -229,11 +511,33 @@ object UiMappers {
         LibrarySort.TITLE -> ENTRY_TITLE_ORDER
         LibrarySort.YEAR -> compareBy<Entry, Int?>(nullsLast(reverseOrder<Int>())) { it.year }.then(ENTRY_TITLE_ORDER)
         LibrarySort.RATING -> compareBy<Entry, Float?>(nullsLast(reverseOrder<Float>())) { it.rating }.then(ENTRY_TITLE_ORDER)
+        LibrarySort.SIZE -> compareByDescending<Entry> { it.size }.then(ENTRY_TITLE_ORDER)
+        LibrarySort.MODIFIED -> compareByDescending<Entry> { it.modified }.then(ENTRY_TITLE_ORDER)
     }
 
     private val TITLE_ORDER: Comparator<IndexedVideo> = compareBy(NaturalOrder) { it.sortKey }
 
     // Details
+
+    /**
+     * "Watched 3 times · last on 2 Nov" (the year too when it isn't this year); "Played once · …"
+     * for one play; null before any.
+     */
+    internal fun historyLine(playCount: Int, lastPlayedAt: Long?, now: Long = System.currentTimeMillis(), zone: ZoneId = ZoneId.systemDefault()): String? {
+        if (playCount <= 0 && lastPlayedAt == null) return null
+        val times = when (playCount) {
+            0, 1 -> "Played once"
+            2 -> "Played twice"
+            else -> "Played $playCount times"
+        }
+        val last = lastPlayedAt?.let {
+            val date = java.time.Instant.ofEpochMilli(it).atZone(zone).toLocalDate()
+            val sameYear = date.year == java.time.Instant.ofEpochMilli(now).atZone(zone).year
+            val pattern = if (sameYear) "d MMM" else "d MMM yyyy"
+            "last on " + date.format(java.time.format.DateTimeFormatter.ofPattern(pattern, java.util.Locale.getDefault()))
+        }
+        return listOfNotNull(times, last).joinToString(" · ")
+    }
 
     fun videoDetails(index: LibraryIndex, videoId: Long): VideoDetailsUi? {
         val item = index.videosById[videoId] ?: return null
@@ -249,6 +553,7 @@ object UiMappers {
             runtimeLabel(video, meta.takeIf { isMovie })
         }
         return VideoDetailsUi(
+            historyLine = historyLine(video.playCount, video.lastPlayedAt),
             id = video.id,
             kind = item.kind,
             title = item.title,
@@ -261,14 +566,15 @@ object UiMappers {
                 MediaKind.VIDEO -> null
             },
             year = item.card.year,
-            runtimeLabel = runtime,
+            // The cut, when the file name says it ("Director's Cut · 2h 51m").
+            runtimeLabel = if (isMovie) joinMeta(com.aakash.novafork.data.MovieEditions.of(video.fileName), runtime) else runtime,
             rating = item.card.rating,
             genres = genresOf(meta),
             artwork = item.card.artwork,
             progress = item.card.progress,
             positionMs = if (item.inProgress) video.positionMs else 0L,
             durationMs = item.card.durationMs,
-            playLabel = if (item.inProgress) "Resume from ${Formats.clock(video.positionMs)}" else "Play",
+            playLabel = if (item.inProgress) resumeLabel(video) else "Play",
             watched = video.watched,
             showKey = item.showKey,
             showTitle = item.showTitle,
@@ -285,9 +591,54 @@ object UiMappers {
             location = locationOf(item),
             sizeLabel = video.sizeBytes?.takeIf { it > 0 }?.let(Formats::size),
             resolutionLabel = resolutionLabel(video.width, video.height),
+            qualityBadges = QualityBadges.of(video.width, video.height),
+            downloaded = item.id in index.downloadedIds,
+            // An episode keeps its show's title; renaming is done on the show's page.
+            titleKey = if (isEpisode) "" else item.titleKey,
+            titleCustomised = !isEpisode && item.titleCustomised,
             sourceLabel = item.source?.let(::sourceLabel).orEmpty(),
             isMatched = meta != null,
-        )
+            starring = meta?.castNames.nonBlank(),
+            directedBy = meta?.directors.nonBlank(),
+            lastWatched = video.lastPlayedAt?.let { watchedLabel(it) },
+            // An episode's page leaves it to its show's page.
+            moreLikeThis = if (isMovie) moreLikeThis(index, meta, item.title) else emptyList(),
+            extras = index.extrasByMovie[item.id].orEmpty().map(::extraCard),
+            downloadable = item.kind != MediaKind.STREAM && VideoDownloads.canDownload(item.source?.type),
+            renamable = item.kind != MediaKind.STREAM && when (item.source?.type) {
+                SourceType.DEVICE -> video.uri.startsWith("content://")
+                SourceType.SMB -> true
+                else -> false
+            },
+        ).let { details ->
+            val collection = if (isMovie) collectionOf(index, meta) else emptyList()
+            if (collection.size < 2) {
+                details
+            } else {
+                details.copy(collectionName = meta?.collectionName.nonBlank() ?: "Collection", collection = collection)
+            }
+        }
+    }
+
+    /** An extra on its movie's page: named by its file (the TMDB title would repeat the movie's), with its length. */
+    private fun extraCard(extra: IndexedVideo): VideoCardUi = extra.card.copy(
+        title = VideoFiles.baseName(extra.video.fileName).ifBlank { extra.title },
+        subtitle = runtimeLabel(extra.video, null),
+        year = null,
+        rating = null,
+    )
+
+    /**
+     * The library's films in [meta]'s TMDB collection, one card per title (its first copy),
+     * oldest first; empty when it is in none.
+     */
+    private fun collectionOf(index: LibraryIndex, meta: MetadataEntity?): List<VideoCardUi> {
+        val collectionId = meta?.collectionId ?: return emptyList()
+        return index.movies
+            .filter { it.meta?.collectionId == collectionId }
+            .distinctBy { it.meta?.key ?: it.id.toString() }
+            .sortedWith(compareBy<IndexedVideo, Int?>(nullsLast()) { it.meta?.year ?: it.card.year }.then(TITLE_ORDER))
+            .map { it.card }
     }
 
     /** The episode after [current] in watching order, skipping other copies of the same episode. */
@@ -340,6 +691,8 @@ object UiMappers {
             key = show.key,
             title = show.title,
             overview = show.meta?.overview.nonBlank(),
+            starring = show.meta?.castNames.nonBlank(),
+            createdBy = show.meta?.directors.nonBlank(),
             tagline = show.meta?.tagline.nonBlank(),
             year = show.card.year,
             rating = show.card.rating,
@@ -349,7 +702,108 @@ object UiMappers {
             nextUp = episodeUi(next),
             playLabel = showPlayLabel(next),
             isMatched = show.meta != null,
+            lastWatched = show.episodes.mapNotNull { it.video.lastPlayedAt }.maxOrNull()?.let { watchedLabel(it) },
+            moreLikeThis = moreLikeThis(index, show.meta, show.title),
+            titleKey = show.titleKey,
+            titleCustomised = show.titleCustomised,
         )
+    }
+
+    // Library health
+
+    /**
+     * What Preferences › Library Health lists, a group only when it has something: movies and
+     * shows with no poster or backdrop at all, movies with no TMDB details, and episodes whose
+     * file name gave no episode number. Streams, home videos and hidden videos are not checked.
+     */
+    fun libraryHealth(index: LibraryIndex): LibraryHealthUi {
+        val groups = ArrayList<HealthGroupUi>()
+        fun noArt(artwork: Artwork) = artwork.posterUrl == null && artwork.backdropUrl == null && artwork.tallUrl == null
+        fun movieItem(movie: IndexedVideo) = HealthItemUi("v:${movie.id}", movie.title, movie.card.subtitle, movie.card.artwork, movie.id)
+        val missingArt = ArrayList<HealthItemUi>()
+        index.movies.filter { noArt(it.card.artwork) }.mapTo(missingArt, ::movieItem)
+        index.shows.filter { noArt(it.card.artwork) }.mapTo(missingArt) { show ->
+            HealthItemUi("s:${show.key}", show.title, countLabel(show.card.episodeCount, "episode"), show.card.artwork, show.episodes.first().id)
+        }
+        if (missingArt.isNotEmpty()) {
+            groups += HealthGroupUi(HealthKind.NO_ARTWORK, missingArt.sortedWith(compareBy(NaturalOrder) { sortKeyOf(it.title) }))
+        }
+        val unidentified = index.movies.filter { it.meta == null }.map(::movieItem)
+        if (unidentified.isNotEmpty()) {
+            groups += HealthGroupUi(HealthKind.UNIDENTIFIED, unidentified.sortedWith(compareBy(NaturalOrder) { sortKeyOf(it.title) }))
+        }
+        val unparsed = index.videos
+            .filter { it.kind == MediaKind.EPISODE && it.video.episode == null && it.id !in index.extraIds }
+            .map { episode ->
+                HealthItemUi("v:${episode.id}", episode.video.fileName, episode.showTitle, episode.card.artwork, episode.id)
+            }
+            .sortedWith(compareBy(NaturalOrder) { it.title })
+        if (unparsed.isNotEmpty()) groups += HealthGroupUi(HealthKind.UNPARSED_EPISODES, unparsed)
+        return LibraryHealthUi(groups)
+    }
+
+    /**
+     * More Like This (Apple TV): the library's other movies and shows sharing the most genres and
+     * cast with [meta], best first (then the better rated), at most [MORE_LIKE_THIS_LIMIT]; none
+     * when [meta] has neither. Other copies of the same title ([title]) are left out.
+     */
+    private fun moreLikeThis(index: LibraryIndex, meta: MetadataEntity?, title: String): List<LibraryItemUi> {
+        val genres = genresOf(meta).mapTo(HashSet()) { it.lowercase(Locale.ROOT) }
+        val cast = namesOf(meta?.castNames)
+        if (genres.isEmpty() && cast.isEmpty()) return emptyList()
+        fun score(other: MetadataEntity?): Int =
+            genresOf(other).count { it.lowercase(Locale.ROOT) in genres } * GENRE_WEIGHT +
+                namesOf(other?.castNames).count { it in cast } * CAST_WEIGHT
+        val movies = index.movies.map { Triple<LibraryItemUi, String, Int>(LibraryItemUi.Video(it.card), it.title, score(it.meta)) to it.card.rating }
+        val shows = index.shows.map { Triple<LibraryItemUi, String, Int>(LibraryItemUi.Show(it.card), it.title, score(it.meta)) to it.card.rating }
+        return (movies + shows)
+            .filter { (entry, _) -> entry.third > 0 && !entry.second.equals(title, ignoreCase = true) }
+            .sortedWith(compareByDescending<Pair<Triple<LibraryItemUi, String, Int>, Float?>> { it.first.third }.thenByDescending { it.second ?: 0f })
+            .distinctBy { it.first.second.lowercase(Locale.ROOT) }
+            .take(MORE_LIKE_THIS_LIMIT)
+            .map { it.first.first }
+    }
+
+    private fun namesOf(list: String?): Set<String> =
+        list.orEmpty().split(',').mapNotNullTo(HashSet()) { it.trim().lowercase(Locale.ROOT).ifEmpty { null } }
+
+    /** "Watched today", "Watched yesterday", "Watched 3 days ago", then "Watched 12 Mar" (with the year before this one). */
+    internal fun watchedLabel(at: Long, now: Long = System.currentTimeMillis(), zone: ZoneId = ZoneId.systemDefault()): String {
+        val day = Instant.ofEpochMilli(at).atZone(zone).toLocalDate()
+        val today = Instant.ofEpochMilli(now).atZone(zone).toLocalDate()
+        val days = ChronoUnit.DAYS.between(day, today)
+        val month = day.month.getDisplayName(TextStyle.SHORT, Locale.getDefault())
+        return "Watched " + when {
+            days <= 0L -> "today"
+            days == 1L -> "yesterday"
+            days < 7L -> "$days days ago"
+            day.year == today.year -> "${day.dayOfMonth} $month"
+            else -> "${day.dayOfMonth} $month ${day.year}"
+        }
+    }
+
+    // Watch history
+
+    /**
+     * Everything played, newest first, under the day it was last played ("Today", "Yesterday", a
+     * weekday, then a date). [hidden] holds the videos taken off the history, each with when it
+     * had last been played then: played again since, it comes back.
+     */
+    fun history(
+        index: LibraryIndex,
+        hidden: Map<Long, Long>,
+        now: Long = System.currentTimeMillis(),
+        zone: ZoneId = ZoneId.systemDefault(),
+    ): List<HistoryDayUi> {
+        val today = Instant.ofEpochMilli(now).atZone(zone).toLocalDate()
+        return index.videos
+            .mapNotNull { video ->
+                val at = video.video.lastPlayedAt ?: return@mapNotNull null
+                if (hidden[video.id]?.let { at <= it } == true) null else HistoryEntryUi(video.card, at)
+            }
+            .sortedByDescending { it.playedAt }
+            .groupBy { Instant.ofEpochMilli(it.playedAt).atZone(zone).toLocalDate() }
+            .map { (day, entries) -> HistoryDayUi(arrivedLabel(day, today), entries) }
     }
 
     private fun episodeUi(item: IndexedVideo): EpisodeUi {
@@ -389,21 +843,24 @@ object UiMappers {
     }
 
     private fun showPlayLabel(next: IndexedVideo): String =
-        playLabel(
-            resume = next.inProgress,
-            code = episodeLabel(next.video.season, next.video.episode, next.video.episodeEnd),
-        )
+        if (next.inProgress) {
+            resumeLabel(next.video)
+        } else {
+            val code = episodeLabel(next.video.season, next.video.episode, next.video.episodeEnd)
+            if (code == null) "Play" else "Play $code"
+        }
 
-    private fun playLabel(resume: Boolean, code: String?): String {
-        val verb = if (resume) "Resume" else "Play"
-        return if (code == null) verb else "$verb $code"
+    /** The Resume button's label: "Resume · 1h 41m left"; just "Resume" while the length is unknown. */
+    private fun resumeLabel(video: VideoEntity): String {
+        val duration = video.durationMs?.takeIf { it > 0 } ?: return "Resume"
+        return "Resume · ${Formats.remaining(video.positionMs, duration)}"
     }
 
     // Browse
 
     fun browse(index: LibraryIndex, scan: ScanState, playlists: List<PlaylistWithCount> = emptyList()): BrowseUi = BrowseUi(
         sources = sources(index, scan),
-        streams = index.videos.filter { it.kind == MediaKind.STREAM }.map { it.card },
+        streams = index.allVideos.filter { it.kind == MediaKind.STREAM }.map { it.card },
         playlists = playlists(index, playlists),
     )
 
@@ -471,7 +928,7 @@ object UiMappers {
         val prefix = if (dir.isEmpty()) "" else "$dir/"
         val subfolderCounts = HashMap<String, Int>()
         val here = ArrayList<IndexedVideo>()
-        for (video in index.videos) {
+        for (video in index.allVideos) {
             if (video.video.sourceId != sourceId) continue
             val folder = video.relativeFolder
             if (folder == dir) {
@@ -578,7 +1035,7 @@ object UiMappers {
         val dir = path.trim('/')
         val prefix = if (dir.isEmpty()) "" else "$dir/"
         val counts = HashMap<String, Int>()
-        for (video in index.videos) {
+        for (video in index.allVideos) {
             if (video.video.sourceId != sourceId) continue
             val folder = video.relativeFolder
             if (folder == dir || !folder.startsWith(prefix)) continue
@@ -626,28 +1083,142 @@ object UiMappers {
 
     // Search
 
+    private fun phraseMatches(video: IndexedVideo, phrase: SearchPhrase): Boolean {
+        if (phrase.unwatched && video.video.watched) return false
+        if (phrase.watched && !video.video.watched) return false
+        if (!phrase.lengthMatches(video.video.durationMs)) return false
+        if (!phrase.yearMatches(video.video.parsedYear ?: video.card.year)) return false
+        if (!phrase.sizeMatches(video.video.height)) return false
+        if (phrase.genres.isNotEmpty()) {
+            val have = genresOf(video.meta)
+            if (phrase.genres.any { want -> have.none { it.equals(want, ignoreCase = true) } }) return false
+        }
+        return phrase.words.all { word ->
+            video.title.contains(word, ignoreCase = true) ||
+                video.showTitle?.contains(word, ignoreCase = true) == true ||
+                creditsMatch(video.meta, word)
+        }
+    }
+
+    /** Typing a genre's whole name finds that genre's titles. */
+    private fun genreMatch(meta: MetadataEntity?, needle: String): Boolean =
+        genresOf(meta).any { it.equals(needle, ignoreCase = true) }
+
+    /**
+     * Search with nothing typed (owner): one long scroll of every video, newest first, under the
+     * month it arrived, as Recently Added shows it.
+     */
+    private fun browse(query: String, index: LibraryIndex, now: Long, zone: ZoneId): SearchUi =
+        SearchUi(query = query, browse = timeline(index, now, zone))
+
     /** Title, show title and file name, case-insensitive; episodes show up as their show. */
-    fun search(index: LibraryIndex, query: String): SearchUi {
+    fun search(
+        index: LibraryIndex,
+        query: String,
+        music: MusicLibraryData = MusicLibraryData(),
+        now: Long = System.currentTimeMillis(),
+        zone: ZoneId = ZoneId.systemDefault(),
+    ): SearchUi {
         val needle = query.trim()
-        if (needle.isEmpty()) return SearchUi(query = query)
+        if (needle.isEmpty()) return browse(query, index, now, zone)
+        val found = MusicSearch.search(music, needle)
+        val songIds = found.songs.map { it.id }
         val entries = ArrayList<Entry>()
         val showKeys = LinkedHashSet<String>()
+        // "comedies under 2 hours", "unwatched 4k": words that name a filter narrow the library.
+        val phrase = SearchPhrase.parse(needle)
         for (video in index.videos) {
-            val matches = video.title.contains(needle, ignoreCase = true) ||
-                video.showTitle?.contains(needle, ignoreCase = true) == true ||
-                video.video.fileName.contains(needle, ignoreCase = true)
+            if (video.id in index.extraIds) continue
+            val matches = if (phrase != null) {
+                phraseMatches(video, phrase)
+            } else {
+                video.title.contains(needle, ignoreCase = true) ||
+                    video.showTitle?.contains(needle, ignoreCase = true) == true ||
+                    video.video.fileName.contains(needle, ignoreCase = true) ||
+                    creditsMatch(video.meta, needle) ||
+                    genreMatch(video.meta, needle)
+            }
             if (!matches) continue
             val showKey = video.showKey
             if (showKey != null) showKeys += showKey else entries += videoEntry(video)
         }
         // A matched show's TMDB name can differ from what its files are called.
-        index.shows.filter { it.title.contains(needle, ignoreCase = true) }.forEach { showKeys += it.key }
+        index.shows.filter { phrase == null }.filter { it.title.contains(needle, ignoreCase = true) || creditsMatch(it.meta, needle) || genreMatch(it.meta, needle) }
+            .forEach { showKeys += it.key }
         showKeys.mapNotNullTo(entries) { key -> index.showsByKey[key]?.let(::showEntry) }
         val ranked = entries.sortedWith(
             compareBy<Entry> { !it.item.title.startsWith(needle, ignoreCase = true) }.then(ENTRY_TITLE_ORDER),
         )
-        return SearchUi(query = query, results = ranked.take(SEARCH_LIMIT).map { it.item })
+        return SearchUi(
+            query = query,
+            results = ranked.take(SEARCH_LIMIT).map { it.item },
+            songs = found.songs.mapIndexed { i, song ->
+                MusicResultUi(
+                    key = "song:${song.id}",
+                    title = song.title,
+                    subtitle = listOfNotNull("Song", song.artist ?: song.albumArtist).joinToString(" · "),
+                    artUri = MusicLibrary.artUri(song),
+                    songIds = songIds,
+                    startIndex = i,
+                )
+            },
+            albums = found.albums.map { album ->
+                MusicResultUi(
+                    key = "album:${album.key}",
+                    title = album.title,
+                    subtitle = "Album · ${album.artist}",
+                    artUri = album.artUri,
+                    songIds = album.songs.map { it.id },
+                )
+            },
+            artists = found.artists.map { artist ->
+                MusicResultUi(
+                    key = "artist:${artist.key}",
+                    title = artist.name,
+                    subtitle = "Artist",
+                    artUri = artist.albums.firstOrNull()?.artUri,
+                    songIds = artist.songs.map { it.id },
+                    round = true,
+                )
+            },
+            lyrics = lyricHits(music, needle, found.songs.mapTo(HashSet()) { it.id }),
+        )
     }
+
+    /** Songs with a lyric line holding [needle] (not already a title hit), the line as subtitle. */
+    private fun lyricHits(music: MusicLibraryData, needle: String, skip: Set<Long>): List<MusicResultUi> {
+        if (needle.length < MIN_LYRICS_QUERY || music.lyrics.isEmpty()) return emptyList()
+        val hits = music.songs.mapNotNull { song ->
+            if (song.id in skip) return@mapNotNull null
+            val line = music.lyrics[song.id]?.firstOrNull { it.contains(needle, ignoreCase = true) } ?: return@mapNotNull null
+            song to line
+        }.take(LYRICS_LIMIT)
+        val ids = hits.map { it.first.id }
+        return hits.mapIndexed { i, (song, line) ->
+            MusicResultUi(
+                key = "lyric:${song.id}",
+                title = song.title,
+                subtitle = listOfNotNull("\u201C$line\u201D", song.artist ?: song.albumArtist).joinToString(" · "),
+                artUri = MusicLibrary.artUri(song),
+                songIds = ids,
+                startIndex = i,
+            )
+        }
+    }
+
+    /** A sung line needs a few letters before matching means anything. */
+    private const val MIN_LYRICS_QUERY = 4
+    private const val LYRICS_LIMIT = 20
+
+    /** Cast or director (creator, for shows) names of a TMDB title contain [needle]. */
+    private fun creditsMatch(meta: MetadataEntity?, needle: String): Boolean {
+        if (meta == null || needle.length < MIN_CREDIT_QUERY) return false
+        return meta.castNames?.contains(needle, ignoreCase = true) == true ||
+            meta.directors?.contains(needle, ignoreCase = true) == true
+    }
+
+    /** Two letters would match half the cast lists; names need three. */
+    private const val MIN_CREDIT_QUERY = 3
 
     // Scan
 
@@ -675,3 +1246,7 @@ object UiMappers {
 /** "1 season", "3 seasons". */
 private fun countLabel(count: Int, singular: String, plural: String = singular + "s"): String =
     "$count ${if (count == 1) singular else plural}"
+
+/** The names of a comma-separated cast or director list ("A, B, C"), trimmed. */
+internal fun creditNames(names: String?): List<String> =
+    names.orEmpty().split(',').map { it.trim() }.filter { it.isNotEmpty() }

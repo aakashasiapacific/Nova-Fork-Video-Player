@@ -159,7 +159,7 @@ private fun PlayerSidePanel(
                         Text(
                             text = title,
                             style = MaterialTheme.typography.titleLarge,
-                            maxLines = 1,
+                            maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f),
                         )
@@ -221,6 +221,7 @@ private fun TrackPanelList(
                         },
                     )
                     SubtitleDelayRow(delayMs = state.subtitleDelayMs, onChange = actions::setSubtitleDelay)
+                    SubtitleSizeRow(sizePercent = state.subtitleSize, onChange = actions::setSubtitleSize)
                 }
                 PlayerPanel.SPEED -> Column {
                     OptionHeader("Speed")

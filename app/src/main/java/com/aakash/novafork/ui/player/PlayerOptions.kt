@@ -16,15 +16,17 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.FilledTonalIconButton
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -38,7 +40,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
 import com.aakash.novafork.data.AspectMode
+import com.aakash.novafork.ui.common.IosTextButton
+import com.aakash.novafork.ui.common.NovaChip
+import com.aakash.novafork.ui.common.NovaIcon
 import com.aakash.novafork.ui.model.TrackUi
+import kotlin.math.roundToInt
 
 // Option rows shared by the phone track sheet and the tablet side panel.
 
@@ -96,14 +102,17 @@ private fun OptionRow(selected: Boolean, label: String, onClick: () -> Unit) {
             .padding(horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        RadioButton(selected = selected, onClick = null)
-        Spacer(Modifier.width(14.dp))
         Text(
             text = label,
             style = MaterialTheme.typography.bodyLarge,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
         )
+        if (selected) {
+            Spacer(Modifier.width(14.dp))
+            NovaIcon(R.drawable.ic_check, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+        }
     }
 }
 
@@ -131,16 +140,22 @@ internal fun AddSubtitleRow(onClick: () -> Unit, modifier: Modifier = Modifier) 
 
 /** "Subtitle delay" with −/+ 100 ms steps; positive shows subtitles later. */
 @Composable
-internal fun SubtitleDelayRow(delayMs: Long, onChange: (Long) -> Unit, modifier: Modifier = Modifier) {
+internal fun SubtitleDelayRow(
+    delayMs: Long,
+    onChange: (Long) -> Unit,
+    modifier: Modifier = Modifier,
+    title: String = "Subtitle delay",
+    what: String = "subtitles",
+) {
     Column(modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-        Text(text = "Subtitle delay", style = MaterialTheme.typography.bodyLarge)
+        Text(text = title, style = MaterialTheme.typography.bodyLarge)
         Row(
             modifier = Modifier.padding(top = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             FilledTonalIconButton(
                 onClick = { onChange(delayMs - SUBTITLE_DELAY_STEP_MS) },
-                modifier = Modifier.semantics { contentDescription = "Show subtitles 100 ms earlier" },
+                modifier = Modifier.semantics { contentDescription = "Play $what 100 ms earlier" },
             ) {
                 Text(text = "−", style = MaterialTheme.typography.titleLarge)
             }
@@ -152,26 +167,81 @@ internal fun SubtitleDelayRow(delayMs: Long, onChange: (Long) -> Unit, modifier:
             )
             FilledTonalIconButton(
                 onClick = { onChange(delayMs + SUBTITLE_DELAY_STEP_MS) },
-                modifier = Modifier.semantics { contentDescription = "Show subtitles 100 ms later" },
+                modifier = Modifier.semantics { contentDescription = "Play $what 100 ms later" },
             ) {
                 Text(text = "+", style = MaterialTheme.typography.titleLarge)
             }
             Spacer(Modifier.width(8.dp))
-            TextButton(onClick = { onChange(0L) }, enabled = delayMs != 0L) { Text("Reset") }
+            IosTextButton(onClick = { onChange(0L) }, enabled = delayMs != 0L) { Text("Reset") }
         }
+    }
+}
+
+/**
+ * "Subtitle size" slider, 50 to 200 percent in steps of 10. The text changes as the slider is
+ * let go (the video is reopened at the same place for it); the value is the app's setting.
+ */
+@Composable
+internal fun SubtitleSizeRow(sizePercent: Int, onChange: (Int) -> Unit, modifier: Modifier = Modifier) {
+    var dragging by remember { mutableStateOf<Float?>(null) }
+    val shown = dragging?.let { (it / 10f).roundToInt() * 10 } ?: sizePercent
+    Column(modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(text = "Subtitle size", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+            Text(
+                text = "$shown%",
+                style = MaterialTheme.typography.titleMedium.merge(TextStyle(fontFeatureSettings = "tnum")),
+            )
+        }
+        Slider(
+            value = dragging ?: sizePercent.toFloat(),
+            onValueChange = { dragging = it },
+            onValueChangeFinished = {
+                dragging?.let { onChange((it / 10f).roundToInt() * 10) }
+                dragging = null
+            },
+            valueRange = 50f..200f,
+            steps = 14,
+            modifier = Modifier.semantics { contentDescription = "Subtitle size" },
+        )
     }
 }
 
 @Composable
 internal fun SpeedChips(rate: Float, onSelect: (Float) -> Unit, modifier: Modifier = Modifier) {
-    ChoiceChips(
-        options = SpeedPresets,
-        isSelected = { isRate(rate, it) },
-        label = { formatRate(it) },
-        onSelect = onSelect,
-        modifier = modifier,
-    )
+    Column(modifier) {
+        ChoiceChips(
+            options = SpeedPresets,
+            isSelected = { isRate(rate, it) },
+            label = { formatRate(it) },
+            onSelect = onSelect,
+        )
+        // A fine slider under the presets: 0.25× to 3×, in steps of 0.05, heard as it moves.
+        Row(
+            Modifier.padding(horizontal = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Slider(
+                value = rate.coerceIn(SPEED_MIN, SPEED_MAX),
+                onValueChange = { onSelect((it / SPEED_STEP).roundToInt() * SPEED_STEP) },
+                valueRange = SPEED_MIN..SPEED_MAX,
+                modifier = Modifier
+                    .weight(1f)
+                    .semantics { contentDescription = "Playback speed" },
+            )
+            Text(
+                text = formatRate(rate),
+                style = MaterialTheme.typography.titleMedium.merge(TextStyle(fontFeatureSettings = "tnum")),
+                textAlign = TextAlign.End,
+                modifier = Modifier.widthIn(min = 56.dp),
+            )
+        }
+    }
 }
+
+private const val SPEED_MIN = 0.25f
+private const val SPEED_MAX = 3f
+private const val SPEED_STEP = 0.05f
 
 @Composable
 internal fun AspectChips(aspect: AspectMode, onSelect: (AspectMode) -> Unit, modifier: Modifier = Modifier) {
@@ -201,21 +271,10 @@ private fun <T> ChoiceChips(
     ) {
         options.forEach { option ->
             val selected = isSelected(option)
-            FilterChip(
+            NovaChip(
                 selected = selected,
                 onClick = { onSelect(option) },
                 label = { Text(label(option)) },
-                leadingIcon = if (selected) {
-                    {
-                        Icon(
-                            painter = painterResource(R.drawable.ic_check),
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp),
-                        )
-                    }
-                } else {
-                    null
-                },
             )
         }
     }

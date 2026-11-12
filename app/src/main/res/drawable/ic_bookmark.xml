@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A bookmark outline, drawn as heavy as the app's other line icons (owner: the thin one did not fit). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="60"
+    android:viewportHeight="60">
+    <group
+        android:translateX="2"
+        android:translateY="2">
+        <path
+            android:strokeColor="#FFFFFFFF"
+            android:strokeWidth="5.2"
+            android:strokeLineJoin="round"
+            android:strokeLineCap="round"
+            android:pathData="M 17.5 5.5 L 38.5 5.5 Q 44.5 5.5 44.5 11.5 L 44.5 48 Q 44.5 51.6 41.6 49.6 L 28 39.6 L 14.4 49.6 Q 11.5 51.6 11.5 48 L 11.5 11.5 Q 11.5 5.5 17.5 5.5 Z" />
+    </group>
+</vector>

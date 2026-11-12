@@ -13,6 +13,7 @@ import android.os.Bundle
 import android.os.IBinder
 import android.os.PowerManager
 import android.util.Log
+import android.view.KeyEvent
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
@@ -20,8 +21,12 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.toAndroidRect
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -31,13 +36,17 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import com.aakash.novafork.NovaApp
 import com.aakash.novafork.ui.adaptive.rememberDeviceLayout
+import com.aakash.novafork.ui.common.HapticsSetting
+import com.aakash.novafork.ui.common.LocalGlassTint
 import com.aakash.novafork.ui.player.PlayerScreen
 import com.aakash.novafork.ui.theme.NovaPlayerTheme
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.videolan.libvlc.util.VLCVideoLayout
 
 /**
@@ -49,6 +58,9 @@ import org.videolan.libvlc.util.VLCVideoLayout
 class PlayerActivity : ComponentActivity(), PlayerController.Host {
 
     private var service: PlaybackService? = null
+
+    /** The last volume key down went to the player's indicator; its key up is swallowed too. */
+    private var volumeKeyHandled = false
     private val connected = MutableStateFlow<PlayerController?>(null)
     private val controller: PlayerController? get() = connected.value
     private var bound = false
@@ -89,6 +101,10 @@ class PlayerActivity : ComponentActivity(), PlayerController.Host {
         volumeControlStream = AudioManager.STREAM_MUSIC
         requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
 
+        // The player fades away as it closes (it is pulled down, or back), instead of sliding.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            overrideActivityTransition(OVERRIDE_TRANSITION_CLOSE, 0, android.R.anim.fade_out)
+        }
         pip = PipController(this) { controller?.togglePlay() }
         pip.register()
         subtitlePicker = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -108,23 +124,34 @@ class PlayerActivity : ComponentActivity(), PlayerController.Host {
         setContent {
             val controller by connected.collectAsStateWithLifecycle()
             val settings by graph.settings.settings.collectAsStateWithLifecycle()
+            // The player's glass is as tinted as Preferences › Appearance › Glass sets the app's.
             NovaPlayerTheme {
-                // Until the service is bound (a moment) the window's black background shows.
-                val current = controller
-                if (current != null) {
-                    val state by current.state.collectAsStateWithLifecycle()
-                    PlayerScreen(
-                        state = state,
-                        actions = current,
-                        layout = rememberDeviceLayout(settings.layoutMode),
-                    ) {
-                        AndroidView(
-                            factory = { context -> VLCVideoLayout(context).also { onVideoLayoutCreated(it) } },
-                            modifier = Modifier.fillMaxSize(),
-                            onRelease = { layout -> onVideoLayoutReleased(layout) },
-                        )
+                CompositionLocalProvider(LocalGlassTint provides settings.glassTint) { HapticsSetting(settings.haptics) {
+                    // Until the service is bound (a moment) the window's black background shows.
+                    val current = controller
+                    if (current != null) {
+                        val state by current.state.collectAsStateWithLifecycle()
+                        PlayerScreen(
+                            state = state,
+                            actions = current,
+                            layout = rememberDeviceLayout(settings.layoutMode),
+                            copyFrame = { onCopied ->
+                                val layout = videoLayout
+                                if (layout == null) onCopied(null) else FrameCapture.copy(layout, onCopied)
+                            },
+                            settings = settings,
+                        ) {
+                            AndroidView(
+                                factory = { context -> VLCVideoLayout(context).also { onVideoLayoutCreated(it) } },
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    // For a smooth shrink into the pop-up window (PipController).
+                                    .onGloballyPositioned { pip.videoBounds = it.boundsInWindow().toAndroidRect() },
+                                onRelease = { layout -> onVideoLayoutReleased(layout) },
+                            )
+                        }
                     }
-                }
+                } }
             }
         }
 
@@ -244,6 +271,21 @@ class PlayerActivity : ComponentActivity(), PlayerController.Host {
         controller.onHostPaused()
     }
 
+    /**
+     * Leaving the app (home, recents) while a video plays: with Settings.pipOnLeave it shrinks into
+     * the pop-up window instead of pausing or playing on as sound. Not while casting, picking a
+     * subtitle file, or when the system has no picture-in-picture.
+     */
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        val current = controller ?: return
+        if (pickingSubtitle || isInPictureInPictureMode || !pip.isSupported) return
+        if (!NovaApp.graph(this).settings.settings.value.pipOnLeave) return
+        if (!current.state.value.isPlaying || current.isCasting) return
+        PlayerDiagnostics.record("picture-in-picture: entered on leaving")
+        pip.enter()
+    }
+
     override fun onStop() {
         super.onStop()
         val playback = service ?: return
@@ -305,17 +347,77 @@ class PlayerActivity : ComponentActivity(), PlayerController.Host {
         if (hasFocus) hideSystemBars()
     }
 
-    override fun onUserLeaveHint() {
-        super.onUserLeaveHint()
-        val current = controller ?: return
-        // Android 12+ enters PiP by itself (auto-enter is on while playing without background audio).
-        if (
-            Build.VERSION.SDK_INT < Build.VERSION_CODES.S && !pickingSubtitle &&
-            current.state.value.isPlaying && !current.continuesInBackground && !current.isCasting
-        ) {
-            pip.enter()
+    /**
+     * The volume keys change the media volume with the player's own iOS-style indicator instead
+     * of the system's panel; in picture-in-picture (or before the player is connected) the
+     * system handles them as usual.
+     */
+    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
+        if (!isInPictureInPictureMode) {
+            if (shortcutsHelp.onKey(keyCode)) return true
+            if (event.unicodeChar == '?'.code || (keyCode == KeyEvent.KEYCODE_SLASH && event.isShiftPressed)) {
+                if (event.repeatCount == 0) shortcutsHelp.toggle()
+                return true
+            }
         }
+        if (isVolumeKey(keyCode) && !isInPictureInPictureMode && controller?.onVolumeKey(keyCode) == true) {
+            volumeKeyHandled = true
+            return true
+        }
+        if (!isInPictureInPictureMode && onPlayerShortcut(keyCode, event)) return true
+        return super.onKeyDown(keyCode, event)
     }
+
+    private val shortcutsHelp by lazy {
+        com.aakash.novafork.ui.common.ShortcutsOverlay(this, "Keyboard shortcuts", com.aakash.novafork.ui.common.ShortcutsOverlay.Player)
+    }
+
+    /**
+     * A keyboard's shortcuts in the player (owner), as YouTube's and VLC's: Space or K plays and
+     * pauses; ← → (or J L) go back and forward 10 s; ↑ ↓ change the volume and M mutes; N and P
+     * play the next and previous; F changes fit or zoom; [ and ] slow down and speed up; 0 to 9
+     * jump to that tenth of the video; , and . step one frame back or on; ? lists them all. A media keyboard's play, next and previous keys work too.
+     */
+    private fun onPlayerShortcut(keyCode: Int, event: KeyEvent): Boolean {
+        val player = controller ?: return false
+        if (event.isCtrlPressed || event.isAltPressed || event.isMetaPressed) return false
+        val state = player.state.value
+        when (keyCode) {
+            KeyEvent.KEYCODE_SPACE, KeyEvent.KEYCODE_K, KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> {
+                if (event.repeatCount == 0) player.togglePlay()
+            }
+            KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_J -> player.seekBy(-KEY_SEEK_MS)
+            KeyEvent.KEYCODE_DPAD_RIGHT, KeyEvent.KEYCODE_L -> player.seekBy(KEY_SEEK_MS)
+            KeyEvent.KEYCODE_DPAD_UP -> player.onVolumeKey(KeyEvent.KEYCODE_VOLUME_UP)
+            KeyEvent.KEYCODE_DPAD_DOWN -> player.onVolumeKey(KeyEvent.KEYCODE_VOLUME_DOWN)
+            KeyEvent.KEYCODE_M -> if (event.repeatCount == 0) player.onVolumeKey(KeyEvent.KEYCODE_VOLUME_MUTE)
+            KeyEvent.KEYCODE_N, KeyEvent.KEYCODE_MEDIA_NEXT -> if (event.repeatCount == 0 && state.hasNext) player.playNext()
+            KeyEvent.KEYCODE_P, KeyEvent.KEYCODE_MEDIA_PREVIOUS -> if (event.repeatCount == 0) player.playPrevious()
+            KeyEvent.KEYCODE_F -> if (event.repeatCount == 0) player.cycleAspect()
+            KeyEvent.KEYCODE_COMMA -> player.stepFrame(forward = false)
+            KeyEvent.KEYCODE_PERIOD -> player.stepFrame(forward = true)
+            KeyEvent.KEYCODE_LEFT_BRACKET -> player.setRate(state.rate - KEY_RATE_STEP)
+            KeyEvent.KEYCODE_RIGHT_BRACKET -> player.setRate(state.rate + KEY_RATE_STEP)
+            in KeyEvent.KEYCODE_0..KeyEvent.KEYCODE_9 -> {
+                if (state.durationMs > 0L) player.seekTo(state.durationMs * (keyCode - KeyEvent.KEYCODE_0) / 10)
+            }
+            else -> return false
+        }
+        return true
+    }
+
+    override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {
+        // The release of a key the player took, so the system doesn't act on it (a click sound, its panel).
+        if (isVolumeKey(keyCode) && volumeKeyHandled) {
+            volumeKeyHandled = false
+            return true
+        }
+        return super.onKeyUp(keyCode, event)
+    }
+
+    private fun isVolumeKey(keyCode: Int): Boolean =
+        keyCode == KeyEvent.KEYCODE_VOLUME_UP || keyCode == KeyEvent.KEYCODE_VOLUME_DOWN ||
+            keyCode == KeyEvent.KEYCODE_VOLUME_MUTE
 
     override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: Configuration) {
         super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
@@ -332,6 +434,20 @@ class PlayerActivity : ComponentActivity(), PlayerController.Host {
 
     override fun enterPictureInPicture() {
         pip.enter()
+    }
+
+    override fun captureFrame(onDone: (Boolean) -> Unit) {
+        val layout = videoLayout ?: return onDone(false)
+        FrameCapture.copy(layout) { bitmap ->
+            if (bitmap == null) {
+                onDone(false)
+            } else {
+                lifecycleScope.launch {
+                    val saved = withContext(Dispatchers.IO) { FrameCapture.save(applicationContext, bitmap, controller?.state?.value?.title) }
+                    onDone(saved)
+                }
+            }
+        }
     }
 
     override fun launchSubtitlePicker(): Boolean {
@@ -397,7 +513,9 @@ class PlayerActivity : ComponentActivity(), PlayerController.Host {
         pip.update(
             playing = playing,
             videoSize = current.videoSize.value,
-            autoEnter = playing && !current.continuesInBackground && !current.isCasting,
+            // Leaving the player pauses (or plays on in the background when that is wanted); it
+            // never turns into a picture-in-picture window by itself: the PiP button does that.
+            autoEnter = false,
         )
     }
 
@@ -435,3 +553,7 @@ class PlayerActivity : ComponentActivity(), PlayerController.Host {
         const val KEY_VIDEO_ID = "player_video_id"
     }
 }
+
+/** A keyboard's ← and →, and the speed [ and ] change by. */
+private const val KEY_SEEK_MS = 10_000L
+private const val KEY_RATE_STEP = 0.25f

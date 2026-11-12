@@ -1,5 +1,12 @@
 package com.aakash.novafork.ui.tablet
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -11,6 +18,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -18,25 +26,41 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.FilterChip
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
 import com.aakash.novafork.ui.adaptive.DeviceLayout
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
+import com.aakash.novafork.data.DetailsHeaderStyle
+import com.aakash.novafork.ui.common.IosFilledTonalButton
+import com.aakash.novafork.ui.common.LocalDetailsHeaderStyle
+import com.aakash.novafork.ui.common.CastRow
+import com.aakash.novafork.ui.common.GlassCircle
+import com.aakash.novafork.ui.common.GreyCaption
+import com.aakash.novafork.ui.common.NovaMenuDivider
+import com.aakash.novafork.ui.common.RenameInLibraryMenuItems
+import com.aakash.novafork.ui.common.RenameTitleDialog
+import com.aakash.novafork.ui.common.TrailerPill
+import com.aakash.novafork.ui.common.MetaBadges
+import com.aakash.novafork.ui.common.NovaChip
+import com.aakash.novafork.ui.common.NovaDropdownMenu
+import com.aakash.novafork.ui.common.NovaIcon
+import com.aakash.novafork.ui.common.NovaMenuItem
+import com.aakash.novafork.ui.common.EpisodeView
 import com.aakash.novafork.ui.common.RatingPill
 import com.aakash.novafork.ui.common.VideoMenuBox
 import com.aakash.novafork.ui.common.metaLine
@@ -45,6 +69,138 @@ import com.aakash.novafork.ui.model.SeasonUi
 import com.aakash.novafork.ui.model.ShowDetailsUi
 
 private val EpisodeCellMin = 280.dp
+private const val SideBySideMinWidthDp = 720
+private val InfoColumnWidth = 380.dp
+private val SideBySidePosterWidth = 180.dp
+
+/**
+ * The show page on a wide screen: a left column with the poster, info, Play and the season list
+ * (scrolls on its own), and the selected season's episodes on the right.
+ */
+@Composable
+private fun ShowSideBySide(
+    details: ShowDetailsUi,
+    season: SeasonUi?,
+    nextUpId: Long?,
+    playId: Long?,
+    onSelectSeason: (Int) -> Unit,
+    actions: AppActions,
+    modifier: Modifier = Modifier,
+) {
+    val dims = LocalNovaDimens.current
+    val seasons = details.seasons
+    Box(modifier.fillMaxSize()) {
+        TabletDetailsBackdrop(details.artwork)
+        Row(Modifier.fillMaxSize()) {
+            Column(
+                Modifier
+                    .width(InfoColumnWidth + dims.gutter)
+                    .fillMaxHeight()
+                    .verticalScroll(rememberScrollState())
+                    .padding(
+                        start = dims.gutter,
+                        top = statusBarTop() + 12.dp,
+                        bottom = navigationBarBottom() + dims.sectionSpacing,
+                    ),
+            ) {
+                TabletBackButton(onClick = actions::back)
+                Spacer(Modifier.height(20.dp))
+                TabletDetailsPoster(details.artwork, details.title, SideBySidePosterWidth)
+                Spacer(Modifier.height(20.dp))
+                ShowHeadline(details)
+                if (playId != null) {
+                    Spacer(Modifier.height(20.dp))
+                    ShowPlay(details) { actions.play(playId) }
+                }
+                Spacer(Modifier.height(20.dp))
+                ShowText(details)
+                if (seasons.size > 1) {
+                    Spacer(Modifier.height(28.dp))
+                    Text("Seasons", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.height(8.dp))
+                    seasons.forEach { item ->
+                        SeasonListRow(item, selected = item.number == season?.number, onClick = { onSelectSeason(item.number) })
+                    }
+                }
+            }
+            LazyVerticalGrid(
+                columns = GridCells.Adaptive(EpisodeCellMin),
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight(),
+                contentPadding = PaddingValues(
+                    start = 24.dp,
+                    end = dims.gutter,
+                    top = statusBarTop() + 12.dp,
+                    bottom = navigationBarBottom() + dims.sectionSpacing,
+                ),
+                horizontalArrangement = Arrangement.spacedBy(20.dp),
+                verticalArrangement = Arrangement.spacedBy(24.dp),
+            ) {
+                if (season != null) {
+                    item(key = "seasonTitle", span = { GridItemSpan(maxLineSpan) }, contentType = "seasons") {
+                        Text(season.title, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(top = 8.dp))
+                    }
+                    if (season.episodes.isNotEmpty()) {
+                        item(key = "playSeason", span = { GridItemSpan(maxLineSpan) }, contentType = "playSeason") {
+                            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                IosFilledTonalButton(onClick = { actions.playSeason(details.key, season.number) }) {
+                                    ButtonLabel(R.drawable.ic_play_arrow, if (seasons.size > 1) "Play ${season.title}" else "Play All")
+                                }
+                                IosFilledTonalButton(onClick = { actions.playSeason(details.key, season.number, shuffle = true) }) {
+                                    ButtonLabel(R.drawable.ic_shuffle, "Shuffle")
+                                }
+                            }
+                        }
+                    }
+                    items(EpisodeView.arrange(season.episodes) { it.watched }, key = { "${it.season}:${it.episode}:${it.videoId}" }, contentType = { "episode" }) { episode ->
+                        VideoMenuBox(
+                            videoId = episode.videoId,
+                            title = metaLine(details.title, episode.code, episode.title),
+                            actions = actions,
+                        ) { openMenu ->
+                            TabletEpisodeCard(
+                                episode = episode,
+                                onClick = { actions.play(episode.videoId) },
+                                onLongClick = openMenu,
+                                isNextUp = episode.videoId == nextUpId,
+                            )
+                        }
+                    }
+                } else {
+                    item(key = "noEpisodes", span = { GridItemSpan(maxLineSpan) }, contentType = "empty") {
+                        Text(
+                            text = "No episodes found for this show.",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SeasonListRow(season: SeasonUi, selected: Boolean, onClick: () -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(vertical = 2.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(if (selected) Color.White.copy(alpha = 0.14f) else Color.Transparent)
+            .clickable(onClickLabel = "Show ${season.title}", onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(season.title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(
+            text = season.episodes.size.toString(),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
 
 /**
  * TV show page: full-screen artwork behind a heavy scrim, a header with poster, info and Play
@@ -65,6 +221,28 @@ internal fun TabletShowDetailsScreen(
     val season = seasons.firstOrNull { it.number == selectedSeason } ?: seasons.firstOrNull()
     val nextUpId = details.nextUp?.videoId
     val playId = nextUpId ?: seasons.firstOrNull()?.episodes?.firstOrNull()?.videoId
+
+    var renamingTitle by remember { mutableStateOf(false) }
+    if (renamingTitle) {
+        RenameTitleDialog(
+            title = details.title,
+            onRename = { actions.setTitleOverride(details.titleKey, it) },
+            onDismiss = { renamingTitle = false },
+        )
+    }
+    // Wide screens (tablets in landscape): info and seasons on the left, the season's episodes beside them.
+    if (layout.isTablet && LocalConfiguration.current.screenWidthDp >= SideBySideMinWidthDp) {
+        ShowSideBySide(
+            details = details,
+            season = season,
+            nextUpId = nextUpId,
+            playId = playId,
+            onSelectSeason = { selectedSeason = it },
+            actions = actions,
+            modifier = modifier,
+        )
+        return
+    }
 
     Box(modifier.fillMaxSize()) {
         TabletDetailsBackdrop(details.artwork)
@@ -92,6 +270,40 @@ internal fun TabletShowDetailsScreen(
                     },
                 )
             }
+            val allEpisodes = seasons.flatMap { it.episodes }
+            if (details.trailerUrl != null || allEpisodes.isNotEmpty()) {
+                item(key = "showActions", span = { GridItemSpan(maxLineSpan) }, contentType = "showActions") {
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        details.trailerUrl?.let { TrailerPill(it, onOpen = actions::openWebPage) }
+                        var menuOpen by remember { mutableStateOf(false) }
+                        Box {
+                            TrailerlessMoreButton { menuOpen = true }
+                            NovaDropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                                val showWatched = allEpisodes.isNotEmpty() && allEpisodes.all { it.watched }
+                                NovaMenuItem(
+                                    text = { Text(if (showWatched) "Mark Show Unwatched" else "Mark Show Watched") },
+                                    onClick = {
+                                        menuOpen = false
+                                        allEpisodes.forEach { actions.setWatched(it.videoId, !showWatched) }
+                                    },
+                                )
+                                RenameInLibraryMenuItems(
+                                    titleKey = details.titleKey,
+                                    customised = details.titleCustomised,
+                                    close = { menuOpen = false },
+                                    onRename = { renamingTitle = true },
+                                    onReset = { actions.setTitleOverride(details.titleKey, null) },
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+            if (details.cast.isNotEmpty()) {
+                item(key = "cast", span = { GridItemSpan(maxLineSpan) }, contentType = "cast") {
+                    CastRow(details.cast, onPerson = actions::openPerson, gutter = 0.dp)
+                }
+            }
             if (season != null) {
                 item(key = "seasons", span = { GridItemSpan(maxLineSpan) }, contentType = "seasons") {
                     SeasonSelector(
@@ -99,21 +311,22 @@ internal fun TabletShowDetailsScreen(
                         selected = season.number,
                         onSelect = { selectedSeason = it },
                         modifier = Modifier.padding(top = 8.dp),
+                        onMarkSeason = { watched -> season.episodes.forEach { actions.setWatched(it.videoId, watched) } },
                     )
                 }
                 if (season.episodes.isNotEmpty()) {
                     item(key = "playSeason", span = { GridItemSpan(maxLineSpan) }, contentType = "playSeason") {
                         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            FilledTonalButton(onClick = { actions.playSeason(details.key, season.number) }) {
-                                ButtonLabel(R.drawable.ic_play_arrow, if (seasons.size > 1) "Play ${season.title}" else "Play all")
+                            IosFilledTonalButton(onClick = { actions.playSeason(details.key, season.number) }) {
+                                ButtonLabel(R.drawable.ic_play_arrow, if (seasons.size > 1) "Play ${season.title}" else "Play All")
                             }
-                            OutlinedButton(onClick = { actions.playSeason(details.key, season.number, shuffle = true) }) {
+                            IosFilledTonalButton(onClick = { actions.playSeason(details.key, season.number, shuffle = true) }) {
                                 ButtonLabel(R.drawable.ic_shuffle, "Shuffle")
                             }
                         }
                     }
                 }
-                items(season.episodes, key = { "${it.season}:${it.episode}:${it.videoId}" }, contentType = { "episode" }) { episode ->
+                items(EpisodeView.arrange(season.episodes) { it.watched }, key = { "${it.season}:${it.episode}:${it.videoId}" }, contentType = { "episode" }) { episode ->
                     VideoMenuBox(
                         videoId = episode.videoId,
                         title = metaLine(details.title, episode.code, episode.title),
@@ -148,12 +361,14 @@ private fun ShowHeader(
     onPlay: (() -> Unit)?,
 ) {
     val dims = LocalNovaDimens.current
+    // Backdrop (Preferences › Appearance › Title page header): no poster beside the title.
+    val withPoster = LocalDetailsHeaderStyle.current == DetailsHeaderStyle.POSTER_AND_BACKDROP
     Column {
         TabletBackButton(onClick = onBack)
-        Spacer(Modifier.height(20.dp))
+        Spacer(Modifier.height(if (withPoster) 20.dp else 96.dp))
         if (layout.isExpanded) {
             Row(horizontalArrangement = Arrangement.spacedBy(40.dp)) {
-                TabletDetailsPoster(details.artwork, details.title, dims.detailPosterWidth)
+                if (withPoster) TabletDetailsPoster(details.artwork, details.title, dims.detailPosterWidth)
                 Column(
                     Modifier
                         .weight(1f, fill = false)
@@ -168,8 +383,10 @@ private fun ShowHeader(
             }
         } else {
             Row(verticalAlignment = Alignment.Bottom) {
-                TabletDetailsPoster(details.artwork, details.title, CompactDetailPosterWidth)
-                Spacer(Modifier.width(28.dp))
+                if (withPoster) {
+                    TabletDetailsPoster(details.artwork, details.title, CompactDetailPosterWidth)
+                    Spacer(Modifier.width(28.dp))
+                }
                 Column(Modifier.weight(1f)) {
                     ShowHeadline(details)
                     Spacer(Modifier.height(20.dp))
@@ -197,12 +414,14 @@ private fun ShowHeadline(details: ShowDetailsUi) {
             if (details.seasons.isNotEmpty()) countLabel(details.seasons.size, "season") else null,
             if (episodeCount > 0) countLabel(episodeCount, "episode") else null,
         )
-        if (meta.isNotEmpty() || (details.rating ?: 0f) > 0f) {
+        val badges = listOfNotNull(details.ageRating)
+        if (meta.isNotEmpty() || badges.isNotEmpty() || (details.rating ?: 0f) > 0f) {
             Spacer(Modifier.height(12.dp))
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 if (meta.isNotEmpty()) {
                     Text(meta, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
+                MetaBadges(badges)
                 RatingPill(details.rating)
             }
         }
@@ -214,6 +433,11 @@ private fun ShowHeadline(details: ShowDetailsUi) {
             ) {
                 details.genres.forEach { TabletTag(it) }
             }
+        }
+        val next = details.nextEpisodeLabel
+        if (!next.isNullOrBlank()) {
+            Spacer(Modifier.height(12.dp))
+            Text(next, style = MaterialTheme.typography.bodyLarge)
         }
     }
 }
@@ -237,12 +461,11 @@ private fun ShowText(details: ShowDetailsUi) {
             Text(
                 text = details.tagline,
                 style = MaterialTheme.typography.titleMedium,
-                fontStyle = FontStyle.Italic,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
         if (!details.overview.isNullOrBlank()) {
-            Text(details.overview, style = MaterialTheme.typography.bodyLarge)
+            Text(details.overview, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.widthIn(max = ReadableWidth))
         }
     }
 }
@@ -253,31 +476,88 @@ private fun SeasonSelector(
     selected: Int,
     onSelect: (Int) -> Unit,
     modifier: Modifier = Modifier,
+    onMarkSeason: (watched: Boolean) -> Unit = {},
 ) {
+    val current = seasons.firstOrNull { it.number == selected } ?: seasons.first()
     if (seasons.size == 1) {
-        Text(seasons.first().title, style = MaterialTheme.typography.titleLarge, modifier = modifier)
+        Column(modifier) {
+            Text(current.title, style = MaterialTheme.typography.titleLarge)
+            GreyCaption(current.summaryCaption)
+        }
         return
     }
-    Row(
-        modifier.horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        seasons.forEach { season ->
-            FilterChip(
-                selected = season.number == selected,
-                onClick = { onSelect(season.number) },
-                label = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(season.title, style = MaterialTheme.typography.labelLarge)
-                        Spacer(Modifier.width(6.dp))
-                        Text(
-                            text = season.episodes.size.toString(),
-                            style = MaterialTheme.typography.labelLarge,
-                            color = LocalContentColor.current.copy(alpha = 0.65f),
-                        )
-                    }
-                },
+    // Apple TV's season picker: "Season 2 ⌄" opening a menu of the seasons.
+    var open by remember { mutableStateOf(false) }
+    Column(modifier) {
+    Box {
+        Row(
+            Modifier
+                .clip(RoundedCornerShape(8.dp))
+                .clickable(onClickLabel = "Choose a season") { open = true }
+                .padding(vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(seasons.firstOrNull { it.number == selected }?.title ?: seasons.first().title, style = MaterialTheme.typography.titleLarge)
+            NovaIcon(
+                R.drawable.ic_expand_more,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = 6.dp).size(20.dp),
             )
         }
+        NovaDropdownMenu(expanded = open, onDismissRequest = { open = false }, title = "Seasons") {
+            seasons.forEach { season ->
+                NovaMenuItem(
+                    text = { Text("${season.title} · ${season.episodes.size}") },
+                    checked = season.number == selected,
+                    onClick = {
+                        open = false
+                        onSelect(season.number)
+                    },
+                )
+            }
+            if (current.episodes.isNotEmpty()) {
+                NovaMenuDivider()
+                val viewContext = androidx.compose.ui.platform.LocalContext.current
+                NovaMenuItem(
+                    text = { Text("Hide Watched Episodes") },
+                    checked = EpisodeView.hideWatched,
+                    onClick = {
+                        open = false
+                        EpisodeView.setHideWatched(viewContext, !EpisodeView.hideWatched)
+                    },
+                )
+                NovaMenuItem(
+                    text = { Text("Newest First") },
+                    checked = EpisodeView.newestFirst,
+                    onClick = {
+                        open = false
+                        EpisodeView.setNewestFirst(viewContext, !EpisodeView.newestFirst)
+                    },
+                )
+                NovaMenuDivider()
+                val allWatched = current.episodes.all { it.watched }
+                NovaMenuItem(
+                    text = { Text(if (allWatched) "Mark Season Unwatched" else "Mark Season Watched") },
+                    onClick = {
+                        open = false
+                        onMarkSeason(!allWatched)
+                    },
+                )
+            }
+        }
+    }
+    GreyCaption(current.summaryCaption)
     }
 }
+
+/** The round "…" of a tablet show page, opening its menu. */
+@Composable
+private fun TrailerlessMoreButton(onClick: () -> Unit) {
+    GlassCircle(onClick = onClick, description = "More options", size = 48.dp) {
+        NovaIcon(R.drawable.ic_more_vert, contentDescription = null, tint = androidx.compose.ui.graphics.Color.White)
+    }
+}
+
+/** Overview text stays at a readable line length (about 70 characters) on a wide screen. */
+private val ReadableWidth = 640.dp

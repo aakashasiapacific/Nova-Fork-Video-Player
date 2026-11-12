@@ -7,6 +7,9 @@ import android.os.Bundle
 import coil.ImageLoader
 import coil.ImageLoaderFactory
 import com.aakash.novafork.ui.MainActivity
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 
 class NovaApp : Application(), ImageLoaderFactory {
     lateinit var graph: AppGraph
@@ -16,8 +19,16 @@ class NovaApp : Application(), ImageLoaderFactory {
         // First, so a crash anywhere below still leaves a report for the next start.
         CrashReporter.install(this)
         super.onCreate()
+        com.aakash.novafork.player.MediaSource.loadPerVideoDecoding(this)
         graph = AppGraph(this)
         registerActivityLifecycleCallbacks(MainScreenLaunches())
+        // Preferences › Sources › Scan schedule: keeps the background scan in step with the setting.
+        graph.appScope.launch {
+            graph.settings.settings
+                .map { it.scanEveryHours }
+                .distinctUntilChanged()
+                .collect { hours -> com.aakash.novafork.data.ScanSchedule.apply(this@NovaApp, hours) }
+        }
     }
 
     /** Opening the main screen is an app launch for the library (see AppGraph.onMainScreenCreated). */

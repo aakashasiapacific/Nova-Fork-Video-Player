@@ -19,7 +19,13 @@ import kotlin.math.abs
  * shade, Bluetooth and wired headset buttons, car head units. Their commands go to [Controls];
  * [update] keeps what they show in step with the player. Main thread only.
  */
-internal class PlaybackSession(context: Context, sessionActivity: PendingIntent, private val controls: Controls) {
+internal class PlaybackSession(
+    context: Context,
+    sessionActivity: PendingIntent,
+    private val controls: Controls,
+    /** Back/forward 10 s buttons; music has previous and next instead. */
+    private val seekButtons: Boolean = true,
+) {
 
     /** What the media controls can ask for. */
     interface Controls {
@@ -155,7 +161,7 @@ internal class PlaybackSession(context: Context, sessionActivity: PendingIntent,
         if (hasContent) {
             // Android 13+ builds its media controls from these: they fill the previous/next
             // slots when there is no previous/next item, then the extra ones.
-            if (state.seekable) {
+            if (state.seekable && seekButtons) {
                 builder.addCustomAction(customAction(CUSTOM_REWIND, "Back 10 seconds", R.drawable.ic_replay_10))
                 builder.addCustomAction(customAction(CUSTOM_FORWARD, "Forward 10 seconds", R.drawable.ic_forward_10))
             }

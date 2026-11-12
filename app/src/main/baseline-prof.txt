@@ -1,0 +1,10 @@
+# Baseline profile (hand-written): the app's own start-up path is compiled ahead of time at
+# install, so the first launch does not interpret it. Wildcards are expanded by the build.
+HSPLcom/aakash/novafork/ui/**;->**(**)**
+HSPLcom/aakash/novafork/data/**;->**(**)**
+HSPLcom/aakash/novafork/AppGraph;->**(**)**
+HSPLcom/aakash/novafork/NovaApp;->**(**)**
+Lcom/aakash/novafork/ui/**;
+Lcom/aakash/novafork/data/**;
+Lcom/aakash/novafork/AppGraph;
+Lcom/aakash/novafork/NovaApp;

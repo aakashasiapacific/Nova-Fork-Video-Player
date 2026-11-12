@@ -73,6 +73,48 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
             putString(KEY_OPENSUBTITLES_PASSWORD, s.opensubtitlesPassword)
             putString(KEY_SUBTITLE_LANGUAGES, s.subtitleLanguages)
             putBoolean(KEY_AUTO_DOWNLOAD_SUBTITLES, s.autoDownloadSubtitles)
+            putBoolean(KEY_FETCH_MISSING_SUBTITLES, s.fetchMissingSubtitles)
+            putFloat(KEY_GLASS_TINT, s.glassTint)
+            putInt(KEY_CROSSFADE_SECONDS, s.crossfadeSeconds)
+            putBoolean(KEY_MUSIC_AUTOPLAY, s.musicAutoplay)
+            putBoolean(KEY_AUTOPLAY_ALBUMS, s.autoplayAlbums)
+            putBoolean(KEY_SOUND_CHECK, s.soundCheck)
+            putString(KEY_EQUALIZER_PRESET, s.equalizerPreset)
+            putString(KEY_EQUALIZER_BANDS, s.equalizerBands)
+            putBoolean(KEY_NIGHT_MODE, s.nightMode)
+            putInt(KEY_SUBTITLE_SIZE, s.subtitleSize)
+            putBoolean(KEY_SUBTITLE_BACKGROUND, s.subtitleBackground)
+            putInt(KEY_SUBTITLE_COLOR, s.subtitleColor)
+            putBoolean(KEY_SUBTITLE_BOLD, s.subtitleBold)
+            putBoolean(KEY_CAPTIONS_WHEN_MUTED, s.captionsWhenMuted)
+            putString(KEY_WAKE_ON_LAN_MAC, s.wakeOnLanMac)
+            putInt(KEY_SCAN_EVERY_HOURS, s.scanEveryHours)
+            putBoolean(KEY_NEW_EPISODE_ALERTS, s.newEpisodeAlerts)
+            putBoolean(KEY_SHOW_STREAM_STATS, s.showStreamStats)
+            putInt(KEY_NETWORK_BUFFER_MS, s.networkBufferMs)
+            putInt(KEY_SUBTITLE_MARGIN, s.subtitleMargin)
+            putBoolean(KEY_HAPTICS, s.haptics)
+            putBoolean(KEY_PIP_ON_LEAVE, s.pipOnLeave)
+            putBoolean(KEY_REQUIRE_FINGERPRINT, s.requireFingerprint)
+            putString(KEY_HERO_STYLE, s.heroStyle.name)
+            putString(KEY_LIBRARY_LAYOUT, s.libraryLayout.name)
+            putString(KEY_POSTER_COLUMNS, s.posterColumns.name)
+            putString(KEY_DETAILS_HEADER_STYLE, s.detailsHeaderStyle.name)
+            putString(KEY_SUBTITLE_FONT, s.subtitleFont)
+            putInt(KEY_SUBTITLE_OUTLINE, s.subtitleOutline)
+            putBoolean(KEY_FORCED_SUBTITLES_ONLY, s.forcedSubtitlesOnly)
+            putInt(KEY_DEINTERLACE, s.deinterlace)
+            putInt(KEY_DOUBLE_TAP_ZONE, s.doubleTapZonePercent)
+            putString(KEY_HIDDEN_PLAYER_BUTTONS, s.hiddenPlayerButtons)
+            putString(KEY_HOME_ROW_ORDER, s.homeRowOrder)
+            putString(KEY_HOME_HIDDEN_ROWS, s.homeHiddenRows)
+            putBoolean(KEY_ONLINE_LYRICS, s.onlineLyrics)
+            putBoolean(KEY_ONLINE_MUSIC_ART, s.onlineMusicArt)
+            putString(KEY_START_TAB, s.startTab)
+            putBoolean(KEY_SPOILER_SAFE, s.spoilerSafe)
+            putBoolean(KEY_RESUME_ON_HEADPHONES, s.resumeOnHeadphones)
+            putString(KEY_HIDDEN_FOLDERS, s.hiddenFolders)
+            putBoolean(KEY_SOURCE_DOTS, s.sourceDots)
         }
     }
 
@@ -97,12 +139,59 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
         const val KEY_PREFERRED_SUBTITLE_LANGUAGE = "preferred_subtitle_language"
         const val KEY_SEEK_STEP_SECONDS = "seek_step_seconds"
         const val KEY_AUTO_PLAY_NEXT = "auto_play_next"
-        const val KEY_BACKGROUND_AUDIO = "background_audio"
+        /**
+         * "background_audio" until it became off by default: a new key, so the old stored "on"
+         * doesn't carry over and every install starts with it off.
+         */
+        const val KEY_BACKGROUND_AUDIO = "background_play_video"
         const val KEY_OPENSUBTITLES_API_KEY = "opensubtitles_api_key"
         const val KEY_OPENSUBTITLES_USERNAME = "opensubtitles_username"
         const val KEY_OPENSUBTITLES_PASSWORD = "opensubtitles_password"
         const val KEY_SUBTITLE_LANGUAGES = "subtitle_languages"
         const val KEY_AUTO_DOWNLOAD_SUBTITLES = "auto_download_subtitles"
+        const val KEY_FETCH_MISSING_SUBTITLES = "fetch_missing_subtitles"
+        /** "_v2": the default moved to Tinted (owner), so a value saved under the old default is dropped. */
+        const val KEY_GLASS_TINT = "glass_tint_v2"
+        const val KEY_CROSSFADE_SECONDS = "crossfade_seconds"
+        const val KEY_MUSIC_AUTOPLAY = "music_autoplay"
+        const val KEY_AUTOPLAY_ALBUMS = "autoplay_albums"
+        const val KEY_SOUND_CHECK = "sound_check"
+        const val KEY_EQUALIZER_PRESET = "equalizer_preset"
+        const val KEY_EQUALIZER_BANDS = "equalizer_bands"
+        const val KEY_NIGHT_MODE = "night_mode"
+        const val KEY_SUBTITLE_SIZE = "subtitle_size"
+        const val KEY_SUBTITLE_BACKGROUND = "subtitle_background"
+        const val KEY_SUBTITLE_COLOR = "subtitle_color"
+        const val KEY_SUBTITLE_BOLD = "subtitle_bold"
+        const val KEY_CAPTIONS_WHEN_MUTED = "captions_when_muted"
+        const val KEY_WAKE_ON_LAN_MAC = "wake_on_lan_mac"
+        const val KEY_SCAN_EVERY_HOURS = "scan_every_hours"
+        const val KEY_NEW_EPISODE_ALERTS = "new_episode_alerts"
+        const val KEY_SHOW_STREAM_STATS = "show_stream_stats"
+        const val KEY_NETWORK_BUFFER_MS = "network_buffer_ms"
+        const val KEY_SUBTITLE_MARGIN = "subtitle_margin"
+        const val KEY_HAPTICS = "haptics"
+        const val KEY_PIP_ON_LEAVE = "pip_on_leave"
+        const val KEY_REQUIRE_FINGERPRINT = "require_fingerprint"
+        const val KEY_HERO_STYLE = "hero_style"
+        const val KEY_LIBRARY_LAYOUT = "library_layout"
+        const val KEY_POSTER_COLUMNS = "poster_columns"
+        const val KEY_DETAILS_HEADER_STYLE = "details_header_style"
+        const val KEY_SUBTITLE_FONT = "subtitle_font"
+        const val KEY_SUBTITLE_OUTLINE = "subtitle_outline"
+        const val KEY_FORCED_SUBTITLES_ONLY = "forced_subtitles_only"
+        const val KEY_DEINTERLACE = "deinterlace"
+        const val KEY_DOUBLE_TAP_ZONE = "double_tap_zone"
+        const val KEY_HIDDEN_PLAYER_BUTTONS = "hidden_player_buttons"
+        const val KEY_HOME_ROW_ORDER = "home_row_order"
+        const val KEY_HOME_HIDDEN_ROWS = "home_hidden_rows"
+        const val KEY_ONLINE_LYRICS = "online_lyrics"
+        const val KEY_ONLINE_MUSIC_ART = "online_music_art"
+        const val KEY_START_TAB = "start_tab"
+        const val KEY_SPOILER_SAFE = "spoiler_safe"
+        const val KEY_RESUME_ON_HEADPHONES = "resume_on_headphones"
+        const val KEY_HIDDEN_FOLDERS = "hidden_folders"
+        const val KEY_SOURCE_DOTS = "source_dots"
 
         /**
          * The type [write] stores each key with. A restored backup's entry of another type is
@@ -133,6 +222,48 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
             KEY_OPENSUBTITLES_PASSWORD to SettingType.STRING,
             KEY_SUBTITLE_LANGUAGES to SettingType.STRING,
             KEY_AUTO_DOWNLOAD_SUBTITLES to SettingType.BOOLEAN,
+            KEY_FETCH_MISSING_SUBTITLES to SettingType.BOOLEAN,
+            KEY_GLASS_TINT to SettingType.FLOAT,
+            KEY_CROSSFADE_SECONDS to SettingType.INT,
+            KEY_MUSIC_AUTOPLAY to SettingType.BOOLEAN,
+            KEY_AUTOPLAY_ALBUMS to SettingType.BOOLEAN,
+            KEY_SOUND_CHECK to SettingType.BOOLEAN,
+            KEY_EQUALIZER_PRESET to SettingType.STRING,
+            KEY_EQUALIZER_BANDS to SettingType.STRING,
+            KEY_NIGHT_MODE to SettingType.BOOLEAN,
+            KEY_SUBTITLE_SIZE to SettingType.INT,
+            KEY_SUBTITLE_BACKGROUND to SettingType.BOOLEAN,
+            KEY_SUBTITLE_COLOR to SettingType.INT,
+            KEY_SUBTITLE_BOLD to SettingType.BOOLEAN,
+            KEY_CAPTIONS_WHEN_MUTED to SettingType.BOOLEAN,
+            KEY_WAKE_ON_LAN_MAC to SettingType.STRING,
+            KEY_SCAN_EVERY_HOURS to SettingType.INT,
+            KEY_NEW_EPISODE_ALERTS to SettingType.BOOLEAN,
+            KEY_SHOW_STREAM_STATS to SettingType.BOOLEAN,
+            KEY_NETWORK_BUFFER_MS to SettingType.INT,
+            KEY_SUBTITLE_MARGIN to SettingType.INT,
+            KEY_HAPTICS to SettingType.BOOLEAN,
+            KEY_PIP_ON_LEAVE to SettingType.BOOLEAN,
+            KEY_REQUIRE_FINGERPRINT to SettingType.BOOLEAN,
+            KEY_HERO_STYLE to SettingType.STRING,
+            KEY_LIBRARY_LAYOUT to SettingType.STRING,
+            KEY_POSTER_COLUMNS to SettingType.STRING,
+            KEY_DETAILS_HEADER_STYLE to SettingType.STRING,
+            KEY_SUBTITLE_FONT to SettingType.STRING,
+            KEY_SUBTITLE_OUTLINE to SettingType.INT,
+            KEY_FORCED_SUBTITLES_ONLY to SettingType.BOOLEAN,
+            KEY_DEINTERLACE to SettingType.INT,
+            KEY_DOUBLE_TAP_ZONE to SettingType.INT,
+            KEY_HIDDEN_PLAYER_BUTTONS to SettingType.STRING,
+            KEY_HOME_ROW_ORDER to SettingType.STRING,
+            KEY_HOME_HIDDEN_ROWS to SettingType.STRING,
+            KEY_ONLINE_LYRICS to SettingType.BOOLEAN,
+            KEY_ONLINE_MUSIC_ART to SettingType.BOOLEAN,
+            KEY_START_TAB to SettingType.STRING,
+            KEY_SPOILER_SAFE to SettingType.BOOLEAN,
+            KEY_RESUME_ON_HEADPHONES to SettingType.BOOLEAN,
+            KEY_HIDDEN_FOLDERS to SettingType.STRING,
+            KEY_SOURCE_DOTS to SettingType.BOOLEAN,
         )
 
         /**
@@ -181,6 +312,48 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
                 opensubtitlesPassword = prefs.string(KEY_OPENSUBTITLES_PASSWORD) ?: defaults.opensubtitlesPassword,
                 subtitleLanguages = prefs.string(KEY_SUBTITLE_LANGUAGES) ?: defaults.subtitleLanguages,
                 autoDownloadSubtitles = prefs.boolean(KEY_AUTO_DOWNLOAD_SUBTITLES, defaults.autoDownloadSubtitles),
+                fetchMissingSubtitles = prefs.boolean(KEY_FETCH_MISSING_SUBTITLES, defaults.fetchMissingSubtitles),
+                glassTint = prefs.float(KEY_GLASS_TINT, defaults.glassTint).coerceIn(0f, 1f),
+                crossfadeSeconds = prefs.int(KEY_CROSSFADE_SECONDS, defaults.crossfadeSeconds).coerceIn(0, 8),
+                musicAutoplay = prefs.boolean(KEY_MUSIC_AUTOPLAY, defaults.musicAutoplay),
+                autoplayAlbums = prefs.boolean(KEY_AUTOPLAY_ALBUMS, defaults.autoplayAlbums),
+                soundCheck = prefs.boolean(KEY_SOUND_CHECK, defaults.soundCheck),
+                equalizerPreset = prefs.string(KEY_EQUALIZER_PRESET) ?: defaults.equalizerPreset,
+                equalizerBands = prefs.string(KEY_EQUALIZER_BANDS) ?: defaults.equalizerBands,
+                nightMode = prefs.boolean(KEY_NIGHT_MODE, defaults.nightMode),
+                subtitleSize = prefs.int(KEY_SUBTITLE_SIZE, defaults.subtitleSize).coerceIn(50, 200),
+                subtitleBackground = prefs.boolean(KEY_SUBTITLE_BACKGROUND, defaults.subtitleBackground),
+                subtitleColor = prefs.int(KEY_SUBTITLE_COLOR, defaults.subtitleColor),
+                subtitleBold = prefs.boolean(KEY_SUBTITLE_BOLD, defaults.subtitleBold),
+                captionsWhenMuted = prefs.boolean(KEY_CAPTIONS_WHEN_MUTED, defaults.captionsWhenMuted),
+                wakeOnLanMac = prefs.string(KEY_WAKE_ON_LAN_MAC) ?: defaults.wakeOnLanMac,
+                scanEveryHours = prefs.int(KEY_SCAN_EVERY_HOURS, defaults.scanEveryHours).coerceIn(0, 48),
+                newEpisodeAlerts = prefs.boolean(KEY_NEW_EPISODE_ALERTS, defaults.newEpisodeAlerts),
+                showStreamStats = prefs.boolean(KEY_SHOW_STREAM_STATS, defaults.showStreamStats),
+                networkBufferMs = prefs.int(KEY_NETWORK_BUFFER_MS, defaults.networkBufferMs).coerceIn(500, 30_000),
+                subtitleMargin = prefs.int(KEY_SUBTITLE_MARGIN, defaults.subtitleMargin).coerceIn(0, 300),
+                haptics = prefs.boolean(KEY_HAPTICS, defaults.haptics),
+                pipOnLeave = prefs.boolean(KEY_PIP_ON_LEAVE, defaults.pipOnLeave),
+                requireFingerprint = prefs.boolean(KEY_REQUIRE_FINGERPRINT, defaults.requireFingerprint),
+                heroStyle = enumOrDefault(prefs.string(KEY_HERO_STYLE), defaults.heroStyle),
+                libraryLayout = enumOrDefault(prefs.string(KEY_LIBRARY_LAYOUT), defaults.libraryLayout),
+                posterColumns = enumOrDefault(prefs.string(KEY_POSTER_COLUMNS), defaults.posterColumns),
+                detailsHeaderStyle = enumOrDefault(prefs.string(KEY_DETAILS_HEADER_STYLE), defaults.detailsHeaderStyle),
+                subtitleFont = prefs.string(KEY_SUBTITLE_FONT) ?: defaults.subtitleFont,
+                subtitleOutline = prefs.int(KEY_SUBTITLE_OUTLINE, defaults.subtitleOutline).coerceIn(0, 6),
+                forcedSubtitlesOnly = prefs.boolean(KEY_FORCED_SUBTITLES_ONLY, defaults.forcedSubtitlesOnly),
+                deinterlace = prefs.int(KEY_DEINTERLACE, defaults.deinterlace).coerceIn(-1, 1),
+                doubleTapZonePercent = prefs.int(KEY_DOUBLE_TAP_ZONE, defaults.doubleTapZonePercent).coerceIn(20, 50),
+                hiddenPlayerButtons = prefs.string(KEY_HIDDEN_PLAYER_BUTTONS) ?: defaults.hiddenPlayerButtons,
+                homeRowOrder = prefs.string(KEY_HOME_ROW_ORDER) ?: defaults.homeRowOrder,
+                homeHiddenRows = prefs.string(KEY_HOME_HIDDEN_ROWS) ?: defaults.homeHiddenRows,
+                onlineLyrics = prefs.boolean(KEY_ONLINE_LYRICS, defaults.onlineLyrics),
+                onlineMusicArt = prefs.boolean(KEY_ONLINE_MUSIC_ART, defaults.onlineMusicArt),
+                startTab = prefs.string(KEY_START_TAB) ?: defaults.startTab,
+                spoilerSafe = prefs.boolean(KEY_SPOILER_SAFE, defaults.spoilerSafe),
+                resumeOnHeadphones = prefs.boolean(KEY_RESUME_ON_HEADPHONES, defaults.resumeOnHeadphones),
+                hiddenFolders = prefs.string(KEY_HIDDEN_FOLDERS) ?: defaults.hiddenFolders,
+                sourceDots = prefs.boolean(KEY_SOURCE_DOTS, defaults.sourceDots),
             )
         }
 
@@ -205,6 +378,13 @@ class PrefsSettingsStore(context: Context) : SettingsStore {
         private fun SharedPreferences.int(key: String, default: Int): Int =
             try {
                 getInt(key, default)
+            } catch (e: ClassCastException) {
+                default
+            }
+
+        private fun SharedPreferences.float(key: String, default: Float): Float =
+            try {
+                getFloat(key, default)
             } catch (e: ClassCastException) {
                 default
             }

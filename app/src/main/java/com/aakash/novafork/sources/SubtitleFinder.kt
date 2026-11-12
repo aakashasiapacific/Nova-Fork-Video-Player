@@ -141,7 +141,27 @@ class SubtitleFinder(
             val file = byName[name] ?: continue
             if (file.length() in 1L..MAX_BYTES && file.canRead()) out += file
         }
+        fromSubsFolder(directory, fileName, out)
         return true
+    }
+
+    /**
+     * A "Subs" (or "Subtitles") folder beside the video, as releases ship them: its subtitle
+     * files, or those of its sub-folder named after the video ("Subs/Episode 1/2_English.srt").
+     * The names there rarely match the video's, so every text subtitle in it counts.
+     */
+    private fun fromSubsFolder(directory: File, fileName: String, out: MutableList<File>) {
+        val subs = directory.listFiles()?.firstOrNull { it.isDirectory && it.name.lowercase(Locale.ROOT) in SUBS_FOLDERS } ?: return
+        val base = VideoFiles.baseName(fileName)
+        val own = subs.listFiles()?.firstOrNull { it.isDirectory && it.name.equals(base, ignoreCase = true) }
+        val candidates = (own ?: subs).listFiles()?.filter { it.isFile && VideoFiles.extension(it.name) in SUBS_FOLDER_EXTENSIONS }.orEmpty()
+        // A folder shared by several videos only counts for the files named after this one.
+        val shared = own == null && (directory.listFiles()?.count { it.isFile && VideoFiles.isVideo(it.name) } ?: 0) > 1
+        for (file in candidates.sortedBy { it.name.lowercase(Locale.ROOT) }) {
+            if (out.size >= MAX_FILES) break
+            if (shared && !file.name.startsWith(base, ignoreCase = true)) continue
+            if (file.length() in 1L..MAX_BYTES && file.canRead() && out.none { it.absolutePath == file.absolutePath }) out += file
+        }
     }
 
     private suspend fun fromContent(uri: Uri, videoUri: String, fileName: String, languages: List<String>, out: MutableList<File>) {
@@ -416,6 +436,8 @@ class SubtitleFinder(
     }
 
     private companion object {
+        private val SUBS_FOLDERS = setOf("subs", "subtitles", "sub")
+        private val SUBS_FOLDER_EXTENSIONS = setOf("srt", "ass", "ssa", "vtt", "smi")
         const val MAX_FILES = 8
         const val MAX_BYTES = 5L * 1024 * 1024
 

@@ -1,6 +1,7 @@
 package com.aakash.novafork.ui
 
 import com.aakash.novafork.core.format.Formats
+import com.aakash.novafork.core.library.ExtraFiles
 import com.aakash.novafork.core.library.LibraryKeys
 import com.aakash.novafork.core.library.VideoFiles
 import com.aakash.novafork.core.smb.SmbUris
@@ -21,6 +22,10 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import java.io.ByteArrayOutputStream
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 /** A present video with the labels and artwork every screen uses. */
@@ -39,6 +44,10 @@ class IndexedVideo(
     val card: VideoCardUi,
     /** Title for alphabetical sorting (show title for episodes). */
     val sortKey: String,
+    /** What "Rename in Library" stores the title under: the movie's, video's or (episodes) show's key. */
+    val titleKey: String = "",
+    /** The title (an episode's show title) is one the user typed. */
+    val titleCustomised: Boolean = false,
 ) {
     val id: Long get() = video.id
     val inProgress: Boolean get() = video.positionMs > 0 && !video.watched
@@ -56,6 +65,10 @@ class IndexedShow(
     /** Newest dateAdded among the episodes. */
     val latestAdded: Long,
     val sortKey: String,
+    /** What "Rename in Library" stores the show's title under. */
+    val titleKey: String = "",
+    /** The title is one the user typed. */
+    val titleCustomised: Boolean = false,
 )
 
 /**
@@ -69,26 +82,85 @@ class LibraryIndex(
     val shows: List<IndexedShow>,
     val sources: List<SourceEntity>,
     val preferLocalArtwork: Boolean,
+    /** Movie id → its extras (trailers, featurettes...), in file-name order. They are also in [videos]. */
+    val extrasByMovie: Map<Long, List<IndexedVideo>> = emptyMap(),
+    /**
+     * Every video, the ones the user hid from the library included ([videos] leaves those out).
+     * Browse and the details of a video opened there still use all of them: hiding never removes
+     * a file or makes it unplayable.
+     */
+    val allVideos: List<IndexedVideo> = videos,
 ) {
-    val videosById: Map<Long, IndexedVideo> = videos.associateBy { it.id }
+    /** Extras that found their movie: shown on its page only, never as items of their own. */
+    val extraIds: Set<Long> = extrasByMovie.values.flatMapTo(HashSet<Long>()) { list -> list.map { it.id } }
+
+    val videosById: Map<Long, IndexedVideo> = allVideos.associateBy { it.id }
     val showsByKey: Map<String, IndexedShow> = shows.associateBy { it.key }
     val sourcesById: Map<Long, SourceEntity> = sources.associateBy { it.id }
-    val videoCountBySource: Map<Long, Int> = videos.groupingBy { it.video.sourceId }.eachCount()
+    val videoCountBySource: Map<Long, Int> = allVideos.groupingBy { it.video.sourceId }.eachCount()
 
     /** By [com.aakash.novafork.data.db.VideoEntity.uri], for matching live network listings to the library. */
-    val videosByUri: Map<String, IndexedVideo> by lazy { videos.associateBy { it.video.uri } }
+    val videosByUri: Map<String, IndexedVideo> by lazy { allVideos.associateBy { it.video.uri } }
+
+    /** Later parts of a movie in parts (CD2, Part 3) whose first part is here too: they play on from it. */
+    private val laterParts: Set<Long> = run {
+        val firstParts = videos
+            .filter { it.kind == MediaKind.MOVIE && com.aakash.novafork.data.MovieParts.partOf(it.video.fileName) == 1 }
+            .mapNotNullTo(HashSet()) { it.video.metadataKey }
+        if (firstParts.isEmpty()) {
+            emptySet()
+        } else {
+            videos.filter { video ->
+                video.kind == MediaKind.MOVIE && video.video.metadataKey in firstParts &&
+                    (com.aakash.novafork.data.MovieParts.partOf(video.video.fileName) ?: 1) > 1
+            }.mapTo(HashSet()) { it.id }
+        }
+    }
 
     /** Movies from device, folders and shares (matched movie streams stay with the streams). Newest first. */
-    val movies: List<IndexedVideo> = videos.filter { it.kind == MediaKind.MOVIE }
+    val movies: List<IndexedVideo> = videos.filter { it.kind == MediaKind.MOVIE && it.id !in extraIds && it.id !in laterParts }
 
     /** Home videos, unidentified files and streams. Newest first. */
-    val otherVideos: List<IndexedVideo> = videos.filter { it.kind == MediaKind.VIDEO || it.kind == MediaKind.STREAM }
+    val otherVideos: List<IndexedVideo> =
+        videos.filter { (it.kind == MediaKind.VIDEO || it.kind == MediaKind.STREAM) && it.id !in extraIds }
+
+    /**
+     * Ids of videos that exist as a copy the app downloaded: those in Movies/Nova Fork on the
+     * device, and the originals on a share or server they were copied from (same file name and,
+     * when both are known, the same size).
+     */
+    val downloadedIds: Set<Long> by lazy {
+        val copies = allVideos.filter { Downloads.isCopy(it) }
+        if (copies.isEmpty()) {
+            emptySet()
+        } else {
+            val names = copies.map { Downloads.nameKey(it.video.fileName) to it.video.sizeBytes }
+            allVideos.filter { video ->
+                Downloads.isCopy(video) ||
+                    names.any { (name, size) ->
+                        name == Downloads.nameKey(video.video.fileName) &&
+                            (size == null || video.video.sizeBytes == null || size == video.video.sizeBytes)
+                    }
+            }.mapTo(HashSet()) { it.id }
+        }
+    }
 
     /** Home only changes with the library, so it is built once per index rather than per UI event. */
     val home: HomeUi by lazy { UiMappers.home(this) }
 
     companion object {
-        fun build(rows: List<VideoWithMeta>, sources: List<SourceEntity>, preferLocalArtwork: Boolean): LibraryIndex {
+        /**
+         * [hidden] are ids of videos the user hid: they are left out of [videos], [shows] and
+         * everything derived from them, and kept in [allVideos] for Browse.
+         */
+        fun build(
+            rows: List<VideoWithMeta>,
+            sources: List<SourceEntity>,
+            preferLocalArtwork: Boolean,
+            hidden: Set<Long> = emptySet(),
+            /** Titles the user typed, by key (see [TitleChoice]); only the shown name changes. */
+            titleOverrides: Map<String, String> = emptyMap(),
+        ): LibraryIndex {
             val sourcesById = sources.associateBy { it.id }
             val smbRoots = sources
                 .filter { it.type == SourceType.SMB }
@@ -97,26 +169,48 @@ class LibraryIndex(
             val seasonPosters = { meta: MetadataEntity ->
                 seasonPosterCache.getOrPut(meta.key) { parseSeasonPosters(meta.seasonPostersJson) }
             }
-            val videos = rows
+            val allVideos = rows
                 .sortedWith(compareByDescending<VideoWithMeta> { it.video.dateAdded }.thenByDescending { it.video.id })
                 .map { row ->
                     val source = sourcesById[row.video.sourceId]
-                    indexVideo(row, source, smbRoots[row.video.sourceId].orEmpty(), preferLocalArtwork, seasonPosters)
+                    indexVideo(row, source, smbRoots[row.video.sourceId].orEmpty(), preferLocalArtwork, seasonPosters, titleOverrides)
                 }
+            val videos = if (hidden.isEmpty()) allVideos else allVideos.filter { it.id !in hidden }
             val episodesByShow = LinkedHashMap<String, MutableList<IndexedVideo>>()
             for (video in videos) {
                 val key = video.showKey ?: continue
                 episodesByShow.getOrPut(key) { ArrayList() }.add(video)
             }
             val shows = episodesByShow
-                .map { (key, episodes) -> buildShow(key, episodes, preferLocalArtwork, seasonPosters) }
+                .map { (key, episodes) -> buildShow(key, episodes, preferLocalArtwork, seasonPosters, titleOverrides) }
                 .sortedWith(compareBy(NaturalOrder) { it.sortKey })
-            return LibraryIndex(videos, shows, sources, preferLocalArtwork)
+            return LibraryIndex(videos, shows, sources, preferLocalArtwork, extrasOf(videos), allVideos)
         }
     }
 }
 
 // Building
+
+/** Matched extras by movie id (see [ExtraFiles]), each movie's in file-name order. */
+private fun extrasOf(videos: List<IndexedVideo>): Map<Long, List<IndexedVideo>> {
+    val candidates = videos.filter { it.kind == MediaKind.MOVIE || it.kind == MediaKind.VIDEO }
+    val matches = ExtraFiles.match(
+        candidates.map { ExtraFiles.Entry(it.id, it.video.sourceId, it.video.folder, it.video.fileName, it.kind == MediaKind.MOVIE) },
+    )
+    if (matches.isEmpty()) return emptyMap()
+    val byId = candidates.associateBy { it.id }
+    return candidates
+        .filter { extra ->
+            val movieId = matches[extra.id] ?: return@filter false
+            val movie = byId[movieId] ?: return@filter false
+            // A film identified as a different title is a real film in an "Other" folder, not a bonus.
+            val own = extra.meta?.key
+            val owner = movie.meta?.key
+            own == null || owner == null || own == owner
+        }
+        .sortedWith(compareBy(NaturalOrder) { it.video.fileName })
+        .groupBy { matches.getValue(it.id) }
+}
 
 private fun indexVideo(
     row: VideoWithMeta,
@@ -124,18 +218,24 @@ private fun indexVideo(
     smbRoot: String,
     preferLocal: Boolean,
     seasonPosters: (MetadataEntity) -> Map<Int, String>,
+    titleOverrides: Map<String, String>,
 ): IndexedVideo {
     val video = row.video
     val meta = row.meta
     val kind = mediaKindOf(video, source)
     val baseName = VideoFiles.baseName(video.fileName).ifBlank { video.fileName }
     val showKey = if (kind == MediaKind.EPISODE) video.showKey ?: LibraryKeys.showKey(null, video.parsedTitle) else null
-    val showTitle = if (kind == MediaKind.EPISODE) meta?.title.nonBlank() ?: video.parsedTitle.ifBlank { baseName } else null
+    val choice = if (kind == MediaKind.EPISODE) {
+        TitleChoice.of(titleOverrides, meta?.key, "show:$showKey")
+    } else {
+        TitleChoice.of(titleOverrides, meta?.key, "video:${video.id}")
+    }
+    val showTitle = if (kind == MediaKind.EPISODE) choice.custom ?: meta?.title.nonBlank() ?: video.parsedTitle.ifBlank { baseName } else null
     val title = when (kind) {
-        MediaKind.MOVIE -> meta?.title.nonBlank() ?: video.parsedTitle.ifBlank { baseName }
+        MediaKind.MOVIE -> choice.custom ?: meta?.title.nonBlank() ?: video.parsedTitle.ifBlank { baseName }
         MediaKind.EPISODE -> video.episodeTitle.nonBlank() ?: video.episode?.let { "Episode $it" } ?: baseName
-        MediaKind.VIDEO -> baseName
-        MediaKind.STREAM -> meta?.title.nonBlank() ?: source?.name.nonBlank() ?: video.parsedTitle.ifBlank { baseName }
+        MediaKind.VIDEO -> choice.custom ?: friendlyVideoTitle(baseName, video.dateAdded)
+        MediaKind.STREAM -> choice.custom ?: meta?.title.nonBlank() ?: source?.name.nonBlank() ?: video.parsedTitle.ifBlank { baseName }
     }
     val artwork = when (kind) {
         MediaKind.EPISODE -> episodeArtwork(
@@ -151,6 +251,7 @@ private fun indexVideo(
             backdropUrl = video.localBackdrop,
             stillUrl = video.localThumb,
             frameSource = frameSourceOf(video.uri),
+            frameAspect = frameAspectOf(video),
             seed = title,
         )
     }
@@ -181,6 +282,7 @@ private fun indexVideo(
         season = video.season,
         episode = video.episode,
         sourceLabel = source?.let(::sourceLabel),
+        uhd = (video.width ?: 0) >= 3200 || (video.height ?: 0) >= 2000,
     )
     return IndexedVideo(
         video = video,
@@ -193,6 +295,8 @@ private fun indexVideo(
         relativeFolder = if (source == null) video.folder.trim('/') else relativeFolder(source.type, smbRoot, video.folder),
         card = card,
         sortKey = sortKeyOf(showTitle ?: title),
+        titleKey = choice.key,
+        titleCustomised = choice.custom != null,
     )
 }
 
@@ -201,11 +305,13 @@ private fun buildShow(
     episodes: List<IndexedVideo>,
     preferLocal: Boolean,
     seasonPosters: (MetadataEntity) -> Map<Int, String>,
+    titleOverrides: Map<String, String>,
 ): IndexedShow {
     val ordered = episodes.sortedWith(EPISODE_ORDER)
     val first = ordered.first()
     val meta = ordered.firstNotNullOfOrNull { it.meta }
-    val title = meta?.title.nonBlank() ?: first.showTitle ?: first.title
+    val choice = TitleChoice.of(titleOverrides, meta?.key, "show:$key")
+    val title = choice.custom ?: meta?.title.nonBlank() ?: first.showTitle ?: first.title
     val artwork = Artwork(
         posterUrl = pick(
             TmdbClient.posterUrl(meta?.posterPath),
@@ -219,6 +325,8 @@ private fun buildShow(
         ),
         frameSource = first.card.artwork.frameSource,
         seed = title,
+        tallUrl = TmdbClient.posterUrl(meta?.textlessPosterPath, TALL_SIZE),
+        logoUrl = TmdbClient.posterUrl(meta?.logoPath, LOGO_SIZE),
     )
     // Two copies of one episode (720p and 1080p) count once.
     val distinct = ordered.distinctBy { episodeIdentity(it) }
@@ -241,7 +349,43 @@ private fun buildShow(
         card = card,
         latestAdded = ordered.maxOf { it.video.dateAdded },
         sortKey = sortKeyOf(title),
+        titleKey = choice.key,
+        titleCustomised = choice.custom != null,
     )
+}
+
+/**
+ * Which key a title's override is stored under and the title typed for it, if any. A title with
+ * TMDB details is keyed by its [primary] metadata key; one without by its [fallback] ("video:12",
+ * "show:the-office"). An override stored under either counts, so renaming an unidentified title
+ * and identifying it later keeps the name.
+ */
+internal class TitleChoice(val key: String, val custom: String?) {
+    companion object {
+        fun of(overrides: Map<String, String>, primary: String?, fallback: String): TitleChoice {
+            val byPrimary = primary?.let { overrides[it] }?.takeIf { it.isNotBlank() }
+            if (primary != null && byPrimary != null) return TitleChoice(primary, byPrimary)
+            val byFallback = overrides[fallback]?.takeIf { it.isNotBlank() }
+            if (byFallback != null) return TitleChoice(fallback, byFallback)
+            return TitleChoice(primary ?: fallback, null)
+        }
+    }
+}
+
+/** The app's downloaded copies live in Movies/Nova Fork (see download/DownloadService). */
+internal object Downloads {
+    private const val FOLDER = "movies/nova fork"
+    private val BAD_CHARACTERS = Regex("[\\\\/:*?\"<>|]")
+
+    /** [video] is a file inside Movies/Nova Fork on the device. */
+    fun isCopy(video: IndexedVideo): Boolean {
+        if (video.source?.type != SourceType.DEVICE) return false
+        val folder = video.video.folder.trim('/').lowercase(Locale.ROOT)
+        return folder == FOLDER || folder.startsWith("$FOLDER/")
+    }
+
+    /** File names compare the way the download wrote them: characters a file system rejects became spaces. */
+    fun nameKey(fileName: String): String = fileName.replace(BAD_CHARACTERS, " ").trim().lowercase(Locale.ROOT)
 }
 
 private fun episodeIdentity(video: IndexedVideo): String {
@@ -267,9 +411,18 @@ private fun movieArtwork(video: VideoEntity, meta: MetadataEntity?, seed: String
         // A movie's "<name>.jpg" is often a poster, so it is only the landscape fallback.
         stillUrl = video.localThumb.takeIf { backdrop == null },
         frameSource = frameSourceOf(video.uri),
+            frameAspect = frameAspectOf(video),
         seed = seed,
+        tallUrl = TmdbClient.posterUrl(meta?.textlessPosterPath, TALL_SIZE),
+        logoUrl = TmdbClient.posterUrl(meta?.logoPath, LOGO_SIZE),
     )
 }
+
+/** Textless posters fill most of a phone screen: a size sharper than the cards' w500. */
+private const val TALL_SIZE = "w780"
+
+/** Logos are drawn at most ~300dp wide. */
+private const val LOGO_SIZE = "w500"
 
 private fun episodeArtwork(
     video: VideoEntity,
@@ -284,6 +437,7 @@ private fun episodeArtwork(
         backdropUrl = pick(TmdbClient.backdropUrl(meta?.backdropPath), video.localBackdrop, preferLocal),
         stillUrl = pick(TmdbClient.stillUrl(video.episodeStillPath), video.localThumb, preferLocal),
         frameSource = frameSourceOf(video.uri),
+            frameAspect = frameAspectOf(video),
         seed = seed,
     )
 }
@@ -494,4 +648,38 @@ internal fun percentDecode(text: String): String {
     }
     if (bytes.size() > 0) out.append(bytes.toString(Charsets.UTF_8.name()))
     return out.toString()
+}
+
+/** A video's width over height, when known. */
+private fun frameAspectOf(video: VideoEntity): Float? {
+    val width = video.width ?: return null
+    val height = video.height ?: return null
+    return if (width > 0 && height > 0) width.toFloat() / height else null
+}
+
+private val CAMERA_NAME = Regex(
+    """(?i)^(vid|pxl|mvimg|img|screen[_ -]?recording|screenrecord|video|inshot)?[_ -]*((?:19|20)\d{2})-?(\d{2})-?(\d{2})(?:[_ .-].*)?$""",
+)
+private val ID_NAME = Regex("""^[0-9_-]{8,}$|^[0-9a-fA-F-]{20,}$""")
+
+/**
+ * A readable title for a file whose name means nothing: a camera's "VID_20240512_183012" or a
+ * screen recording becomes "Video · 12 May 2024" (from the date in the name); a download named
+ * by a number ("17936004744169077", Instagram and WhatsApp saves) becomes "Video · <the day it
+ * arrived>". Other names stay as they are.
+ */
+internal fun friendlyVideoTitle(baseName: String, dateAdded: Long, zone: ZoneId = ZoneId.systemDefault()): String {
+    val format = DateTimeFormatter.ofPattern("d MMM yyyy", Locale.getDefault())
+    CAMERA_NAME.matchEntire(baseName.trim())?.let { match ->
+        val (prefix, year, month, day) = match.destructured
+        val date = runCatching { LocalDate.of(year.toInt(), month.toInt(), day.toInt()) }.getOrNull()
+        if (date != null) {
+            val label = if (prefix.startsWith("screen", ignoreCase = true)) "Screen recording" else "Video"
+            return "$label · ${date.format(format)}"
+        }
+    }
+    if (ID_NAME.matches(baseName.trim()) && dateAdded > 0) {
+        return "Video · ${Instant.ofEpochMilli(dateAdded).atZone(zone).toLocalDate().format(format)}"
+    }
+    return baseName
 }

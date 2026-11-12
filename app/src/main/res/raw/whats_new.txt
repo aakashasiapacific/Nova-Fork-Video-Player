@@ -1,0 +1,8 @@
+Tabs only change colour when you switch, with no pop or bounce
+Progress runs along the bottom of cards, as in Apple TV
+New Preferences: sections with a state line, a Library summary card and outline icons
+Motion rebuilt: calmer, more consistent transitions
+Automatic weekly backup to a folder you choose
+Hidden Videos can ask for your fingerprint
+Keyboard shortcuts help: press ?
+and more

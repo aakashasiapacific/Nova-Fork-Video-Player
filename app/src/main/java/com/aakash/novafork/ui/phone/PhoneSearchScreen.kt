@@ -1,40 +1,107 @@
 package com.aakash.novafork.ui.phone
 
+import android.app.Activity
+import android.content.Intent
+import android.speech.RecognizerIntent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
-import com.aakash.novafork.ui.common.EmptyState
+import com.aakash.novafork.ui.common.CollapsedTitleBar
+import com.aakash.novafork.ui.common.CollapsingTitle
+import com.aakash.novafork.ui.common.Hairline
+import com.aakash.novafork.ui.common.IosColors
+import com.aakash.novafork.ui.common.IosIconButton
+import com.aakash.novafork.ui.common.IosTextButton
+import com.aakash.novafork.ui.common.LocalBottomBarSpace
+import com.aakash.novafork.ui.common.LocalSearchQuery
+import com.aakash.novafork.ui.common.NovaChip
 import com.aakash.novafork.ui.common.NovaIcon
+import com.aakash.novafork.ui.common.OnTabReselect
+import com.aakash.novafork.ui.common.PosterArt
+import com.aakash.novafork.ui.common.SwipeToDelete
+import com.aakash.novafork.ui.common.collapsingHeader
+import com.aakash.novafork.ui.common.largeTitle
+import com.aakash.novafork.ui.common.musicSearchResults
+import com.aakash.novafork.ui.common.rememberCollapsingTitle
+import com.aakash.novafork.ui.common.searchHighlighted
+import com.aakash.novafork.ui.common.stretchWithPull
 import com.aakash.novafork.ui.model.AppActions
+import com.aakash.novafork.ui.model.Artwork
+import com.aakash.novafork.ui.model.LibraryFilter
+import com.aakash.novafork.ui.model.LibraryItemUi
+import com.aakash.novafork.ui.model.MediaKind
 import com.aakash.novafork.ui.model.SearchUi
+import com.aakash.novafork.ui.model.TopDestination
+import com.aakash.novafork.ui.theme.NovaColors
+import kotlin.math.abs
+import kotlin.math.roundToInt
 
 @Composable
 fun PhoneSearchScreen(
@@ -50,79 +117,477 @@ fun PhoneSearchScreen(
         mutableStateOf(TextFieldValue(search.query, TextRange(search.query.length)))
     }
     val focusRequester = remember { FocusRequester() }
+    // The microphone: the phone's own speech recogniser (Google's), when there is one.
+    val context = LocalContext.current
+    val speech = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        val said = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
+        if (result.resultCode == Activity.RESULT_OK && !said.isNullOrBlank()) {
+            field = TextFieldValue(said, TextRange(said.length))
+            actions.search(said)
+        }
+    }
+    val speechIntent = remember {
+        Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+            .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            .putExtra(RecognizerIntent.EXTRA_PROMPT, "Search")
+    }
+    val voice: (() -> Unit)? = if (speechIntent.resolveActivity(context.packageManager) != null) {
+        { speech.launch(speechIntent) }
+    } else {
+        null
+    }
+    // Which kind of result the chips under the field show; All again once the field is emptied.
+    var filter by remember { mutableStateOf(SearchFilter.ALL) }
+    val fieldBlank = field.text.isBlank()
+    LaunchedEffect(fieldBlank) { if (fieldBlank) filter = SearchFilter.ALL }
+    // Leaving Search with results on screen keeps the query in the recent searches, as iOS does
+    // once a search has been used.
+    val latest by rememberUpdatedState(field.text to !search.isEmpty)
+    DisposableEffect(Unit) {
+        onDispose {
+            val (text, hadResults) = latest
+            if (hadResults) actions.rememberSearch(text)
+        }
+    }
     val keyboard = LocalSoftwareKeyboardController.current
+    val focusManager = LocalFocusManager.current
+    // Tapping Search again goes to the field, keyboard up, as on iOS.
+    // iOS: once the title has shrunk, scrolling on tucks the field up out of the way too; it
+    // comes back (before the title) when the results are pulled back to the top.
+    val fieldTuck = rememberCollapsingTitle()
+    OnTabReselect {
+        fieldTuck.offset = 0f
+        focusRequester.requestFocus()
+    }
     LaunchedEffect(focusRequester) {
         // Coming back to existing results should not pop the keyboard over them.
         if (field.text.isEmpty()) focusRequester.requestFocus()
     }
 
-    Column(modifier.fillMaxSize()) {
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .statusBarsPadding()
-                .padding(start = 4.dp, end = dims.gutter, top = 8.dp, bottom = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            IconButton(onClick = actions::back) {
-                NovaIcon(R.drawable.ic_arrow_back, contentDescription = "Back")
+    // Apple TV's search (owner): a big title with the field right under it, then the results.
+    // They end above the tab bar, or above the keyboard while typing.
+    val barSpace = LocalBottomBarSpace.current
+    val imeBottom = WindowInsets.ime.asPaddingValues().calculateBottomPadding()
+    val listSpace = maxOf(imeBottom, barSpace)
+    // Scrolling the results puts the keyboard away, so more of them show (iOS).
+    val currentKeyboard by rememberUpdatedState(keyboard)
+    val hideOnScroll = remember {
+        object : NestedScrollConnection {
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                if (source == NestedScrollSource.UserInput && abs(available.y) > 1f) currentKeyboard?.hide()
+                return Offset.Zero
             }
-            OutlinedTextField(
+        }
+    }
+    // iOS 27's large title: scrolling the results shrinks "Search" into a small title at the top,
+    // the results moving up with it; scrolling back to the top brings it back.
+    val searchTitle = rememberCollapsingTitle()
+    Box(modifier.fillMaxSize()) {
+        Column(Modifier.fillMaxSize().nestedScroll(hideOnScroll).nestedScroll(searchTitle.connection).nestedScroll(fieldTuck.connection)) {
+            Text(
+                "Search",
+                style = MaterialTheme.typography.headlineLarge,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier
+                    .collapsingHeader(searchTitle)
+                    .statusBarsPadding()
+                    .padding(start = dims.gutter, end = dims.gutter, top = 16.dp, bottom = 8.dp)
+                    .stretchWithPull()
+                    .largeTitle(searchTitle.state),
+            )
+            // Always full width (owner: no Cancel beside it); its ✕ clears what was typed. Once
+            // the title has shrunk into the bar the field stays pinned right under it.
+            SearchField(
                 value = field,
                 onValueChange = { value ->
                     val changed = value.text != field.text
                     field = value
                     if (changed) actions.search(value.text)
                 },
+                onClear = {
+                    field = TextFieldValue("")
+                    actions.search("")
+                    focusRequester.requestFocus()
+                },
+                onSearch = {
+                    actions.rememberSearch(field.text)
+                    keyboard?.hide()
+                },
+                focusRequester = focusRequester,
+                onVoice = voice,
                 modifier = Modifier
-                    .weight(1f)
-                    .focusRequester(focusRequester),
-                placeholder = { Text("Search movies, shows, videos") },
-                leadingIcon = { NovaIcon(R.drawable.ic_search, contentDescription = null) },
-                trailingIcon = if (field.text.isNotEmpty()) {
-                    {
-                        IconButton(
-                            onClick = {
-                                field = TextFieldValue("")
-                                actions.search("")
-                                focusRequester.requestFocus()
-                            },
-                        ) {
-                            NovaIcon(R.drawable.ic_close, contentDescription = "Clear")
+                    .tuckable(fieldTuck)
+                    .padding(start = dims.gutter, end = dims.gutter, top = 8.dp, bottom = 12.dp),
+            )
+            if (!fieldBlank) {
+                // All, Movies, Shows and Songs, as in the TV and Music apps' search.
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState())
+                        .padding(start = dims.gutter, end = dims.gutter, bottom = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    SearchFilter.entries.forEach { option ->
+                        NovaChip(
+                            selected = filter == option,
+                            onClick = { filter = option },
+                            label = { Text(option.label) },
+                        )
+                    }
+                }
+            }
+            val query = search.query.trim()
+            val shown = remember(search.results, filter) { search.results.filter(filter::accepts) }
+            val showMusic = filter == SearchFilter.ALL || filter == SearchFilter.SONGS
+            // Results show what was typed in bold.
+            CompositionLocalProvider(LocalBottomBarSpace provides listSpace, LocalSearchQuery provides field.text) {
+                when {
+                    field.text.isBlank() && (search.recent.isNotEmpty() || search.browse.isNotEmpty()) -> {
+                        val pick: (String) -> Unit = { picked ->
+                            field = TextFieldValue(picked, TextRange(picked.length))
+                            actions.search(picked)
+                            actions.rememberSearch(picked)
+                            keyboard?.hide()
+                        }
+                        // Nothing typed (owner): Apple TV's poster wall, every video as a bare
+                        // poster in three columns, newest first; recent searches, if any, above.
+                        // Apple TV's browse tiles (Movies, Shows, Music) lead, above the rest.
+                        val recent: @Composable () -> Unit = {
+                            Column {
+                                BrowseTiles(actions, Modifier.padding(top = 4.dp, bottom = 8.dp))
+                                if (search.recent.isNotEmpty()) {
+                                    RecentSearchesBlock(
+                                        recent = search.recent,
+                                        onPick = pick,
+                                        onClear = actions::clearRecentSearches,
+                                        onForget = actions::forgetSearch,
+                                        modifier = Modifier.padding(top = 8.dp),
+                                    )
+                                }
+                            }
+                        }
+                        if (search.browse.isEmpty()) {
+                            Column(Modifier.fillMaxSize()) {
+                                BrowseTiles(actions, Modifier.padding(start = dims.gutter, end = dims.gutter, top = 4.dp, bottom = 8.dp))
+                                Box(Modifier.weight(1f)) {
+                                    RecentSearches(
+                                        recent = search.recent,
+                                        onPick = pick,
+                                        onClear = actions::clearRecentSearches,
+                                        bottomSpace = listSpace,
+                                        onForget = actions::forgetSearch,
+                                    )
+                                }
+                            }
+                        } else {
+                            val posters = remember(search.browse) { search.browse.flatMap { it.cards } }
+                            PhoneSearchPosterGrid(cards = posters, actions = actions, header = recent)
                         }
                     }
-                } else {
-                    null
-                },
+                    field.text.isBlank() -> Column(Modifier.fillMaxSize()) {
+                        BrowseTiles(actions, Modifier.padding(start = dims.gutter, end = dims.gutter, top = 4.dp, bottom = 8.dp))
+                        CenteredScrollable(Modifier.weight(1f).padding(bottom = listSpace)) {
+                            PhoneEmptyLine("Search movies, shows, videos and music")
+                        }
+                    }
+                    search.isEmpty && query.isNotEmpty() -> CenteredScrollable(Modifier.padding(bottom = listSpace)) {
+                        PhoneEmptyLine("No results for “$query”")
+                    }
+                    shown.isEmpty() && !(showMusic && search.hasMusic) -> CenteredScrollable(Modifier.padding(bottom = listSpace)) {
+                        PhoneEmptyLine("No ${filter.label.lowercase()} match “$query”")
+                    }
+                    else -> {
+                        // Apple Music's Top Hit: the best match first, larger, then the rest.
+                        val topHit = shown.firstOrNull()
+                        PhoneLibraryGrid(
+                            items = shown.drop(1),
+                            actions = actions,
+                            // All: the videos under Movies and Shows headings, the music's own after.
+                            groupTitle = if (filter == SearchFilter.ALL) {
+                                { item: LibraryItemUi -> if (SearchFilter.MOVIES.accepts(item)) "Movies" else "Shows" }
+                            } else {
+                                null
+                            },
+                            header = {
+                                if (topHit != null) {
+                                    item(key = "top:" + topHit.key, span = { GridItemSpan(maxLineSpan) }) { TopHit(topHit, actions) }
+                                }
+                            },
+                            footer = {
+                                if (showMusic) musicSearchResults(search) { actions.playMusic(it.songIds, it.startIndex) }
+                            },
+                        )
+                    }
+                }
+            }
+        }
+        CollapsedTitleBar(state = searchTitle.state, title = "Search")
+        // Putting the keyboard away (its arrow, or back) ends typing, so the cursor goes too.
+        val keyboardUp = imeBottom > 0.dp
+        var keyboardWasUp by remember { mutableStateOf(false) }
+        LaunchedEffect(keyboardUp) {
+            if (keyboardUp) {
+                keyboardWasUp = true
+            } else if (keyboardWasUp) {
+                keyboardWasUp = false
+                focusManager.clearFocus()
+            }
+        }
+    }
+}
+
+/**
+ * The search field's place shrinks by how far [tuck] has collapsed, the field sliding up under the
+ * bar (clipped) and fading as it goes, so the results move up with it.
+ */
+private fun Modifier.tuckable(tuck: CollapsingTitle): Modifier = this
+    .clipToBounds()
+    .layout { measurable, constraints ->
+        val placeable = measurable.measure(constraints)
+        val limit = placeable.height.toFloat()
+        tuck.limit = limit
+        val shift = tuck.offset.coerceIn(0f, limit).roundToInt()
+        layout(placeable.width, placeable.height - shift) { placeable.placeRelative(0, -shift) }
+    }
+    .graphicsLayer {
+        val limit = tuck.limit
+        alpha = if (limit > 0f) 1f - (tuck.offset / limit).coerceIn(0f, 1f) else 1f
+    }
+
+/**
+ * Apple TV's search browse, shown while nothing is typed: rounded tiles two to a row, Movies and
+ * Shows opening the library at that kind, Music the Music tab.
+ */
+@Composable
+private fun BrowseTiles(actions: AppActions, modifier: Modifier = Modifier) {
+    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            BrowseTile("Movies", R.drawable.ic_movie, NovaColors.IosBlue, Modifier.weight(1f)) { actions.openLibrary(LibraryFilter.MOVIES) }
+            BrowseTile("Shows", R.drawable.ic_tv, NovaColors.IosBlue, Modifier.weight(1f)) { actions.openLibrary(LibraryFilter.SHOWS) }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            BrowseTile("Music", R.drawable.ic_music_notes, NovaColors.AppleMusicRed, Modifier.weight(1f)) { actions.selectTab(TopDestination.AUDIO) }
+            Spacer(Modifier.weight(1f))
+        }
+    }
+}
+
+@Composable
+private fun BrowseTile(label: String, icon: Int, tint: Color, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    Box(
+        modifier
+            .height(72.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(Color(0xFF1C1C1E))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+    ) {
+        NovaIcon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(22.dp).align(Alignment.TopStart))
+        Text(
+            label,
+            color = Color.White,
+            fontWeight = FontWeight.SemiBold,
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.align(Alignment.BottomStart),
+        )
+    }
+}
+
+/** The chips under the search field: what kind of result is shown. */
+private enum class SearchFilter(val label: String) {
+    ALL("All"),
+    MOVIES("Movies"),
+    SHOWS("Shows"),
+    SONGS("Songs"),
+    ;
+
+    /** Whether a video or show result belongs to this filter (Songs are music, which is handled apart). */
+    fun accepts(item: LibraryItemUi): Boolean = when (this) {
+        ALL -> true
+        MOVIES -> item is LibraryItemUi.Video && item.card.kind != MediaKind.EPISODE
+        SHOWS -> item is LibraryItemUi.Show || (item is LibraryItemUi.Video && item.card.kind == MediaKind.EPISODE)
+        SONGS -> false
+    }
+}
+
+/** Search's best match, larger than the rest: its poster, title and what it is, tap to open. */
+@Composable
+private fun TopHit(item: LibraryItemUi, actions: AppActions) {
+    val artwork: Artwork
+    val title: String
+    val caption: String?
+    val open: () -> Unit
+    when (item) {
+        is LibraryItemUi.Video -> {
+            artwork = item.card.artwork
+            title = item.card.displayTitle()
+            caption = item.card.displaySubtitle()
+            open = { actions.openVideo(item.card.id) }
+        }
+        is LibraryItemUi.Show -> {
+            artwork = item.card.artwork
+            title = item.card.title
+            caption = item.card.watchedCaption ?: countLabel(item.card.episodeCount, "episode")
+            open = { actions.openShow(item.card.key) }
+        }
+    }
+    Column(Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
+        Text("Top Hit", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(bottom = 10.dp))
+        Row(
+            Modifier
+                .fillMaxWidth()
+                // iOS 27's concentric corners: the card's is its poster's plus the space between.
+                .clip(RoundedCornerShape(TopHitPosterCorner + TopHitPadding))
+                .background(MaterialTheme.colorScheme.surfaceContainer)
+                .clickable(onClickLabel = "Open $title", onClick = open)
+                .padding(TopHitPadding),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            PosterArt(
+                artwork = artwork,
+                title = title,
+                modifier = Modifier
+                    .width(TopHitPosterWidth)
+                    .aspectRatio(2f / 3f)
+                    .clip(RoundedCornerShape(TopHitPosterCorner)),
+            )
+            Column(Modifier.weight(1f).padding(start = 14.dp)) {
+                Text(searchHighlighted(title), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 3, overflow = TextOverflow.Ellipsis)
+                if (!caption.isNullOrBlank()) {
+                    Text(caption, style = MaterialTheme.typography.bodyMedium, color = IosColors.SecondaryLabel, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp))
+                }
+            }
+        }
+    }
+}
+
+private val TopHitPosterWidth = 84.dp
+private val TopHitPosterCorner = 8.dp
+private val TopHitPadding = 12.dp
+
+/**
+ * Apple TV's search field: a slim grey capsule (the same as Preferences') with a magnifier, one
+ * line of text (or a short hint), and a clear button.
+ */
+@Composable
+private fun SearchField(
+    value: TextFieldValue,
+    onValueChange: (TextFieldValue) -> Unit,
+    onClear: () -> Unit,
+    onSearch: () -> Unit,
+    focusRequester: FocusRequester,
+    modifier: Modifier = Modifier,
+    onVoice: (() -> Unit)? = null,
+) {
+    Row(
+        modifier
+            .fillMaxWidth()
+            .height(SearchFieldHeight)
+            .background(IosColors.GroupedCard, RoundedCornerShape(percent = 50))
+            .padding(start = 16.dp, end = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        NovaIcon(R.drawable.ic_search, contentDescription = null, tint = IosColors.SecondaryLabel, modifier = Modifier.size(22.dp))
+        Box(
+            Modifier
+                .weight(1f)
+                .padding(start = 10.dp),
+            contentAlignment = Alignment.CenterStart,
+        ) {
+            if (value.text.isEmpty()) {
+                // One line always (owner: it broke in two once Cancel narrowed the field).
+                Text(
+                    "Movies, music and more",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = IosColors.TertiaryLabel,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            BasicTextField(
+                value = value,
+                onValueChange = onValueChange,
                 singleLine = true,
-                shape = RoundedCornerShape(28.dp),
-                textStyle = MaterialTheme.typography.bodyLarge,
+                textStyle = MaterialTheme.typography.bodyLarge.copy(color = Color.White),
+                cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                keyboardActions = KeyboardActions(onSearch = { keyboard?.hide() }),
+                keyboardActions = KeyboardActions(onSearch = { onSearch() }),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .focusRequester(focusRequester),
             )
         }
+        if (value.text.isNotEmpty()) {
+            IosIconButton(onClick = onClear) {
+                NovaIcon(R.drawable.ic_close, contentDescription = "Clear", tint = Color.White.copy(alpha = 0.6f))
+            }
+        } else if (onVoice != null) {
+            // Say a title or a phrase ("comedies under two hours").
+            IosIconButton(onClick = onVoice) {
+                NovaIcon(R.drawable.ic_mic, contentDescription = "Search by voice", tint = Color.White.copy(alpha = 0.6f))
+            }
+        }
+    }
+}
 
-        val query = search.query.trim()
-        when {
-            field.text.isBlank() -> CenteredScrollable(Modifier.imePadding()) {
-                EmptyState(
-                    icon = R.drawable.ic_search,
-                    title = "Search your library",
-                    body = "Find movies, shows and videos by title.",
-                )
+private val SearchFieldHeight = 48.dp
+
+/**
+ * iOS's recent searches as a page of their own: a header with Clear, then each search, tap to run
+ * it again or swipe it left to take just that one away.
+ */
+@Composable
+internal fun RecentSearches(
+    recent: List<String>,
+    onPick: (String) -> Unit,
+    onClear: () -> Unit,
+    bottomSpace: Dp,
+    onForget: (String) -> Unit = {},
+) {
+    val dims = LocalNovaDimens.current
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(start = dims.gutter, end = dims.gutter, top = 8.dp, bottom = bottomSpace),
+    ) {
+        item(key = "recent") { RecentSearchesBlock(recent, onPick, onClear, onForget) }
+    }
+}
+
+/** The recent searches themselves: "Recent Searches" with Clear, then a row for each. */
+@Composable
+internal fun RecentSearchesBlock(
+    recent: List<String>,
+    onPick: (String) -> Unit,
+    onClear: () -> Unit,
+    onForget: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier.fillMaxWidth()) {
+        Row(Modifier.fillMaxWidth().padding(bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text("Recent Searches", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+            IosTextButton(onClick = onClear) { Text("Clear") }
+        }
+        recent.forEach { query ->
+            key(query) {
+                SwipeToDelete(onDelete = { onForget(query) }, label = "Remove") {
+                    Column(Modifier.clickable { onPick(query) }) {
+                        Row(Modifier.padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                            // A clock: something searched before (iOS).
+                            NovaIcon(R.drawable.ic_history, contentDescription = null, tint = IosColors.SecondaryLabel, modifier = Modifier.size(18.dp))
+                            Text(
+                                query,
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.primary,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.padding(start = 12.dp),
+                            )
+                        }
+                        Box(Modifier.fillMaxWidth().height(Hairline).background(IosColors.Separator))
+                    }
+                }
             }
-            search.results.isEmpty() && query.isNotEmpty() -> CenteredScrollable(Modifier.imePadding()) {
-                EmptyState(
-                    icon = R.drawable.ic_search,
-                    title = "No results",
-                    body = "Nothing in your library matches “$query”.",
-                )
-            }
-            else -> PhoneLibraryGrid(
-                items = search.results,
-                actions = actions,
-                modifier = Modifier.imePadding(),
-            )
         }
     }
 }

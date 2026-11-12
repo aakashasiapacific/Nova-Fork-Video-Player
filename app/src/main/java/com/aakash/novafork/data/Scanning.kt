@@ -47,6 +47,10 @@ data class ScannedVideo(
      * Identify replaces it. Null: the file name is parsed and matched against TMDB as usual.
      */
     val serverMetadata: ServerMetadata? = null,
+    /** Where the media server says it was left (another device's progress); null when it wasn't started. */
+    val serverPositionMs: Long? = null,
+    /** The media server counts it as watched. */
+    val serverWatched: Boolean = false,
 )
 
 enum class ServerItemType { MOVIE, EPISODE }
@@ -143,6 +147,13 @@ interface SmbBrowser {
      * Credentials come from the source that owns host+share. Caller closes the stream.
      */
     suspend fun open(smbUri: String): SmbReadHandle
+
+    /**
+     * Renames the file [smbUri] points to, in the same folder, to [newName] (a file name, not a
+     * path), using the credentials of the source that owns it. Refuses to replace an existing
+     * file. Returns the file's new smb:// URI.
+     */
+    suspend fun rename(smbUri: String, newName: String): String
 }
 
 class SmbReadHandle(val stream: InputStream, val length: Long)

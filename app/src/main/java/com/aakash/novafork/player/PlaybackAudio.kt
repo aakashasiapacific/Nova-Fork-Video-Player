@@ -12,8 +12,15 @@ import android.os.Looper
 import android.util.Log
 import androidx.core.content.ContextCompat
 
-/** Audio focus for movie playback, and the "headphones unplugged" broadcast while playing. */
-internal class PlaybackAudio(context: Context, private val listener: Listener) {
+/**
+ * Audio focus for playback, and the "headphones unplugged" broadcast while playing. [contentType]
+ * is an AudioAttributes content type: movies for the video player, music for the Audio tab.
+ */
+internal class PlaybackAudio(
+    context: Context,
+    private val listener: Listener,
+    contentType: Int = AudioAttributes.CONTENT_TYPE_MOVIE,
+) {
 
     interface Listener {
         /** Another app took focus; [transient] = it will give it back (a call, navigation prompt). */
@@ -32,7 +39,7 @@ internal class PlaybackAudio(context: Context, private val listener: Listener) {
         .setAudioAttributes(
             AudioAttributes.Builder()
                 .setUsage(AudioAttributes.USAGE_MEDIA)
-                .setContentType(AudioAttributes.CONTENT_TYPE_MOVIE)
+                .setContentType(contentType)
                 .build(),
         )
         .setOnAudioFocusChangeListener(

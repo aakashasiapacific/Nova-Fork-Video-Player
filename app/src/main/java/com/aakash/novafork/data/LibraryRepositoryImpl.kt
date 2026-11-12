@@ -201,7 +201,22 @@ class LibraryRepositoryImpl(
 
     /** The first call after [markLaunch] (or after this repository was created) is the launch's refresh. */
     override suspend fun refreshAll() {
+        wakeNas()
         refreshAll(force = !takeLaunch())
+    }
+
+    @Volatile private var lastWakeAt = 0L
+
+    /** Wake-on-LAN, when a MAC is set: wakes the NAS and gives it a few seconds, at most once in ten minutes. */
+    private suspend fun wakeNas() {
+        val mac = settings.settings.value.wakeOnLanMac
+        if (mac.isBlank()) return
+        val sent = withContext(Dispatchers.IO) { WakeOnLan.wake(mac) }
+        val now = System.currentTimeMillis()
+        if (sent && now - lastWakeAt > WAKE_REPEAT_MS) {
+            lastWakeAt = now
+            kotlinx.coroutines.delay(WAKE_WAIT_MS)
+        }
     }
 
     /**
@@ -496,6 +511,9 @@ class LibraryRepositoryImpl(
             localBackdrop = file.localBackdrop,
             localThumb = file.localThumb,
             remoteId = file.remoteId,
+            // Continue from another device: the server's progress for a video new here.
+            positionMs = file.serverPositionMs ?: 0L,
+            watched = file.serverWatched,
         ).withParse(parsed)
         val server = file.serverMetadata?.takeIf { it.isUsable() }
         return if (server != null) video.withServerMetadata(sourceId, server, now) else video
@@ -516,7 +534,15 @@ class LibraryRepositoryImpl(
             localThumb = file.localThumb,
             remoteId = file.remoteId ?: old.remoteId,
             present = true,
-        )
+        ).let { video ->
+            // Continue from another device: progress made elsewhere on the server reaches a video
+            // not started here. What was watched on this device is never overwritten.
+            if (old.positionMs == 0L && !old.watched && (file.serverPositionMs != null || file.serverWatched)) {
+                video.copy(positionMs = file.serverPositionMs ?: 0L, watched = file.serverWatched)
+            } else {
+                video
+            }
+        }
         val server = file.serverMetadata?.takeIf { it.isUsable() }
         return when {
             // The user's Identify outranks both the server and the file name.
@@ -929,6 +955,22 @@ class LibraryRepositoryImpl(
         reportRemote(RemoteReport(videoId, positionMs = 0L, durationMs = null, finished = watched))
     }
 
+    override suspend fun renameVideoFile(videoId: Long, newFileName: String, newUri: String?) {
+        withContext(Dispatchers.IO) {
+            val old = videoDao.byId(videoId) ?: return@withContext
+            val renamed = old.copy(fileName = newFileName, uri = newUri ?: old.uri)
+            // A manual Identify outranks the file name, as in a rescan (refreshed).
+            val updated = if (old.matchState == MatchState.MANUAL) {
+                renamed
+            } else {
+                renamed.withParse(parseName(newFileName, old.folder.split('/').filter { it.isNotEmpty() }.asReversed()))
+            }
+            videoDao.update(updated)
+        }
+        // The new name may match something else; the matcher looks again.
+        enricher.request()
+    }
+
     // Progress on media servers
 
     private class RemoteReport(val videoId: Long, val positionMs: Long, val durationMs: Long?, val finished: Boolean)
@@ -971,7 +1013,9 @@ class LibraryRepositoryImpl(
     override suspend fun nextEpisode(videoId: Long): VideoWithMeta? = withContext(Dispatchers.IO) {
         val current = videoDao.byId(videoId) ?: return@withContext null
         val showKey = current.showKey
-        if (current.kind != VideoKind.EPISODE || showKey == null) return@withContext null
+        // A movie in parts (CD1, CD2 / Part 1, Part 2) goes on to its next part as an episode would.
+        if (current.kind != VideoKind.EPISODE) return@withContext nextPart(current)
+        if (showKey == null) return@withContext null
         // No season (absolute numbering not placed yet) is listed as season 1, as in the UI.
         val season = current.season ?: 1
         val lastEpisode = current.episodeEnd ?: current.episode ?: return@withContext null
@@ -990,6 +1034,17 @@ class LibraryRepositoryImpl(
                     { it.video.fileName.lowercase() },
                 ),
             )
+    }
+
+    /** The next part of a multi-part movie: same title match, same folder, part number one higher. */
+    private suspend fun nextPart(current: VideoEntity): VideoWithMeta? {
+        val part = MovieParts.partOf(current.fileName) ?: return null
+        val key = current.metadataKey ?: return null
+        val folder = current.uri.substringBeforeLast('/')
+        val next = videoDao.byMetadataKey(key).firstOrNull { other ->
+            other.id != current.id && other.uri.substringBeforeLast('/') == folder && MovieParts.partOf(other.fileName) == part + 1
+        } ?: return null
+        return videoDao.withMeta(next.id)
     }
 
     // TMDB
@@ -1521,3 +1576,7 @@ private fun TmdbTvSummary.toSearchResult() = TmdbSearchResult(
     overview = overview.nonBlank(),
     posterUrl = TmdbClient.posterUrl(posterPath, "w342"),
 )
+
+/** Wake-on-LAN is repeated at most this often, and the NAS gets this long to wake. */
+private const val WAKE_REPEAT_MS = 10 * 60_000L
+private const val WAKE_WAIT_MS = 5_000L
