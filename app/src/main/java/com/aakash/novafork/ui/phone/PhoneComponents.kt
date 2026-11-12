@@ -839,6 +839,8 @@ internal fun PhoneLibraryGrid(
     footer: LazyGridScope.() -> Unit = {},
     /** Full-width content before the cards (search's Top Hit). */
     header: LazyGridScope.() -> Unit = {},
+    /** When given, the cards are grouped under a small heading each ("Movies", "Shows"), in order of first appearance. */
+    groupTitle: ((LibraryItemUi) -> String)? = null,
 ) {
     val dims = LocalNovaDimens.current
     val seen = remember { mutableSetOf<Any>() }
@@ -852,47 +854,66 @@ internal fun PhoneLibraryGrid(
         verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
         header()
-        itemsIndexed(items, key = { _, item -> item.key }) { index, item ->
-            val appear = Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null).staggeredAppear(item.key, index, seen)
-            when (item) {
-                is LibraryItemUi.Video -> VideoMenuBox(
-                    videoId = item.card.id,
-                    title = item.card.displayTitle(),
-                    actions = actions,
-                    showDetails = false,
-                    info = item.card.infoLine(),
-                    modifier = appear,
-                ) { openMenu ->
-                    if (asList) {
-                        PhoneLibraryListRow(
-                            title = item.card.displayTitle(),
-                            subtitle = item.card.displaySubtitle(),
-                            artwork = item.card.artwork,
-                            onClick = { actions.openVideo(item.card.id) },
-                            onLongClick = openMenu,
-                            progress = item.card.progress,
-                            watched = item.card.watched,
-                        )
-                    } else {
-                        SelectablePosterCard(item.card, actions, openMenu)
-                    }
+        if (groupTitle == null) {
+            libraryCards(items, actions, asList, seen)
+        } else {
+            items.groupBy(groupTitle).forEach { (title, group) ->
+                item(key = "group:$title", span = { GridItemSpan(maxLineSpan) }) {
+                    Text(
+                        title,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(top = 12.dp),
+                    )
                 }
-                is LibraryItemUi.Show -> ShowMenuBox(showKey = item.card.key, actions = actions, modifier = appear) { openMenu ->
-                    if (asList) {
-                        PhoneLibraryListRow(
-                            title = item.card.title,
-                            subtitle = item.card.watchedCaption ?: countLabel(item.card.episodeCount, "episode"),
-                            artwork = item.card.artwork,
-                            onClick = { actions.openShow(item.card.key) },
-                            onLongClick = openMenu,
-                        )
-                    } else {
-                        PhoneShowCard(item.card, onClick = { actions.openShow(item.card.key) }, onLongClick = openMenu)
-                    }
-                }
+                libraryCards(group, actions, asList, seen)
             }
         }
         footer()
+    }
+}
+
+/** [PhoneLibraryGrid]'s cards: a poster (or list row) per video or show, each with its menu. */
+private fun LazyGridScope.libraryCards(items: List<LibraryItemUi>, actions: AppActions, asList: Boolean, seen: MutableSet<Any>) {
+    itemsIndexed(items, key = { _, item -> item.key }) { index, item ->
+        val appear = Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null).staggeredAppear(item.key, index, seen)
+        when (item) {
+            is LibraryItemUi.Video -> VideoMenuBox(
+                videoId = item.card.id,
+                title = item.card.displayTitle(),
+                actions = actions,
+                showDetails = false,
+                info = item.card.infoLine(),
+                modifier = appear,
+            ) { openMenu ->
+                if (asList) {
+                    PhoneLibraryListRow(
+                        title = item.card.displayTitle(),
+                        subtitle = item.card.displaySubtitle(),
+                        artwork = item.card.artwork,
+                        onClick = { actions.openVideo(item.card.id) },
+                        onLongClick = openMenu,
+                        progress = item.card.progress,
+                        watched = item.card.watched,
+                    )
+                } else {
+                    SelectablePosterCard(item.card, actions, openMenu)
+                }
+            }
+            is LibraryItemUi.Show -> ShowMenuBox(showKey = item.card.key, actions = actions, modifier = appear) { openMenu ->
+                if (asList) {
+                    PhoneLibraryListRow(
+                        title = item.card.title,
+                        subtitle = item.card.watchedCaption ?: countLabel(item.card.episodeCount, "episode"),
+                        artwork = item.card.artwork,
+                        onClick = { actions.openShow(item.card.key) },
+                        onLongClick = openMenu,
+                    )
+                } else {
+                    PhoneShowCard(item.card, onClick = { actions.openShow(item.card.key) }, onLongClick = openMenu)
+                }
+            }
+        }
     }
 }
 

@@ -94,9 +94,12 @@ import com.aakash.novafork.ui.common.searchHighlighted
 import com.aakash.novafork.ui.common.stretchWithPull
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.Artwork
+import com.aakash.novafork.ui.model.LibraryFilter
 import com.aakash.novafork.ui.model.LibraryItemUi
 import com.aakash.novafork.ui.model.MediaKind
 import com.aakash.novafork.ui.model.SearchUi
+import com.aakash.novafork.ui.model.TopDestination
+import com.aakash.novafork.ui.theme.NovaColors
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
@@ -249,34 +252,44 @@ fun PhoneSearchScreen(
                         }
                         // Nothing typed (owner): Apple TV's poster wall, every video as a bare
                         // poster in three columns, newest first; recent searches, if any, above.
-                        val recent: (@Composable () -> Unit)? = if (search.recent.isEmpty()) {
-                            null
-                        } else {
-                            {
-                                RecentSearchesBlock(
-                                    recent = search.recent,
-                                    onPick = pick,
-                                    onClear = actions::clearRecentSearches,
-                                    onForget = actions::forgetSearch,
-                                    modifier = Modifier.padding(top = 8.dp),
-                                )
+                        // Apple TV's browse tiles (Movies, Shows, Music) lead, above the rest.
+                        val recent: @Composable () -> Unit = {
+                            Column {
+                                BrowseTiles(actions, Modifier.padding(top = 4.dp, bottom = 8.dp))
+                                if (search.recent.isNotEmpty()) {
+                                    RecentSearchesBlock(
+                                        recent = search.recent,
+                                        onPick = pick,
+                                        onClear = actions::clearRecentSearches,
+                                        onForget = actions::forgetSearch,
+                                        modifier = Modifier.padding(top = 8.dp),
+                                    )
+                                }
                             }
                         }
                         if (search.browse.isEmpty()) {
-                            RecentSearches(
-                                recent = search.recent,
-                                onPick = pick,
-                                onClear = actions::clearRecentSearches,
-                                bottomSpace = listSpace,
-                                onForget = actions::forgetSearch,
-                            )
+                            Column(Modifier.fillMaxSize()) {
+                                BrowseTiles(actions, Modifier.padding(start = dims.gutter, end = dims.gutter, top = 4.dp, bottom = 8.dp))
+                                Box(Modifier.weight(1f)) {
+                                    RecentSearches(
+                                        recent = search.recent,
+                                        onPick = pick,
+                                        onClear = actions::clearRecentSearches,
+                                        bottomSpace = listSpace,
+                                        onForget = actions::forgetSearch,
+                                    )
+                                }
+                            }
                         } else {
                             val posters = remember(search.browse) { search.browse.flatMap { it.cards } }
                             PhoneSearchPosterGrid(cards = posters, actions = actions, header = recent)
                         }
                     }
-                    field.text.isBlank() -> CenteredScrollable(Modifier.padding(bottom = listSpace)) {
-                        PhoneEmptyLine("Search movies, shows, videos and music")
+                    field.text.isBlank() -> Column(Modifier.fillMaxSize()) {
+                        BrowseTiles(actions, Modifier.padding(start = dims.gutter, end = dims.gutter, top = 4.dp, bottom = 8.dp))
+                        CenteredScrollable(Modifier.weight(1f).padding(bottom = listSpace)) {
+                            PhoneEmptyLine("Search movies, shows, videos and music")
+                        }
                     }
                     search.isEmpty && query.isNotEmpty() -> CenteredScrollable(Modifier.padding(bottom = listSpace)) {
                         PhoneEmptyLine("No results for “$query”")
@@ -290,6 +303,12 @@ fun PhoneSearchScreen(
                         PhoneLibraryGrid(
                             items = shown.drop(1),
                             actions = actions,
+                            // All: the videos under Movies and Shows headings, the music's own after.
+                            groupTitle = if (filter == SearchFilter.ALL) {
+                                { item: LibraryItemUi -> if (SearchFilter.MOVIES.accepts(item)) "Movies" else "Shows" }
+                            } else {
+                                null
+                            },
                             header = {
                                 if (topHit != null) {
                                     item(key = "top:" + topHit.key, span = { GridItemSpan(maxLineSpan) }) { TopHit(topHit, actions) }
@@ -335,6 +354,45 @@ private fun Modifier.tuckable(tuck: CollapsingTitle): Modifier = this
         val limit = tuck.limit
         alpha = if (limit > 0f) 1f - (tuck.offset / limit).coerceIn(0f, 1f) else 1f
     }
+
+/**
+ * Apple TV's search browse, shown while nothing is typed: rounded tiles two to a row, Movies and
+ * Shows opening the library at that kind, Music the Music tab.
+ */
+@Composable
+private fun BrowseTiles(actions: AppActions, modifier: Modifier = Modifier) {
+    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            BrowseTile("Movies", R.drawable.ic_movie, NovaColors.IosBlue, Modifier.weight(1f)) { actions.openLibrary(LibraryFilter.MOVIES) }
+            BrowseTile("Shows", R.drawable.ic_tv, NovaColors.IosBlue, Modifier.weight(1f)) { actions.openLibrary(LibraryFilter.SHOWS) }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            BrowseTile("Music", R.drawable.ic_music_notes, NovaColors.AppleMusicRed, Modifier.weight(1f)) { actions.selectTab(TopDestination.AUDIO) }
+            Spacer(Modifier.weight(1f))
+        }
+    }
+}
+
+@Composable
+private fun BrowseTile(label: String, icon: Int, tint: Color, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    Box(
+        modifier
+            .height(72.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(Color(0xFF1C1C1E))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+    ) {
+        NovaIcon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(22.dp).align(Alignment.TopStart))
+        Text(
+            label,
+            color = Color.White,
+            fontWeight = FontWeight.SemiBold,
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.align(Alignment.BottomStart),
+        )
+    }
+}
 
 /** The chips under the search field: what kind of result is shown. */
 private enum class SearchFilter(val label: String) {

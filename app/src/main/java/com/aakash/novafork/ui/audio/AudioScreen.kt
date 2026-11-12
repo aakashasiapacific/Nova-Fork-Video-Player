@@ -1345,6 +1345,9 @@ private fun SongRow(song: SongEntity, ctx: PageContext, onClick: () -> Unit, onR
     var menuOpen by remember { mutableStateOf(false) }
     // A long press opens the menu iOS's way (the row lifted over the blurred page); "…" plainly.
     var pressed by remember { mutableStateOf(false) }
+    // Held, the row lights up from edge to edge of the screen, past the page's gutters, as iOS's do.
+    val touch = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+    val touched by touch.collectIsPressedAsState()
     val hud = LocalHud.current
     Box {
         ContextMenuLift(open = menuOpen && pressed, grow = 1.03f, copyBackground = RowLiftColor) { _ ->
@@ -1357,14 +1360,27 @@ private fun SongRow(song: SongEntity, ctx: PageContext, onClick: () -> Unit, onR
                 onRemove = onRemove,
             ) {
                 Column(
-                    Modifier.combinedClickable(
-                        onClick = onClick,
-                        onLongClickLabel = "More",
-                        onLongClick = {
-                            pressed = true
-                            menuOpen = true
-                        },
-                    ),
+                    Modifier
+                        .drawBehind {
+                            if (touched) {
+                                val edge = Gutter.toPx()
+                                drawRect(
+                                    color = Color.White.copy(alpha = 0.08f),
+                                    topLeft = Offset(-edge, 0f),
+                                    size = androidx.compose.ui.geometry.Size(size.width + edge * 2, size.height),
+                                )
+                            }
+                        }
+                        .combinedClickable(
+                            interactionSource = touch,
+                            indication = null,
+                            onClick = onClick,
+                            onLongClickLabel = "More",
+                            onLongClick = {
+                                pressed = true
+                                menuOpen = true
+                            },
+                        ),
                 ) {
                     Row(Modifier.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                         Cover(MusicLibrary.artUri(song), size = 48, corner = 6)
