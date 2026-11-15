@@ -13,6 +13,7 @@ import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.key
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -36,16 +37,19 @@ fun RollingText(
     style: TextStyle = LocalTextStyle.current,
     color: Color = Color.Unspecified,
 ) {
-    // The caller's own digits: a running clock passes equal-width ones, a caption its natural ones.
-    val tabular = style
+    // Each digit is its own piece, so it can roll alone; the words between them stay whole, so
+    // their letters keep their natural spacing ("m left" is one run, not six separate letters).
+    val pieces = remember(text) { rollingPieces(text) }
     Row(modifier.clearAndSetSemantics { this.text = AnnotatedString(text) }, verticalAlignment = Alignment.CenterVertically) {
-        text.forEachIndexed { index, char ->
-            key(text.length - index) {
+        pieces.forEach { (start, piece) ->
+            key(text.length - start) {
                 AnimatedContent(
-                    targetState = char,
+                    targetState = piece,
                     transitionSpec = {
-                        if (initialState.isDigit() && targetState.isDigit()) {
-                            val up = targetState > initialState
+                        val from = initialState.singleOrNull()
+                        val to = targetState.singleOrNull()
+                        if (from != null && to != null && from.isDigit() && to.isDigit()) {
+                            val up = to > from
                             val roll = Motion.content(IntOffset.VisibilityThreshold)
                             (slideInVertically(roll) { h -> if (up) h else -h } + fadeIn(Motion.content())) togetherWith
                                 (slideOutVertically(roll) { h -> if (up) -h else h } + fadeOut(Motion.press())) using
@@ -56,9 +60,27 @@ fun RollingText(
                     },
                     label = "rollingChar",
                 ) { shown ->
-                    Text(shown.toString(), style = tabular, color = color, maxLines = 1, softWrap = false)
+                    // The caller's own digits: a running clock passes equal-width ones in its style.
+                    Text(shown, style = style, color = color, maxLines = 1, softWrap = false)
                 }
             }
         }
     }
+}
+
+/** [text] cut into single digits and the runs of other characters between them, each with where it starts. */
+internal fun rollingPieces(text: String): List<Pair<Int, String>> {
+    val pieces = ArrayList<Pair<Int, String>>()
+    var runStart = -1
+    text.forEachIndexed { index, char ->
+        if (char.isDigit()) {
+            if (runStart >= 0) pieces.add(runStart to text.substring(runStart, index))
+            runStart = -1
+            pieces.add(index to char.toString())
+        } else if (runStart < 0) {
+            runStart = index
+        }
+    }
+    if (runStart >= 0) pieces.add(runStart to text.substring(runStart))
+    return pieces
 }
