@@ -1546,7 +1546,7 @@ private fun Scrubber(player: MusicPlayerState, actions: AudioActions) {
     val atEnd = scrubbing?.let { it <= 0f || it >= 1f } == true
     LaunchedEffect(atEnd) { if (atEnd) haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove) }
     // The times' digits roll as they change (iOS's numeric transition).
-    val timeStyle = LocalTextStyle.current.copy(fontSize = 12.sp)
+    val timeStyle = LocalTextStyle.current.copy(fontSize = 12.sp, fontFeatureSettings = "tnum")
     Row(Modifier.fillMaxWidth().padding(top = 6.dp)) {
         val shownMs = (fraction * duration).toLong()
         Box(

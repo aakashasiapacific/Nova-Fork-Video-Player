@@ -12,12 +12,14 @@ import androidx.compose.ui.graphics.graphicsLayer
 
 /**
  * Cut-off text fades away at the end of its last line instead of ending in "…" (iOS 27). Pair
- * with maxLines and TextOverflow.Clip; [lines] is that maxLines, to find the last line.
+ * with maxLines and TextOverflow.Clip; [lines] is that maxLines, to find the last line. Text that
+ * fits is left whole: [cut] says whether it was cut off (the Text's `hasVisualOverflow`).
  */
-fun Modifier.fadeLastLine(lines: Int): Modifier = this
+fun Modifier.fadeLastLine(lines: Int, cut: () -> Boolean): Modifier = this
     .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
     .drawWithContent {
         drawContent()
+        if (!cut()) return@drawWithContent
         val lineHeight = size.height / lines.coerceAtLeast(1)
         val top = size.height - lineHeight
         val start = size.width * 0.72f

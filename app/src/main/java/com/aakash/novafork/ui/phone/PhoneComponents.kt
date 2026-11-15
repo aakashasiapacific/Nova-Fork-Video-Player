@@ -491,6 +491,7 @@ private fun WideCardLayout(
         Spacer(Modifier.height(8.dp))
         // One line of title and one of caption (Apple TV): every card in a row ends at the same
         // height, with no empty line between a short title and its caption.
+        var titleCut by remember { mutableStateOf(false) }
         Text(
             text = title,
             style = MaterialTheme.typography.titleSmall,
@@ -498,8 +499,10 @@ private fun WideCardLayout(
             maxLines = 1,
             softWrap = false,
             overflow = TextOverflow.Clip,
-            // A long title fades out at the card's edge instead of ending in "…" (iOS 27).
-            modifier = Modifier.fadeLastLine(1),
+            onTextLayout = { titleCut = it.hasVisualOverflow },
+            // A long title fades out at the card's edge instead of ending in "…" (iOS 27); one
+            // that fits is left whole.
+            modifier = Modifier.fadeLastLine(1) { titleCut },
         )
         if (rollingSubtitle) {
             // iOS's rolling digits: "42m left" counts down to "30m left" on coming back from playing.

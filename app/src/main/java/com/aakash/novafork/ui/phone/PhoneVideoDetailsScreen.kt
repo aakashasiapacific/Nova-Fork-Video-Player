@@ -101,6 +101,8 @@ fun PhoneVideoDetailsScreen(
         DetailsStatusBar(details.artwork, listState, backdropHeight)
         val tint = rememberDetailsTint(details.artwork)
         val hasOverview = !details.tagline.isNullOrBlank() || !details.overview.isNullOrBlank()
+        // The rows between Play and the summary carry the tint too, so it runs down unbroken.
+        val midBand = if (hasOverview) Modifier.fillMaxWidth().tintBand(tint, from = 0.55f, to = 0.55f) else Modifier
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             state = listState,
@@ -129,19 +131,19 @@ fun PhoneVideoDetailsScreen(
             }
             details.languageLine?.let { line ->
                 item(key = "languages") {
-                    GreyCaption(line, Modifier.padding(start = dims.gutter, end = dims.gutter, top = 10.dp))
+                    GreyCaption(line, midBand.padding(start = dims.gutter, end = dims.gutter, top = 10.dp))
                 }
             }
             details.historyLine?.let { line ->
                 item(key = "history") {
-                    GreyCaption(line, Modifier.padding(start = dims.gutter, end = dims.gutter, top = 10.dp))
+                    GreyCaption(line, midBand.padding(start = dims.gutter, end = dims.gutter, top = 10.dp))
                 }
             }
             val trailer = details.trailerUrl
             if (trailer != null || details.downloaded) {
                 item(key = "trailer") {
                     Row(
-                        Modifier.padding(start = dims.gutter, end = dims.gutter, top = 12.dp),
+                        midBand.padding(start = dims.gutter, end = dims.gutter, top = 12.dp),
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
@@ -152,7 +154,7 @@ fun PhoneVideoDetailsScreen(
             }
             // "Downloading 42%" while it copies to the phone (Download is in the ⋮ menu).
             item(key = "download") {
-                DownloadStatus(details, Modifier.padding(start = dims.gutter, end = dims.gutter, top = 12.dp))
+                DownloadStatus(details, midBand.padding(start = dims.gutter, end = dims.gutter, top = 12.dp))
             }
             item(key = "overview") {
                 Column(Modifier.tintBand(tint, from = 0.55f, to = 0f).padding(start = dims.gutter, end = dims.gutter, top = 16.dp)) {

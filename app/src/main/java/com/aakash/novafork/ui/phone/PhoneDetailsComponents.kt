@@ -32,6 +32,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyListState
@@ -101,6 +102,7 @@ import com.aakash.novafork.ui.common.PictureStatusBar
 import com.aakash.novafork.ui.common.PosterArt
 import com.aakash.novafork.ui.common.RatingPill
 import com.aakash.novafork.ui.common.bottomScrim
+import com.aakash.novafork.ui.common.GlassCircle
 import com.aakash.novafork.ui.common.easedVerticalFade
 import com.aakash.novafork.ui.model.Artwork
 
@@ -221,8 +223,10 @@ internal fun BackdropPosterHeader(
                             Brush.verticalGradient(
                                 0f to Color.Transparent,
                                 0.4f to Color.Transparent,
-                                0.8f to Color.Black.copy(alpha = 0.6f),
-                                1f to Color.Black.copy(alpha = 0.3f),
+                                0.75f to Color.Black.copy(alpha = 0.5f),
+                                // Clear at the foot: the picture has faded into the page's tint
+                                // there, and any shade left would show as a line where the header ends.
+                                1f to Color.Transparent,
                             ),
                         ),
                 )
@@ -521,15 +525,9 @@ internal fun ScrimIconButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    IosIconButton(
-        onClick = onClick,
-        modifier = modifier,
-        colors = IconButtonDefaults.iconButtonColors(
-            containerColor = Color.Black.copy(alpha = 0.4f),
-            contentColor = Color.White,
-        ),
-    ) {
-        NovaIcon(icon, contentDescription = contentDescription)
+    // The same glass circle as every other page's Back button (one family of buttons).
+    GlassCircle(onClick = onClick, description = contentDescription, size = 40.dp, modifier = modifier) {
+        NovaIcon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
     }
 }
 
@@ -564,7 +562,8 @@ internal fun PhoneDetailsTopBar(
                 }
             }
             .statusBarsPadding()
-            .padding(horizontal = 8.dp, vertical = 4.dp),
+            // The 40dp glass circles sit where every page's top bar puts them: 12dp in, in a 56dp bar.
+            .padding(horizontal = 12.dp, vertical = 8.dp),
     ) {
         if (title != null) {
             Text(

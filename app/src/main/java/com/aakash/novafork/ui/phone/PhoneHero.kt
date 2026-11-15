@@ -338,13 +338,15 @@ private fun PhoneHeroPage(hero: HeroUi, preview: Boolean, muted: Boolean, action
             }
             val overview = hero.overview
             if (wide && !overview.isNullOrBlank()) {
+                var overviewCut by remember { mutableStateOf(false) }
                 Text(
                     text = overview,
                     style = MaterialTheme.typography.bodyMedium,
                     color = Color.White.copy(alpha = 0.82f),
                     maxLines = 2,
                     overflow = TextOverflow.Clip,
-                    modifier = Modifier.padding(top = 10.dp).fadeLastLine(2),
+                    onTextLayout = { overviewCut = it.hasVisualOverflow },
+                    modifier = Modifier.padding(top = 10.dp).fadeLastLine(2) { overviewCut },
                 )
             }
             if (!wide) {

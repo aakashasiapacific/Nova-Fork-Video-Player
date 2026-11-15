@@ -325,11 +325,15 @@ private fun PlayerOptionRows(options: List<PlayerOption>, onCapture: (() -> Unit
     BoxWithConstraints(modifier.fillMaxWidth()) {
         val total = options.size + if (capture != null) 1 else 0
         if (maxWidth / total >= OptionCellMin) {
-            val cell = (maxWidth / total).coerceAtMost(OptionCellMax)
+            val capped = (maxWidth / total).coerceAtMost(OptionCellMax)
+            // Capture stands apart at the left only when there is real room to set it apart; a
+            // sliver of spare width would read as one uneven gap, so then every cell shares it.
+            val apart = capture != null && maxWidth - capped * total >= capped
+            val cell = if (apart) capped else maxWidth / total
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 if (capture != null) {
                     OptionCell(capture, cell)
-                    Spacer(Modifier.weight(1f))
+                    if (apart) Spacer(Modifier.weight(1f))
                 }
                 options.forEach { OptionCell(it, cell) }
             }

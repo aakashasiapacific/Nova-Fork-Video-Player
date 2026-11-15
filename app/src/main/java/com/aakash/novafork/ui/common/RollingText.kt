@@ -25,7 +25,7 @@ import androidx.compose.ui.unit.IntOffset
 /**
  * Text whose digits roll when they change, as iOS's numeric content transition: a digit going up
  * slides up and out while the new one comes up from below (down for a smaller one); anything that
- * is not a digit crossfades. Digits are tabular so the line keeps its width. Characters are lined
+ * is not a digit crossfades. Clocks pass equal-width digits in their style. Characters are lined
  * up from the end, so "9:59" to "10:00" rolls each place under its old one. Reads as one piece of
  * text to accessibility and tests.
  */
@@ -36,7 +36,8 @@ fun RollingText(
     style: TextStyle = LocalTextStyle.current,
     color: Color = Color.Unspecified,
 ) {
-    val tabular = style.copy(fontFeatureSettings = "tnum")
+    // The caller's own digits: a running clock passes equal-width ones, a caption its natural ones.
+    val tabular = style
     Row(modifier.clearAndSetSemantics { this.text = AnnotatedString(text) }, verticalAlignment = Alignment.CenterVertically) {
         text.forEachIndexed { index, char ->
             key(text.length - index) {

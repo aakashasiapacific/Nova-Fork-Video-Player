@@ -175,7 +175,10 @@ fun PhoneShowDetailsScreen(
             val trailer = details.trailerUrl
             if (trailer != null) {
                 item(key = "trailer") {
-                    Row(Modifier.padding(start = dims.gutter, end = dims.gutter, top = 12.dp)) {
+                    Row(
+                        (if (hasOverview) Modifier.fillMaxWidth().tintBand(tint, from = 0.55f, to = 0.55f) else Modifier)
+                            .padding(start = dims.gutter, end = dims.gutter, top = 12.dp),
+                    ) {
                         TrailerPill(trailer, onOpen = actions::openWebPage)
                     }
                 }

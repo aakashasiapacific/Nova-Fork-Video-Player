@@ -361,15 +361,11 @@ private fun Modifier.tuckable(tuck: CollapsingTitle): Modifier = this
  */
 @Composable
 private fun BrowseTiles(actions: AppActions, modifier: Modifier = Modifier) {
-    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            BrowseTile("Movies", R.drawable.ic_movie, NovaColors.IosBlue, Modifier.weight(1f)) { actions.openLibrary(LibraryFilter.MOVIES) }
-            BrowseTile("Shows", R.drawable.ic_tv, NovaColors.IosBlue, Modifier.weight(1f)) { actions.openLibrary(LibraryFilter.SHOWS) }
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            BrowseTile("Music", R.drawable.ic_music_notes, NovaColors.AppleMusicRed, Modifier.weight(1f)) { actions.selectTab(TopDestination.AUDIO) }
-            Spacer(Modifier.weight(1f))
-        }
+    // One row of three equal tiles: no empty place beside the last one.
+    Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        BrowseTile("Movies", R.drawable.ic_movie, NovaColors.IosBlue, Modifier.weight(1f)) { actions.openLibrary(LibraryFilter.MOVIES) }
+        BrowseTile("Shows", R.drawable.ic_tv, NovaColors.IosBlue, Modifier.weight(1f)) { actions.openLibrary(LibraryFilter.SHOWS) }
+        BrowseTile("Music", R.drawable.ic_music_notes, NovaColors.AppleMusicRed, Modifier.weight(1f)) { actions.selectTab(TopDestination.AUDIO) }
     }
 }
 

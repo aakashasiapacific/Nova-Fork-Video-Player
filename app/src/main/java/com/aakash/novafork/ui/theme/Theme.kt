@@ -110,8 +110,8 @@ private fun ios(size: Float, line: Float, weight: FontWeight, tracking: Float): 
     fontSize = size.sp,
     lineHeight = line.sp,
     letterSpacing = tracking.sp,
-    // Equal-width digits everywhere, so times and counts never jitter as they change.
-    fontFeatureSettings = "tnum",
+    // Digits keep their natural widths, as in Apple's text ("S1 · E4", "1h 41m" set tight);
+    // running clocks ask for equal-width digits themselves so they never jitter.
 )
 
 private val Base = Typography()
