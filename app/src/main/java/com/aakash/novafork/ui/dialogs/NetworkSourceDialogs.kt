@@ -321,7 +321,8 @@ internal fun NetworkServerDialog(dialog: DialogUi.NetworkServer, actions: AppAct
 }
 
 private fun dialogTitle(type: SourceType, adding: Boolean): String {
-    val noun = if (type == SourceType.NFS) "share" else "server"
+    // Apple's title case, as "Add Network Source" before it.
+    val noun = if (type == SourceType.NFS) "Share" else "Server"
     return "${if (adding) "Add" else "Edit"} ${NetworkForms.typeLabel(type)} $noun"
 }
 
@@ -603,7 +604,7 @@ internal fun UpnpServersDialog(dialog: DialogUi.UpnpServers, actions: AppActions
         form = true,
         onDismissRequest = actions::dismissDialog,
         icon = { NovaIcon(sourceTypeIcon(SourceType.UPNP), contentDescription = null) },
-        title = { Text("DLNA servers") },
+        title = { Text("DLNA Servers") },
         text = {
             Column(
                 Modifier.verticalScroll(rememberScrollState()),

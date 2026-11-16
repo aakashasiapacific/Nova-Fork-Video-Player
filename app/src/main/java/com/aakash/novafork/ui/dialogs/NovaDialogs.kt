@@ -72,7 +72,7 @@ fun NovaDialogs(dialog: DialogUi?, actions: AppActions, playlists: List<Playlist
             onDismiss = actions::dismissDialog,
         )
         is DialogUi.RenamePlaylist -> PlaylistNameDialog(
-            title = "Rename playlist",
+            title = "Rename Playlist",
             confirmLabel = "Rename",
             initialName = dialog.name,
             onConfirm = { name -> actions.renamePlaylist(dialog.playlistId, name) },

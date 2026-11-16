@@ -219,7 +219,7 @@ private fun RestoreDialog(preview: RestorePreviewUi, onRestore: () -> Unit, onCa
     NovaAlertDialog(
         form = true,
         onDismissRequest = onCancel,
-        title = { Text("Restore this backup?") },
+        title = { Text("Restore This Backup?") },
         text = {
             Column(
                 Modifier.verticalScroll(rememberScrollState()),

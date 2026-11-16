@@ -507,7 +507,7 @@ private fun ClearMetadataRow(shape: Shape, onConfirm: () -> Unit) {
     if (confirming) {
         NovaAlertDialog(
             onDismissRequest = { confirming = false },
-            title = { Text("Clear metadata?") },
+            title = { Text("Clear Metadata?") },
             text = {
                 Text("Posters, backdrops and details from TMDB are removed and downloaded again. Your videos and watch history stay.")
             },

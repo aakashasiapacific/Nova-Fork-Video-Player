@@ -40,7 +40,7 @@ internal fun LibraryDiagnosticsDialog(dialog: DialogUi.LibraryDiagnostics, actio
         form = true,
         onDismissRequest = actions::dismissDialog,
         icon = { NovaIcon(R.drawable.ic_info, contentDescription = null) },
-        title = { Text("Library diagnostics") },
+        title = { Text("Library Diagnostics") },
         text = {
             if (report == null) {
                 Row(verticalAlignment = Alignment.CenterVertically) {

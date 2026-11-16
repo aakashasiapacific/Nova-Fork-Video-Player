@@ -267,7 +267,8 @@ fun NovaAlertDialog(
     title: (@Composable () -> Unit)? = null,
     text: (@Composable () -> Unit)? = null,
     properties: DialogProperties = DialogProperties(),
-    @Suppress("UNUSED_PARAMETER") form: Boolean = false,
+    /** A form: its buttons line up with its fields' edges instead of sitting a little wider. */
+    form: Boolean = false,
 ) {
     BasicAlertDialog(onDismissRequest = onDismissRequest, modifier = modifier, properties = properties) {
         Surface(shape = RoundedCornerShape(AlertCorner), color = IosColors.Popover, contentColor = Color.White) {
@@ -299,7 +300,7 @@ fun NovaAlertDialog(
                 Row(
                     Modifier
                         .fillMaxWidth()
-                        .padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
+                        .padding(start = if (form) 22.dp else 16.dp, end = if (form) 22.dp else 16.dp, bottom = 16.dp),
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     if (dismissButton != null) {

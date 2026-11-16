@@ -80,7 +80,7 @@ internal fun SmbServerDialog(dialog: DialogUi.SmbServer, actions: AppActions) {
         onDismissRequest = actions::dismissDialog,
         properties = DialogProperties(dismissOnClickOutside = false),
         icon = { NovaIcon(R.drawable.ic_lan, contentDescription = null) },
-        title = { Text(if (initial.id == null) "Add network share" else "Edit network share") },
+        title = { Text(if (initial.id == null) "Add Network Share" else "Edit Network Share") },
         text = {
             Column(
                 Modifier.verticalScroll(rememberScrollState()),
