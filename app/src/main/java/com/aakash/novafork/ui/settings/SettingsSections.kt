@@ -615,6 +615,21 @@ private val DeinterlaceChoices = listOf(Option(-1, "Automatic"), Option(0, "Off"
 
 private val DoubleTapZones = listOf(Option(25, "Narrow"), Option(33, "Normal"), Option(40, "Wide"), Option(50, "Half each"))
 
+/** Each player button's row shows that button's own glyph, as it looks in the player. */
+private fun PlayerButton.prefIconRes(): Int = when (this) {
+    PlayerButton.POPUP -> R.drawable.ic_player_popup
+    PlayerButton.ROTATE -> R.drawable.ic_player_rotate
+    PlayerButton.LOCK -> R.drawable.ic_player_lock
+    PlayerButton.REPEAT -> R.drawable.ic_player_mode_all
+    PlayerButton.EQUALIZER -> R.drawable.ic_player_equalizer
+    PlayerButton.NIGHT -> R.drawable.ic_player_night
+    PlayerButton.SLEEP -> R.drawable.ic_player_sleep
+    PlayerButton.CAST -> R.drawable.ic_player_cast
+    PlayerButton.BOOKMARKS -> R.drawable.ic_bookmark
+    PlayerButton.BACKGROUND -> R.drawable.ic_player_headphones
+    PlayerButton.CAPTURE -> R.drawable.ic_player_capture
+}
+
 /** Preferences › Player › Player Buttons: a switch per button the player can do without. */
 private fun playerButtonsGroup(settings: Settings, actions: AppActions): SettingsGroup {
     val hidden = settings.hiddenPlayerButtons.split(',').map { it.trim() }.filter { it.isNotEmpty() }.toSet()
@@ -622,7 +637,7 @@ private fun playerButtonsGroup(settings: Settings, actions: AppActions): Setting
         key = "player-buttons",
         title = "Player buttons",
         rows = PlayerButton.entries.map { button ->
-            switchRow("player-button-${button.key}", R.drawable.ic_grid_view, button.label, button.key !in hidden) { shown ->
+            switchRow("player-button-${button.key}", button.prefIconRes(), button.label, button.key !in hidden) { shown ->
                 val next = if (shown) hidden - button.key else hidden + button.key
                 actions.updateSettings { it.copy(hiddenPlayerButtons = next.sorted().joinToString(",")) }
             }
@@ -665,16 +680,16 @@ private fun playerGroups(settings: Settings, actions: AppActions): List<Settings
             switchRow("autoplay-next", R.drawable.ic_skip_next, "Auto-play next episode", settings.autoPlayNext) { on ->
                 actions.updateSettings { it.copy(autoPlayNext = on) }
             },
-            switchRow("stream-stats", R.drawable.ic_hd, "Stream stats", settings.showStreamStats) { on ->
+            switchRow("stream-stats", R.drawable.ic_info, "Stream stats", settings.showStreamStats) { on ->
                 actions.updateSettings { it.copy(showStreamStats = on) }
             },
-            choiceRow("network-buffer", R.drawable.ic_hd, "Network buffer", NetworkBuffers, settings.networkBufferMs, tile = IosPalette.Gray) { ms ->
+            choiceRow("network-buffer", R.drawable.ic_wifi, "Network buffer", NetworkBuffers, settings.networkBufferMs, tile = IosPalette.Gray) { ms ->
                 actions.updateSettings { it.copy(networkBufferMs = ms) }
             },
-            choiceRow("deinterlace", R.drawable.ic_hd, "Deinterlace", DeinterlaceChoices, settings.deinterlace, tile = IosPalette.Gray) { mode ->
+            choiceRow("deinterlace", R.drawable.ic_tune, "Deinterlace", DeinterlaceChoices, settings.deinterlace, tile = IosPalette.Gray) { mode ->
                 actions.updateSettings { it.copy(deinterlace = mode) }
             },
-            choiceRow("double-tap-zone", R.drawable.ic_replay, "Double-tap area", DoubleTapZones, settings.doubleTapZonePercent) { percent ->
+            choiceRow("double-tap-zone", R.drawable.ic_pref_touch, "Double-tap area", DoubleTapZones, settings.doubleTapZonePercent) { percent ->
                 actions.updateSettings { it.copy(doubleTapZonePercent = percent) }
             },
         ),

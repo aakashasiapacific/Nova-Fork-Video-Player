@@ -997,8 +997,8 @@ private const val MiniFlingVelocity = 900f
 private val MiniDismissDrag = 44.dp
 
 
-/** iOS's dark tab bar material: near-black and a little see-through. */
-private val DockColor = Color(0xF2121214)
+/** iOS's dark tab bar material: near-black. Solid, since nothing blurs the page behind it: see-through, the page's text showed sharp between the tab names. */
+private val DockColor = Color(0xFF121214)
 
 /** The first page of [tab], as [AppActions.selectTab] opens it. */
 private fun rootOf(tab: TopDestination): Route = when (tab) {

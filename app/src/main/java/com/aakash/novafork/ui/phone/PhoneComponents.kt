@@ -255,11 +255,17 @@ private fun PosterCardLayout(
         }
         if (!bare) {
             Spacer(Modifier.height(Spacing.sm))
+            // A long title fades at the card's edge, as on the wide cards: one way of ending
+            // cut-off titles everywhere, not "…" on some cards and a fade on others.
+            var titleCut by remember { mutableStateOf(false) }
             Text(
                 text = searchHighlighted(title),
                 style = MaterialTheme.typography.titleSmall,
                 maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+                softWrap = false,
+                overflow = TextOverflow.Clip,
+                onTextLayout = { titleCut = it.hasVisualOverflow },
+                modifier = Modifier.fadeLastLine(1) { titleCut },
             )
             // Always present, one line each (Apple TV), so cards in a row or grid line up tidily.
             Text(
