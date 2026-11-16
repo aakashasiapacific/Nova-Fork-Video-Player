@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.aakash.novafork.data.ServerMetadataTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-11-16T04:42:08.450Z" hostname="runnervmccnms" time="0.235">
+  <properties/>
+  <testcase name="identifyOutranksTheServerAndLastsThroughRescans" classname="com.aakash.novafork.data.ServerMetadataTest" time="0.043"/>
+  <testcase name="episodesTakeTheServersShowAndNumbering" classname="com.aakash.novafork.data.ServerMetadataTest" time="0.034"/>
+  <testcase name="clearingMetadataKeepsWhatServersDescribed" classname="com.aakash.novafork.data.ServerMetadataTest" time="0.037"/>
+  <testcase name="aMovieIsStoredAsTheServerDescribesIt" classname="com.aakash.novafork.data.ServerMetadataTest" time="0.031"/>
+  <testcase name="unusableMetadataIsIgnored" classname="com.aakash.novafork.data.ServerMetadataTest" time="0.03"/>
+  <testcase name="removingTheServerTakesItsMetadataAlong" classname="com.aakash.novafork.data.ServerMetadataTest" time="0.028"/>
+  <testcase name="aRescanUpdatesWhatTheServerSaysAndDropsWhatItNoLongerSays" classname="com.aakash.novafork.data.ServerMetadataTest" time="0.032"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

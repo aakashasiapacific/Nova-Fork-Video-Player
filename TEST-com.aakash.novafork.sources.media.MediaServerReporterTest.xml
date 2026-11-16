@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.aakash.novafork.sources.media.MediaServerReporterTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-11-16T04:42:11.796Z" hostname="runnervmccnms" time="0.15">
+  <properties/>
+  <testcase name="aFinishedVideoIsStoppedAndMarkedOnceThroughTheCredits" classname="com.aakash.novafork.sources.media.MediaServerReporterTest" time="0.037"/>
+  <testcase name="noSaveForAWhileStopsTheSessionAtTheLastPosition" classname="com.aakash.novafork.sources.media.MediaServerReporterTest" time="0.018"/>
+  <testcase name="markingAnotherVideoLeavesThePlayingOneAlone" classname="com.aakash.novafork.sources.media.MediaServerReporterTest" time="0.02"/>
+  <testcase name="anotherVideoStartingStopsThePreviousOneWhereItWas" classname="com.aakash.novafork.sources.media.MediaServerReporterTest" time="0.019"/>
+  <testcase name="savesBecomeAStartAndProgressEveryTenSeconds" classname="com.aakash.novafork.sources.media.MediaServerReporterTest" time="0.019"/>
+  <testcase name="aFailedStopStillMarksTheVideoWatched" classname="com.aakash.novafork.sources.media.MediaServerReporterTest" time="0.019"/>
+  <testcase name="sourcesWithoutAServerAreIgnored" classname="com.aakash.novafork.sources.media.MediaServerReporterTest" time="0.018"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
