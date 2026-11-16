@@ -86,7 +86,8 @@ private fun HomeRowsEditor(
                         contentDescription = "Move ${row.label}",
                         tint = IosColors.TertiaryLabel,
                         modifier = Modifier
-                            .size(22.dp)
+                            // In the same 28dp place as the other rows' glyphs, so every label starts on one line.
+                            .size(28.dp)
                             .pointerInput(row) {
                                 detectDragGestures(
                                     onDragStart = {

@@ -233,7 +233,12 @@ internal fun PlayerSeekBar(
     Box(modifier.onGloballyPositioned { bubbleCoords[0] = it }) {
         if (stacked) {
             Column(Modifier.fillMaxWidth()) {
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                // The times start and end exactly where the track does: the slider sets its track
+                // in by half its 28dp thumb, and the end time carries 4dp of its own for its tap.
+                Row(
+                    Modifier.fillMaxWidth().padding(start = StackedTrackInset, end = StackedTrackInset - 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
                     elapsed()
                     Spacer(Modifier.weight(1f))
                     end()
@@ -254,6 +259,9 @@ internal fun PlayerSeekBar(
         bigTimeLabel()
     }
 }
+
+/** Half the seek slider's 28dp thumb box: how far its track sits in from the slider's own edges. */
+private val StackedTrackInset = 14.dp
 
 /** Whether a drag from [fromMs] to [toMs] passed a 10-second mark or a chapter's start. */
 private fun passesMark(fromMs: Long, toMs: Long, chapterStarts: List<Long>): Boolean {

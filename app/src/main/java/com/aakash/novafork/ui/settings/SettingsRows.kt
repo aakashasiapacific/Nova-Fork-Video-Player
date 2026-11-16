@@ -228,6 +228,7 @@ internal fun prefIcon(@DrawableRes icon: Int): Int = when (icon) {
     R.drawable.ic_hd -> R.drawable.ic_pref_hd
     R.drawable.ic_hide_image -> R.drawable.ic_pref_hide_image
     R.drawable.ic_history -> R.drawable.ic_pref_history
+    R.drawable.ic_home -> R.drawable.ic_pref_home
     R.drawable.ic_image -> R.drawable.ic_pref_image
     R.drawable.ic_info -> R.drawable.ic_pref_info
     R.drawable.ic_key -> R.drawable.ic_pref_key
@@ -273,7 +274,8 @@ internal fun prefIcon(@DrawableRes icon: Int): Int = when (icon) {
 @Composable
 internal fun IconTile(@DrawableRes icon: Int, color: Color, size: Dp = TileSize) {
     Box(Modifier.size(size), contentAlignment = Alignment.Center) {
-        NovaIcon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(size * 0.8f))
+        // Preferences' outline version where there is one, so a list never mixes filled and outlined glyphs.
+        NovaIcon(prefIcon(icon), contentDescription = null, tint = Color.White, modifier = Modifier.size(size * 0.8f))
     }
 }
 
