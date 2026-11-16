@@ -48,7 +48,22 @@ data class DiagnosticsInput(
     val stats: LibraryStats?,
     val statsError: String? = null,
     val scan: ScanState = ScanState(),
+    /** Null when the music library wasn't asked (older callers, tests). */
+    val music: MusicDiagnostics? = null,
 )
+
+/** The music side of the report: access, songs per source (by name) and the last music scan. */
+data class MusicDiagnostics(
+    /** READ_MEDIA_AUDIO (or the storage permission before Android 13), or All files access. */
+    val hasAccess: Boolean,
+    /** Source name and type → songs shown, hidden (not found by the last scan). */
+    val sources: List<MusicSourceCount> = emptyList(),
+    val lastScanAt: Long? = null,
+    val scanning: Boolean = false,
+    val error: String? = null,
+)
+
+data class MusicSourceCount(val name: String, val type: String, val shown: Int, val hidden: Int)
 
 /**
  * Settings › About › Library diagnostics: a plain-text report a user can copy or share when the
@@ -67,6 +82,7 @@ object LibraryDiagnostics {
         settings: Settings,
         appVersion: String,
         census: suspend () -> MediaStoreCensus,
+        music: suspend () -> MusicDiagnostics? = { null },
     ): String = withContext(Dispatchers.IO) {
         var statsError: String? = null
         val stats = try {
@@ -84,6 +100,13 @@ object LibraryDiagnostics {
         } catch (e: Exception) {
             MediaStoreCensus(error = describe(e))
         }
+        val musicReport = try {
+            music()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            MusicDiagnostics(hasAccess = StoragePermissions.hasAudioAccess(context), error = describe(e))
+        }
         format(
             DiagnosticsInput(
                 createdAt = System.currentTimeMillis(),
@@ -98,6 +121,7 @@ object LibraryDiagnostics {
                 stats = stats,
                 statsError = statsError,
                 scan = library.scanState.value,
+                music = musicReport,
             ),
         )
     }
@@ -208,6 +232,24 @@ object LibraryDiagnostics {
         )
         if (input.scan.enriching) appendLine("Fetching posters: ${input.scan.enrichDone} / ${input.scan.enrichTotal}")
         input.scan.lastError?.takeIf { it.isNotBlank() }?.let { appendLine("Last error: $it") }
+
+        val music = input.music
+        if (music != null) {
+            section("Music")
+            appendLine("Music Nova can see on the device: ${if (music.hasAccess) "all" else "none (no access to music)"}")
+            if (music.sources.isEmpty()) appendLine("Songs: none")
+            music.sources.forEach { entry ->
+                appendLine("${entry.name} (${entry.type}): ${entry.shown} songs shown · hidden: ${entry.hidden}")
+            }
+            appendLine(
+                "Last music scan: " + when {
+                    music.scanning -> "running now"
+                    music.lastScanAt != null -> at(music.lastScanAt)
+                    else -> "not since the app started"
+                },
+            )
+            music.error?.takeIf { it.isNotBlank() }?.let { appendLine("Last music error: $it") }
+        }
     }.trimEnd() + "\n"
 
     private fun StringBuilder.section(title: String) {

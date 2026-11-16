@@ -146,6 +146,16 @@ internal class SubtitleDownloads(
         }
     }
 
+    private val attempts = context.getSharedPreferences(ATTEMPTS_PREFS, Context.MODE_PRIVATE)
+
+    /** True once a quiet fetch ("Fetch missing subtitles") was tried for [videoKey]: never twice. */
+    fun quietAttempted(videoKey: String): Boolean = attempts.getBoolean(videoKey, false)
+
+    /** Remembers that [videoKey]'s quiet fetch was tried. */
+    fun markQuietAttempt(videoKey: String) {
+        attempts.edit().putBoolean(videoKey, true).apply()
+    }
+
     /** The OpenSubtitles hash of a file on this device, read through the content resolver; null when it can't be read. */
     private suspend fun movieHash(target: Target): String? = withContext(Dispatchers.IO) {
         try {
@@ -176,6 +186,7 @@ internal class SubtitleDownloads(
 
     private companion object {
         const val TAG = "SubtitleDownloads"
+        const val ATTEMPTS_PREFS = "quiet_subtitle_attempts"
 
         /** In the video's download folder: its automatic download is settled. Hidden, so never loaded as a subtitle. */
         const val AUTO_MARKER = ".auto-download"

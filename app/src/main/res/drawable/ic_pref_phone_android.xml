@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Preferences-only outline glyph: 24dp grid, 1.5 stroke, round caps. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:pathData="M8.3 3.5h7.4a1.8 1.8 0 0 1 1.8 1.8v13.4a1.8 1.8 0 0 1 -1.8 1.8h-7.4a1.8 1.8 0 0 1 -1.8 -1.8v-13.4a1.8 1.8 0 0 1 1.8 -1.8z"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="1.5"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+    <path
+        android:pathData="M10.5 17.5h3"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="1.5"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+</vector>

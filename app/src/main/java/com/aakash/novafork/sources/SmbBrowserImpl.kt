@@ -147,6 +147,47 @@ class SmbBrowserImpl(
         return opened.getAndSet(null) ?: throw IOException("Couldn't open $smbUri")
     }
 
+    override suspend fun rename(smbUri: String, newName: String): String {
+        val location = SmbUris.parse(smbUri) ?: throw IOException("Not an smb:// address: $smbUri")
+        if (location.path.isEmpty()) throw IOException("Not a file: $smbUri")
+        if (newName.isBlank() || '/' in newName || '\\' in newName) throw IOException("Not a file name: $newName")
+        val credentials = credentialsFor(location.host, location.share) ?: SmbCredentials(null, null, null)
+        val target = location.copy(path = location.parentPath.let { if (it.isEmpty()) newName else "$it/$newName" })
+        withContext(Dispatchers.IO) { renameBlocking(location, target, credentials) }
+        return SmbUris.build(target)
+    }
+
+    /** Renames inside one share; a file already named [target] is never replaced. */
+    private fun renameBlocking(location: SmbLocation, target: SmbLocation, credentials: SmbCredentials) {
+        val key = sessionKey(location.host, location.port, credentials)
+        try {
+            withShare(key, location.share, failFast = true) { disk ->
+                if (disk.fileExists(target.path.toSmbPath()) || disk.folderExists(target.path.toSmbPath())) {
+                    throw IOException("A file named ${target.name} already exists")
+                }
+                val file = disk.openFile(
+                    location.path.toSmbPath(),
+                    EnumSet.of(AccessMask.DELETE, AccessMask.GENERIC_READ),
+                    null,
+                    SMB2ShareAccess.ALL,
+                    SMB2CreateDisposition.FILE_OPEN,
+                    null,
+                )
+                try {
+                    file.rename(target.path.toSmbPath(), false)
+                } finally {
+                    file.closeSilently()
+                }
+            }
+        } catch (e: IOException) {
+            throw e
+        } catch (e: Exception) {
+            throw failure(e, key, location.host, location.share, location.path, isFile = true)
+        } catch (e: LinkageError) {
+            throw unsupported(e)
+        }
+    }
+
     private fun openBlocking(location: SmbLocation, credentials: SmbCredentials): SmbReadHandle {
         val key = sessionKey(location.host, location.port, credentials)
         return try {

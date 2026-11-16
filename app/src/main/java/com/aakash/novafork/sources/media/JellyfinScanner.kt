@@ -144,6 +144,9 @@ internal object JellyfinItems {
             height = videoStream?.height ?: item.height,
             dateAdded = JellyfinDates.epochMillis(item.dateCreated) ?: now,
             remoteId = item.id,
+            // 100 ns ticks to ms.
+            serverPositionMs = item.userData?.playbackPositionTicks?.takeIf { it > 0 }?.div(10_000),
+            serverWatched = item.userData?.played == true,
             serverMetadata = metadata(client, item, series, season),
         )
     }

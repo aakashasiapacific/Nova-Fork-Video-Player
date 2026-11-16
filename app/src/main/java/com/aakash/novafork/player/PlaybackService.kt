@@ -166,6 +166,21 @@ class PlaybackService : Service() {
         return START_NOT_STICKY
     }
 
+    /**
+     * The app was cleared from recents (its main task or the player's): playback stops with it,
+     * background play or not (owner's choice).
+     */
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        super.onTaskRemoved(rootIntent)
+        PlayerDiagnostics.record("app cleared from recents: playback stopped")
+        controller.close()
+        if (foreground) stopForeground(STOP_FOREGROUND_REMOVE)
+        foreground = false
+        notificationManager.cancel(NOTIFICATION_ID)
+        posted = null
+        stopSelf()
+    }
+
     override fun onDestroy() {
         destroyed = true
         artworkJob?.cancel()

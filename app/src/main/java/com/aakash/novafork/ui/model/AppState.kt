@@ -6,8 +6,20 @@ import com.aakash.novafork.data.db.SourceType
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
-/** Top-level tabs. Phone shows them in a bottom NavigationBar, tablet in a NavigationRail. */
-enum class TopDestination(val label: String) { HOME("Home"), LIBRARY("Library"), BROWSE("Browse"), SETTINGS("Settings") }
+/**
+ * The four tabs, in the Apple TV app's order (owner's decision): Video (the Home feed, with the
+ * library behind its row headers and "Library" entry), Audio, Settings (with the sources) and
+ * Search. Phone shows them in a bottom bar, tablet in a rail.
+ */
+enum class TopDestination(val label: String) {
+    VIDEO("Video"),
+
+    /** Music (a temporary test screen until the Apple Music-style design). */
+    AUDIO("Audio"),
+    /** Settings, called "Preferences" with a person icon (owner's choice). */
+    SETTINGS("Preferences"),
+    SEARCH("Search"),
+}
 
 @Immutable
 sealed interface Route {
@@ -15,20 +27,51 @@ sealed interface Route {
     data object Library : Route
     data object Browse : Route
     data object Settings : Route
+    data object Audio : Route
     data object Search : Route
     data class VideoDetails(val videoId: Long) : Route
     data class ShowDetails(val showKey: String) : Route
     data class BrowseDir(val sourceId: Long, val path: String) : Route
     data class Playlist(val playlistId: Long) : Route
+
+    /** Everything left partway, from Home's "Continue Watching ›". */
+    data object ContinueWatching : Route
+
+    /** The next episode of each show being watched, from Home's "Up Next ›". */
+    data object UpNext : Route
+
+    /** Every video played, newest first, from Home's Library list. */
+    data object History : Route
+
+    /** One section of Preferences on its own page (phone), as iOS Settings opens its rows. */
+    data class SettingsPage(val section: String) : Route
+
+    /** An actor's or director's page: the library's movies and shows with [name] in their credits. */
+    data class Person(val name: String) : Route
+
+    /** Preferences › Hidden Videos: what was hidden from the library, each with "Unhide". */
+    data object HiddenVideos : Route
+
+    /** Coming Up: new episodes on the way for the library's shows. */
+    data object Upcoming : Route
+
+    /** The channels of an IPTV list (an .m3u link). */
+    data class Channels(val url: String) : Route
+
+    /** Preferences › Library Health: videos without artwork or details, episodes the names gave no number. */
+    data object LibraryHealth : Route
 }
 
 /** The tab a route belongs to (for highlighting the nav bar / rail). */
 val Route.top: TopDestination
     get() = when (this) {
-        Route.Home, is Route.VideoDetails, is Route.ShowDetails, Route.Search -> TopDestination.HOME
-        Route.Library -> TopDestination.LIBRARY
-        Route.Browse, is Route.BrowseDir, is Route.Playlist -> TopDestination.BROWSE
-        Route.Settings -> TopDestination.SETTINGS
+        Route.Home, Route.Library, Route.ContinueWatching, Route.UpNext, Route.History, is Route.VideoDetails, is Route.ShowDetails, is Route.Playlist,
+        is Route.Person, Route.Upcoming, is Route.Channels,
+        -> TopDestination.VIDEO
+        // Sources are under Settings.
+        Route.Browse, is Route.BrowseDir, Route.Settings, is Route.SettingsPage, Route.HiddenVideos, Route.LibraryHealth -> TopDestination.SETTINGS
+        Route.Audio -> TopDestination.AUDIO
+        Route.Search -> TopDestination.SEARCH
     }
 
 @Immutable
@@ -112,7 +155,7 @@ sealed interface DialogUi {
     /** Save a stream URL to the library. */
     data object AddStream : DialogUi
 
-    /** Play a URL once without saving ("Open network stream" in VLC). */
+    /** Play a URL once without saving ("Open Network Stream" in VLC). */
     data object OpenUrl : DialogUi
 
     data class SmbServer(
@@ -133,7 +176,24 @@ sealed interface DialogUi {
 
     data class ConfirmRemoveSource(val source: SourceUi) : DialogUi
 
-    /** "Add network source": picks the kind of server (SMB, FTP, SFTP, NFS, WebDAV, DLNA/UPnP, Jellyfin, Emby, Plex). */
+    /**
+     * "Change artwork": TMDB's posters and backdrops for a movie or show ([metadataKey]), as TMDB
+     * paths ("/abc.jpg"); [poster]/[backdrop] are the ones shown now. Picking one applies it.
+     */
+    data class ChangeArtwork(
+        val metadataKey: String,
+        val title: String,
+        val loading: Boolean = true,
+        val posters: List<String> = emptyList(),
+        val backdrops: List<String> = emptyList(),
+        val poster: String? = null,
+        val backdrop: String? = null,
+        /** The user picked artwork for it before: "Use TMDB's" undoes that. */
+        val customised: Boolean = false,
+        val error: String? = null,
+    ) : DialogUi
+
+    /** "Add Network Source": picks the kind of server (SMB, FTP, SFTP, NFS, WebDAV, DLNA/UPnP, Jellyfin, Emby, Plex). */
     data object AddSource : DialogUi
 
     /** Add or edit an FTP, SFTP, NFS, WebDAV, DLNA/UPnP (by address), Jellyfin, Emby or Plex source. */
@@ -187,6 +247,12 @@ data class BackupUi(
     val confirm: RestorePreviewUi? = null,
     /** Entries of a restore (watch history, matches, playlist items) still waiting for their videos to be scanned. */
     val waiting: Int = 0,
+    /** Automatic backup: weekly into [autoFolderName]. */
+    val autoWeekly: Boolean = false,
+    /** Name of the folder automatic backups go to; null = none picked yet. */
+    val autoFolderName: String? = null,
+    /** When the last automatic backup was written (epoch ms); null = never. */
+    val lastAutoAt: Long? = null,
 )
 
 /** What a backup file holds, shown before restoring it. */
@@ -203,16 +269,26 @@ data class RestorePreviewUi(
     val videos: Int,
     val matches: Int,
     val playlists: Int,
+    /** Songs with plays. */
+    val songs: Int = 0,
+    /** Watchlist and favorites entries. */
+    val saved: Int = 0,
 )
 
 private val IdleBackupState: StateFlow<BackupUi> = MutableStateFlow(BackupUi())
 
 @Immutable
 data class AppUiState(
+    /** False until the library has been read once (the launch screen stays up until then). */
+    val libraryLoaded: Boolean = false,
     val route: Route = Route.Home,
     /** The tab the current page was opened from (details opened from Library keep Library highlighted). */
-    val tab: TopDestination = TopDestination.HOME,
+    val tab: TopDestination = TopDestination.VIDEO,
     val canGoBack: Boolean = false,
+    /** Pages on the back stack (1 on a tab's first page): deeper is a push, shallower a pop. */
+    val stackDepth: Int = 1,
+    /** The page back would return to (drawn under the current one while it is swiped away). */
+    val previousRoute: Route? = null,
     val home: HomeUi = HomeUi(),
     val library: LibraryUi = LibraryUi(),
     val browse: BrowseUi = BrowseUi(),
@@ -226,6 +302,18 @@ data class AppUiState(
     val previewKey: String? = null,
     /** The playlist being shown (route Playlist); null while it loads or after it was deleted. */
     val playlist: PlaylistDetailsUi? = null,
+    /** The History page (route History): played videos by day, newest first. */
+    val history: List<HistoryDayUi> = emptyList(),
+    /** Set while route is [Route.Upcoming]. */
+    val upcoming: List<UpcomingUi> = emptyList(),
+    /** Set while route is [Route.Channels]. */
+    val channels: ChannelsUi? = null,
+    /** An actor's or director's page (route Person): the library's movies and shows they are credited in, newest first. */
+    val person: List<LibraryItemUi> = emptyList(),
+    /** Hidden Videos (route HiddenVideos): what was hidden from the library. */
+    val hidden: List<HiddenItemUi> = emptyList(),
+    /** Library Health (route LibraryHealth). */
+    val health: LibraryHealthUi = LibraryHealthUi(),
     val search: SearchUi = SearchUi(),
     val settings: SettingsUi = SettingsUi(),
     val scan: ScanUi = ScanUi(),
@@ -254,6 +342,12 @@ interface AppActions {
     fun preview(item: LibraryItemUi)
 
     fun refresh()
+
+    /** The library refresh with nothing shown for it (pulling a page down, coming back to the app). */
+    fun refreshQuietly() = refresh()
+
+    /** Looks through one source again (its row's "Scan Now"). */
+    fun scanSource(sourceId: Long) {}
     fun requestPermission()
     /** Opens the system "All files access" screen (Android 11+). */
     fun requestAllFilesAccess()
@@ -261,6 +355,84 @@ interface AppActions {
     fun setLibraryFilter(filter: LibraryFilter)
     fun setLibrarySort(sort: LibrarySort)
     fun search(query: String)
+
+    /** Keeps [query] in Search's recent searches (the keyboard's Search key, a result opened). */
+    fun rememberSearch(query: String) {}
+
+    fun clearRecentSearches() {}
+
+    /** Takes a video off the History page only (files, resume and watched state stay); a later play brings it back. */
+    fun hideFromHistory(videoId: Long, playedAt: Long) {}
+
+    /** Takes one search out of the recent searches (swiped away). */
+    fun forgetSearch(query: String) {}
+
+    /** Opens the page of an actor or director: the library's titles with [name] in their credits. */
+    fun openPerson(name: String) = navigate(Route.Person(name))
+
+    /** Hides a video from the library's screens (Browse still lists it); nothing is deleted. */
+    fun hideVideo(videoId: Long) {}
+
+    /** Keeps a title ("v:<id>" / "s:<showKey>") off Home; it stays in the library. */
+    fun hideFromHome(itemKey: String) {}
+
+    /** Pins a title to the front of Home's hero, or unpins it. */
+    fun toggleHomePin(itemKey: String) {}
+
+    fun isPinnedToHome(itemKey: String): Boolean = false
+
+    /** Brings back every title kept off Home. */
+    fun restoreHomeTitles() {}
+
+    /** Whether a video is set to play with software decoding (its hold menu), whatever the setting. */
+    fun isSoftwareDecoded(videoId: Long): Boolean = false
+
+    /** Shares a picture of the title's poster with its name and [line] ("2024 · 2h 10m"). */
+    fun sharePosterCard(title: String, line: String?, posterUrl: String?) {}
+
+    fun toggleSoftwareDecoding(videoId: Long) {}
+
+    /** Hides a show (all its episodes) from the library's screens. */
+    fun hideShow(showKey: String) {}
+
+    /** Brings hidden videos back into the library. */
+    fun unhideVideos(videoIds: List<Long>) {}
+
+    /** Opens the library (under the Video tab) showing [filter]. */
+    fun openLibrary(filter: LibraryFilter) {
+        navigate(Route.Library)
+        setLibraryFilter(filter)
+    }
+
+    /** Opens "Change artwork" for the movie or show [videoId] belongs to. */
+    fun changeArtwork(videoId: Long) {}
+
+    /** Uses this poster and/or backdrop (TMDB paths) for [metadataKey]; null leaves that one as it is. */
+    fun chooseArtwork(metadataKey: String, posterPath: String?, backdropPath: String?) {}
+
+    /** Back to TMDB's own poster and backdrop for [metadataKey]. */
+    fun resetArtwork(metadataKey: String) {}
+
+    /** The hero's "+": adds the item ([HeroUi.itemKey]) to the watchlist, or takes it off. */
+    fun toggleWatchlist(itemKey: String) {}
+
+    /** The hero's star: adds the item to Favorites, or takes it out. */
+    fun toggleFavorite(itemKey: String) {}
+
+    /**
+     * The watchlist/favorites key a video's long-press menu saves: its show for an episode (the
+     * library lists shows, not episodes), the video itself otherwise; null when it can't be saved.
+     */
+    fun saveKeyFor(videoId: Long): String? = null
+
+    /** Whether [itemKey] is in Favorites right now (read as a menu opens). */
+    fun isFavorite(itemKey: String): Boolean = false
+
+    /** Whether [itemKey] is on the watchlist right now (read as a menu opens). */
+    fun isOnWatchlist(itemKey: String): Boolean = false
+
+    /** Plays songs from search results (see [MusicResultUi]). */
+    fun playMusic(songIds: List<Long>, startIndex: Int) {}
 
     fun openSource(sourceId: Long) = navigate(Route.BrowseDir(sourceId, ""))
     fun openFolder(folder: FolderUi) = navigate(Route.BrowseDir(folder.sourceId, folder.path))
@@ -283,14 +455,27 @@ interface AppActions {
     fun identifyPick(videoId: Long, result: IdentifyResultUi)
     fun setWatched(videoId: Long, watched: Boolean)
 
+    /**
+     * "Rename in Library": shows [title] for the movie, show or video stored under [key]
+     * ([VideoDetailsUi.titleKey]) from now on; null or blank goes back to the original title.
+     * Only the name in the app changes; no file is renamed.
+     */
+    fun setTitleOverride(key: String, title: String?) {}
+
     fun updateSettings(transform: (Settings) -> Settings)
     fun checkTmdbKey()
     fun clearMetadata()
 
     fun consumeMessage()
 
+    /** A short notice at the top of the screen. */
+    fun showMessage(text: String) {}
+
     /** Shares the crash report text (Android share sheet). */
     fun shareCrashReport()
+
+    /** Shares a short report for a bug: the app and Android versions, the device, the player's recent events. */
+    fun shareDiagnostics() {}
     /** Forgets the crash report. */
     fun dismissCrashReport()
 
@@ -321,7 +506,7 @@ interface AppActions {
 
     fun openPlaylist(playlistId: Long) = navigate(Route.Playlist(playlistId))
 
-    /** Opens the "Add to playlist" sheet for [videoIds]; [label] names them in the sheet's title. */
+    /** Opens the "Add to Playlist" sheet for [videoIds]; [label] names them in the sheet's title. */
     fun addToPlaylist(videoIds: List<Long>, label: String = "") = showDialog(DialogUi.AddToPlaylist(videoIds, label))
 
     /** Appends [videoIds] to the playlist (videos already in it are skipped). */
@@ -341,7 +526,7 @@ interface AppActions {
 
     // Network sources: FTP, SFTP, NFS, WebDAV, DLNA/UPnP, Jellyfin, Emby and Plex (SMB keeps saveSmb/testSmb).
 
-    /** Opens the "Add network source" type picker ([DialogUi.AddSource]). */
+    /** Opens the "Add Network Source" type picker ([DialogUi.AddSource]). */
     fun addNetworkSource() = showDialog(DialogUi.AddSource)
 
     /**
@@ -374,6 +559,12 @@ interface AppActions {
     /** Plays a video of a live folder listing that the library doesn't hold (yet): [uri] as the library would store it. */
     fun playRemote(uri: String, title: String) {}
 
+    /**
+     * Renames the real file of [videoId] (a device or SMB video) to [newBaseName] plus its current
+     * extension, then updates the library. The outcome comes as a message; nothing is deleted.
+     */
+    fun renameVideoFile(videoId: Long, newBaseName: String) {}
+
     /** Opens [url] in the browser (plex.tv/link). */
     fun openWebPage(url: String) {}
 
@@ -388,6 +579,15 @@ interface AppActions {
      */
     fun exportBackup(includeSecrets: Boolean) {}
 
+    /** Saves the watch history as a CSV file the person picks (History's "Export"). */
+    fun exportHistory() {}
+
+    /** Saves a CSV list of every title in the library. */
+    fun exportLibrary() {}
+
+    /** Shows only one source's titles in the library (null = every source). */
+    fun setLibrarySource(sourceId: Long?) {}
+
     /** Picks a backup file (system picker) and reads it; [BackupUi.confirm] then asks before restoring. */
     fun importBackup() {}
 
@@ -396,6 +596,12 @@ interface AppActions {
 
     /** Forgets the backup waiting in [BackupUi.confirm]. */
     fun cancelRestore() {}
+
+    /** Automatic backup: Off or Weekly (it needs a folder, see [pickBackupFolder]). */
+    fun setAutoBackup(weekly: Boolean) {}
+
+    /** Picks the folder automatic backups are written to (system folder picker). */
+    fun pickBackupFolder() {}
 }
 
 /** No-op actions for previews and screenshot tests. */
@@ -431,3 +637,25 @@ open class NoOpAppActions : AppActions {
     override fun shareCrashReport() {}
     override fun dismissCrashReport() {}
 }
+
+
+/** A show of Coming Up: the day its next episode airs. */
+@Immutable
+data class UpcomingUi(
+    val showKey: String,
+    val title: String,
+    val artwork: Artwork,
+    /** "Today", "Tomorrow", "Friday" or "14 Nov". */
+    val dayLabel: String,
+    /** The full date, "Friday 14 November 2026". */
+    val dateLabel: String,
+)
+
+/** An IPTV list being read, or its channels. */
+@Immutable
+data class ChannelsUi(
+    val url: String,
+    val loading: Boolean = true,
+    val error: String? = null,
+    val channels: List<com.aakash.novafork.data.IptvChannel> = emptyList(),
+)

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Equaliser, after One UI's line icons: three sliders, each a line broken by its round knob. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path android:strokeColor="#FFFFFFFF" android:strokeWidth="1.7" android:strokeLineCap="round" android:pathData="M6,4.5 V11.3 M6,15.7 V19.5" />
+    <path android:strokeColor="#FFFFFFFF" android:strokeWidth="1.7" android:pathData="M3.8,13.5 A2.2,2.2 0 1,0 8.2,13.5 A2.2,2.2 0 1,0 3.8,13.5 Z" />
+    <path android:strokeColor="#FFFFFFFF" android:strokeWidth="1.7" android:strokeLineCap="round" android:pathData="M12,4.5 V6.3 M12,10.7 V19.5" />
+    <path android:strokeColor="#FFFFFFFF" android:strokeWidth="1.7" android:pathData="M9.8,8.5 A2.2,2.2 0 1,0 14.2,8.5 A2.2,2.2 0 1,0 9.8,8.5 Z" />
+    <path android:strokeColor="#FFFFFFFF" android:strokeWidth="1.7" android:strokeLineCap="round" android:pathData="M18,4.5 V13.3 M18,17.7 V19.5" />
+    <path android:strokeColor="#FFFFFFFF" android:strokeWidth="1.7" android:pathData="M15.8,15.5 A2.2,2.2 0 1,0 20.2,15.5 A2.2,2.2 0 1,0 15.8,15.5 Z" />
+</vector>

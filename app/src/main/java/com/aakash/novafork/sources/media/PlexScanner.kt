@@ -183,6 +183,8 @@ internal object PlexItems {
             dateAdded = item.addedAt?.takeIf { it > 0 }?.times(MILLIS_PER_SECOND) ?: now,
             dateModified = item.updatedAt?.takeIf { it > 0 }?.times(MILLIS_PER_SECOND),
             remoteId = item.ratingKey.takeIf { it.isNotBlank() },
+            serverPositionMs = item.viewOffset?.takeIf { it > 0 },
+            serverWatched = (item.viewCount ?: 0) > 0,
             serverMetadata = metadata,
         )
     }

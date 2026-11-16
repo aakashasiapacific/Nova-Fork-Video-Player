@@ -9,6 +9,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
+import android.graphics.Rect
 import android.graphics.drawable.Icon
 import android.os.Build
 import android.util.Log
@@ -27,6 +28,13 @@ internal class PipController(
     private var autoEnter = false
     private var aspectRatio = DEFAULT_ASPECT
     private var registered = false
+
+    /**
+     * Where the video view sits in the window. The picture within it (fitted to [aspectRatio])
+     * is handed to the system, so going into the pop-up window shrinks the picture itself into
+     * place in one motion instead of jumping.
+     */
+    var videoBounds: Rect? = null
 
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
@@ -103,11 +111,31 @@ internal class PipController(
         val builder = PictureInPictureParams.Builder()
             .setAspectRatio(aspectRatio)
             .setActions(listOf(RemoteAction(icon, label, label, toggleIntent)))
+        pictureBounds()?.let(builder::setSourceRectHint)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             builder.setAutoEnterEnabled(autoEnter)
             builder.setSeamlessResizeEnabled(true)
         }
         return builder.build()
+    }
+
+    /** The video's picture inside [videoBounds]: the largest [aspectRatio] rectangle, centred. */
+    private fun pictureBounds(): Rect? {
+        val bounds = videoBounds ?: return null
+        if (bounds.width() <= 0 || bounds.height() <= 0) return null
+        val ratio = aspectRatio.toFloat()
+        val width: Int
+        val height: Int
+        if (bounds.width() / bounds.height().toFloat() > ratio) {
+            height = bounds.height()
+            width = (height * ratio).toInt()
+        } else {
+            width = bounds.width()
+            height = (width / ratio).toInt()
+        }
+        val left = bounds.left + (bounds.width() - width) / 2
+        val top = bounds.top + (bounds.height() - height) / 2
+        return Rect(left, top, left + width, top + height)
     }
 
     /** The system rejects ratios outside [1/2.39, 2.39]; the bounds used here stay just inside. */

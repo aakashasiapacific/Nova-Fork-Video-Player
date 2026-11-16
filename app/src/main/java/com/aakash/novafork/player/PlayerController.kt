@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.pm.ActivityInfo
 import android.content.res.Configuration
 import android.media.AudioManager
+import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.os.Build
 import android.os.Handler
@@ -11,7 +12,10 @@ import android.os.Looper
 import android.os.ParcelFileDescriptor
 import android.os.SystemClock
 import android.provider.OpenableColumns
+import android.provider.Settings as SystemSettings
 import android.util.Log
+import android.view.KeyEvent
+import androidx.compose.ui.graphics.asImageBitmap
 import com.aakash.novafork.AppGraph
 import com.aakash.novafork.CrashReporter
 import com.aakash.novafork.core.library.VideoFiles
@@ -20,6 +24,7 @@ import com.aakash.novafork.core.opensubtitles.OpenSubtitlesLanguages
 import com.aakash.novafork.core.opensubtitles.SubtitleResult
 import com.aakash.novafork.core.smb.SmbUris
 import com.aakash.novafork.data.AspectMode
+import com.aakash.novafork.data.Connectivity
 import com.aakash.novafork.data.HwDecoding
 import com.aakash.novafork.data.Settings
 import com.aakash.novafork.data.SmbCredentials
@@ -29,18 +34,23 @@ import com.aakash.novafork.data.db.VideoWithMeta
 import com.aakash.novafork.sources.DownloadedSubtitles
 import com.aakash.novafork.sources.SubtitleFinder
 import com.aakash.novafork.ui.model.Artwork
+import com.aakash.novafork.ui.model.BookmarkUi
 import com.aakash.novafork.ui.model.CastDeviceUi
+import com.aakash.novafork.ui.model.ChapterUi
 import com.aakash.novafork.ui.model.GestureFeedback
 import com.aakash.novafork.ui.model.PlayerActions
 import com.aakash.novafork.ui.model.PlayerUiState
 import com.aakash.novafork.ui.model.QueueItemUi
 import com.aakash.novafork.ui.model.RepeatMode
+import com.aakash.novafork.ui.model.SLEEP_END_OF_VIDEO
+import com.aakash.novafork.ui.model.SleepTimerUi
 import com.aakash.novafork.ui.model.SubtitleSearchUi
 import com.aakash.novafork.ui.model.TrackUi
 import com.aakash.novafork.ui.model.UpNextUi
 import java.io.File
 import java.util.Locale
 import java.util.concurrent.atomic.AtomicReference
+import kotlin.math.ceil
 import kotlin.math.roundToInt
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -50,16 +60,19 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import org.videolan.libvlc.MediaPlayer
 import org.videolan.libvlc.RendererItem
 import org.videolan.libvlc.interfaces.IMedia
 import org.videolan.libvlc.util.VLCVideoLayout
-import android.provider.Settings as SystemSettings
 
 /** The decoded picture as it is displayed: sample aspect ratio and rotation already applied. */
 data class VideoSize(val width: Int, val height: Int) {
@@ -110,6 +123,9 @@ class PlayerController(
 
         /** The configuration of the screen the player is shown on. */
         val screenConfiguration: Configuration
+
+        /** Saves the frame on screen to the gallery; [onDone] says whether it did, on the main thread. */
+        fun captureFrame(onDone: (Boolean) -> Unit)
     }
 
     private class NowPlaying(val uri: String, val kind: UriKind, val fileName: String, val entry: VideoWithMeta?) {
@@ -128,14 +144,39 @@ class PlayerController(
     private class CarriedChoices(val audioTrack: Int?, val subtitleTrack: Int?, val subtitleDelayMs: Long)
 
     private val appContext: Context = context.applicationContext
-    private val libVLC = VlcEngine.libVLC(appContext)
-    private val mediaPlayer: MediaPlayer = VlcEngine.newMediaPlayer(appContext)
+    // Videos draw subtitles in the person's style (size, box, height): an instance made with it.
+    private val libVLC = graph.settings.settings.value.let { settings ->
+        VlcEngine.videoLibVLC(
+            appContext,
+            VlcEngine.SubtitleStyle(
+                settings.subtitleSize,
+                settings.subtitleBackground,
+                settings.subtitleMargin,
+                color = settings.subtitleColor,
+                bold = settings.subtitleBold,
+                font = settings.subtitleFont,
+                outline = settings.subtitleOutline,
+            ),
+        )
+    }
+    private val mediaPlayer: MediaPlayer = MediaPlayer(libVLC)
     private val audioManager: AudioManager = checkNotNull(appContext.getSystemService(AudioManager::class.java))
     private val mainHandler = Handler(Looper.getMainLooper())
     private val subtitleFinder = SubtitleFinder(appContext, graph.smb) { server, share ->
         graph.library.smbCredentials(server, share)
     }
     private val subtitleDownloads = SubtitleDownloads(appContext, graph, subtitleFinder)
+    private val subtitleDelays = SubtitleDelays(appContext)
+    private val showPreferences = ShowPreferences(appContext)
+    private val audioDelays = AudioDelays(appContext)
+    private val bookmarkStore = VideoBookmarkStore(appContext)
+    private var subtitleSizeJob: Job? = null
+
+    /** A video paused when its subtitle size changed stays paused after it reopens. */
+    private var pauseAfterReopen = false
+    private val videoAspects = VideoAspects(appContext)
+    /** The playing episode's show, for what a show remembers (speed, audio language). */
+    private var currentShowKey: String? = null
 
     /** The player screen, while one is shown. */
     private var host: Host? = null
@@ -211,6 +252,15 @@ class PlayerController(
     private var resumeBannerPending = false
     private var userRotated = false
 
+    /** Frames for the scrub bubble: the open retriever, for which uri, and the latest request. */
+    private var frameRetriever: MediaMetadataRetriever? = null
+    private var frameRetrieverUri: String? = null
+    private var frameJob: Job? = null
+    private val frameLock = Mutex()
+
+    /** The current video's shape read from its file before playback, for turning the screen early. */
+    private var fileShape: VideoSize? = null
+
     /** False from open() until the new media is set: the player still holds the previous one. */
     private var mediaReady = false
 
@@ -226,6 +276,9 @@ class PlayerController(
     private var rememberedSubtitle: Int? = null
     private var audioLanguage: Set<String> = emptySet()
     private var subtitleLanguage: Set<String> = emptySet()
+
+    /** The show's earlier episodes had subtitles turned off: this one starts without them too. */
+    private var showSubtitlesOff = false
     private var audioChoicePending = false
     private var externalSubtitles: List<File>? = null
     private var subtitleSetupDone = false
@@ -261,7 +314,7 @@ class PlayerController(
 
     // Gestures
     private var volumeLevel = 0f
-    private var volumeGestureActive = false
+    private var volumeHudJob: Job? = null
     private var scrubStartMs: Long? = null
     private var seekSeriesStartMs: Long? = null
     private var seekSeriesTargetMs: Long? = null
@@ -293,6 +346,12 @@ class PlayerController(
     private var resumeBannerJob: Job? = null
     private var feedbackJob: Job? = null
     private var pictureWatchJob: Job? = null
+
+    /** The sleep timer counting down, then fading the video out; see [setSleepTimer]. */
+    private var sleepJob: Job? = null
+
+    /** The sleep timer waits for the end of the video playing ("End of Video"). */
+    private var sleepAtEnd = false
 
     private val eventListener = object : MediaPlayer.EventListener {
         override fun onEvent(event: MediaPlayer.Event) = onPlayerEvent(event)
@@ -328,6 +387,37 @@ class PlayerController(
         },
     )
 
+    /** Preferences' Stream stats: the input bitrate and dropped frames, read once a second. */
+    private val statsJob: Job = scope.launch {
+        var lastBytes = -1L
+        while (true) {
+            delay(STATS_EVERY_MS)
+            if (released) break
+            if (!graph.settings.settings.value.showStreamStats) {
+                lastBytes = -1L
+                if (_state.value.streamStats != null) _state.update { it.copy(streamStats = null) }
+                continue
+            }
+            val media = mediaPlayer.media ?: continue
+            try {
+                val stats = media.stats ?: continue
+                val bytes = stats.readBytes.toLong()
+                val mbps = if (lastBytes >= 0L && bytes >= lastBytes) (bytes - lastBytes) * 8.0 / 1_000_000.0 else null
+                lastBytes = bytes
+                val line = listOfNotNull(
+                    mbps?.let { String.format(java.util.Locale.ROOT, "%.1f Mb/s", it) },
+                    "${stats.lostPictures} dropped",
+                    if (stats.lostAbuffers > 0) "${stats.lostAbuffers} audio lost" else null,
+                ).joinToString(" · ")
+                _state.update { it.copy(streamStats = line) }
+            } catch (e: Exception) {
+                Log.w(TAG, "Couldn't read stream stats", e)
+            } finally {
+                media.release()
+            }
+        }
+    }
+
     init {
         mediaPlayer.setEventListener(eventListener)
         val settings = graph.settings.settings.value
@@ -335,6 +425,8 @@ class PlayerController(
         _state.value = PlayerUiState(
             aspect = settings.defaultAspect,
             seekStepMs = seekStepMs(settings),
+            doubleTapZone = settings.doubleTapZonePercent / 100f,
+            hiddenButtons = hiddenButtons(settings),
             // Both come from the screen once one attaches.
             canEnterPictureInPicture = false,
             canRotate = canRotateScreen(appContext.resources.configuration),
@@ -345,6 +437,18 @@ class PlayerController(
                 delay(SAVE_INTERVAL_MS)
                 if (_state.value.isPlaying) saveProgress()
             }
+        }
+        // The equaliser and night mode follow the settings as they change, also mid-video:
+        // libVLC keeps them on the player for every video it opens after.
+        scope.launch {
+            graph.settings.settings
+                .map { Triple(it.equalizerPreset, it.equalizerBands, it.nightMode) }
+                .distinctUntilChanged()
+                .collect { (preset, _, night) ->
+                    if (released) return@collect
+                    AudioEffects.applyEqualizer(mediaPlayer, graph.settings.settings.value, nightMode = night)
+                    _state.update { it.copy(nightMode = night, equalizerOn = preset.isNotBlank()) }
+                }
         }
     }
 
@@ -401,7 +505,7 @@ class PlayerController(
                 brightness = brightness,
             )
         }
-        _videoSize.value?.let { applyOrientation(it) }
+        (_videoSize.value ?: fileShape)?.let { applyOrientation(it) }
     }
 
     fun detachHost(host: Host) {
@@ -432,7 +536,6 @@ class PlayerController(
         hostPaused = false
         pictureWatchJob?.cancel()
         scrubStartMs = null
-        volumeGestureActive = false
         // Off before the surface goes: a decoder writing to a vanished surface can fail.
         disableVideo()
         detachSurface()
@@ -477,6 +580,7 @@ class PlayerController(
         feedbackJob?.cancel()
         pictureWatchJob?.cancel()
         queueJob?.cancel()
+        sleepJob?.cancel()
         if (mediaPlayer.hasMedia()) {
             mediaPlayer.stop()
             dropStaleEvents()
@@ -683,7 +787,28 @@ class PlayerController(
         }
         val current = NowPlaying(uri, kind, fileName, entry)
         nowPlaying = current
-        _state.update { it.copy(title = titles.title, subtitle = titles.subtitle) }
+        // The timing set for this video before (owner), unless one was carried over from a reopen.
+        if (carried == null) {
+            val delayMs = subtitleDelays.get(current.videoKey)
+            if (delayMs != _state.value.subtitleDelayMs) _state.update { it.copy(subtitleDelayMs = delayMs) }
+        }
+        // And the fit or zoom picked for it before (owner), else the one last picked for its show.
+        (videoAspects.get(current.videoKey) ?: showPreferences.aspect(entry?.video?.showKey))?.let { mode ->
+            if (mode != _state.value.aspect) {
+                mediaPlayer.setVideoScale(mode.toScaleType())
+                _state.update { it.copy(aspect = mode) }
+            }
+        }
+        _state.update {
+            it.copy(
+                bookmarks = bookmarkStore.bookmarks(current.videoKey).map(::bookmarkUi),
+                title = titles.title,
+                subtitle = titles.subtitle,
+                overview = entry?.meta?.overview?.takeIf { text -> text.isNotBlank() },
+                finished = false,
+                chapterFrameSource = chapterFrameSourceOf(current),
+            )
+        }
         if (entry != null) {
             val videoId = entry.video.id
             // A link that turned out to be a library video becomes a queue of one.
@@ -700,12 +825,21 @@ class PlayerController(
         val carry = carried
         rememberedAudio = carry?.audioTrack ?: video?.audioTrackId
         rememberedSubtitle = carry?.subtitleTrack ?: video?.subtitleTrackId
-        audioLanguage = TrackLanguages.aliases(settings.preferredAudioLanguage)
-        subtitleLanguage = TrackLanguages.aliases(settings.preferredSubtitleLanguage)
+        currentShowKey = video?.showKey
+        // A show's own audio language (owner: remembered per show) before the general preference.
+        audioLanguage = showPreferences.audioLanguage(currentShowKey) ?: TrackLanguages.aliases(settings.preferredAudioLanguage)
+        // And the speed last chosen for it, unless a reopen carries one over.
+        if (carry == null) showPreferences.rate(currentShowKey)?.let { rate -> _state.update { it.copy(rate = rate) } }
+        // Likewise the subtitle language (or none) last chosen for the show.
+        showSubtitlesOff = showPreferences.subtitlesOff(currentShowKey)
+        // A show's own choice, then its source's language (Preferences › Library), then the general one.
+        val sourceLanguage = video?.sourceId?.let { com.aakash.novafork.data.SourceSubtitleLanguages.get(appContext, it) }
+        subtitleLanguage = showPreferences.subtitleLanguage(currentShowKey)
+            ?: TrackLanguages.aliases(sourceLanguage ?: settings.preferredSubtitleLanguage)
         audioChoicePending = rememberedAudio != null || audioLanguage.isNotEmpty()
         val resumeAt = if (
             video != null && settings.resumePlayback && !request.startOver && !video.watched &&
-            video.positionMs > RESUME_MIN_MS
+            video.positionMs > 0L
         ) {
             video.positionMs
         } else {
@@ -715,6 +849,25 @@ class PlayerController(
         resumeBannerPending = request.startPositionMs == null && resumeAt != null
 
         startSubtitleSearch(current, settings)
+
+        // Turn the screen to the video's shape from the file itself, before the first frame: a
+        // phone's reel opens in portrait straight away instead of landscape (owner).
+        fileShape = if (kind == UriKind.CONTENT || kind == UriKind.FILE) readFileShape(uri) else null
+        // A network video names its source under the buffering ring.
+        _state.update { it.copy(sourceName = null) }
+        if (!kind.isLocal) {
+            scope.launch {
+                val name = try {
+                    graph.library.sourceForUri(uri)?.name
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    null
+                }
+                if (name != null && nowPlaying?.uri == uri) _state.update { it.copy(sourceName = name) }
+            }
+        }
+        fileShape?.let { applyOrientation(it) }
 
         val decoding = MediaSource.decodingFor(uri, settings.hardwareDecoding)
         this.decoding = decoding
@@ -746,6 +899,32 @@ class PlayerController(
         } catch (e: Exception) {
             Log.w(TAG, "Library lookup failed", e)
             null
+        }
+    }
+
+    /**
+     * The picture's shape as it is shown: the stored width and height, swapped when the file
+     * says to turn it a quarter (how phones store videos filmed upright). Null when unknown.
+     */
+    private suspend fun readFileShape(uri: String): VideoSize? = withContext(Dispatchers.IO) {
+        val retriever = MediaMetadataRetriever()
+        try {
+            val parsed = Uri.parse(uri)
+            if (parsed.scheme == "file") retriever.setDataSource(parsed.path) else retriever.setDataSource(appContext, parsed)
+            val width = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)?.toIntOrNull() ?: 0
+            val height = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)?.toIntOrNull() ?: 0
+            val rotation = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION)?.toIntOrNull() ?: 0
+            when {
+                width <= 0 || height <= 0 -> null
+                rotation % 180 != 0 -> VideoSize(height, width)
+                else -> VideoSize(width, height)
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            null
+        } finally {
+            runCatching { retriever.release() }
         }
     }
 
@@ -860,6 +1039,13 @@ class PlayerController(
         _videoSize.value = null
     }
 
+    /** Where chapter pictures come from: the file itself when it is on this device (as for the scrub frames), else none. */
+    private fun chapterFrameSourceOf(playing: NowPlaying): String? = when (playing.kind) {
+        UriKind.CONTENT -> playing.uri
+        UriKind.FILE -> if (playing.uri.startsWith("/")) "file://${playing.uri}" else playing.uri
+        UriKind.SMB, UriKind.NETWORK -> null
+    }
+
     private fun freshState(old: PlayerUiState, title: String): PlayerUiState = PlayerUiState(
         title = title,
         isBuffering = true,
@@ -870,6 +1056,9 @@ class PlayerController(
         canEnterPictureInPicture = old.canEnterPictureInPicture,
         canRotate = old.canRotate,
         seekStepMs = seekStepMs(graph.settings.settings.value),
+        doubleTapZone = graph.settings.settings.value.doubleTapZonePercent / 100f,
+        hiddenButtons = hiddenButtons(graph.settings.settings.value),
+        subtitleSize = graph.settings.settings.value.subtitleSize,
         volume = old.volume,
         brightness = old.brightness,
         shuffle = old.shuffle,
@@ -950,11 +1139,15 @@ class PlayerController(
         PlayerDiagnostics.record(if (inPictureInPicture) "picture-in-picture on" else "picture-in-picture off")
         if (inPictureInPicture) {
             scrubStartMs = null
-            volumeGestureActive = false
             feedbackJob?.cancel()
+            volumeHudJob?.cancel()
         }
         _state.update {
-            it.copy(inPictureInPicture = inPictureInPicture, feedback = if (inPictureInPicture) null else it.feedback)
+            it.copy(
+                inPictureInPicture = inPictureInPicture,
+                feedback = if (inPictureInPicture) null else it.feedback,
+                volumeHud = if (inPictureInPicture) null else it.volumeHud,
+            )
         }
     }
 
@@ -1007,6 +1200,14 @@ class PlayerController(
         if (released) return
         saveProgress()
         released = true
+        statsJob.cancel()
+        frameJob?.cancel()
+        // Not while a read still runs; the retriever then goes with the process.
+        if (frameLock.tryLock()) {
+            frameRetriever?.let { retriever -> runCatching { retriever.release() } }
+            frameRetriever = null
+            frameLock.unlock()
+        }
         openJob?.cancel()
         subtitleJob?.cancel()
         subtitleSearchJob?.cancel()
@@ -1043,6 +1244,8 @@ class PlayerController(
     override fun play() {
         if (released || !hasContent) return
         pausedByFocusLoss = false
+        // Played again after (or while) the sleep timer faded it out: the picture and sound come back.
+        if (_state.value.sleepDim > 0f) setSleepTimer(0)
         val request = lastRequest
         if (_state.value.error != null && request != null) {
             // Retry, continuing where it stopped when it had started.
@@ -1100,46 +1303,84 @@ class PlayerController(
         val feedback = GestureFeedback.Seek(target, target - start, current.durationMs)
         if (commit) {
             scrubStartMs = null
+            frameJob?.cancel()
+            _state.update { it.copy(scrubFrame = null) }
             seekInternal(target)
             showFeedback(feedback, GESTURE_FEEDBACK_MS)
         } else {
             showFeedback(feedback, hideAfterMs = null)
+            previewFrame(target)
         }
     }
 
-    override fun adjustVolume(delta: Float) {
-        if (released) return
-        if (!volumeGestureActive) {
-            volumeGestureActive = true
-            volumeLevel = systemVolumeLevel()
-        }
-        // Kept as a fraction so slow drags add up across the coarse system steps.
-        volumeLevel = (volumeLevel + delta).coerceIn(0f, 1f)
-        val max = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
-        val index = (volumeLevel * max).roundToInt()
-        if (!audioManager.isVolumeFixed && index != audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)) {
-            try {
-                audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, index, 0)
-            } catch (e: SecurityException) {
-                Log.w(TAG, "Volume change refused", e)
+    /**
+     * The frame at [positionMs] for the scrub bubble, as Samsung's player shows one: read from a
+     * file on the phone (not a stream) with one retriever kept open while scrubbing, the latest
+     * request winning.
+     */
+    private fun previewFrame(positionMs: Long) {
+        val playing = nowPlaying ?: return
+        if (playing.kind != UriKind.CONTENT && playing.kind != UriKind.FILE) return
+        frameJob?.cancel()
+        frameJob = scope.launch {
+            delay(FRAME_PREVIEW_DELAY_MS)
+            val frame = withContext(Dispatchers.IO) {
+                // One read at a time: a cancelled read may still be running when the next starts.
+                frameLock.withLock {
+                    runCatching {
+                        val retriever = frameRetriever?.takeIf { frameRetrieverUri == playing.uri } ?: MediaMetadataRetriever().also { opened ->
+                            frameRetriever?.let { old -> runCatching { old.release() } }
+                            val parsed = Uri.parse(playing.uri)
+                            if (parsed.scheme == "file") opened.setDataSource(parsed.path) else opened.setDataSource(appContext, parsed)
+                            frameRetriever = opened
+                            frameRetrieverUri = playing.uri
+                        }
+                        val micros = positionMs * 1000
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+                            retriever.getScaledFrameAtTime(micros, MediaMetadataRetriever.OPTION_CLOSEST_SYNC, FRAME_PREVIEW_PX, FRAME_PREVIEW_PX)
+                        } else {
+                            retriever.getFrameAtTime(micros, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+                        }
+                    }.getOrNull()?.asImageBitmap()
+                }
             }
+            if (frame != null && scrubStartMs != null) _state.update { it.copy(scrubFrame = frame) }
         }
-        val level = volumeLevel
-        _state.update { it.copy(volume = level) }
-        showFeedback(GestureFeedback.Volume(level), hideAfterMs = null)
     }
 
-    override fun adjustBrightness(delta: Float) {
-        val host = host
-        if (released || host == null) return
-        val level = (_state.value.brightness + delta).coerceIn(MIN_BRIGHTNESS, 1f)
-        host.windowBrightness = level
-        _state.update { it.copy(brightness = level) }
-        showFeedback(GestureFeedback.Brightness(level), hideAfterMs = null)
+    /**
+     * A volume key while the player is on screen (not in picture-in-picture): one step of the
+     * media volume, without the system's volume panel, shown with the player's own indicator
+     * ([PlayerUiState.volumeHud]). False when the system should handle the key: a device with
+     * fixed volume, or a change it refused.
+     */
+    fun onVolumeKey(keyCode: Int): Boolean {
+        if (released || audioManager.isVolumeFixed) return false
+        val direction = when (keyCode) {
+            KeyEvent.KEYCODE_VOLUME_UP -> AudioManager.ADJUST_RAISE
+            KeyEvent.KEYCODE_VOLUME_DOWN -> AudioManager.ADJUST_LOWER
+            KeyEvent.KEYCODE_VOLUME_MUTE -> AudioManager.ADJUST_TOGGLE_MUTE
+            else -> return false
+        }
+        try {
+            // No FLAG_SHOW_UI: the player shows the level itself.
+            audioManager.adjustStreamVolume(AudioManager.STREAM_MUSIC, direction, 0)
+        } catch (e: SecurityException) {
+            Log.w(TAG, "Volume change refused", e)
+            return false
+        }
+        val level = if (audioManager.isStreamMute(AudioManager.STREAM_MUSIC)) 0f else systemVolumeLevel()
+        volumeLevel = level
+        _state.update { it.copy(volume = level, volumeHud = level) }
+        volumeHudJob?.cancel()
+        volumeHudJob = scope.launch {
+            delay(VOLUME_HUD_MS)
+            _state.update { it.copy(volumeHud = null) }
+        }
+        return true
     }
 
     override fun endGesture() {
-        volumeGestureActive = false
         scrubStartMs = null
         if (_state.value.feedback != null) hideFeedbackAfter(GESTURE_FEEDBACK_MS)
     }
@@ -1154,6 +1395,8 @@ class PlayerController(
         val name = _state.value.audioTracks.firstOrNull { it.id == id }?.name
         showLabel(if (id == DISABLED_TRACK) "Audio off" else name ?: "Audio track changed")
         saveTrackChoice()
+        val show = currentShowKey
+        if (show != null && name != null && id != DISABLED_TRACK) showPreferences.setAudioTrack(show, name)
     }
 
     override fun selectSubtitleTrack(id: Int) {
@@ -1166,6 +1409,10 @@ class PlayerController(
         val name = _state.value.subtitleTracks.firstOrNull { it.id == id }?.name
         showLabel(if (id == DISABLED_TRACK) "Subtitles off" else name ?: "Subtitles on")
         saveTrackChoice()
+        val show = currentShowKey
+        if (show != null) {
+            if (id == DISABLED_TRACK) showPreferences.setSubtitlesOff(show) else if (name != null) showPreferences.setSubtitleTrack(show, name)
+        }
     }
 
     override fun pickSubtitleFile() {
@@ -1178,11 +1425,35 @@ class PlayerController(
         }
     }
 
+    override fun stepFrame(forward: Boolean) {
+        if (released || !_state.value.seekable) return
+        if (mediaPlayer.isPlaying) pause()
+        // libVLC 3 has no frame step backwards; a seek of one frame (24 fps) each way does both alike.
+        val target = clampPosition(currentPositionMs() + if (forward) FRAME_MS else -FRAME_MS)
+        seekInternal(target)
+    }
+
+    override fun holdSpeed(on: Boolean) {
+        if (released) return
+        // Not the chosen speed: nothing is saved, and letting go puts the chosen one back.
+        mediaPlayer.setRate(if (on) HOLD_RATE else _state.value.rate)
+        if (on) showLabel("2× speed")
+    }
+
+    override fun setAudioDelay(delayMs: Long) {
+        if (released) return
+        // libVLC takes microseconds; kept for the Bluetooth device (or speaker) playing now.
+        mediaPlayer.setAudioDelay(delayMs * 1_000)
+        _state.update { it.copy(audioDelayMs = delayMs) }
+        audioDelays.set(audioDelays.currentOutput(), delayMs)
+    }
+
     override fun setSubtitleDelay(delayMs: Long) {
         if (released) return
         // libVLC takes microseconds.
         mediaPlayer.setSpuDelay(delayMs * 1_000)
         _state.update { it.copy(subtitleDelayMs = delayMs) }
+        nowPlaying?.let { subtitleDelays.set(it.videoKey, delayMs) }
     }
 
     override fun cycleAspect() {
@@ -1194,6 +1465,8 @@ class PlayerController(
         if (released) return
         mediaPlayer.setVideoScale(mode.toScaleType())
         _state.update { it.copy(aspect = mode) }
+        nowPlaying?.let { videoAspects.set(it.videoKey, mode) }
+        currentShowKey?.let { showPreferences.setAspect(it, mode) }
         showLabel(mode.label)
     }
 
@@ -1202,6 +1475,7 @@ class PlayerController(
         val clamped = rate.coerceIn(MIN_RATE, MAX_RATE)
         mediaPlayer.setRate(clamped)
         _state.update { it.copy(rate = clamped) }
+        currentShowKey?.let { showPreferences.setRate(it, clamped) }
         showLabel(PlayerText.rateLabel(clamped))
     }
 
@@ -1222,6 +1496,12 @@ class PlayerController(
         userRotated = true
         host.screenOrientation = orientation
         showLabel(label)
+    }
+
+    override fun captureFrame() {
+        val host = host
+        if (released || host == null) return
+        host.captureFrame { saved -> showLabel(if (saved) "Saved to Pictures" else "Couldn't capture this frame") }
     }
 
     override fun enterPictureInPicture() {
@@ -1523,7 +1803,13 @@ class PlayerController(
                     _state.update { it.copy(isBuffering = buffering) }
                 }
             }
-            MediaPlayer.Event.Playing -> onPlaying()
+            MediaPlayer.Event.Playing -> {
+                // Reopened for a new subtitle size while paused: set up as usual, then back to paused.
+                val repause = pauseAfterReopen
+                pauseAfterReopen = false
+                onPlaying()
+                if (repause) pause()
+            }
             MediaPlayer.Event.Paused -> onPaused()
             MediaPlayer.Event.Stopped -> onStopped()
             MediaPlayer.Event.EndReached -> onEndReached()
@@ -1532,6 +1818,8 @@ class PlayerController(
             MediaPlayer.Event.LengthChanged -> {
                 val length = event.lengthChanged.coerceAtLeast(0L)
                 _state.update { it.copy(durationMs = length) }
+                // Some containers only list their chapters once the length is known.
+                if (playbackStarted) refreshChapters()
             }
             MediaPlayer.Event.SeekableChanged -> {
                 val seekable = event.seekable
@@ -1544,6 +1832,9 @@ class PlayerController(
             MediaPlayer.Event.ESAdded -> {
                 if (event.esChangedType == IMedia.Track.Type.Video) videoTrackSeen = true
                 onTracksChanged(added = true)
+                // The picture's size can be known here already; the video output event may come
+                // before libVLC reports the track.
+                if (event.esChangedType == IMedia.Track.Type.Video) onVideoOutput()
             }
             MediaPlayer.Event.ESDeleted, MediaPlayer.Event.ESSelected -> {
                 onTracksChanged(added = false)
@@ -1589,17 +1880,22 @@ class PlayerController(
                 mediaPlayer.setTime(target)
                 lastPositionUpdate = SystemClock.uptimeMillis()
                 _state.update { it.copy(positionMs = target) }
-                if (resumeBannerPending) showResumeBanner(target)
+                // No "Resumed at … · Start Over" pill (owner: no interruptions); it just plays on.
             }
             resumeBannerPending = false
         }
         if (firstStart) {
             val rate = _state.value.rate
             if (rate != 1f) mediaPlayer.setRate(rate)
+            // The delay set for these earbuds (or the speaker) before.
+            val audioDelayMs = audioDelays.get(audioDelays.currentOutput())
+            if (audioDelayMs != 0L) mediaPlayer.setAudioDelay(audioDelayMs * 1_000)
+            _state.update { it.copy(audioDelayMs = audioDelayMs) }
             // libVLC keeps the delay per input: one set while opening (or carried over) applies now.
             val subtitleDelayMs = _state.value.subtitleDelayMs
             if (subtitleDelayMs != 0L) mediaPlayer.setSpuDelay(subtitleDelayMs * 1_000)
             refreshTracks()
+            refreshChapters()
             if (audioChoicePending) applyAudioChoice()
             trySetupSubtitles()
         }
@@ -1611,6 +1907,26 @@ class PlayerController(
             inBackground -> disableVideo()
             else -> watchForPicture()
         }
+    }
+
+    /**
+     * Reads the file's chapters (libVLC knows them once the input is open; most files have none),
+     * for the marks on the seek bar, the Chapters list and Skip Intro.
+     */
+    private fun refreshChapters() {
+        val chapters = try {
+            mediaPlayer.getChapters(-1)
+        } catch (e: Exception) {
+            Log.w(TAG, "Couldn't read the chapters", e)
+            null
+        }?.mapIndexed { index, chapter ->
+            ChapterUi(
+                name = chapter.name?.trim()?.takeIf { it.isNotEmpty() } ?: "Chapter ${index + 1}",
+                startMs = chapter.timeOffset.coerceAtLeast(0L),
+                durationMs = chapter.duration.coerceAtLeast(0L),
+            )
+        }?.sortedBy { it.startMs }.orEmpty()
+        if (chapters != _state.value.chapters) _state.update { it.copy(chapters = chapters) }
     }
 
     private fun onPaused() {
@@ -1645,9 +1961,18 @@ class PlayerController(
     /**
      * What follows an ended video: itself again (repeat), the next queue item, or the next
      * episode; offered on the up-next card, started at once in the background when it would
-     * start by itself. With nothing to follow the player closes.
+     * start by itself. With nothing to follow it stays on the last frame ([endHere]).
      */
     private fun continueAfterEnd() {
+        if (sleepAtEnd) {
+            // The sleep timer said "End of Video": it stops here, whatever would follow.
+            sleepAtEnd = false
+            upNextJob?.cancel()
+            _playRequested.value = false
+            _state.update { it.copy(upNext = null, sleepTimer = null) }
+            endHere()
+            return
+        }
         val videoId = nowPlaying?.videoId
         val repeat = _state.value.repeatMode
         upNextJob?.cancel()
@@ -1664,7 +1989,7 @@ class PlayerController(
             if (usesQueue) {
                 val position = queue.nextPosition(wrap = repeat == RepeatMode.ALL)
                 if (position == null) {
-                    finishPlayback()
+                    endHere()
                     return@launch
                 }
                 if (inBackground) {
@@ -1680,7 +2005,7 @@ class PlayerController(
             } else {
                 next = if (videoId != null) nextEntry ?: fetchNextEpisode(videoId) else null
                 if (next == null) {
-                    finishPlayback()
+                    endHere()
                     return@launch
                 }
                 automatic = graph.settings.settings.value.autoPlayNext
@@ -1702,6 +2027,14 @@ class PlayerController(
     private fun finishPlayback() {
         PlayerDiagnostics.record("nothing left to play")
         onFinished()
+    }
+
+    /**
+     * Nothing follows the ended video: as Samsung's player does, it stays on its last frame with
+     * the controls up and Replay in the middle. Playing in the background, it closes instead.
+     */
+    private fun endHere() {
+        if (inBackground) finishPlayback() else _state.update { it.copy(finished = true) }
     }
 
     private suspend fun lookUp(videoId: Long): VideoWithMeta? =
@@ -1916,10 +2249,43 @@ class PlayerController(
     }
 
     private fun refreshTracks() {
+        recordStreamTraits()
         val audioTracks = trackList(mediaPlayer.audioTracks, mediaPlayer.audioTrack)
         val subtitleTracks = trackList(mediaPlayer.spuTracks, mediaPlayer.spuTrack)
         _state.update { it.copy(audioTracks = audioTracks, subtitleTracks = subtitleTracks) }
     }
+
+    /** Remembers the most audio channels of any track, for the details page's "5.1" badge. */
+    private fun recordStreamTraits() {
+        val videoId = nowPlaying?.entry?.video?.id ?: return
+        val media = mediaPlayer.media ?: return
+        try {
+            val channels = (0 until media.trackCount)
+                .mapNotNull { media.getTrack(it) as? IMedia.AudioTrack }
+                .maxOfOrNull { it.channels } ?: return
+            graph.streamTraits.recordChannels(videoId, channels)
+            graph.streamTraits.recordLanguages(
+                videoId,
+                languageList(mediaPlayer.audioTracks),
+                languageList(mediaPlayer.spuTracks),
+            )
+        } catch (e: Exception) {
+            Log.w(TAG, "Couldn't read the stream's tracks", e)
+        } finally {
+            media.release()
+        }
+    }
+
+    /** "English, French": the language each real track names, once each (track names look like "Track 1 - [English]"). */
+    private fun languageList(tracks: Array<out MediaPlayer.TrackDescription>?): String =
+        realTracks(tracks)
+            .mapNotNull { track ->
+                val name = track.name ?: return@mapNotNull null
+                val inBrackets = name.substringAfter('[', "").substringBefore(']', "")
+                inBrackets.ifBlank { if (" - " in name) name.substringAfterLast(" - ") else name }.trim().takeIf { it.isNotEmpty() && !it.startsWith("Track") }
+            }
+            .distinct()
+            .joinToString(", ")
 
     private fun trackList(tracks: Array<out MediaPlayer.TrackDescription>?, selectedId: Int): List<TrackUi> {
         val real = realTracks(tracks)
@@ -1991,26 +2357,47 @@ class PlayerController(
         val embedded = realTracks(mediaPlayer.spuTracks)
         val remembered = rememberedSubtitle
         var selected: File? = null
+        // The setting asks for captions when the media volume is off as the video opens.
+        val mutedCaptions = graph.settings.settings.value.captionsWhenMuted &&
+            audioManager.getStreamVolume(AudioManager.STREAM_MUSIC) == 0
         when {
             remembered == DISABLED_TRACK -> mediaPlayer.setSpuTrack(DISABLED_TRACK)
             remembered != null && embedded.any { it.id == remembered } -> mediaPlayer.setSpuTrack(remembered)
             // Most likely an external file: its track appears once the slave below is loaded.
             remembered != null -> pendingSubtitleRestore = remembered
+            // This show's earlier episodes had them off (unless the phone is muted and captions follow that).
+            showSubtitlesOff && !mutedCaptions -> mediaPlayer.setSpuTrack(DISABLED_TRACK)
             else -> {
-                val preferred = embedded.firstOrNull { TrackLanguages.matches(it.name, subtitleLanguage) }
-                if (preferred != null) {
+                val forcedOnly = graph.settings.settings.value.forcedSubtitlesOnly && !mutedCaptions
+                // Forced only: a forced track (signs, foreign lines) turns on; full subtitles stay off.
+                val preferred = if (forcedOnly) {
+                    embedded.firstOrNull { it.name.orEmpty().contains("forced", ignoreCase = true) && TrackLanguages.matches(it.name, subtitleLanguage) }
+                        ?: embedded.firstOrNull { it.name.orEmpty().contains("forced", ignoreCase = true) }
+                } else {
+                    embedded.firstOrNull { TrackLanguages.matches(it.name, subtitleLanguage) }
+                }
+                if (forcedOnly && preferred == null) {
+                    selected = external.firstOrNull { it.name.contains("forced", ignoreCase = true) }
+                    if (selected == null && embedded.isNotEmpty()) mediaPlayer.setSpuTrack(DISABLED_TRACK)
+                } else if (preferred != null) {
                     mediaPlayer.setSpuTrack(preferred.id)
                 } else {
                     selected = external.firstOrNull { isPreferredLanguage(it) }
                         ?: external.firstOrNull().takeIf { embedded.isEmpty() }
+                    // Muted with no language match: some captions beat none.
+                    if (mutedCaptions && selected == null) embedded.firstOrNull()?.let { mediaPlayer.setSpuTrack(it.id) }
                 }
             }
         }
         for (file in external) {
             if (file.absolutePath !in addedSubtitleFiles) addSubtitleFile(file, select = file == selected)
         }
+        addExternalAudioTracks()
         refreshTracks()
-        maybeDownloadSubtitles(embedded, external, remembered)
+        if (!showSubtitlesOff || remembered != null) {
+            maybeDownloadSubtitles(embedded, external, remembered)
+            maybeFetchMissingSubtitles(embedded, external)
+        }
     }
 
     /**
@@ -2045,6 +2432,49 @@ class PlayerController(
     }
 
     /** Adds [file] to the playing video as a subtitle track ([select]: turned on); false when libVLC refused it. */
+    /**
+     * Separate audio tracks next to the video (Movie.mka, Movie.ac3, Movie.eng.dts …) join the
+     * audio menu, as VLC adds them: same name, an audio-only extension. Local files only.
+     */
+    private fun addExternalAudioTracks() {
+        val current = nowPlaying ?: return
+        if (current.kind != UriKind.FILE && current.kind != UriKind.CONTENT) return
+        scope.launch {
+            val files = withContext(Dispatchers.IO) {
+                try {
+                    val path = localFilePath(current.uri) ?: return@withContext emptyList()
+                    val video = File(path)
+                    val base = VideoFiles.baseName(video.name)
+                    video.parentFile?.listFiles()?.filter { file ->
+                        file.isFile && file.canRead() &&
+                            VideoFiles.extension(file.name) in EXTERNAL_AUDIO_EXTENSIONS &&
+                            VideoFiles.baseName(file.name).let { it.equals(base, ignoreCase = true) || it.startsWith("$base.", ignoreCase = true) }
+                    }.orEmpty().take(4)
+                } catch (e: Exception) {
+                    emptyList()
+                }
+            }
+            if (released || nowPlaying !== current) return@launch
+            for (file in files) mediaPlayer.addSlave(IMedia.Slave.Type.Audio, Uri.fromFile(file), false)
+            if (files.isNotEmpty()) refreshTracks()
+        }
+    }
+
+    /** A java.io path for [uri]: itself, a file:// path, or MediaStore's DATA column when it is readable. */
+    private fun localFilePath(uri: String): String? {
+        if (uri.startsWith("/")) return uri
+        val parsed = Uri.parse(uri)
+        if (parsed.scheme == "file") return parsed.path
+        if (parsed.authority != android.provider.MediaStore.AUTHORITY) return null
+        return try {
+            appContext.contentResolver.query(parsed, arrayOf(android.provider.MediaStore.MediaColumns.DATA), null, null, null)?.use { c ->
+                if (c.moveToFirst()) c.getString(0) else null
+            }?.takeIf { File(it).canRead() }
+        } catch (e: Exception) {
+            null
+        }
+    }
+
     private fun addSubtitleFile(file: File, select: Boolean): Boolean {
         if (tracksBeforeFiles == null) tracksBeforeFiles = realTracks(mediaPlayer.spuTracks).map { it.id }.toSet()
         if (!mediaPlayer.addSlave(IMedia.Slave.Type.Subtitle, Uri.fromFile(file), select)) return false
@@ -2137,6 +2567,51 @@ class PlayerController(
                     GestureFeedback.Label("Couldn't download subtitles: ${SubtitleDownloadRules.errorMessage(e)}"),
                     MESSAGE_LABEL_MS,
                 )
+            }
+        }
+    }
+
+    /**
+     * With "Fetch missing subtitles" on (and the loud automatic download off): when the video has
+     * no subtitle in the first wanted language, fetches the best one and adds it to the subtitle
+     * menu, not turned on and without any message. Tried once per video; failures only reach the log.
+     */
+    private fun maybeFetchMissingSubtitles(embedded: List<MediaPlayer.TrackDescription>, external: List<File>) {
+        val current = nowPlaying ?: return
+        val settings = graph.settings.settings.value
+        if (!settings.fetchMissingSubtitles || settings.autoDownloadSubtitles || !subtitleDownloads.hasKey) return
+        if (!Connectivity(appContext).isOnline || subtitleDownloads.quietAttempted(current.videoKey)) return
+        val missing = SubtitleDownloadRules.quietLanguages(subtitleDownloads.languages(settings)) { language ->
+            val aliases = SubtitleDownloadRules.aliases(language)
+            embedded.any { TrackLanguages.matches(it.name, aliases) } ||
+                external.any { SubtitleDownloadRules.fileIsInLanguage(it.name, current.fileName, aliases) }
+        }
+        if (missing.isEmpty()) return
+        val forSession = session
+        autoSubtitleJob?.cancel()
+        autoSubtitleJob = scope.launch {
+            try {
+                val target = current.subtitleTarget
+                val best = when (val pick = subtitleDownloads.autoPick(target, missing)) {
+                    is SubtitleDownloadRules.AutoPick.Download -> pick.result
+                    SubtitleDownloadRules.AutoPick.Settle -> {
+                        subtitleDownloads.markQuietAttempt(current.videoKey)
+                        return@launch
+                    }
+                    // Not sure to fit yet: a later play, once the library matched the video, tries again.
+                    SubtitleDownloadRules.AutoPick.Later -> return@launch
+                }
+                subtitleDownloads.markQuietAttempt(current.videoKey)
+                val file = subtitleDownloads.download(target, best)
+                if (released || session != forSession || !mediaReady) return@launch
+                if (file.absolutePath !in addedSubtitleFiles && addSubtitleFile(file, select = false)) {
+                    PlayerDiagnostics.record("subtitles: fetched quietly")
+                    refreshTracks()
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.w(TAG, "Quiet subtitle fetch failed", e)
             }
         }
     }
@@ -2331,6 +2806,118 @@ class PlayerController(
         }
     }
 
+    override fun toggleNightMode() {
+        if (released) return
+        val on = !graph.settings.settings.value.nightMode
+        graph.settings.update { it.copy(nightMode = on) }
+        showLabel(if (on) "Night mode on" else "Night mode off")
+    }
+
+    override fun updateSettings(transform: (Settings) -> Settings) {
+        if (!released) graph.settings.update(transform)
+    }
+
+    private fun bookmarkUi(bookmark: VideoBookmark) = BookmarkUi(bookmark.positionMs, bookmark.label)
+
+    override fun addBookmark() {
+        val playing = nowPlaying ?: return
+        if (released || !mediaReady) return
+        val position = currentPositionMs().coerceAtLeast(0L)
+        val saved = bookmarkStore.add(playing.videoKey, position, formatPosition(position))
+        _state.update { it.copy(bookmarks = saved.map(::bookmarkUi)) }
+        showLabel("Bookmark added")
+    }
+
+    override fun removeBookmark(positionMs: Long) {
+        val playing = nowPlaying ?: return
+        val saved = bookmarkStore.remove(playing.videoKey, positionMs)
+        _state.update { it.copy(bookmarks = saved.map(::bookmarkUi)) }
+    }
+
+    /**
+     * Keeps [percent] as the app's subtitle size at once. The size is an option of the media, so
+     * once the slider rests the playing video is opened again at the same position with it.
+     */
+    override fun setSubtitleSize(percent: Int) {
+        if (released) return
+        val size = percent.coerceIn(50, 200)
+        if (graph.settings.settings.value.subtitleSize == size) return
+        graph.settings.update { it.copy(subtitleSize = size) }
+        _state.update { it.copy(subtitleSize = size) }
+        subtitleSizeJob?.cancel()
+        subtitleSizeJob = scope.launch {
+            delay(SUBTITLE_SIZE_SETTLE_MS)
+            reopenForSubtitleSize()
+        }
+    }
+
+    private fun reopenForSubtitleSize() {
+        val request = lastRequest
+        if (released || request == null || !hasContent || !mediaReady || ended || isCasting || !playbackStarted) return
+        val current = _state.value
+        if (current.error != null) return
+        val carry = CarriedChoices(
+            audioTrack = rememberedAudio ?: carried?.audioTrack,
+            subtitleTrack = rememberedSubtitle ?: carried?.subtitleTrack,
+            subtitleDelayMs = current.subtitleDelayMs,
+        )
+        val position = currentPositionMs().takeIf { it > 0 } ?: request.startPositionMs
+        PlayerDiagnostics.record("subtitles: size changed, reopening at the same position")
+        pauseAfterReopen = !mediaPlayer.isPlaying
+        openSession(request.copy(startPositionMs = position), carry)
+    }
+
+    override fun setSleepTimer(minutes: Int) {
+        if (released) return
+        sleepJob?.cancel()
+        sleepJob = null
+        sleepAtEnd = minutes == SLEEP_END_OF_VIDEO
+        // Turned off or changed mid-fade: the sound and the picture come straight back.
+        if (_state.value.sleepDim > 0f) {
+            mediaPlayer.setVolume(FULL_VOLUME)
+            _state.update { it.copy(sleepDim = 0f) }
+        }
+        when {
+            minutes == 0 -> _state.update { it.copy(sleepTimer = null) }
+            sleepAtEnd -> _state.update { it.copy(sleepTimer = SleepTimerUi(choice = minutes, minutesLeft = null)) }
+            else -> {
+                val endsAt = SystemClock.elapsedRealtime() + minutes * 60_000L
+                sleepJob = scope.launch { runSleepTimer(minutes, endsAt) }
+            }
+        }
+    }
+
+    /** Counts down to [endsAt] (elapsed realtime), showing the minutes left, then [fallAsleep]. */
+    private suspend fun runSleepTimer(choice: Int, endsAt: Long) {
+        while (true) {
+            val left = endsAt - SystemClock.elapsedRealtime()
+            if (left <= 0L) break
+            val minutesLeft = ceil(left / 60_000.0).toInt()
+            _state.update { it.copy(sleepTimer = SleepTimerUi(choice, minutesLeft)) }
+            delay(left.coerceAtMost(SLEEP_TICK_MS))
+        }
+        fallAsleep()
+    }
+
+    /**
+     * The sleep timer ran out: the picture dims and the sound fades together over
+     * [SLEEP_FADE_MS], then the video pauses (and the screen may sleep). It stays dimmed until it
+     * is played again.
+     */
+    private suspend fun fallAsleep() {
+        for (step in 1..SLEEP_FADE_STEPS) {
+            val shown = 1f - step.toFloat() / SLEEP_FADE_STEPS
+            if (released) return
+            mediaPlayer.setVolume((FULL_VOLUME * shown).roundToInt())
+            _state.update { it.copy(sleepDim = 1f - shown) }
+            delay(SLEEP_FADE_MS / SLEEP_FADE_STEPS)
+        }
+        sleepJob = null
+        pause()
+        if (!released) mediaPlayer.setVolume(FULL_VOLUME)
+        _state.update { it.copy(sleepTimer = null) }
+    }
+
     private fun showLabel(text: String) = showFeedback(GestureFeedback.Label(text), LABEL_MS)
 
     private fun showFeedback(feedback: GestureFeedback, hideAfterMs: Long?) {
@@ -2383,17 +2970,32 @@ class PlayerController(
     }
 
     private companion object {
+        const val STATS_EVERY_MS = 1_000L
         const val TAG = "PlayerController"
 
         const val ENABLE_SUBTITLES = true
         const val USE_TEXTURE_VIEW = false
         const val DISABLED_TRACK = -1
+
+        /** Audio-only files VLC takes as extra tracks of a video with the same name. */
+        val EXTERNAL_AUDIO_EXTENSIONS = setOf("mka", "ac3", "eac3", "dts", "thd", "aac", "flac", "opus")
         const val FULL_VOLUME = 100
         const val DUCKED_VOLUME = 30
+
+        /** The sleep timer's minutes left are refreshed this often; its fade lasts this long. */
+        const val SLEEP_TICK_MS = 15_000L
+        const val SLEEP_FADE_MS = 10_000L
+        const val SUBTITLE_SIZE_SETTLE_MS = 700L
+        const val SLEEP_FADE_STEPS = 30
+
+        /** The volume indicator stays this long after the last volume key, like iOS's. */
+        const val VOLUME_HUD_MS = 1_500L
 
         const val SAVE_INTERVAL_MS = 10_000L
         const val POSITION_UPDATE_INTERVAL_MS = 250L
         const val RESUME_MIN_MS = 10_000L
+        const val HOLD_RATE = 2f
+        const val FRAME_MS = 42L
         const val RESUME_BANNER_MS = 6_000L
         const val GESTURE_FEEDBACK_MS = 600L
         const val LABEL_MS = 1_200L
@@ -2424,6 +3026,12 @@ class PlayerController(
         /** libvlc_video_orient_t values 4–7 swap width and height. */
         val TRANSPOSED_ORIENTATIONS = 4..7
 
+        /** How long a scrub rests before its frame is read, so a fast drag reads few. */
+        const val FRAME_PREVIEW_DELAY_MS = 60L
+
+        /** The scrub bubble frame's longest side, in pixels. */
+        const val FRAME_PREVIEW_PX = 320
+
         /** Android 16 (API 36) ignores orientation requests of apps targeting it on screens this wide. */
         const val ORIENTATION_IGNORED_SDK = 36
         const val LARGE_SCREEN_DP = 600
@@ -2431,6 +3039,9 @@ class PlayerController(
         fun canRotateScreen(configuration: Configuration): Boolean =
             Build.VERSION.SDK_INT < ORIENTATION_IGNORED_SDK ||
                 configuration.smallestScreenWidthDp < LARGE_SCREEN_DP
+
+        fun hiddenButtons(settings: Settings): Set<String> =
+            settings.hiddenPlayerButtons.split(',').map { it.trim() }.filter { it.isNotEmpty() }.toSet()
 
         fun seekStepMs(settings: Settings): Long = settings.seekStepSeconds.coerceAtLeast(1) * 1_000L
 

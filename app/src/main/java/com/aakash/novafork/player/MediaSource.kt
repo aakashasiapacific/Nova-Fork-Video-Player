@@ -67,7 +67,6 @@ internal fun ParcelFileDescriptor?.closeQuietly() {
 
 internal object MediaSource {
     private const val TAG = "MediaSource"
-    private const val NETWORK_CACHING_MS = 1500
 
     /** Videos (by URI) whose hardware decoding failed in this process; they play in software now. */
     private val softwareOnly: MutableSet<String> = ConcurrentHashMap.newKeySet<String>()
@@ -76,8 +75,31 @@ internal object MediaSource {
      * The decoding [uri] gets: the setting, except that "Automatic" stays in software for a video
      * whose hardware decoding already failed in this process, so a fallback never repeats itself.
      */
-    fun decodingFor(uri: String, setting: HwDecoding): HwDecoding =
-        if (setting == HwDecoding.AUTO && uri in softwareOnly) HwDecoding.DISABLED else setting
+    fun decodingFor(uri: String, setting: HwDecoding): HwDecoding = when {
+        // Chosen for this video in its hold menu: software, whatever the setting.
+        uri in pinnedSoftware -> HwDecoding.DISABLED
+        setting == HwDecoding.AUTO && uri in softwareOnly -> HwDecoding.DISABLED
+        else -> setting
+    }
+
+    /** Videos (by URI) set to play in software from their hold menu, kept across launches. */
+    private val pinnedSoftware: MutableSet<String> = ConcurrentHashMap.newKeySet<String>()
+    private const val DECODING_PREFS = "per_video_decoding"
+    private const val SOFTWARE_KEY = "software"
+
+    fun loadPerVideoDecoding(context: Context) {
+        val saved = context.getSharedPreferences(DECODING_PREFS, Context.MODE_PRIVATE).getStringSet(SOFTWARE_KEY, null).orEmpty()
+        pinnedSoftware.clear()
+        pinnedSoftware.addAll(saved)
+    }
+
+    fun isSoftwareForVideo(uri: String): Boolean = uri in pinnedSoftware
+
+    fun setSoftwareForVideo(context: Context, uri: String, on: Boolean) {
+        if (on) pinnedSoftware.add(uri) else pinnedSoftware.remove(uri)
+        context.getSharedPreferences(DECODING_PREFS, Context.MODE_PRIVATE).edit()
+            .putStringSet(SOFTWARE_KEY, HashSet(pinnedSoftware)).apply()
+    }
 
     /** Plays [uri] with software decoding (under "Automatic") until the process ends. */
     fun rememberSoftwareDecoding(uri: String) {
@@ -108,12 +130,12 @@ internal object MediaSource {
                 smbCredentials?.username?.takeIf { it.isNotBlank() }?.let { addOption(":smb-user=$it") }
                 smbCredentials?.password?.takeIf { it.isNotBlank() }?.let { addOption(":smb-pwd=$it") }
                 smbCredentials?.domain?.takeIf { it.isNotBlank() }?.let { addOption(":smb-domain=$it") }
-                addOption(":network-caching=$NETWORK_CACHING_MS")
+                addOption(":network-caching=${settings.networkBufferMs}")
             }
             UriKind.NETWORK -> {
                 val network = networkPlayback(context, uri)
                 Media(libVLC, Uri.parse(network.uri)).apply {
-                    addOption(":network-caching=$NETWORK_CACHING_MS")
+                    addOption(":network-caching=${settings.networkBufferMs}")
                     for (option in network.options) addOption(option)
                 }
             }
@@ -157,8 +179,19 @@ internal object MediaSource {
             media.addOption(":no-mediacodec-dr")
             media.addOption(":no-omxil-dr")
         }
+        // Deinterlacing for old TV recordings; -1 leaves it to libVLC.
+        when (settings.deinterlace) {
+            0 -> media.addOption(":deinterlace=0")
+            1 -> {
+                media.addOption(":deinterlace=1")
+                media.addOption(":deinterlace-mode=yadif")
+            }
+        }
         val encoding = settings.subtitleEncoding.trim()
         if (encoding.isNotEmpty()) media.addOption(":subsdec-encoding=$encoding")
+        // The subtitle size is an instance option too (see VlcEngine.videoLibVLC); stated here as
+        // well, a change of it applies when the video is opened again, without a new instance.
+        media.addOption(":sub-text-scale=${settings.subtitleSize.coerceIn(50, 200)}")
     }
 
     private fun localPath(uri: String): String =

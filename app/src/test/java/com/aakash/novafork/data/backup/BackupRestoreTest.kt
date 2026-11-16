@@ -20,6 +20,8 @@ import com.aakash.novafork.data.db.MatchState
 import com.aakash.novafork.data.db.SourceEntity
 import com.aakash.novafork.data.db.SourceType
 import com.aakash.novafork.data.db.VideoEntity
+import com.aakash.novafork.data.db.VideoFavoriteEntity
+import com.aakash.novafork.data.db.WatchlistEntity
 import com.aakash.novafork.data.grantVideoAccess
 import com.aakash.novafork.data.inertScope
 import com.aakash.novafork.data.scannedVideo
@@ -536,6 +538,47 @@ class BackupRestoreTest {
             for (i in off until off + len) b[i] = read().toByte()
             return len
         }
+    }
+
+    @Test
+    fun watchlistAndFavoritesTravelAndWaitForTheirVideos() = runBlocking<Unit> {
+        pendingFile.delete()
+        val a = fixture()
+        share(a, DUNE, CLIP)
+        val duneA = a.videoAt(DUNE.uri).id
+        val clipA = a.videoAt(CLIP.uri).id
+        a.database.watchlistDao().add(WatchlistEntity("v:$duneA", 1_000L))
+        a.database.watchlistDao().add(WatchlistEntity("s:severance", 2_000L))
+        a.database.videoFavoriteDao().add(VideoFavoriteEntity("v:$clipA", 3_000L))
+        val backup = manager(a).read(exportText(manager(a), includeSecrets = true).byteInputStream())
+        assertEquals(3, backup.summary().saved)
+        assertEquals(setOf("severance"), backup.watchlist.mapNotNull { it.showKey }.toSet())
+
+        // Device B: the share comes back, not scanned yet. The show is saved at once; the
+        // movie and the clip wait for their files.
+        newDeviceSettings()
+        val b = fixture()
+        val restorer = manager(b)
+        val report = restorer.restore(backup)
+        assertEquals(1, report.applied.saved)
+        assertEquals(2, report.waiting.saved)
+        assertEquals(listOf("s:severance"), b.database.watchlistDao().all().map { it.itemKey })
+
+        val nas = requireNotNull(b.database.sourceDao().byId(report.addedSourceIds.single()))
+        b.shares.serve(nas.location, CLIP, DUNE)
+        b.repository.scanSource(nas.id)
+
+        val duneB = b.videoAt(DUNE.uri).id
+        val clipB = b.videoAt(CLIP.uri).id
+        assertEquals(setOf("s:severance", "v:$duneB"), b.database.watchlistDao().all().map { it.itemKey }.toSet())
+        assertEquals(1_000L, b.database.watchlistDao().all().single { it.itemKey == "v:$duneB" }.addedAt)
+        assertEquals(listOf("v:$clipB"), b.database.videoFavoriteDao().all().map { it.itemKey })
+        assertEquals(RestoreCounts(), restorer.waiting())
+
+        // Restoring the same file again adds nothing twice.
+        restorer.restore(backup)
+        assertEquals(2, b.database.watchlistDao().all().size)
+        assertEquals(1, b.database.videoFavoriteDao().all().size)
     }
 
     private companion object {

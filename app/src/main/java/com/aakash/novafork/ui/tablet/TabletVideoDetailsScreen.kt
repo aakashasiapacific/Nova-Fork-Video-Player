@@ -1,5 +1,6 @@
 package com.aakash.novafork.ui.tablet
 
+import com.aakash.novafork.ui.common.breakableName
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -15,26 +16,44 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.aakash.novafork.R
 import com.aakash.novafork.ui.adaptive.DeviceLayout
 import com.aakash.novafork.ui.adaptive.LocalNovaDimens
+import com.aakash.novafork.data.DetailsHeaderStyle
+import com.aakash.novafork.ui.common.GlassCircle
+import com.aakash.novafork.ui.common.IosFilledTonalButton
+import com.aakash.novafork.ui.common.IosTextButton
+import com.aakash.novafork.ui.common.LocalDetailsHeaderStyle
+import com.aakash.novafork.ui.common.MetaBadges
+import com.aakash.novafork.ui.common.NovaDropdownMenu
 import com.aakash.novafork.ui.common.NovaIcon
+import com.aakash.novafork.ui.common.NovaMenuItem
 import com.aakash.novafork.ui.common.RatingPill
+import com.aakash.novafork.ui.common.CastRow
+import com.aakash.novafork.ui.common.GreyCaption
+import com.aakash.novafork.ui.common.RenameFileDialog
+import com.aakash.novafork.ui.common.RenameInLibraryMenuItems
+import com.aakash.novafork.ui.common.RenameTitleDialog
+import com.aakash.novafork.ui.common.TrailerPill
+import com.aakash.novafork.ui.common.RenameFileMenuItem
 import com.aakash.novafork.ui.common.metaLine
 import com.aakash.novafork.ui.model.AppActions
 import com.aakash.novafork.ui.model.MediaKind
@@ -55,6 +74,8 @@ internal fun TabletVideoDetailsScreen(
     modifier: Modifier = Modifier,
 ) {
     val dims = LocalNovaDimens.current
+    // Backdrop (Preferences › Appearance › Title page header): no poster beside the title.
+    val withPoster = LocalDetailsHeaderStyle.current == DetailsHeaderStyle.POSTER_AND_BACKDROP
     Box(modifier.fillMaxSize()) {
         TabletDetailsBackdrop(details.artwork)
         Column(
@@ -70,14 +91,14 @@ internal fun TabletVideoDetailsScreen(
                 ),
         ) {
             TabletBackButton(onClick = actions::back)
-            Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.height(if (withPoster) 20.dp else 96.dp))
             if (layout.isExpanded) {
                 Row(horizontalArrangement = Arrangement.spacedBy(40.dp)) {
                     Column(
                         Modifier.width(dims.detailPosterWidth),
                         verticalArrangement = Arrangement.spacedBy(20.dp),
                     ) {
-                        TabletDetailsPoster(details.artwork, details.title, dims.detailPosterWidth)
+                        if (withPoster) TabletDetailsPoster(details.artwork, details.title, dims.detailPosterWidth)
                         VideoFileCard(details, Modifier.fillMaxWidth())
                     }
                     Column(
@@ -92,8 +113,10 @@ internal fun TabletVideoDetailsScreen(
                 }
             } else {
                 Row(verticalAlignment = Alignment.Bottom) {
-                    TabletDetailsPoster(details.artwork, details.title, CompactDetailPosterWidth)
-                    Spacer(Modifier.width(28.dp))
+                    if (withPoster) {
+                        TabletDetailsPoster(details.artwork, details.title, CompactDetailPosterWidth)
+                        Spacer(Modifier.width(28.dp))
+                    }
                     Column(Modifier.weight(1f)) { VideoHeadline(details) }
                 }
                 Spacer(Modifier.height(28.dp))
@@ -124,12 +147,14 @@ private fun VideoHeadline(details: VideoDetailsUi) {
             )
         }
         val meta = metaLine(details.year?.toString(), details.runtimeLabel, details.episodeCode)
-        if (meta.isNotEmpty() || (details.rating ?: 0f) > 0f) {
+        val badges = listOfNotNull(details.ageRating) + details.qualityBadges
+        if (meta.isNotEmpty() || badges.isNotEmpty() || (details.rating ?: 0f) > 0f) {
             Spacer(Modifier.height(12.dp))
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 if (meta.isNotEmpty()) {
                     Text(meta, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
+                MetaBadges(badges)
                 RatingPill(details.rating)
             }
         }
@@ -150,40 +175,91 @@ private fun VideoBody(details: VideoDetailsUi, actions: AppActions) {
     val dims = LocalNovaDimens.current
     val isStream = details.kind == MediaKind.STREAM
     val started = (details.progress ?: 0f) > 0f
+    var renaming by remember { mutableStateOf(false) }
+    var renamingTitle by remember { mutableStateOf(false) }
+    if (renamingTitle) {
+        RenameTitleDialog(
+            title = details.title,
+            onRename = { actions.setTitleOverride(details.titleKey, it) },
+            onDismiss = { renamingTitle = false },
+        )
+    }
+    if (renaming) {
+        RenameFileDialog(
+            fileName = details.fileName,
+            onRename = { actions.renameVideoFile(details.id, it) },
+            onDismiss = { renaming = false },
+        )
+    }
     Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
         FlowRow(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             TabletPlayButton(label = details.playLabel, onClick = { actions.play(details.id) })
-            if (started) {
-                FilledTonalButton(onClick = { actions.play(details.id, startOver = true) }, modifier = Modifier.height(48.dp)) {
-                    ButtonLabel(R.drawable.ic_restart_alt, "Start over")
+            details.trailerUrl?.let { TrailerPill(it, onOpen = actions::openWebPage) }
+            // The rest waits in one round "…", as on the Apple TV app's iPad pages.
+            var menuOpen by remember { mutableStateOf(false) }
+            Box {
+                GlassCircle(onClick = { menuOpen = true }, description = "More options", size = 48.dp) {
+                    NovaIcon(R.drawable.ic_more_vert, contentDescription = null, tint = Color.White)
                 }
-            }
-            if (!isStream) {
-                OutlinedButton(onClick = { actions.identify(details.id) }, modifier = Modifier.height(48.dp)) {
-                    ButtonLabel(R.drawable.ic_search, "Identify")
-                }
-                OutlinedButton(onClick = { actions.setWatched(details.id, !details.watched) }, modifier = Modifier.height(48.dp)) {
-                    if (details.watched) {
-                        ButtonLabel(R.drawable.ic_visibility_off, "Mark unwatched")
-                    } else {
-                        ButtonLabel(R.drawable.ic_check, "Mark watched")
+                NovaDropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                    if (!isStream) {
+                        NovaMenuItem(
+                            text = { Text("Identify…") },
+                            leadingIcon = { NovaIcon(R.drawable.ic_search, contentDescription = null) },
+                            onClick = {
+                                menuOpen = false
+                                actions.identify(details.id)
+                            },
+                        )
+                        NovaMenuItem(
+                            text = { Text("Change Artwork…") },
+                            leadingIcon = { NovaIcon(R.drawable.ic_image, contentDescription = null) },
+                            onClick = {
+                                menuOpen = false
+                                actions.changeArtwork(details.id)
+                            },
+                        )
+                        NovaMenuItem(
+                            text = { Text(if (details.watched) "Mark as Unwatched" else "Mark as Watched") },
+                            leadingIcon = {
+                                NovaIcon(
+                                    if (details.watched) R.drawable.ic_visibility_off else R.drawable.ic_check_circle,
+                                    contentDescription = null,
+                                )
+                            },
+                            onClick = {
+                                menuOpen = false
+                                actions.setWatched(details.id, !details.watched)
+                            },
+                        )
                     }
+                    NovaMenuItem(
+                        text = { Text("Add to Playlist") },
+                        leadingIcon = { NovaIcon(R.drawable.ic_playlist_add, contentDescription = null) },
+                        onClick = {
+                            menuOpen = false
+                            actions.addToPlaylist(listOf(details.id), details.title)
+                        },
+                    )
+                    RenameInLibraryMenuItems(
+                        titleKey = details.titleKey,
+                        customised = details.titleCustomised,
+                        close = { menuOpen = false },
+                        onRename = { renamingTitle = true },
+                        onReset = { actions.setTitleOverride(details.titleKey, null) },
+                    )
+                    RenameFileMenuItem(details, close = { menuOpen = false }, onRename = { renaming = true })
                 }
-            }
-            OutlinedButton(
-                onClick = { actions.addToPlaylist(listOf(details.id), details.title) },
-                modifier = Modifier.height(48.dp),
-            ) {
-                ButtonLabel(R.drawable.ic_playlist_add, "Add to playlist")
             }
         }
         WatchProgress(progress = details.progress, positionMs = details.positionMs, durationMs = details.durationMs)
+        if (details.downloaded) GreyCaption("Downloaded")
         val showKey = details.showKey
         if (details.kind == MediaKind.EPISODE && showKey != null && !details.showTitle.isNullOrBlank()) {
-            TextButton(onClick = { actions.openShow(showKey) }) {
+            IosTextButton(onClick = { actions.openShow(showKey) }) {
                 ButtonLabel(R.drawable.ic_tv, "From ${details.showTitle}")
                 Spacer(Modifier.width(4.dp))
                 NovaIcon(R.drawable.ic_chevron_right, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -193,28 +269,36 @@ private fun VideoBody(details: VideoDetailsUi, actions: AppActions) {
             Text(
                 text = details.tagline,
                 style = MaterialTheme.typography.titleMedium,
-                fontStyle = FontStyle.Italic,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        when {
-            !details.overview.isNullOrBlank() -> Text(details.overview, style = MaterialTheme.typography.bodyLarge)
-            !isStream && !details.isMatched -> Text(
-                text = "No description for this one yet. If the title looks wrong, use Identify to pick the right match.",
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+        if (!details.overview.isNullOrBlank()) Text(details.overview, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.widthIn(max = ReadableWidth))
         val next = details.nextEpisode
         if (next != null) {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Next episode", style = MaterialTheme.typography.titleLarge)
+                Text("Next Episode", style = MaterialTheme.typography.titleLarge)
                 TabletLandscapeCard(
                     card = next,
                     onClick = { actions.play(next.id) },
                     onLongClick = { actions.openVideo(next.id) },
                     modifier = Modifier.width(dims.landscapeCardWidth),
                 )
+            }
+        }
+        CastRow(details.cast, onPerson = actions::openPerson, gutter = 0.dp)
+        if (details.extras.isNotEmpty()) {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("Extras", style = MaterialTheme.typography.titleLarge)
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(dims.rowSpacing)) {
+                    items(details.extras, key = { it.id }) { card ->
+                        TabletLandscapeCard(
+                            card = card,
+                            onClick = { actions.play(card.id) },
+                            onLongClick = { actions.openVideo(card.id) },
+                            modifier = Modifier.width(dims.landscapeCardWidth),
+                        )
+                    }
+                }
             }
         }
     }
@@ -257,7 +341,7 @@ private fun VideoFileCard(details: VideoDetailsUi, modifier: Modifier = Modifier
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         Text(
-                            text = fact.value,
+                            text = fact.value.breakableName(),
                             style = MaterialTheme.typography.bodyMedium,
                             maxLines = 4,
                             overflow = TextOverflow.Ellipsis,
@@ -268,3 +352,6 @@ private fun VideoFileCard(details: VideoDetailsUi, modifier: Modifier = Modifier
         }
     }
 }
+
+/** Overview text stays at a readable line length (about 70 characters) on a wide screen. */
+private val ReadableWidth = 640.dp

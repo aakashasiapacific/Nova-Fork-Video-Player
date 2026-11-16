@@ -249,4 +249,12 @@ class SubtitleDownloadRulesTest {
         assertEquals("Download limit reached, resets at 13:03", SubtitleDownloadRules.errorMessage(quota))
         assertEquals("Something went wrong with OpenSubtitles. Try again.", SubtitleDownloadRules.errorMessage(IOException("boom")))
     }
+
+    @Test
+    fun quietFetchWantsOnlyTheFirstLanguageWhenTheVideoLacksIt() {
+        val present = setOf("fr")
+        assertEquals(listOf("hi"), SubtitleDownloadRules.quietLanguages(listOf("hi", "en", "fr")) { it in present })
+        assertEquals(emptyList<String>(), SubtitleDownloadRules.quietLanguages(listOf("fr", "en")) { it in present })
+        assertEquals(listOf("en"), SubtitleDownloadRules.quietLanguages(listOf("en")) { false })
+    }
 }

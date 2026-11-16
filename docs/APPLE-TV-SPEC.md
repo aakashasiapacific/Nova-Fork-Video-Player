@@ -3,7 +3,7 @@
 The owner wants Nova Fork to look and behave like the Apple TV app, screen for screen. Match
 layout, proportions, spacing, typography scale, colours, materials, motion and interaction.
 Only these differ, for legal/technical reasons: the font is Inter (SF Pro may not ship on
-Android), icons are our Material Symbols drawables drawn at SF-Symbol-like weights, no Apple
+Android), icons are Framework7 Icons (MIT), an SF-Symbols-style set, since SF Symbols may not ship on Android, no Apple
 names or logos, and the content is the user's own library.
 
 ## Global
