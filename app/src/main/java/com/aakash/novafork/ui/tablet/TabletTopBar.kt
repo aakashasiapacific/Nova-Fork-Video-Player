@@ -63,7 +63,7 @@ internal fun TabletTopBar(
 }
 
 /** The side bar's width, and the room pages leave for it on the right. */
-internal val TabletSideBarWidth = 72.dp
+internal val TabletSideBarWidth = 80.dp
 internal val TabletSideBarSpace = TabletSideBarWidth + 16.dp
 
 /**
@@ -84,7 +84,7 @@ internal fun TabletSideBar(
             .width(TabletSideBarWidth)
             .frostedGlass(RoundedCornerShape(percent = 50))
             // 14 + 10 at the ends equals 10 + 4 + 10 between tabs: the bar's ends match its gaps.
-            .padding(vertical = 14.dp, horizontal = 6.dp),
+            .padding(vertical = 14.dp, horizontal = 4.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -94,7 +94,9 @@ internal fun TabletSideBar(
             Column(
                 Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(percent = 50))
+                    // A soft corner, not a full pill: a pill's round ends cut into the name under
+                    // the icon ("Preferences" lost both its ends).
+                    .clip(RoundedCornerShape(18.dp))
                     // Only the colour marks the chosen tab (owner: no pill).
                     .selectable(
                         selected = active,
@@ -113,6 +115,7 @@ internal fun TabletSideBar(
                     style = MaterialTheme.typography.labelSmall,
                     color = tint,
                     maxLines = 1,
+                    softWrap = false,
                     modifier = Modifier.padding(top = 3.dp),
                 )
             }

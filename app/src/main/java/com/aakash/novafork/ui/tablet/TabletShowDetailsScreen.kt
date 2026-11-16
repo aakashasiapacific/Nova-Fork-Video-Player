@@ -130,7 +130,8 @@ private fun ShowSideBySide(
                     .fillMaxHeight(),
                 contentPadding = PaddingValues(
                     start = 24.dp,
-                    end = dims.gutter,
+                    // Clear of the tab bar on the right: the page's picture runs under it, its episodes do not.
+                    end = TabletSideBarSpace,
                     top = statusBarTop() + 12.dp,
                     bottom = navigationBarBottom() + dims.sectionSpacing,
                 ),
@@ -251,7 +252,7 @@ internal fun TabletShowDetailsScreen(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(
                 start = dims.gutter,
-                end = dims.gutter,
+                end = TabletSideBarSpace,
                 top = statusBarTop() + 12.dp,
                 bottom = navigationBarBottom() + dims.sectionSpacing,
             ),

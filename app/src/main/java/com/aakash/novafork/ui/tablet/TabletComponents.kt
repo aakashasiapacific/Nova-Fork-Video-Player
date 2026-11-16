@@ -625,7 +625,7 @@ internal fun TabletEpisodeCard(
         description = episode.overview.takeUnless {
             com.aakash.novafork.ui.common.LocalSpoilerSafe.current && !episode.watched && (episode.progress ?: 0f) <= 0f
         },
-        footnote = metaLine(durationLabel(episode.durationMs), episode.airDate),
+        footnote = metaLine(durationLabel(episode.durationMs), airDateLabel(episode.airDate)),
         progress = episode.progress,
         watched = episode.watched,
         badge = if (isNextUp) "Next up" else null,
@@ -752,4 +752,10 @@ private fun CollagePoster(seed: String, rotation: Float, offsetX: Float, elevate
     ) {
         ArtPlaceholder(seed = seed, title = null)
     }
+}
+
+/** An episode's air date as people write it ("17 Jan 2025"), not the stored "2025-01-17"; as stored if it cannot be read. */
+internal fun airDateLabel(airDate: String?): String? {
+    val date = com.aakash.novafork.core.tmdb.NextEpisodeLabel.parse(airDate) ?: return airDate
+    return java.time.format.DateTimeFormatter.ofPattern("d MMM yyyy", java.util.Locale.getDefault()).format(date)
 }
